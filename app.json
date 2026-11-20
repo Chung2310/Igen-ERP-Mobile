@@ -6,7 +6,17 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép ERP Mobile chọn ảnh để tạo Lead bằng OCR.",
+          "cameraPermission": "Cho phép ERP Mobile chụp tài liệu để tạo Lead bằng OCR.",
+          "microphonePermission": false
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     },
