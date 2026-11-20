@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Card } from '@/components/Card';
-import { mockConversations, mockKnowledgeSources, mockLeads } from '@/features/crm/mockCrmData';
-import { recognizeLeadImage } from '@/features/crm/crmApi';
+import { createErpLead, loadConversationMessages, loadCrmWorkspace, markConversationRead, resumeConversationAI, sendConversationReply } from '@/features/crm/crmApi';
 import type { ConversationMode, CrmConversation, CrmLead, CrmLeadDraft, CrmMessage } from '@/features/crm/types';
 import { colors } from '@/theme/colors';
 
@@ -11,15 +10,15 @@ type CrmSection = 'inbox' | 'leads' | 'automation';
 type InboxFilter = 'all' | 'unread' | 'unassigned';
 
 const channelMark: Record<CrmConversation['channel'], string> = {
-  Zalo: 'Z', Facebook: 'f', Instagram: '◎', 'Web chat': '◌',
+  Zalo: 'Z', Facebook: 'f', TikTok: '♪', Instagram: '◎', 'Web chat': '◌',
 };
 
 const emptyLead: CrmLeadDraft = { name: '', company: '', phone: '', email: '' };
 
 export function CrmScreen() {
   const [section, setSection] = useState<CrmSection>('inbox');
-  const [conversations, setConversations] = useState(mockConversations);
-  const [leads, setLeads] = useState(mockLeads);
+  const [conversations, setConversations] = useState<CrmConversation[]>([]);
+  const [leads, setLeads] = useState<CrmLead[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<InboxFilter>('all');
   const [query, setQuery] = useState('');
@@ -30,7 +29,13 @@ export function CrmScreen() {
   const [leadFormOpen, setLeadFormOpen] = useState(false);
   const [leadDraft, setLeadDraft] = useState<CrmLeadDraft>(emptyLead);
   const [leadSource, setLeadSource] = useState('Nhập thủ công');
-  const [ocrBusy, setOcrBusy] = useState(false);
+  const [leadNotice, setLeadNotice] = useState('');
+  const [workspaceLoading, setWorkspaceLoading] = useState(true);
+  const [workspaceNotice, setWorkspaceNotice] = useState('');
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [conversationError, setConversationError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [leadSaving, setLeadSaving] = useState(false);
 
   const activeConversation = conversations.find((conversation) => conversation.id === selectedId) ?? null;
   const visibleConversations = useMemo(() => conversations.filter((conversation) => {
@@ -39,54 +44,106 @@ export function CrmScreen() {
     return matchesQuery && matchesFilter;
   }), [conversations, filter, query]);
 
+  async function refreshWorkspace() {
+    setWorkspaceLoading(true);
+    try {
+      const result = await loadCrmWorkspace();
+      setConversations(result.conversations);
+      setLeads(result.leads);
+      const notices = [
+        result.unavailableChannels.length ? `Không tải được kênh: ${result.unavailableChannels.join(', ')}.` : '',
+        result.leadsUnavailable ? 'Không tải được Lead từ ERP.' : '',
+      ].filter(Boolean);
+      setWorkspaceNotice(notices.join(' '));
+    } catch (error) {
+      setConversations([]);
+      setLeads([]);
+      setWorkspaceNotice(error instanceof Error ? error.message : 'Không tải được dữ liệu CRM từ ERP.');
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }
+
+  useEffect(() => { void refreshWorkspace(); }, []);
+
   function updateConversation(id: string, update: Partial<CrmConversation>) {
     setConversations((items) => items.map((item) => item.id === id ? { ...item, ...update } : item));
   }
 
-  function openConversation(conversation: CrmConversation) {
+  async function openConversation(conversation: CrmConversation) {
     setSelectedId(conversation.id);
+    setConversationError('');
+    setMessagesLoading(true);
     updateConversation(conversation.id, { unreadCount: 0 });
+    try {
+      const messages = await loadConversationMessages(conversation);
+      updateConversation(conversation.id, { messages });
+      await markConversationRead(conversation);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không tải được tin nhắn.';
+      setConversationError(message);
+    } finally {
+      setMessagesLoading(false);
+    }
   }
 
-  function sendMessage() {
+  async function sendMessage() {
     if (!activeConversation || !messageDraft.trim()) return;
     const text = messageDraft.trim();
-    const newMessage: CrmMessage = { id: `local-${Date.now()}`, sender: 'staff', text, time: 'Vừa xong' };
-    updateConversation(activeConversation.id, {
-      messages: [...activeConversation.messages, newMessage],
-      lastMessage: text,
-      updatedAt: 'Vừa xong',
-      assignedTo: activeConversation.assignedTo ?? 'Anh Nguyễn',
-      mode: 'human',
-    });
-    setMessageDraft('');
+    setSending(true);
+    try {
+      await sendConversationReply(activeConversation, text);
+      const newMessage: CrmMessage = { id: `sent-${Date.now()}`, sender: 'staff', text, time: 'Vừa xong' };
+      updateConversation(activeConversation.id, {
+        messages: [...activeConversation.messages, newMessage],
+        lastMessage: text,
+        updatedAt: 'Vừa xong',
+        mode: 'human',
+      });
+      setMessageDraft('');
+    } catch (error) {
+      Alert.alert('Chưa gửi được tin nhắn', error instanceof Error ? error.message : 'ERP không gửi được tin nhắn.');
+    } finally {
+      setSending(false);
+    }
   }
 
-  function setConversationMode(mode: ConversationMode) {
+  async function setConversationMode(mode: ConversationMode) {
     if (!activeConversation) return;
-    updateConversation(activeConversation.id, {
-      mode,
-      assignedTo: mode === 'human' ? (activeConversation.assignedTo ?? 'Anh Nguyễn') : activeConversation.assignedTo,
-    });
+    if (mode === 'human') {
+      Alert.alert('Tiếp quản hội thoại', 'ERP hiện chưa có API tạm dừng AI riêng. Gửi tin nhắn với tư cách nhân viên để ERP tạm dừng AI cho hội thoại này.');
+      return;
+    }
+    if (mode === 'ai') {
+      try {
+        await resumeConversationAI(activeConversation);
+      } catch (error) {
+        Alert.alert('Chưa bật lại được AI', error instanceof Error ? error.message : 'ERP không cập nhật được trạng thái AI.');
+        return;
+      }
+    }
+    updateConversation(activeConversation.id, { mode });
   }
 
-  function createLead() {
+  async function createLead() {
     if (!leadDraft.name.trim() || !leadDraft.phone.trim()) {
       Alert.alert('Thiếu thông tin', 'Vui lòng nhập tên và số điện thoại của Lead.');
       return;
     }
-    const lead: CrmLead = {
-      id: `lead-${Date.now()}`,
-      ...leadDraft,
-      source: leadSource,
-      status: 'Mới',
-      createdAt: 'Vừa tạo',
-    };
-    setLeads((items) => [lead, ...items]);
-    setLeadDraft(emptyLead);
-    setLeadSource('Nhập thủ công');
-    setLeadFormOpen(false);
-    setSection('leads');
+    setLeadSaving(true);
+    try {
+      const created = await createErpLead(leadDraft);
+      setLeads((items) => [created, ...items]);
+      setLeadDraft(emptyLead);
+      setLeadSource('Nhập thủ công');
+      setLeadNotice('');
+      setLeadFormOpen(false);
+      setSection('leads');
+    } catch (error) {
+      Alert.alert('Chưa tạo được Lead', error instanceof Error ? error.message : 'ERP không lưu được Lead.');
+    } finally {
+      setLeadSaving(false);
+    }
   }
 
   async function startOcr(camera: boolean) {
@@ -97,24 +154,16 @@ export function CrmScreen() {
       if (result.canceled || !result.assets[0]) return;
 
       setLeadDraft(emptyLead);
-      setLeadSource('OCR');
+      setLeadSource('Ảnh đã chọn');
+      setLeadNotice('ERP hiện chưa có API OCR độc lập cho Lead. Hãy nhập thông tin bên dưới; ảnh chưa được tải lên máy chủ.');
       setLeadFormOpen(true);
-      setOcrBusy(true);
-      try {
-        const extracted = await recognizeLeadImage(result.assets[0]);
-        setLeadDraft({ ...emptyLead, ...extracted });
-      } catch {
-        Alert.alert('Chưa kết nối OCR', 'Ảnh đã được chọn. Bạn có thể nhập thông tin Lead thủ công; dịch vụ OCR sẽ hoạt động khi backend được cấu hình.');
-      } finally {
-        setOcrBusy(false);
-      }
     } catch {
       Alert.alert('Không mở được ảnh', 'Vui lòng kiểm tra quyền truy cập camera hoặc thư viện ảnh trong cài đặt thiết bị.');
     }
   }
 
   function chooseOcrSource() {
-    Alert.alert('Tạo Lead bằng OCR', 'Chọn cách đưa ảnh danh thiếp hoặc tài liệu vào.', [
+    Alert.alert('Chọn ảnh tài liệu', 'API ERP hiện chưa có OCR độc lập cho Lead. Bạn vẫn có thể chọn ảnh rồi nhập thông tin thủ công.', [
       { text: 'Chụp ảnh', onPress: () => { void startOcr(true); } },
       { text: 'Chọn từ thư viện', onPress: () => { void startOcr(false); } },
       { text: 'Hủy', style: 'cancel' },
@@ -126,9 +175,10 @@ export function CrmScreen() {
       <LeadEditor
         draft={leadDraft}
         source={leadSource}
-        busy={ocrBusy}
+        saving={leadSaving}
+        notice={leadNotice}
         onChange={setLeadDraft}
-        onCancel={() => { setLeadFormOpen(false); setLeadDraft(emptyLead); setOcrBusy(false); }}
+        onCancel={() => { setLeadFormOpen(false); setLeadDraft(emptyLead); setLeadNotice(''); }}
         onSave={createLead}
       />
     );
@@ -139,11 +189,14 @@ export function CrmScreen() {
       <ConversationDetail
         conversation={activeConversation}
         draft={messageDraft}
+        loading={messagesLoading}
+        sending={sending}
+        error={conversationError}
         onDraftChange={setMessageDraft}
         onBack={() => { setSelectedId(null); setMessageDraft(''); }}
         onSend={sendMessage}
         onSetMode={setConversationMode}
-        onAssign={() => updateConversation(activeConversation.id, { assignedTo: activeConversation.assignedTo ? null : 'Anh Nguyễn' })}
+        onAssign={() => Alert.alert('Chưa có API phân công', 'Dự án ERP hiện chưa cung cấp endpoint phân công hội thoại.')}
       />
     );
   }
@@ -153,7 +206,8 @@ export function CrmScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={styles.eyebrow}>KHÁCH HÀNG &amp; BÁN HÀNG</Text>
         <Text style={styles.title}>CRM &amp; Hộp thư</Text>
-        <Text style={styles.subtitle}>Hội thoại, Lead và tự động hóa AI trong một nơi.</Text>
+        <Text style={styles.subtitle}>Hộp thư, Lead và AI từ hệ thống ERP.</Text>
+        {!!workspaceNotice && <Card style={styles.apiNotice}><Text style={styles.apiNoticeText}>{workspaceNotice}</Text></Card>}
 
         <View style={styles.sectionTabs}>
           <SectionTab label={`Hộp thư ${unreadTotal(conversations)}`} active={section === 'inbox'} onPress={() => setSection('inbox')} />
@@ -173,9 +227,10 @@ export function CrmScreen() {
               {visibleConversations.map((conversation) => (
                 <ConversationRow key={conversation.id} conversation={conversation} onPress={() => openConversation(conversation)} />
               ))}
-              {visibleConversations.length === 0 && <Text style={styles.empty}>Không có hội thoại phù hợp.</Text>}
+              {workspaceLoading && <ActivityIndicator color={colors.primary} style={styles.loading} />}
+              {!workspaceLoading && visibleConversations.length === 0 && <Text style={styles.empty}>{query || filter !== 'all' ? 'Không có hội thoại phù hợp.' : 'Chưa có hội thoại từ các kênh đã kết nối ERP.'}</Text>}
             </View>
-            <Text style={styles.demoNote}>Đang hiển thị hội thoại mẫu · nguồn kênh sẽ đồng bộ từ ERP.</Text>
+            <Text style={styles.demoNote}>Tin nhắn và trạng thái hội thoại được tải từ ERP.</Text>
           </>
         )}
 
@@ -183,13 +238,15 @@ export function CrmScreen() {
           <>
             <View style={styles.leadActions}>
               <ActionButton label="＋ Tạo Lead" onPress={() => { setLeadDraft(emptyLead); setLeadSource('Nhập thủ công'); setLeadFormOpen(true); }} />
-              <ActionButton label="▧ OCR từ ảnh" secondary onPress={chooseOcrSource} />
+              <ActionButton label="▧ Ảnh / OCR" secondary onPress={chooseOcrSource} />
             </View>
             <Text style={styles.listCaption}>{leads.length} Lead gần đây</Text>
             <View style={styles.leadList}>
               {leads.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+              {workspaceLoading && <ActivityIndicator color={colors.primary} style={styles.loading} />}
+              {!workspaceLoading && leads.length === 0 && <Text style={styles.empty}>Chưa có Lead trong ERP.</Text>}
             </View>
-            <Text style={styles.demoNote}>Lead được tạo trong phiên này chỉ lưu trên thiết bị mẫu.</Text>
+            <Text style={styles.demoNote}>Lead được tải và lưu trên máy chủ ERP.</Text>
           </>
         )}
 
@@ -235,10 +292,13 @@ function ConversationRow({ conversation, onPress }: { conversation: CrmConversat
 }
 
 function ConversationDetail({
-  conversation, draft, onDraftChange, onBack, onSend, onSetMode, onAssign,
+  conversation, draft, loading, sending, error, onDraftChange, onBack, onSend, onSetMode, onAssign,
 }: {
   conversation: CrmConversation;
   draft: string;
+  loading: boolean;
+  sending: boolean;
+  error: string;
   onDraftChange: (value: string) => void;
   onBack: () => void;
   onSend: () => void;
@@ -262,19 +322,22 @@ function ConversationDetail({
       <Card style={styles.assignmentCard}>
         <View style={styles.assignmentIcon}><Text style={styles.assignmentGlyph}>♙</Text></View>
         <View style={styles.assignmentCopy}><Text style={styles.assignmentLabel}>Người phụ trách</Text><Text style={styles.assignmentName}>{conversation.assignedTo ?? 'Chưa phân công'}</Text></View>
-        <Pressable onPress={onAssign} style={styles.assignButton}><Text style={styles.assignText}>{conversation.assignedTo ? 'Bỏ gán' : 'Gán cho tôi'}</Text></Pressable>
+        <Pressable onPress={onAssign} style={styles.assignButton}><Text style={styles.assignText}>Phân công</Text></Pressable>
       </Card>
 
       <ScrollView contentContainerStyle={styles.messageList} showsVerticalScrollIndicator={false}>
         <Text style={styles.dayLabel}>HÔM NAY</Text>
+        {loading && <ActivityIndicator color={colors.primary} style={styles.loading} />}
+        {!!error && <Text style={styles.apiNoticeText}>{error}</Text>}
         {conversation.messages.map((message) => <MessageBubble key={message.id} message={message} />)}
         {conversation.mode === 'ai' && <Text style={styles.aiStatus}>✦ AI đang trả lời dựa trên tài liệu và kịch bản đã bật</Text>}
+        {conversation.mode === 'human' && <Text style={styles.handoverHint}>Để ERP tạm dừng AI, hãy gửi tin nhắn với tư cách nhân viên.</Text>}
       </ScrollView>
 
       <View style={styles.composer}>
-        <Pressable style={styles.attachButton} onPress={() => Alert.alert('Đính kèm', 'Gửi ảnh và tài liệu sẽ được nối với dịch vụ hội thoại.') }><Text style={styles.attachGlyph}>＋</Text></Pressable>
+        <Pressable style={styles.attachButton} onPress={() => Alert.alert('Đính kèm', 'Dự án ERP hiện chưa cung cấp API gửi tệp đính kèm từ ứng dụng mobile.') }><Text style={styles.attachGlyph}>＋</Text></Pressable>
         <TextInput value={draft} onChangeText={onDraftChange} placeholder="Nhập tin nhắn..." placeholderTextColor={colors.muted} style={styles.messageInput} multiline />
-        <Pressable onPress={onSend} style={[styles.sendButton, !draft.trim() && styles.sendButtonDisabled]}><Text style={styles.sendGlyph}>↑</Text></Pressable>
+        <Pressable disabled={sending || !draft.trim()} onPress={onSend} style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]}>{sending ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.sendGlyph}>↑</Text>}</Pressable>
       </View>
     </View>
   );
@@ -313,11 +376,12 @@ function ActionButton({ label, onPress, secondary = false }: { label: string; on
 }
 
 function LeadEditor({
-  draft, source, busy, onChange, onCancel, onSave,
+  draft, source, saving, notice, onChange, onCancel, onSave,
 }: {
   draft: CrmLeadDraft;
   source: string;
-  busy: boolean;
+  saving: boolean;
+  notice: string;
   onChange: (draft: CrmLeadDraft) => void;
   onCancel: () => void;
   onSave: () => void;
@@ -334,7 +398,8 @@ function LeadEditor({
       <Text style={styles.eyebrow}>CRM · LEAD</Text>
       <Text style={styles.title}>Tạo Lead</Text>
       <Text style={styles.subtitle}>Nguồn tạo: {source}</Text>
-      {busy && <Card style={styles.ocrProgress}><Text style={styles.ocrProgressText}>Đang gửi ảnh để nhận diện thông tin...</Text></Card>}
+      {!!notice && <Card style={styles.ocrProgress}><Text style={styles.ocrProgressText}>{notice}</Text></Card>}
+      {saving && <ActivityIndicator color={colors.primary} style={styles.loading} />}
       {fields.map((field) => (
         <View key={field.key} style={styles.formField}>
           <Text style={styles.fieldLabel}>{field.label}</Text>
@@ -349,8 +414,8 @@ function LeadEditor({
           />
         </View>
       ))}
-      <Card style={styles.formHint}><Text style={styles.formHintGlyph}>ⓘ</Text><Text style={styles.formHintText}>Kiểm tra thông tin nhận diện trước khi lưu Lead.</Text></Card>
-      <ActionButton label="Lưu Lead" onPress={onSave} />
+      <Card style={styles.formHint}><Text style={styles.formHintGlyph}>ⓘ</Text><Text style={styles.formHintText}>Lead sẽ được lưu trực tiếp vào ERP.</Text></Card>
+      <ActionButton label={saving ? 'Đang lưu Lead...' : 'Lưu Lead'} onPress={onSave} />
     </ScrollView>
   );
 }
@@ -374,9 +439,7 @@ function AutomationPanel({
       </Card>
       <Text style={styles.sectionLabel}>NGUỒN TRẢ LỜI</Text>
       <Card style={styles.settingRow}><View style={styles.settingCopy}><Text style={styles.settingTitle}>Kho tri thức</Text><Text style={styles.settingHint}>Dùng tài liệu doanh nghiệp làm căn cứ trả lời</Text></View><Switch value={useKnowledge} onValueChange={onKnowledgeChange} disabled={!enabled} /></Card>
-      <View style={styles.knowledgeList}>
-        {mockKnowledgeSources.map((source) => <View key={source} style={styles.knowledgeItem}><Text style={styles.fileIcon}>▤</Text><Text style={styles.fileName}>{source}</Text><Text style={styles.ready}>Đã đồng bộ</Text></View>)}
-      </View>
+      <Card style={styles.scenarioCard}><Text style={styles.scenarioText}>Tài liệu được quản lý trong Kho tri thức ERP. Tùy chọn áp dụng tri thức trong màn hình này hiện là bản xem trước.</Text></Card>
       <Card style={styles.settingRow}><View style={styles.settingCopy}><Text style={styles.settingTitle}>Quy tắc và kịch bản</Text><Text style={styles.settingHint}>Áp dụng cách xưng hô, điều kiện và luồng chuyển nhân viên</Text></View><Switch value={useRules} onValueChange={onRulesChange} disabled={!enabled} /></Card>
       <Text style={styles.sectionLabel}>KỊCH BẢN ĐANG DÙNG</Text>
       <Card style={styles.scenarioCard}><Text style={styles.scenarioTitle}>Tư vấn sản phẩm</Text><Text style={styles.scenarioText}>Trả lời câu hỏi thường gặp bằng thông tin trong kho tri thức.</Text></Card>
@@ -421,6 +484,9 @@ const styles = StyleSheet.create({
   unreadBadge: { width: 19, height: 19, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginLeft: 7 },
   unreadCount: { color: colors.white, fontSize: 8, fontWeight: '800' },
   demoNote: { color: colors.muted, fontSize: 8, lineHeight: 13, textAlign: 'center', marginTop: 15 },
+  apiNotice: { padding: 10, marginTop: 12, backgroundColor: '#FFF8EE', borderColor: '#F6E5C8' },
+  apiNoticeText: { color: '#7D633A', fontSize: 8, lineHeight: 13 },
+  loading: { padding: 22 },
   empty: { color: colors.muted, fontSize: 11, textAlign: 'center', padding: 30 },
   leadActions: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   actionButton: { alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 42, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.primary },
@@ -478,6 +544,7 @@ const styles = StyleSheet.create({
   messageInput: { flex: 1, maxHeight: 76, paddingHorizontal: 10, color: colors.ink, fontSize: 10 },
   sendButton: { width: 31, height: 31, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   sendButtonDisabled: { opacity: 0.55 },
+  handoverHint: { color: colors.muted, fontSize: 8, textAlign: 'center', marginTop: 8 },
   sendGlyph: { color: colors.white, fontSize: 18, fontWeight: '800' },
   formContent: { padding: 18, paddingBottom: 30 },
   formBack: { flexDirection: 'row', alignItems: 'center', marginBottom: 17 },

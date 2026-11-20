@@ -1,4 +1,4 @@
-export type ConversationChannel = 'Zalo' | 'Facebook' | 'Instagram' | 'Web chat';
+export type ConversationChannel = 'Zalo' | 'Facebook' | 'TikTok' | 'Instagram' | 'Web chat';
 export type ConversationMode = 'ai' | 'human';
 
 export type CrmMessage = {
@@ -14,6 +14,11 @@ export type CrmConversation = {
   initials: string;
   channel: ConversationChannel;
   channelColor: string;
+  /** Identifiers used by the ERP messaging API. */
+  backendId?: string;
+  recipientId?: string;
+  accountId?: string;
+  updatedAtTimestamp?: number;
   lastMessage: string;
   updatedAt: string;
   unreadCount: number;
