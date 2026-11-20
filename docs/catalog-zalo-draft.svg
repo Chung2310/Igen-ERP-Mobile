@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="1180" viewBox="0 0 1100 1180">
+  <defs>
+    <linearGradient id="device" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#27354c"/><stop offset="1" stop-color="#101827"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-15%" width="140%" height="140%"><feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#1b2940" flood-opacity=".2"/></filter>
+    <clipPath id="screen"><rect x="320" y="48" width="460" height="1060" rx="42"/></clipPath>
+  </defs>
+  <rect width="1100" height="1180" fill="#eef2f8"/>
+  <text x="550" y="32" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" font-weight="700" letter-spacing="3" fill="#718099">DANH MỤC · MINI APP STYLE</text>
+  <rect x="305" y="58" width="490" height="1080" rx="62" fill="url(#device)" filter="url(#shadow)"/>
+  <rect x="320" y="48" width="460" height="1060" rx="42" fill="#fff"/>
+  <g clip-path="url(#screen)" font-family="Arial,sans-serif">
+    <rect x="320" y="48" width="460" height="1060" fill="#fff"/>
+    <text x="348" y="83" font-size="13" font-weight="700" fill="#202a3b">9:41</text>
+    <rect x="696" y="70" width="20" height="11" rx="3" fill="none" stroke="#202a3b" stroke-width="2"/>
+    <path d="M728 80 Q737 67 746 80 M732 80 Q737 73 742 80" fill="none" stroke="#202a3b" stroke-width="2"/>
+    <text x="348" y="132" font-size="20" font-weight="700" fill="#202a3b">Danh mục</text>
+    <text x="710" y="130" text-anchor="middle" font-size="19" fill="#455167">•••</text>
+    <text x="750" y="130" text-anchor="middle" font-size="22" fill="#455167">×</text>
+
+    <!-- Large pastel mini-app tiles, two columns. The catalog continues on scroll. -->
+    <g>
+      <rect x="340" y="157" width="207" height="158" rx="16" fill="#f0e5d9"/>
+      <circle cx="510" cy="204" r="52" fill="#f7ede4"/>
+      <path d="M466 198h52v7h-52zM470 187h44v7h-44zM474 176h36v7h-36z" fill="#dca46f"/>
+      <path d="M465 208h53v8h-53zM469 218h49v8h-49z" fill="#bd755e"/>
+      <path d="M482 170l22-11 23 11h-45z" fill="#58627a"/><path d="M491 170h23v5h-23z" fill="#58627a"/>
+      <text x="356" y="283" font-size="11" font-weight="700" fill="#263247">CRM &amp; Hộp thư</text><text x="356" y="299" font-size="11" font-weight="700" fill="#263247">đa kênh</text>
+
+      <rect x="559" y="157" width="201" height="158" rx="16" fill="#e4def5"/>
+      <circle cx="716" cy="204" r="54" fill="#eeeafb"/>
+      <path d="M685 190h44v29h-44z" fill="#fff" stroke="#8c84b6" stroke-width="3"/><path d="M690 185h44v29h-44z" fill="#d4c9eb" stroke="#8c84b6" stroke-width="3"/><path d="M695 180h44v29h-44z" fill="#b9a9dc" stroke="#8c84b6" stroke-width="3"/><path d="M701 187h30M701 194h24" stroke="#fff" stroke-width="2"/>
+      <text x="575" y="291" font-size="11" font-weight="700" fill="#263247">Kho tri thức</text>
+
+      <rect x="340" y="327" width="207" height="158" rx="16" fill="#f7eac5"/>
+      <circle cx="510" cy="375" r="52" fill="#fbf1d9"/>
+      <rect x="477" y="375" width="14" height="33" rx="3" fill="#e49b55"/><rect x="497" y="359" width="14" height="49" rx="3" fill="#7ca98a"/><rect x="517" y="344" width="14" height="64" rx="3" fill="#7182bd"/><path d="M474 412h62" stroke="#68758d" stroke-width="4" stroke-linecap="round"/>
+      <text x="356" y="453" font-size="11" font-weight="700" fill="#263247">Tổng quan</text>
+
+      <rect x="559" y="327" width="201" height="158" rx="16" fill="#dce8fa"/>
+      <circle cx="716" cy="375" r="54" fill="#e8effb"/>
+      <circle cx="699" cy="372" r="12" fill="#f0b34d"/><circle cx="727" cy="359" r="11" fill="#f0b34d"/><circle cx="727" cy="390" r="11" fill="#f0b34d"/><path d="M699 372h28M727 359v31" stroke="#7887ba" stroke-width="4"/>
+      <text x="575" y="445" font-size="11" font-weight="700" fill="#263247">Tích hợp &amp; cấu hình</text><text x="575" y="461" font-size="11" font-weight="700" fill="#263247">kênh</text>
+
+      <rect x="340" y="497" width="207" height="158" rx="16" fill="#e3e3f5"/>
+      <circle cx="510" cy="545" r="52" fill="#eeeeFA"/>
+      <path d="M482 531h44v35h-44z" fill="#fff" stroke="#8289b3" stroke-width="3"/><path d="M489 540h30M489 548h22" stroke="#a6acd1" stroke-width="3"/><path d="M504 519l5-9 5 9" fill="#e3ab53"/><circle cx="510" cy="571" r="8" fill="#e3ab53"/>
+      <text x="356" y="615" font-size="11" font-weight="700" fill="#263247">Gói AI &amp; lượt sử dụng</text>
+
+      <rect x="559" y="497" width="201" height="158" rx="16" fill="#f1e2d7"/>
+      <circle cx="716" cy="545" r="54" fill="#f7ece5"/>
+      <circle cx="705" cy="540" r="12" fill="#6886ad"/><circle cx="730" cy="540" r="12" fill="#91a9c6"/><path d="M683 572q2-22 22-22t22 22M712 572q2-22 19-22t20 22" fill="#6e9b86"/>
+      <text x="575" y="615" font-size="11" font-weight="700" fill="#263247">Quản trị tài khoản</text>
+
+      <rect x="340" y="667" width="207" height="158" rx="16" fill="#dbe8fb"/>
+      <circle cx="510" cy="715" r="52" fill="#eaf1fc"/>
+      <circle cx="510" cy="715" r="20" fill="#8293bd"/><circle cx="510" cy="715" r="8" fill="#eaf1fc"/><path d="M510 686v-8M510 752v-8M481 715h-8M547 715h-8M489 694l-6-6M537 742l-6-6M531 694l6-6M483 742l6-6" stroke="#68799f" stroke-width="6" stroke-linecap="round"/>
+      <text x="356" y="785" font-size="11" font-weight="700" fill="#263247">Cài đặt hệ thống</text>
+
+      <rect x="559" y="667" width="201" height="158" rx="16" fill="#dcefd7"/>
+      <circle cx="716" cy="715" r="54" fill="#eaf5e6"/>
+      <rect x="694" y="701" width="43" height="34" rx="5" fill="#fff" stroke="#76a77d" stroke-width="3"/><path d="M694 710h43" stroke="#76a77d" stroke-width="5"/><circle cx="702" cy="706" r="2" fill="#f08b71"/><circle cx="709" cy="706" r="2" fill="#f0bd58"/><path d="M706 721h18M706 727h12" stroke="#8a9caa" stroke-width="3"/>
+      <text x="575" y="785" font-size="11" font-weight="700" fill="#263247">Nhân sự</text>
+    </g>
+    <text x="550" y="856" text-anchor="middle" font-size="10" fill="#8a96a8">Vuốt lên để xem các module còn lại</text>
+    <rect x="320" y="900" width="460" height="208" fill="#fff"/><line x1="320" y1="900" x2="780" y2="900" stroke="#e8edf4"/>
+    <g font-size="8" text-anchor="middle">
+      <text x="366" y="947" font-size="17" fill="#8c99ac">⌂</text><text x="366" y="967" fill="#8c99ac">Tổng quan</text>
+      <rect x="386" y="923" width="70" height="55" rx="13" fill="#eaf2ff"/><text x="421" y="946" font-size="17" fill="#2463eb">▦</text><text x="421" y="966" font-weight="700" fill="#2463eb">Danh mục</text>
+      <text x="504" y="947" font-size="17" fill="#8c99ac">▤</text><text x="504" y="967" fill="#8c99ac">Trò chuyện</text><text x="504" y="980" font-size="7" fill="#8c99ac">nội bộ</text>
+      <text x="596" y="947" font-size="17" fill="#8c99ac">✦</text><text x="596" y="967" fill="#8c99ac">Trò chuyện</text><text x="596" y="980" font-size="7" fill="#8c99ac">AI</text>
+      <text x="694" y="947" font-size="17" fill="#8c99ac">⚙</text><text x="694" y="967" fill="#8c99ac">Cài đặt</text><text x="694" y="980" font-size="7" fill="#8c99ac">cá nhân</text>
+    </g>
+    <rect x="475" y="1074" width="150" height="5" rx="3" fill="#18243b"/>
+  </g>
+</svg>

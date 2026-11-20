@@ -4,19 +4,20 @@ import { Screen } from '@/components/Screen';
 import { colors } from '@/theme/colors';
 
 const conversations = [
-  { initials: 'ML', name: 'Minh Long Trading', message: 'Bên mình cần báo giá cho đơn hàng tháng này...', time: '09:42', color: '#E9F1FF', unread: true },
-  { initials: 'TH', name: 'Thu Hà Nguyễn', message: 'Cảm ơn bạn, tôi sẽ xem lại thông tin.', time: '08:16', color: '#FFF1E5', unread: true },
-  { initials: 'NP', name: 'Nội thất Phú An', message: 'Đã nhận được tài liệu, xin cảm ơn.', time: 'Hôm qua', color: '#E9F8F1', unread: false },
+  { initials: 'VH', name: 'Nhóm Vận hành', message: 'Hà: Đã cập nhật lịch giao hàng tuần này.', time: '09:42', color: '#E9F1FF', unread: true, group: true },
+  { initials: 'KD', name: 'Nhóm Kinh doanh', message: 'Minh: Mọi người xem giúp báo giá mới nhé.', time: '09:18', color: '#F1EBFF', unread: true, group: true },
+  { initials: 'MT', name: 'Minh Tuấn', message: 'Mình gửi bạn biên bản cuộc họp sáng nay.', time: '08:16', color: '#FFF1E5', unread: false, group: false },
+  { initials: 'HT', name: 'Hỗ trợ nội bộ', message: 'Đã tiếp nhận yêu cầu của bạn.', time: 'Hôm qua', color: '#E9F8F1', unread: false, group: true },
 ];
 
 export default function InboxScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.eyebrow}>CRM & CHĂM SÓC KHÁCH HÀNG</Text>
-        <Text style={styles.title}>Hộp thư</Text>
-        <Text style={styles.subtitle}>Hội thoại từ các kênh được kết nối.</Text>
-        <View style={styles.filters}><Text style={styles.activeFilter}>Tất cả 08</Text><Text style={styles.filter}>Chưa đọc 02</Text><Text style={styles.filter}>Đang xử lý</Text></View>
+        <Text style={styles.eyebrow}>TRAO ĐỔI TRONG DOANH NGHIỆP</Text>
+        <Text style={styles.title}>Trò chuyện nội bộ</Text>
+        <Text style={styles.subtitle}>Tin nhắn cá nhân và nhóm làm việc.</Text>
+        <View style={styles.filters}><Text style={styles.activeFilter}>Tất cả</Text><Text style={styles.filter}>Chưa đọc</Text><Text style={styles.filter}>Nhóm</Text></View>
         <View style={styles.list}>
           {conversations.map((item) => (
             <Card key={item.name} style={styles.row}>
@@ -29,7 +30,7 @@ export default function InboxScreen() {
             </Card>
           ))}
         </View>
-        <Text style={styles.note}>Màn hình hộp thư hiện dùng dữ liệu mẫu; kết nối kênh sẽ được bổ sung theo API.</Text>
+        <Text style={styles.note}>Hội thoại mẫu · gửi tin nhắn và đồng bộ sẽ được nối với dịch vụ trò chuyện nội bộ.</Text>
       </ScrollView>
     </Screen>
   );

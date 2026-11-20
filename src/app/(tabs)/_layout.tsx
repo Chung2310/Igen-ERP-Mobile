@@ -6,17 +6,18 @@ const tabOptions = {
   headerShown: false,
   tabBarActiveTintColor: colors.primary,
   tabBarInactiveTintColor: colors.muted,
-  tabBarStyle: { height: 66, paddingTop: 8, paddingBottom: 8, borderTopColor: colors.border, backgroundColor: colors.white },
-  tabBarLabelStyle: { fontSize: 11, fontWeight: '600' as const },
+  tabBarStyle: { height: 76, paddingTop: 6, paddingBottom: 5, borderTopColor: colors.border, backgroundColor: colors.white },
+  tabBarLabelStyle: { fontSize: 8, lineHeight: 10, fontWeight: '600' as const },
 };
 
 export default function TabLayout() {
   return (
     <Tabs screenOptions={tabOptions}>
       <Tabs.Screen name="index" options={{ title: 'Tổng quan', tabBarLabel: 'Tổng quan', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 17 }}>⌂</Text> }} />
-      <Tabs.Screen name="modules" options={{ title: 'Phân hệ', tabBarLabel: 'Phân hệ', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>▦</Text> }} />
-      <Tabs.Screen name="inbox" options={{ title: 'Hộp thư', tabBarLabel: 'Hộp thư', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>▤</Text> }} />
-      <Tabs.Screen name="profile" options={{ title: 'Tài khoản', tabBarLabel: 'Tài khoản', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>♙</Text> }} />
+      <Tabs.Screen name="modules" options={{ title: 'Danh mục', tabBarLabel: 'Danh mục', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 17 }}>▦</Text> }} />
+      <Tabs.Screen name="inbox" options={{ title: 'Trò chuyện nội bộ', tabBarLabel: ({ color }) => <Text style={{ color, fontSize: 8, lineHeight: 10, textAlign: 'center' }}>Trò chuyện{'\n'}nội bộ</Text>, tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 17 }}>▤</Text> }} />
+      <Tabs.Screen name="ai-chat" options={{ title: 'Trò chuyện AI', tabBarLabel: 'Trò chuyện AI', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 17 }}>✦</Text> }} />
+      <Tabs.Screen name="profile" options={{ title: 'Cài đặt cá nhân', tabBarLabel: ({ color }) => <Text style={{ color, fontSize: 8, lineHeight: 10, textAlign: 'center' }}>Cài đặt{'\n'}cá nhân</Text>, tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 17 }}>⚙</Text> }} />
     </Tabs>
   );
 }

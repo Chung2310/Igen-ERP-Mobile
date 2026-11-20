@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1190" viewBox="0 0 1400 1190">
+  <defs>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#26354f"/><stop offset="1" stop-color="#101828"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-15%" width="140%" height="140%"><feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#182844" flood-opacity=".17"/></filter>
+    <clipPath id="overview"><rect x="150" y="90" width="500" height="1010" rx="44"/></clipPath>
+    <clipPath id="catalog"><rect x="750" y="90" width="500" height="1010" rx="44"/></clipPath>
+  </defs>
+  <rect width="1400" height="1190" fill="#eef2f8"/>
+  <text x="700" y="40" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="700" letter-spacing="3" fill="#73819a">ERP MOBILE · MENU DRAFT 02</text>
+  <text x="400" y="70" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#56657c">TỔNG QUAN</text>
+  <text x="1000" y="70" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#56657c">DANH MỤC · LƯỚI 2 CỘT</text>
+  <rect x="135" y="98" width="530" height="1035" rx="62" fill="url(#frame)" filter="url(#shadow)"/>
+  <rect x="150" y="90" width="500" height="1010" rx="44" fill="#f5f7fb"/>
+  <g clip-path="url(#overview)" font-family="Arial,sans-serif">
+    <rect x="150" y="90" width="500" height="1010" fill="#f5f7fb"/>
+    <text x="184" y="128" font-size="14" font-weight="700" fill="#18243b">9:41</text>
+    <rect x="571" y="115" width="22" height="12" rx="3" fill="none" stroke="#18243b" stroke-width="2"/>
+    <path d="M603 126 Q613 112 623 126 M607 126 Q613 118 619 126" fill="none" stroke="#18243b" stroke-width="2"/>
+    <text x="184" y="169" font-size="14" font-weight="800" fill="#2463eb">IGEN ERP · IGEN TECHNOLOGY⌄</text>
+    <circle cx="611" cy="163" r="18" fill="#dce8ff"/><text x="611" y="168" text-anchor="middle" font-size="11" font-weight="700" fill="#2463eb">AN</text>
+    <text x="184" y="210" font-size="24" font-weight="800" fill="#17233b">Tổng quan</text>
+    <rect x="184" y="226" width="432" height="39" rx="12" fill="#fff" stroke="#e6ebf3"/>
+    <text x="201" y="251" font-size="12" fill="#344158">Kỳ báo cáo</text><text x="600" y="251" text-anchor="end" font-size="12" fill="#2463eb">Tháng này⌄</text>
+    <text x="184" y="293" font-size="13" font-weight="800" fill="#17233b">Kết quả kinh doanh</text>
+    <rect x="184" y="306" width="207" height="80" rx="15" fill="#fff" stroke="#e8edf4"/><text x="200" y="331" font-size="10" fill="#8190a8">Doanh thu</text><text x="200" y="363" font-size="20" font-weight="800" fill="#17233b">1,28 tỷ</text><text x="372" y="363" text-anchor="end" font-size="9" font-weight="700" fill="#16885a">↑ 12%</text>
+    <rect x="401" y="306" width="215" height="80" rx="15" fill="#fff" stroke="#e8edf4"/><text x="417" y="331" font-size="10" fill="#8190a8">Chi phí</text><text x="417" y="363" font-size="20" font-weight="800" fill="#17233b">680 triệu</text><text x="598" y="363" text-anchor="end" font-size="9" font-weight="700" fill="#c27617">↓ 4%</text>
+    <rect x="184" y="396" width="207" height="80" rx="15" fill="#fff" stroke="#e8edf4"/><text x="200" y="421" font-size="10" fill="#8190a8">Lợi nhuận</text><text x="200" y="453" font-size="20" font-weight="800" fill="#17233b">320 triệu</text><text x="372" y="453" text-anchor="end" font-size="9" font-weight="700" fill="#16885a">↑ 8%</text>
+    <rect x="401" y="396" width="215" height="80" rx="15" fill="#fff" stroke="#e8edf4"/><text x="417" y="421" font-size="10" fill="#8190a8">Công nợ phải thu</text><text x="417" y="453" font-size="20" font-weight="800" fill="#17233b">145 triệu</text><circle cx="596" cy="449" r="4" fill="#ef9b32"/>
+    <rect x="184" y="490" width="432" height="183" rx="16" fill="#fff" stroke="#e8edf4"/><text x="202" y="518" font-size="12" font-weight="800" fill="#17233b">Doanh thu &amp; chi phí</text><text x="599" y="518" text-anchor="end" font-size="9" fill="#8190a8">6 tháng⌄</text>
+    <line x1="208" y1="625" x2="593" y2="625" stroke="#edf0f5"/><line x1="208" y1="589" x2="593" y2="589" stroke="#edf0f5"/><line x1="208" y1="553" x2="593" y2="553" stroke="#edf0f5"/>
+    <path d="M218 611 L280 588 L345 598 L410 560 L475 575 L540 535 L585 548" fill="none" stroke="#2463eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M218 638 L280 624 L345 630 L410 607 L475 614 L540 598 L585 605" fill="none" stroke="#f2a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="211" cy="655" r="4" fill="#2463eb"/><text x="221" y="659" font-size="9" fill="#65738a">Doanh thu</text><circle cx="293" cy="655" r="4" fill="#f2a34a"/><text x="303" y="659" font-size="9" fill="#65738a">Chi phí</text>
+    <text x="184" y="706" font-size="13" font-weight="800" fill="#17233b">Vận hành &amp; cảnh báo</text>
+    <rect x="184" y="719" width="207" height="48" rx="12" fill="#fff" stroke="#e8edf4"/><text x="198" y="748" font-size="10" fill="#65738a">Lead mới</text><text x="375" y="750" text-anchor="end" font-size="16" font-weight="800" fill="#17233b">12</text>
+    <rect x="401" y="719" width="215" height="48" rx="12" fill="#fff" stroke="#e8edf4"/><text x="415" y="748" font-size="10" fill="#65738a">Tin chưa đọc</text><text x="600" y="750" text-anchor="end" font-size="16" font-weight="800" fill="#17233b">08</text>
+    <rect x="184" y="775" width="207" height="48" rx="12" fill="#fff" stroke="#e8edf4"/><text x="198" y="804" font-size="10" fill="#65738a">Công việc hôm nay</text><text x="375" y="806" text-anchor="end" font-size="16" font-weight="800" fill="#17233b">05</text>
+    <rect x="401" y="775" width="215" height="48" rx="12" fill="#fff" stroke="#e8edf4"/><text x="415" y="804" font-size="10" fill="#65738a">Cảnh báo tồn kho</text><text x="600" y="806" text-anchor="end" font-size="16" font-weight="800" fill="#17233b">06</text>
+    <rect x="184" y="831" width="432" height="55" rx="14" fill="#eaf2ff"/><circle cx="208" cy="858" r="12" fill="#d6e5ff"/><text x="208" y="863" text-anchor="middle" font-size="13" fill="#2463eb">✦</text><text x="232" y="854" font-size="10" font-weight="700" fill="#17233b">Trợ lý AI · hạn mức còn 72%</text><text x="232" y="872" font-size="9" fill="#65738a">3 việc cần xử lý</text><text x="599" y="864" text-anchor="end" font-size="17" fill="#2463eb">›</text>
+    <text x="400" y="908" text-anchor="middle" font-size="9" fill="#98a4b7">Dữ liệu mẫu · hiển thị theo kỳ, gói dịch vụ và quyền</text>
+    <rect x="150" y="936" width="500" height="164" fill="#fff"/><line x1="150" y1="936" x2="650" y2="936" stroke="#e8edf4"/>
+    <g font-size="8" text-anchor="middle"><rect x="175" y="949" width="68" height="53" rx="13" fill="#eaf2ff"/><text x="209" y="972" font-size="17" fill="#2463eb">⌂</text><text x="209" y="992" font-weight="700" fill="#2463eb">Tổng quan</text><text x="301" y="975" font-size="17" fill="#8c99ac">▦</text><text x="301" y="994" fill="#8c99ac">Danh mục</text><text x="401" y="975" font-size="17" fill="#8c99ac">▤</text><text x="401" y="994" fill="#8c99ac">Trò chuyện nội bộ</text><text x="501" y="975" font-size="17" fill="#8c99ac">✦</text><text x="501" y="994" fill="#8c99ac">Trò chuyện AI</text><text x="601" y="975" font-size="17" fill="#8c99ac">⚙</text><text x="601" y="994" fill="#8c99ac">Cài đặt cá nhân</text></g>
+    <rect x="325" y="1066" width="150" height="5" rx="3" fill="#18243b"/>
+  </g>
+
+  <!-- Module catalog, 2 cards per row -->
+  <rect x="735" y="98" width="530" height="1035" rx="62" fill="url(#frame)" filter="url(#shadow)"/>
+  <rect x="750" y="90" width="500" height="1010" rx="44" fill="#f5f7fb"/>
+  <g clip-path="url(#catalog)" font-family="Arial,sans-serif">
+    <rect x="750" y="90" width="500" height="1010" fill="#f5f7fb"/>
+    <text x="784" y="128" font-size="14" font-weight="700" fill="#18243b">9:41</text><rect x="1171" y="115" width="22" height="12" rx="3" fill="none" stroke="#18243b" stroke-width="2"/><path d="M1203 126 Q1213 112 1223 126 M1207 126 Q1213 118 1219 126" fill="none" stroke="#18243b" stroke-width="2"/>
+    <text x="784" y="169" font-size="14" font-weight="800" fill="#2463eb">IGEN ERP</text><circle cx="1211" cy="163" r="18" fill="#dce8ff"/><text x="1211" y="168" text-anchor="middle" font-size="11" font-weight="700" fill="#2463eb">AN</text>
+    <text x="784" y="207" font-size="23" font-weight="800" fill="#17233b">Danh mục</text><text x="784" y="228" font-size="10" fill="#8190a8">Chọn module để mở chức năng</text>
+    <rect x="780" y="242" width="440" height="39" rx="12" fill="#fff" stroke="#e6ebf3"/><circle cx="800" cy="261" r="6" fill="none" stroke="#8b98ac" stroke-width="2"/><path d="M805 266l5 5" stroke="#8b98ac" stroke-width="2"/><text x="820" y="266" font-size="10" fill="#98a4b7">Tìm chức năng...</text>
+    <g font-size="8" font-weight="700" text-anchor="middle"><rect x="780" y="291" width="69" height="24" rx="9" fill="#2463eb"/><text x="814" y="307" fill="#fff">Tất cả</text><rect x="856" y="291" width="94" height="24" rx="9" fill="#fff" stroke="#e6ebf3"/><text x="903" y="307" fill="#65738a">Kinh doanh</text><rect x="957" y="291" width="78" height="24" rx="9" fill="#fff" stroke="#e6ebf3"/><text x="996" y="307" fill="#65738a">Vận hành</text><rect x="1042" y="291" width="78" height="24" rx="9" fill="#fff" stroke="#e6ebf3"/><text x="1081" y="307" fill="#65738a">Quản trị</text></g>
+    <g fill="#fff" stroke="#e8edf4">
+      <rect x="780" y="326" width="212" height="68" rx="13"/><rect x="1004" y="326" width="216" height="68" rx="13"/>
+      <rect x="780" y="402" width="212" height="68" rx="13"/><rect x="1004" y="402" width="216" height="68" rx="13"/>
+      <rect x="780" y="478" width="212" height="68" rx="13"/><rect x="1004" y="478" width="216" height="68" rx="13"/>
+      <rect x="780" y="554" width="212" height="68" rx="13"/><rect x="1004" y="554" width="216" height="68" rx="13"/>
+      <rect x="780" y="630" width="212" height="68" rx="13"/><rect x="1004" y="630" width="216" height="68" rx="13"/>
+      <rect x="780" y="706" width="212" height="68" rx="13"/><rect x="1004" y="706" width="216" height="68" rx="13"/>
+      <rect x="780" y="782" width="212" height="68" rx="13"/><rect x="1004" y="782" width="216" height="68" rx="13"/>
+      <rect x="780" y="858" width="212" height="68" rx="13"/>
+    </g>
+    <g font-size="9" font-weight="700" fill="#17233b">
+      <circle cx="800" cy="348" r="9" fill="#eaf2ff" stroke="none"/><text x="800" y="351" text-anchor="middle" font-size="9" fill="#2463eb">▣</text><text x="794" y="378">CRM &amp; Hộp thư đa kênh</text>
+      <circle cx="1024" cy="348" r="9" fill="#f1ebff" stroke="none"/><text x="1024" y="351" text-anchor="middle" font-size="9" fill="#7754c8">▤</text><text x="1018" y="378">Kho tri thức</text>
+      <circle cx="800" cy="424" r="9" fill="#e9f8f1" stroke="none"/><text x="800" y="427" text-anchor="middle" font-size="9" fill="#16885a">◫</text><text x="794" y="454">Tổng quan</text>
+      <circle cx="1024" cy="424" r="9" fill="#e8f7fa" stroke="none"/><text x="1024" y="427" text-anchor="middle" font-size="9" fill="#24869a">⌘</text><text x="1018" y="454">Tích hợp &amp; cấu hình kênh</text>
+      <circle cx="800" cy="500" r="9" fill="#fff3e5" stroke="none"/><text x="800" y="503" text-anchor="middle" font-size="9" fill="#c27617">✦</text><text x="794" y="530">Gói AI &amp; lượt sử dụng</text>
+      <circle cx="1024" cy="500" r="9" fill="#fdecf0" stroke="none"/><text x="1024" y="503" text-anchor="middle" font-size="9" fill="#ba526e">♙</text><text x="1018" y="530">Quản trị tài khoản</text>
+      <circle cx="800" cy="576" r="9" fill="#f0f3f8" stroke="none"/><text x="800" y="579" text-anchor="middle" font-size="9" fill="#65738a">⚙</text><text x="794" y="606">Cài đặt hệ thống</text>
+      <circle cx="1024" cy="576" r="9" fill="#e8f7fa" stroke="none"/><text x="1024" y="579" text-anchor="middle" font-size="9" fill="#24869a">♧</text><text x="1018" y="606">Nhân sự</text>
+      <circle cx="800" cy="652" r="9" fill="#eaf2ff" stroke="none"/><text x="800" y="655" text-anchor="middle" font-size="9" fill="#2463eb">▧</text><text x="794" y="682">Quản lý tài nguyên</text>
+      <circle cx="1024" cy="652" r="9" fill="#e9f8f1" stroke="none"/><text x="1024" y="655" text-anchor="middle" font-size="9" fill="#16885a">☏</text><text x="1018" y="682">Trò chuyện nội bộ</text>
+      <circle cx="800" cy="728" r="9" fill="#fff3e5" stroke="none"/><text x="800" y="731" text-anchor="middle" font-size="9" fill="#c27617">♧</text><text x="794" y="758">Đối tác</text>
+      <circle cx="1024" cy="728" r="9" fill="#f1ebff" stroke="none"/><text x="1024" y="731" text-anchor="middle" font-size="9" fill="#7754c8">▱</text><text x="1018" y="758">Báo giá</text>
+      <circle cx="800" cy="804" r="9" fill="#eaf2ff" stroke="none"/><text x="800" y="807" text-anchor="middle" font-size="9" fill="#2463eb">✧</text><text x="794" y="834">Trợ lý ERP</text>
+      <circle cx="1024" cy="804" r="9" fill="#e9f8f1" stroke="none"/><text x="1024" y="807" text-anchor="middle" font-size="9" fill="#16885a">▥</text><text x="1018" y="834">Phân tích &amp; báo cáo</text>
+      <circle cx="800" cy="880" r="9" fill="#fff3e5" stroke="none"/><text x="800" y="883" text-anchor="middle" font-size="9" fill="#c27617">▦</text><text x="794" y="910">Kho &amp; sản phẩm</text>
+    </g>
+    <text x="1000" y="956" text-anchor="middle" font-size="9" fill="#98a4b7">15 module · thẻ cuối đứng một mình</text>
+    <rect x="750" y="936" width="500" height="164" fill="#fff"/><line x1="750" y1="936" x2="1250" y2="936" stroke="#e8edf4"/>
+    <g font-size="8" text-anchor="middle"><text x="827" y="975" font-size="17" fill="#8c99ac">⌂</text><text x="827" y="994" fill="#8c99ac">Tổng quan</text><rect x="877" y="949" width="68" height="53" rx="13" fill="#eaf2ff"/><text x="911" y="972" font-size="17" fill="#2463eb">▦</text><text x="911" y="992" font-weight="700" fill="#2463eb">Danh mục</text><text x="1011" y="975" font-size="17" fill="#8c99ac">▤</text><text x="1011" y="994" fill="#8c99ac">Trò chuyện nội bộ</text><text x="1111" y="975" font-size="17" fill="#8c99ac">✦</text><text x="1111" y="994" fill="#8c99ac">Trò chuyện AI</text><text x="1211" y="975" font-size="17" fill="#8c99ac">⚙</text><text x="1211" y="994" fill="#8c99ac">Cài đặt cá nhân</text></g>
+    <rect x="925" y="1066" width="150" height="5" rx="3" fill="#18243b"/>
+  </g>
+</svg>
