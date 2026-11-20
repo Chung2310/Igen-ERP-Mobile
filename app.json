@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "ERP Mobile",
+    "slug": "erp-mobile",
+    "scheme": "erpmobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "vn.igen.erp.mobile"
+    },
+    "android": {
+      "package": "vn.igen.erp.mobile"
+    }
+  }
+}
