@@ -15,7 +15,8 @@
           "cameraPermission": "Cho phép ERP Mobile chụp tài liệu để tạo Lead bằng OCR.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

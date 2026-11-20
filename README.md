@@ -19,7 +19,9 @@ src/
     (tabs)/             # Tổng quan, phân hệ, hộp thư, tài khoản
     modules/[slug].tsx  # Trang khung dùng chung cho phân hệ
   components/           # Thành phần giao diện dùng lại
-  core/                 # Hạ tầng dùng chung như kết nối API và lỗi
+  core/
+    auth/               # Đăng nhập ERP, phiên người dùng và access token an toàn
+    network/            # Kết nối API và chuẩn hóa lỗi
   features/             # Nghiệp vụ tách theo domain
     modules/            # Danh mục phân hệ và metadata
   theme/                # Màu sắc và token giao diện
@@ -29,8 +31,10 @@ src/
 
 Thêm một định nghĩa vào `src/features/modules/moduleCatalog.ts` để phân hệ xuất hiện trong danh sách, tìm kiếm, trang tổng quan và route chi tiết. Khi bắt đầu làm nghiệp vụ, tạo thư mục `src/features/<ten-phan-he>/` để chứa màn hình, thành phần, kiểu dữ liệu và API riêng, rồi đăng ký màn hình trong `src/features/modules/featureScreenRegistry.ts`. Route chỉ giữ vai trò điều hướng; phân hệ chưa có màn hình riêng sẽ dùng màn hình khung chung.
 
-Các service của phân hệ gọi API qua `src/core/network/apiClient.ts`, để chuẩn hóa cấu hình địa chỉ máy chủ, token truy cập và lỗi phản hồi. Sao chép `.env.example` thành `.env` rồi thay địa chỉ khi môi trường backend sẵn sàng.
+Các service gọi API ERP qua `src/core/network/apiClient.ts`. `EXPO_PUBLIC_API_URL` nhận origin của máy chủ; client tự nối `/api/v1`. Sao chép `.env.example` thành `.env` rồi chọn máy chủ phù hợp với thiết bị. Khi chạy Android emulator với backend cục bộ, thường dùng `http://10.0.2.2:3000`; trên iOS simulator dùng `http://localhost:3000`; điện thoại thật cần dùng địa chỉ LAN hoặc staging có thể truy cập.
+
+Đăng nhập gọi `POST /api/v1/auth/login`, khôi phục hồ sơ qua `GET /api/v1/auth/me` và làm mới access token qua `POST /api/v1/auth/refresh-token`. Access token được lưu bằng SecureStore trên thiết bị. Tài khoản superadmin cần bước xác thực bổ sung chưa được hỗ trợ trong mobile.
 
 ## Phạm vi hiện tại
 
-Đây là khung giao diện với dữ liệu mẫu. Đăng nhập thật, phân quyền từ máy chủ, API nghiệp vụ, kết nối kênh, giao dịch và thông báo đẩy chưa được nối. Tài liệu phạm vi gốc nằm tại `docs/Pham-vi-trien-khai-app-mobile-ERP.docx`.
+Đăng nhập và kiểm tra kết nối máy chủ ERP đã được nối. Các màn hình nghiệp vụ CRM, Kho tri thức, Tổng quan và những phân hệ còn lại vẫn đang được tích hợp lần lượt; các màn hình chưa hoàn tất API tiếp tục hiển thị dữ liệu mẫu. Tài liệu phạm vi gốc nằm tại `docs/Pham-vi-trien-khai-app-mobile-ERP.docx`.

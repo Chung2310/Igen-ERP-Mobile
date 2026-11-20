@@ -1,3 +1,5 @@
+import { clearAccessToken, getAccessToken, saveAccessToken } from '@/core/auth/authSession';
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -12,52 +14,110 @@ export class ApiError extends Error {
 type ApiRequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
   accessToken?: string;
+  /** Send this request without the current access token. */
+  skipAuth?: boolean;
+  /** Do not attempt refresh-token renewal after a 401 response. */
+  skipRefresh?: boolean;
 };
 
-const baseUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/+$/, '');
+const apiBaseUrl = configuredUrl
+  ? (/\/api\/v1$/i.test(configuredUrl) ? configuredUrl : `${configuredUrl}/api/v1`)
+  : undefined;
 
-/** Shared API entry point. Feature services should call this instead of fetch directly. */
-export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  if (!baseUrl) {
-    throw new Error('Thiếu EXPO_PUBLIC_API_URL. Hãy cấu hình địa chỉ API trong tệp môi trường.');
+let refreshInFlight: Promise<string | null> | null = null;
+
+function getApiUrl(path: string) {
+  if (!apiBaseUrl) {
+    throw new Error('Thiếu EXPO_PUBLIC_API_URL. Hãy cấu hình địa chỉ dự án ERP trong tệp .env.');
   }
+  return `${apiBaseUrl}/${path.replace(/^\/+/, '')}`;
+}
 
-  const { accessToken, body, headers: requestHeaders, ...requestOptions } = options;
-  const headers = new Headers(requestHeaders);
-  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-
-  let requestBody: BodyInit | undefined;
-  if (body !== undefined) {
-    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
-    if (isFormData || typeof body === 'string') {
-      requestBody = body as BodyInit;
-    } else {
-      headers.set('Content-Type', 'application/json');
-      requestBody = JSON.stringify(body);
-    }
-  }
-
-  const response = await fetch(`${baseUrl}/${path.replace(/^\//, '')}`, {
-    ...requestOptions,
-    headers,
-    body: requestBody,
-  });
-
+async function parseResponse(response: Response): Promise<unknown> {
   const responseText = await response.text();
-  let result: unknown = responseText;
-  if (responseText) {
+  if (!responseText) return undefined;
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return responseText;
+  }
+}
+
+function messageFrom(result: unknown, fallback: string) {
+  return typeof result === 'object' && result !== null && 'message' in result
+    ? String(result.message)
+    : fallback;
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const pending = (async () => {
     try {
-      result = JSON.parse(responseText);
+      const response = await fetch(getApiUrl('/auth/refresh-token'), {
+        method: 'POST',
+        credentials: 'include',
+        headers: new Headers(),
+      });
+      const result = await parseResponse(response) as { accessToken?: string } | undefined;
+      if (!response.ok || !result?.accessToken) {
+        await clearAccessToken();
+        return null;
+      }
+      await saveAccessToken(result.accessToken);
+      return result.accessToken;
     } catch {
-      // Keep non-JSON responses as text so API errors remain inspectable.
+      return null;
     }
+  })();
+
+  refreshInFlight = pending;
+  try {
+    return await pending;
+  } finally {
+    if (refreshInFlight === pending) refreshInFlight = null;
+  }
+}
+
+/** Shared API entry point for the ERP server. EXPO_PUBLIC_API_URL may be an origin or end in /api/v1. */
+export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  const { accessToken, skipAuth = false, skipRefresh = false, body, headers: requestHeaders, ...requestOptions } = options;
+
+  const send = (token?: string) => {
+    const headers = new Headers(requestHeaders);
+    if (token && !skipAuth) headers.set('Authorization', `Bearer ${token}`);
+
+    let requestBody: BodyInit | undefined;
+    if (body !== undefined) {
+      const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+      if (isFormData || typeof body === 'string') {
+        requestBody = body as BodyInit;
+      } else {
+        headers.set('Content-Type', 'application/json');
+        requestBody = JSON.stringify(body);
+      }
+    }
+
+    return fetch(getApiUrl(path), {
+      ...requestOptions,
+      credentials: requestOptions.credentials ?? 'include',
+      headers,
+      body: requestBody,
+    });
+  };
+
+  const currentToken = skipAuth ? undefined : (accessToken ?? getAccessToken() ?? undefined);
+  let response = await send(currentToken);
+
+  if (response.status === 401 && !skipAuth && !skipRefresh && !/\/auth\/(login|refresh-token|logout)\b/i.test(path)) {
+    const renewedToken = await refreshAccessToken();
+    if (renewedToken) response = await send(renewedToken);
   }
 
+  const result = await parseResponse(response);
   if (!response.ok) {
-    const message = typeof result === 'object' && result !== null && 'message' in result
-      ? String(result.message)
-      : `API request failed (${response.status})`;
-    throw new ApiError(message, response.status, result);
+    throw new ApiError(messageFrom(result, `ERP API trả về lỗi (${response.status})`), response.status, result);
   }
 
   return result as T;
