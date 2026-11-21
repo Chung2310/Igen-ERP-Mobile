@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import type { LucideIcon } from 'lucide-react-native';
+import { Camera, ChevronLeft, ChevronRight, Ellipsis, Info, MessageCircle, MessagesSquare, Music2, Paperclip, Plus, ScanLine, Send, Sparkles, Users, UserRound } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { createErpLead, loadConversationMessages, loadCrmWorkspace, markConversationRead, resumeConversationAI, sendConversationReply } from '@/features/crm/crmApi';
 import type { ConversationMode, CrmConversation, CrmLead, CrmLeadDraft, CrmMessage } from '@/features/crm/types';
@@ -9,8 +11,8 @@ import { colors } from '@/theme/colors';
 type CrmSection = 'inbox' | 'leads' | 'automation';
 type InboxFilter = 'all' | 'unread' | 'unassigned';
 
-const channelMark: Record<CrmConversation['channel'], string> = {
-  Zalo: 'Z', Facebook: 'f', TikTok: '♪', Instagram: '◎', 'Web chat': '◌',
+const channelIcon: Record<CrmConversation['channel'], LucideIcon> = {
+  Zalo: MessageCircle, Facebook: Users, TikTok: Music2, Instagram: Camera, 'Web chat': MessagesSquare,
 };
 
 const emptyLead: CrmLeadDraft = { name: '', company: '', phone: '', email: '' };
@@ -237,8 +239,8 @@ export function CrmScreen() {
         {section === 'leads' && (
           <>
             <View style={styles.leadActions}>
-              <ActionButton label="＋ Tạo Lead" onPress={() => { setLeadDraft(emptyLead); setLeadSource('Nhập thủ công'); setLeadFormOpen(true); }} />
-              <ActionButton label="▧ Ảnh / OCR" secondary onPress={chooseOcrSource} />
+              <ActionButton icon={Plus} label="Tạo Lead" onPress={() => { setLeadDraft(emptyLead); setLeadSource('Nhập thủ công'); setLeadFormOpen(true); }} />
+              <ActionButton icon={ScanLine} label="Ảnh / OCR" secondary onPress={chooseOcrSource} />
             </View>
             <Text style={styles.listCaption}>{leads.length} Lead gần đây</Text>
             <View style={styles.leadList}>
@@ -278,9 +280,10 @@ function FilterChip({ label, active, onPress }: { label: string; active: boolean
 }
 
 function ConversationRow({ conversation, onPress }: { conversation: CrmConversation; onPress: () => void }) {
+  const ChannelIcon = channelIcon[conversation.channel];
   return (
     <Card onPress={onPress} style={styles.conversationRow}>
-      <View style={[styles.contactAvatar, { backgroundColor: conversation.channelColor }]}><Text style={styles.contactInitials}>{conversation.initials}</Text><View style={styles.channelBadge}><Text style={styles.channelMark}>{channelMark[conversation.channel]}</Text></View></View>
+      <View style={[styles.contactAvatar, { backgroundColor: conversation.channelColor }]}><Text style={styles.contactInitials}>{conversation.initials}</Text><View style={styles.channelBadge}><ChannelIcon size={13} color={colors.white} /></View></View>
       <View style={styles.conversationCopy}>
         <View style={styles.conversationHeader}><Text numberOfLines={1} style={styles.contactName}>{conversation.contactName}</Text><Text style={styles.time}>{conversation.updatedAt}</Text></View>
         <Text numberOfLines={1} style={styles.lastMessage}>{conversation.lastMessage}</Text>
@@ -308,19 +311,19 @@ function ConversationDetail({
   return (
     <View style={styles.detailContainer}>
       <View style={styles.detailHeader}>
-        <Pressable onPress={onBack} style={styles.backButton}><Text style={styles.backGlyph}>‹</Text></Pressable>
+        <Pressable onPress={onBack} style={styles.backButton}><ChevronLeft size={21} color={colors.primary} /></Pressable>
         <View style={[styles.contactAvatar, styles.detailAvatar, { backgroundColor: conversation.channelColor }]}><Text style={styles.contactInitials}>{conversation.initials}</Text></View>
         <View style={styles.detailContact}><Text numberOfLines={1} style={styles.contactName}>{conversation.contactName}</Text><Text style={styles.channelName}>{conversation.channel}</Text></View>
-        <Text style={styles.moreButton}>•••</Text>
+        <Ellipsis size={21} color={colors.muted} />
       </View>
 
       <View style={styles.modeToolbar}>
-        <Pressable onPress={() => onSetMode('ai')} style={[styles.modeButton, conversation.mode === 'ai' && styles.modeButtonActive]}><Text style={[styles.modeButtonText, conversation.mode === 'ai' && styles.modeButtonTextActive]}>✦ AI trả lời</Text></Pressable>
+        <Pressable onPress={() => onSetMode('ai')} style={[styles.modeButton, conversation.mode === 'ai' && styles.modeButtonActive]}><View style={styles.modeButtonContent}><Sparkles size={12} color={conversation.mode === 'ai' ? colors.primary : colors.muted} /><Text style={[styles.modeButtonText, conversation.mode === 'ai' && styles.modeButtonTextActive]}>AI trả lời</Text></View></Pressable>
         <Pressable onPress={() => onSetMode('human')} style={[styles.modeButton, conversation.mode === 'human' && styles.modeButtonActive]}><Text style={[styles.modeButtonText, conversation.mode === 'human' && styles.modeButtonTextActive]}>Nhân viên tiếp quản</Text></Pressable>
       </View>
 
       <Card style={styles.assignmentCard}>
-        <View style={styles.assignmentIcon}><Text style={styles.assignmentGlyph}>♙</Text></View>
+        <View style={styles.assignmentIcon}><UserRound size={15} color={colors.primary} /></View>
         <View style={styles.assignmentCopy}><Text style={styles.assignmentLabel}>Người phụ trách</Text><Text style={styles.assignmentName}>{conversation.assignedTo ?? 'Chưa phân công'}</Text></View>
         <Pressable onPress={onAssign} style={styles.assignButton}><Text style={styles.assignText}>Phân công</Text></Pressable>
       </Card>
@@ -330,14 +333,14 @@ function ConversationDetail({
         {loading && <ActivityIndicator color={colors.primary} style={styles.loading} />}
         {!!error && <Text style={styles.apiNoticeText}>{error}</Text>}
         {conversation.messages.map((message) => <MessageBubble key={message.id} message={message} />)}
-        {conversation.mode === 'ai' && <Text style={styles.aiStatus}>✦ AI đang trả lời dựa trên tài liệu và kịch bản đã bật</Text>}
+        {conversation.mode === 'ai' && <View style={styles.aiStatusRow}><Sparkles size={12} color={colors.primary} /><Text style={styles.aiStatus}>AI đang trả lời dựa trên tài liệu và kịch bản đã bật</Text></View>}
         {conversation.mode === 'human' && <Text style={styles.handoverHint}>Để ERP tạm dừng AI, hãy gửi tin nhắn với tư cách nhân viên.</Text>}
       </ScrollView>
 
       <View style={styles.composer}>
-        <Pressable style={styles.attachButton} onPress={() => Alert.alert('Đính kèm', 'Dự án ERP hiện chưa cung cấp API gửi tệp đính kèm từ ứng dụng mobile.') }><Text style={styles.attachGlyph}>＋</Text></Pressable>
+        <Pressable style={styles.attachButton} onPress={() => Alert.alert('Đính kèm', 'Dự án ERP hiện chưa cung cấp API gửi tệp đính kèm từ ứng dụng mobile.') }><Paperclip size={16} color={colors.primary} /></Pressable>
         <TextInput value={draft} onChangeText={onDraftChange} placeholder="Nhập tin nhắn..." placeholderTextColor={colors.muted} style={styles.messageInput} multiline />
-        <Pressable disabled={sending || !draft.trim()} onPress={onSend} style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]}>{sending ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.sendGlyph}>↑</Text>}</Pressable>
+        <Pressable disabled={sending || !draft.trim()} onPress={onSend} style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]}>{sending ? <ActivityIndicator size="small" color={colors.white} /> : <Send size={15} color={colors.white} />}</Pressable>
       </View>
     </View>
   );
@@ -348,7 +351,7 @@ function MessageBubble({ message }: { message: CrmMessage }) {
   return (
     <View style={[styles.messageLine, outgoing && styles.messageLineOutgoing]}>
       <View style={[styles.messageBubble, outgoing && styles.messageBubbleOutgoing, message.sender === 'ai' && styles.messageBubbleAi]}>
-        {message.sender === 'ai' && <Text style={styles.aiMessageLabel}>✦ AI trả lời</Text>}
+        {message.sender === 'ai' && <View style={styles.aiMessageLabelRow}><Sparkles size={11} color={colors.primary} /><Text style={styles.aiMessageLabel}>AI trả lời</Text></View>}
         <Text style={[styles.messageText, outgoing && styles.messageTextOutgoing]}>{message.text}</Text>
         <Text style={[styles.messageTime, outgoing && styles.messageTimeOutgoing]}>{message.time}</Text>
       </View>
@@ -366,13 +369,13 @@ function LeadRow({ lead }: { lead: CrmLead }) {
         <Text numberOfLines={1} style={styles.leadCompany}>{lead.company || 'Chưa có công ty'}</Text>
         <Text style={styles.leadSource}>{lead.phone} · {lead.source} · {lead.createdAt}</Text>
       </View>
-      <Text style={styles.rowArrow}>›</Text>
+      <ChevronRight size={17} color={colors.muted} />
     </Card>
   );
 }
 
-function ActionButton({ label, onPress, secondary = false }: { label: string; onPress: () => void; secondary?: boolean }) {
-  return <Pressable onPress={onPress} style={[styles.actionButton, secondary && styles.actionButtonSecondary]}><Text style={[styles.actionButtonText, secondary && styles.actionButtonTextSecondary]}>{label}</Text></Pressable>;
+function ActionButton({ label, onPress, secondary = false, icon: Icon }: { label: string; onPress: () => void; secondary?: boolean; icon?: LucideIcon }) {
+  return <Pressable onPress={onPress} style={[styles.actionButton, secondary && styles.actionButtonSecondary]}>{Icon ? <Icon size={14} color={secondary ? colors.primary : colors.white} /> : null}<Text style={[styles.actionButtonText, secondary && styles.actionButtonTextSecondary]}>{label}</Text></Pressable>;
 }
 
 function LeadEditor({
@@ -394,7 +397,7 @@ function LeadEditor({
   ];
   return (
     <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
-      <Pressable onPress={onCancel} style={styles.formBack}><Text style={styles.backGlyph}>‹</Text><Text style={styles.formBackText}>Quay lại Lead</Text></Pressable>
+      <Pressable onPress={onCancel} style={styles.formBack}><ChevronLeft size={18} color={colors.primary} /><Text style={styles.formBackText}>Quay lại Lead</Text></Pressable>
       <Text style={styles.eyebrow}>CRM · LEAD</Text>
       <Text style={styles.title}>Tạo Lead</Text>
       <Text style={styles.subtitle}>Nguồn tạo: {source}</Text>
@@ -414,7 +417,7 @@ function LeadEditor({
           />
         </View>
       ))}
-      <Card style={styles.formHint}><Text style={styles.formHintGlyph}>ⓘ</Text><Text style={styles.formHintText}>Lead sẽ được lưu trực tiếp vào ERP.</Text></Card>
+      <Card style={styles.formHint}><Info size={16} color="#B47821" /><Text style={styles.formHintText}>Lead sẽ được lưu trực tiếp vào ERP.</Text></Card>
       <ActionButton label={saving ? 'Đang lưu Lead...' : 'Lưu Lead'} onPress={onSave} />
     </ScrollView>
   );
@@ -433,7 +436,7 @@ function AutomationPanel({
   return (
     <View style={styles.automationContent}>
       <Card style={styles.automationMaster}>
-        <View style={styles.automationIcon}><Text style={styles.aiMessageLabel}>✦</Text></View>
+        <View style={styles.automationIcon}><Sparkles size={18} color={colors.primary} /></View>
         <View style={styles.automationCopy}><Text style={styles.automationTitle}>AI trả lời tự động</Text><Text style={styles.automationHint}>Bật cho hội thoại chưa có nhân viên tiếp quản</Text></View>
         <Switch value={enabled} onValueChange={onEnabledChange} trackColor={{ false: '#DCE2EB', true: '#A9C5FF' }} thumbColor={enabled ? colors.primary : '#FFFFFF'} />
       </Card>
@@ -471,7 +474,6 @@ const styles = StyleSheet.create({
   contactAvatar: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   contactInitials: { color: colors.ink, fontSize: 11, fontWeight: '800' },
   channelBadge: { position: 'absolute', right: -3, bottom: -3, width: 17, height: 17, borderRadius: 9, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
-  channelMark: { color: colors.primary, fontSize: 8, fontWeight: '800' },
   conversationCopy: { flex: 1, marginLeft: 11 },
   conversationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   contactName: { color: colors.ink, fontSize: 11, fontWeight: '800', flex: 1, marginRight: 8 },
@@ -489,7 +491,7 @@ const styles = StyleSheet.create({
   loading: { padding: 22 },
   empty: { color: colors.muted, fontSize: 11, textAlign: 'center', padding: 30 },
   leadActions: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  actionButton: { alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 42, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.primary },
+  actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flex: 1, minHeight: 42, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.primary },
   actionButtonSecondary: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
   actionButtonText: { color: colors.white, fontSize: 10, fontWeight: '800' },
   actionButtonTextSecondary: { color: colors.ink },
@@ -504,22 +506,19 @@ const styles = StyleSheet.create({
   leadStatus: { fontSize: 7, fontWeight: '800', overflow: 'hidden', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
   leadCompany: { color: colors.muted, fontSize: 8, marginTop: 4 },
   leadSource: { color: colors.muted, fontSize: 7, marginTop: 4 },
-  rowArrow: { color: colors.muted, fontSize: 20, marginLeft: 5 },
   detailContainer: { flex: 1 },
   detailHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.white },
   backButton: { width: 28, alignItems: 'flex-start', justifyContent: 'center' },
-  backGlyph: { color: colors.primary, fontSize: 31, lineHeight: 32 },
   detailAvatar: { width: 37, height: 37, borderRadius: 13 },
   detailContact: { flex: 1, marginLeft: 9 },
-  moreButton: { color: colors.muted, fontSize: 16, paddingHorizontal: 5 },
   modeToolbar: { flexDirection: 'row', gap: 7, paddingHorizontal: 14, paddingTop: 9 },
   modeButton: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
+  modeButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   modeButtonActive: { backgroundColor: '#EAF2FF', borderColor: '#D7E5FF' },
   modeButtonText: { color: colors.muted, fontSize: 8, fontWeight: '700' },
   modeButtonTextActive: { color: colors.primary },
   assignmentCard: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 14, marginTop: 9, padding: 9, borderRadius: 13 },
   assignmentIcon: { width: 29, height: 29, borderRadius: 10, backgroundColor: '#F0F4FA', alignItems: 'center', justifyContent: 'center' },
-  assignmentGlyph: { color: colors.primary, fontSize: 13 },
   assignmentCopy: { flex: 1, marginLeft: 8 },
   assignmentLabel: { color: colors.muted, fontSize: 7 },
   assignmentName: { color: colors.ink, fontSize: 9, fontWeight: '700', marginTop: 2 },
@@ -536,16 +535,16 @@ const styles = StyleSheet.create({
   messageTextOutgoing: { color: colors.white },
   messageTime: { color: colors.muted, fontSize: 7, textAlign: 'right', marginTop: 4 },
   messageTimeOutgoing: { color: '#DCE8FF' },
-  aiMessageLabel: { color: colors.primary, fontSize: 8, fontWeight: '800', marginBottom: 5 },
-  aiStatus: { color: colors.primary, fontSize: 8, textAlign: 'center', marginTop: 4 },
+  aiMessageLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 5 },
+  aiMessageLabel: { color: colors.primary, fontSize: 8, fontWeight: '800' },
+  aiStatusRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, marginTop: 4 },
+  aiStatus: { color: colors.primary, fontSize: 8, textAlign: 'center' },
   composer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.white },
   attachButton: { width: 31, height: 31, borderRadius: 11, backgroundColor: '#F0F4FA', alignItems: 'center', justifyContent: 'center' },
-  attachGlyph: { color: colors.primary, fontSize: 20 },
   messageInput: { flex: 1, maxHeight: 76, paddingHorizontal: 10, color: colors.ink, fontSize: 10 },
   sendButton: { width: 31, height: 31, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   sendButtonDisabled: { opacity: 0.55 },
   handoverHint: { color: colors.muted, fontSize: 8, textAlign: 'center', marginTop: 8 },
-  sendGlyph: { color: colors.white, fontSize: 18, fontWeight: '800' },
   formContent: { padding: 18, paddingBottom: 30 },
   formBack: { flexDirection: 'row', alignItems: 'center', marginBottom: 17 },
   formBackText: { color: colors.primary, fontSize: 10, fontWeight: '700', marginLeft: 4 },
@@ -555,7 +554,6 @@ const styles = StyleSheet.create({
   ocrProgress: { padding: 11, marginTop: 12, backgroundColor: '#EEF4FF', borderColor: '#DDE9FF' },
   ocrProgressText: { color: colors.primary, fontSize: 9, fontWeight: '700' },
   formHint: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 11, marginTop: 17, marginBottom: 12, backgroundColor: '#FFF8EE', borderColor: '#F6E5C8' },
-  formHintGlyph: { color: '#B47821', fontSize: 14 },
   formHintText: { color: '#7D633A', fontSize: 9, flex: 1, lineHeight: 14 },
   automationContent: { gap: 10 },
   automationMaster: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#EEF4FF', borderColor: '#DDE9FF' },

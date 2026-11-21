@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/core/auth/AuthProvider';
+import { HrConfirmHost } from '@/features/hr/components/HrConfirmModal';
 import { colors } from '@/theme/colors';
 
 export default function RootLayout() {
@@ -34,8 +35,10 @@ function AuthenticatedRouter() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modules/[slug]" options={{ headerShown: true, title: 'Phân hệ', headerBackTitle: 'Trở lại', headerTintColor: colors.ink }} />
+        <Stack.Screen name="profile/[section]" options={{ headerShown: true, title: 'Cài đặt cá nhân', headerBackTitle: 'Trở lại', headerTintColor: colors.ink }} />
       </Stack>
       {(isLoading || redirectPending) && <View style={styles.loadingOverlay}><ActivityIndicator size="small" color={colors.primary} /></View>}
+      <HrConfirmHost />
     </View>
   );
 }

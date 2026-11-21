@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { ChevronRight, File, FileImage, FileSpreadsheet, FileText, Plus, Upload, X } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { deleteKnowledgeDocument, listKnowledgeDocuments, updateKnowledgeDocumentType, uploadKnowledgeDocument, type ErpKnowledgeDocument, type KnowledgeDocumentType } from '@/features/knowledge/knowledgeApi';
 import { colors } from '@/theme/colors';
 
@@ -81,6 +83,7 @@ export function KnowledgeScreen() {
     const matchesSearch = `${document.name} ${document.fileName} ${document.category}`.toLocaleLowerCase('vi').includes(query.trim().toLocaleLowerCase('vi'));
     return matchesSearch && (category === 'all' || document.documentType === category);
   }), [documents, query, category]);
+  const SelectedIcon = selected ? fileIcon(selected.mimeType) : null;
 
   function confirmAddDocuments() {
     Alert.alert('Nạp tài liệu vào Kho tri thức?', 'ERP sẽ trích xuất nội dung và lập chỉ mục AI. Thao tác này có thể sử dụng lượt AI của doanh nghiệp.', [
@@ -130,17 +133,20 @@ export function KnowledgeScreen() {
   }
 
   function deleteDocument(document: KnowledgeDocument) {
-    Alert.alert('Xóa tài liệu?', `“${document.name}” sẽ bị xóa khỏi Kho tri thức ERP.`, [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Xóa', style: 'destructive', onPress: () => {
-        void deleteKnowledgeDocument(document.id).then(() => {
+    setSelected(null);
+    showHrConfirm({
+      title: 'Xóa tài liệu?',
+      message: `“${document.name}” sẽ bị xóa khỏi Kho tri thức ERP.`,
+      confirmLabel: 'Xóa',
+      onConfirm: async () => {
+        try {
+          await deleteKnowledgeDocument(document.id);
           setDocuments((items) => items.filter((item) => item.id !== document.id));
-          setSelected(null);
-        }).catch((cause: unknown) => {
+        } catch (cause: unknown) {
           Alert.alert('Chưa xóa được tài liệu', cause instanceof Error ? cause.message : 'ERP không xóa được tài liệu.');
-        });
-      } },
-    ]);
+        }
+      },
+    });
   }
 
   return (
@@ -158,9 +164,9 @@ export function KnowledgeScreen() {
         </View>
 
         <Pressable disabled={saving} onPress={confirmAddDocuments} style={[styles.uploadButton, saving && styles.uploadDisabled]}>
-          {saving ? <ActivityIndicator color={colors.white} style={styles.uploadGlyph} /> : <Text style={styles.uploadGlyph}>＋</Text>}
+          <View style={styles.uploadIcon}>{saving ? <ActivityIndicator color={colors.white} /> : <Upload size={17} color={colors.white} />}</View>
           <View style={styles.uploadCopy}><Text style={styles.uploadTitle}>Thêm tài liệu</Text><Text style={styles.uploadHint}>PDF, Word, Excel hoặc TXT</Text></View>
-          <Text style={styles.uploadArrow}>›</Text>
+          <ChevronRight size={18} color={colors.primary} />
         </Pressable>
 
         <TextInput value={query} onChangeText={setQuery} placeholder="Tìm tên tài liệu..." placeholderTextColor={colors.muted} style={styles.search} />
@@ -180,8 +186,8 @@ export function KnowledgeScreen() {
       <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
         {selected && <View style={styles.modalBackdrop}><View style={styles.detailSheet}>
           <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Chi tiết tài liệu</Text><Pressable onPress={() => setSelected(null)}><Text style={styles.close}>×</Text></Pressable></View>
-          <View style={styles.fileHero}><Text style={styles.fileGlyph}>{fileType(selected.mimeType)}</Text><View style={styles.fileHeroCopy}><Text style={styles.documentName}>{selected.name}</Text><Text style={styles.fileName}>{selected.fileName}</Text></View></View>
+          <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Chi tiết tài liệu</Text><Pressable style={styles.closeButton} onPress={() => setSelected(null)}><X size={19} color={colors.muted} /></Pressable></View>
+          <View style={styles.fileHero}><View style={styles.fileIcon}>{SelectedIcon && <SelectedIcon size={21} color="#7852C7" />}</View><View style={styles.fileHeroCopy}><Text style={styles.documentName}>{selected.name}</Text><Text style={styles.fileName}>{selected.fileName}</Text></View></View>
           <InfoLine label="Danh mục" value={selected.category} />
           <InfoLine label="Phạm vi kênh" value={selected.channelScope.join(', ')} />
           <InfoLine label="Mục đích AI" value={selected.purposeScope.join(', ')} />
@@ -198,7 +204,7 @@ export function KnowledgeScreen() {
       <Modal visible={Boolean(editing)} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
         {editing && <View style={styles.modalBackdrop}><View style={styles.editSheet}>
           <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Chỉnh sửa tài liệu</Text><Pressable onPress={() => setEditing(null)}><Text style={styles.close}>×</Text></Pressable></View>
+          <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Chỉnh sửa tài liệu</Text><Pressable style={styles.closeButton} onPress={() => setEditing(null)}><X size={19} color={colors.muted} /></Pressable></View>
           <Text style={styles.fieldLabel}>Tài liệu</Text>
           <Text style={styles.editDocumentName}>{editing.name}</Text>
           <Text style={styles.fieldLabel}>Phân loại tri thức</Text>
@@ -211,10 +217,11 @@ export function KnowledgeScreen() {
 }
 
 function DocumentRow({ document, onPress }: { document: KnowledgeDocument; onPress: () => void }) {
+  const Icon = fileIcon(document.mimeType);
   return <Card onPress={onPress} style={styles.documentRow}>
-    <View style={styles.documentIcon}><Text style={styles.fileGlyphSmall}>{fileType(document.mimeType)}</Text></View>
+    <View style={styles.documentIcon}><Icon size={19} color="#7852C7" /></View>
     <View style={styles.documentCopy}><Text numberOfLines={1} style={styles.rowName}>{document.name}</Text><Text style={styles.rowMeta}>{document.category} · {statusLabel(document.status)} · {formatDate(document.updatedAt)}</Text></View>
-    <Text style={styles.rowArrow}>›</Text>
+    <ChevronRight size={17} color={colors.muted} />
   </Card>;
 }
 
@@ -222,23 +229,23 @@ function InfoLine({ label, value }: { label: string; value: string }) {
   return <View style={styles.infoLine}><Text style={styles.infoLabel}>{label}</Text><Text style={styles.infoValue}>{value}</Text></View>;
 }
 
-function fileType(mimeType: string) {
-  if (mimeType.includes('pdf')) return 'PDF';
-  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'XLS';
-  if (mimeType.includes('word') || mimeType.includes('document')) return 'DOC';
-  return 'TXT';
+function fileIcon(mimeType: string) {
+  if (mimeType.includes('image')) return FileImage;
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return FileSpreadsheet;
+  if (mimeType.includes('pdf') || mimeType.includes('word') || mimeType.includes('document')) return FileText;
+  return File;
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 }, content: { padding: 18, paddingTop: 14, paddingBottom: 28 },
   eyebrow: { color: colors.primary, fontSize: 9, fontWeight: '800', letterSpacing: 1.1 }, title: { color: colors.ink, fontSize: 24, fontWeight: '800', marginTop: 4 }, subtitle: { color: colors.muted, fontSize: 10, lineHeight: 16, marginTop: 5 },
   summaryRow: { flexDirection: 'row', gap: 8, marginTop: 17 }, summaryCard: { flex: 1, padding: 11, alignItems: 'center', borderRadius: 14 }, summaryValue: { color: colors.ink, fontSize: 17, fontWeight: '800' }, summaryLabel: { color: colors.muted, fontSize: 8, marginTop: 4 },
-  uploadButton: { flexDirection: 'row', alignItems: 'center', marginTop: 14, padding: 12, borderRadius: 15, backgroundColor: '#EEF4FF', borderWidth: 1, borderColor: '#DDE9FF' }, uploadGlyph: { color: colors.white, backgroundColor: colors.primary, width: 31, height: 31, borderRadius: 11, textAlign: 'center', textAlignVertical: 'center', fontSize: 21, overflow: 'hidden' }, uploadCopy: { flex: 1, marginLeft: 10 }, uploadTitle: { color: colors.ink, fontSize: 10, fontWeight: '800' }, uploadHint: { color: colors.muted, fontSize: 8, marginTop: 3 }, uploadArrow: { color: colors.primary, fontSize: 23 },
+  uploadButton: { flexDirection: 'row', alignItems: 'center', marginTop: 14, padding: 12, borderRadius: 15, backgroundColor: '#EEF4FF', borderWidth: 1, borderColor: '#DDE9FF' }, uploadIcon: { width: 31, height: 31, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }, uploadCopy: { flex: 1, marginLeft: 10 }, uploadTitle: { color: colors.ink, fontSize: 10, fontWeight: '800' }, uploadHint: { color: colors.muted, fontSize: 8, marginTop: 3 },
   search: { height: 42, paddingHorizontal: 13, marginTop: 14, borderRadius: 13, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, color: colors.ink, fontSize: 10 }, filters: { gap: 7, paddingVertical: 11 }, filter: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9, backgroundColor: colors.white }, filterActive: { backgroundColor: '#EAF2FF' }, filterText: { color: colors.muted, fontSize: 8, fontWeight: '700' }, filterTextActive: { color: colors.primary },
-  listHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5, marginBottom: 9 }, listTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' }, listCount: { color: colors.muted, fontSize: 8 }, documentList: { gap: 8 }, documentRow: { flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 15 }, documentIcon: { width: 38, height: 40, borderRadius: 12, backgroundColor: '#F1EBFF', alignItems: 'center', justifyContent: 'center' }, fileGlyphSmall: { color: '#7852C7', fontSize: 9, fontWeight: '900' }, documentCopy: { flex: 1, marginHorizontal: 10 }, rowName: { color: colors.ink, fontSize: 10, fontWeight: '800' }, rowMeta: { color: colors.muted, fontSize: 8, marginTop: 5 }, rowArrow: { color: colors.muted, fontSize: 20 }, empty: { color: colors.muted, textAlign: 'center', fontSize: 10, padding: 28 }, note: { color: colors.muted, textAlign: 'center', fontSize: 8, lineHeight: 13, marginTop: 16 },
+  listHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5, marginBottom: 9 }, listTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' }, listCount: { color: colors.muted, fontSize: 8 }, documentList: { gap: 8 }, documentRow: { flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 15 }, documentIcon: { width: 38, height: 40, borderRadius: 12, backgroundColor: '#F1EBFF', alignItems: 'center', justifyContent: 'center' }, documentCopy: { flex: 1, marginHorizontal: 10 }, rowName: { color: colors.ink, fontSize: 10, fontWeight: '800' }, rowMeta: { color: colors.muted, fontSize: 8, marginTop: 5 }, empty: { color: colors.muted, textAlign: 'center', fontSize: 10, padding: 28 }, note: { color: colors.muted, textAlign: 'center', fontSize: 8, lineHeight: 13, marginTop: 16 },
   loading: { padding: 24 }, errorCard: { padding: 11, marginTop: 12, backgroundColor: '#FFF1F0', borderColor: '#F6D6D4' }, errorText: { color: '#A43B36', fontSize: 8, lineHeight: 13 }, uploadDisabled: { opacity: 0.65 },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#10182866' }, detailSheet: { backgroundColor: colors.background, borderTopLeftRadius: 23, borderTopRightRadius: 23, paddingHorizontal: 20, paddingTop: 9, paddingBottom: 25 }, editSheet: { backgroundColor: colors.background, borderTopLeftRadius: 23, borderTopRightRadius: 23, paddingHorizontal: 20, paddingTop: 9, paddingBottom: 25 }, sheetHandle: { alignSelf: 'center', width: 38, height: 4, borderRadius: 3, backgroundColor: '#CDD4E0', marginBottom: 14 }, sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 17 }, sheetTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' }, close: { color: colors.muted, fontSize: 25, lineHeight: 25 },
-  fileHero: { flexDirection: 'row', alignItems: 'center', padding: 13, backgroundColor: colors.white, borderRadius: 15, marginBottom: 12 }, fileGlyph: { color: '#7852C7', backgroundColor: '#F1EBFF', width: 43, height: 43, borderRadius: 13, textAlign: 'center', textAlignVertical: 'center', fontSize: 10, fontWeight: '900', overflow: 'hidden' }, fileHeroCopy: { flex: 1, marginLeft: 11 }, documentName: { color: colors.ink, fontSize: 11, fontWeight: '800' }, fileName: { color: colors.muted, fontSize: 8, marginTop: 4 }, infoLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.border }, infoLabel: { color: colors.muted, fontSize: 9 }, infoValue: { color: colors.ink, fontSize: 9, fontWeight: '700' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#10182866' }, detailSheet: { backgroundColor: colors.background, borderTopLeftRadius: 23, borderTopRightRadius: 23, paddingHorizontal: 20, paddingTop: 9, paddingBottom: 25 }, editSheet: { backgroundColor: colors.background, borderTopLeftRadius: 23, borderTopRightRadius: 23, paddingHorizontal: 20, paddingTop: 9, paddingBottom: 25 }, sheetHandle: { alignSelf: 'center', width: 38, height: 4, borderRadius: 3, backgroundColor: '#CDD4E0', marginBottom: 14 }, sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 17 }, sheetTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' }, closeButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  fileHero: { flexDirection: 'row', alignItems: 'center', padding: 13, backgroundColor: colors.white, borderRadius: 15, marginBottom: 12 }, fileIcon: { backgroundColor: '#F1EBFF', width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, fileHeroCopy: { flex: 1, marginLeft: 11 }, documentName: { color: colors.ink, fontSize: 11, fontWeight: '800' }, fileName: { color: colors.muted, fontSize: 8, marginTop: 4 }, infoLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.border }, infoLabel: { color: colors.muted, fontSize: 9 }, infoValue: { color: colors.ink, fontSize: 9, fontWeight: '700' },
   sheetActions: { flexDirection: 'row', gap: 9, marginTop: 18 }, secondaryButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF2FF', borderRadius: 12 }, secondaryButtonText: { color: colors.primary, fontSize: 10, fontWeight: '800' }, deleteButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FCEBEC', borderRadius: 12 }, deleteButtonText: { color: '#B4232E', fontSize: 10, fontWeight: '800' },
   fieldLabel: { color: colors.ink, fontSize: 9, fontWeight: '700', marginBottom: 6 }, fieldInput: { height: 43, paddingHorizontal: 12, backgroundColor: colors.white, borderRadius: 12, borderColor: colors.border, borderWidth: 1, color: colors.ink, fontSize: 10, marginBottom: 15 }, categoryOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 19 }, categoryOption: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9, backgroundColor: colors.white }, categoryOptionActive: { backgroundColor: '#EAF2FF' }, categoryOptionText: { color: colors.muted, fontSize: 8, fontWeight: '700' }, categoryOptionTextActive: { color: colors.primary }, saveButton: { minHeight: 43, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: 12 }, saveButtonText: { color: colors.white, fontSize: 10, fontWeight: '800' },
   editDocumentName: { color: colors.ink, fontSize: 10, lineHeight: 15, padding: 12, borderRadius: 12, backgroundColor: colors.white, marginBottom: 15 },

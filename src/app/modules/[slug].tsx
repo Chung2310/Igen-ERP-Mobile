@@ -4,6 +4,7 @@ import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { getFeatureScreen } from '@/features/modules/featureScreenRegistry';
 import { getModuleBySlug } from '@/features/modules/moduleCatalog';
+import { Check } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 
 export default function ModuleScaffoldScreen() {
@@ -17,18 +18,19 @@ export default function ModuleScaffoldScreen() {
   const FeatureScreen = getFeatureScreen(module.slug);
   if (FeatureScreen) {
     return (
-      <Screen>
-        <Stack.Screen options={{ title: module.name }} />
+      <Screen edges={module.slug === 'quotes' || module.slug === 'inventory' ? ['left', 'right'] : undefined}>
+        <Stack.Screen options={module.slug === 'resources' ? { headerShown: false } : { headerShown: true, title: module.name, headerBackTitle: 'Trở lại', headerTintColor: colors.ink }} />
         <FeatureScreen module={module} />
       </Screen>
     );
   }
 
+  const ModuleIcon = module.icon;
   return (
     <Screen>
       <Stack.Screen options={{ title: module.name }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.icon, { backgroundColor: module.color }]}><Text style={styles.iconText}>{module.icon}</Text></View>
+        <View style={[styles.icon, { backgroundColor: module.color }]}><ModuleIcon size={28} color={colors.primary} /></View>
         <Text style={styles.category}>{module.category.toLocaleUpperCase('vi')} · ĐỢT 1</Text>
         <Text style={styles.title}>{module.name}</Text>
         <Text style={styles.body}>{module.description}</Text>
@@ -38,7 +40,7 @@ export default function ModuleScaffoldScreen() {
         </Card>
         <Text style={styles.sectionTitle}>Phạm vi dự kiến</Text>
         {module.capabilities.map((capability) => (
-          <View key={capability} style={styles.capability}><Text style={styles.check}>✓</Text><Text style={styles.capabilityText}>{capability}</Text></View>
+          <View key={capability} style={styles.capability}><Check size={14} color="#16885A" style={styles.check} /><Text style={styles.capabilityText}>{capability}</Text></View>
         ))}
         <Text style={styles.footer}>Các dữ liệu hiển thị ở bản khung chưa kết nối ERP thật.</Text>
       </ScrollView>
@@ -50,7 +52,6 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingTop: 22 },
   missing: { flex: 1, justifyContent: 'center', padding: 24 },
   icon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  iconText: { fontSize: 25 },
   category: { color: colors.primary, fontSize: 9, fontWeight: '800', letterSpacing: 1.1, marginTop: 19 },
   title: { color: colors.ink, fontSize: 25, fontWeight: '800', marginTop: 6 },
   body: { color: colors.muted, fontSize: 13, lineHeight: 20, marginTop: 8 },
@@ -61,7 +62,7 @@ const styles = StyleSheet.create({
   statusBody: { color: colors.muted, fontSize: 10, lineHeight: 16, marginTop: 5 },
   sectionTitle: { color: colors.ink, fontSize: 14, fontWeight: '800', marginTop: 26, marginBottom: 12 },
   capability: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 11 },
-  check: { color: '#16885A', fontSize: 13, fontWeight: '800', marginRight: 9, marginTop: 1 },
+  check: { marginRight: 9, marginTop: 1 },
   capabilityText: { color: colors.ink, fontSize: 12, flex: 1, lineHeight: 18 },
   footer: { color: colors.muted, textAlign: 'center', fontSize: 10, lineHeight: 16, marginTop: 24, marginBottom: 20 },
 });

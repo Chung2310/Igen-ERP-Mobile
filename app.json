@@ -16,7 +16,16 @@
           "microphonePermission": false
         }
       ],
-      "expo-secure-store"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Cho phép ERP Mobile dùng camera để quét mã vạch khi kiểm kê kho.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

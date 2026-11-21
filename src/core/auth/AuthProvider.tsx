@@ -7,6 +7,7 @@ type AuthContextValue = {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -47,7 +48,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
-  const value = useMemo(() => ({ user, isLoading, signIn, signOut }), [user, isLoading, signIn, signOut]);
+  const refreshUser = useCallback(async () => {
+    const currentUser = await getCurrentErpUser();
+    setUser(currentUser);
+  }, []);
+
+  const value = useMemo(
+    () => ({ user, isLoading, signIn, signOut, refreshUser }),
+    [user, isLoading, signIn, signOut, refreshUser],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

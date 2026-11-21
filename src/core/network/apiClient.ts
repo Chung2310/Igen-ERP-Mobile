@@ -13,6 +13,7 @@ export class ApiError extends Error {
 
 type ApiRequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
+  responseType?: 'json' | 'blob';
   accessToken?: string;
   /** Send this request without the current access token. */
   skipAuth?: boolean;
@@ -82,7 +83,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
 /** Shared API entry point for the ERP server. EXPO_PUBLIC_API_URL may be an origin or end in /api/v1. */
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  const { accessToken, skipAuth = false, skipRefresh = false, body, headers: requestHeaders, ...requestOptions } = options;
+  const { accessToken, skipAuth = false, skipRefresh = false, responseType = 'json', body, headers: requestHeaders, ...requestOptions } = options;
 
   const send = (token?: string) => {
     const headers = new Headers(requestHeaders);
@@ -91,7 +92,8 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     let requestBody: BodyInit | undefined;
     if (body !== undefined) {
       const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
-      if (isFormData || typeof body === 'string') {
+      const isBlob = typeof Blob !== 'undefined' && body instanceof Blob;
+      if (isFormData || isBlob || typeof body === 'string') {
         requestBody = body as BodyInit;
       } else {
         headers.set('Content-Type', 'application/json');
@@ -115,10 +117,13 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     if (renewedToken) response = await send(renewedToken);
   }
 
-  const result = await parseResponse(response);
   if (!response.ok) {
+    const result = await parseResponse(response);
     throw new ApiError(messageFrom(result, `ERP API trả về lỗi (${response.status})`), response.status, result);
   }
 
+  if (responseType === 'blob') return await response.blob() as T;
+
+  const result = await parseResponse(response);
   return result as T;
 }

@@ -1,0 +1,1081 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import {
+  AlertTriangle,
+  ExternalLink,
+  FileText,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Settings,
+  Upload,
+} from 'lucide-react-native';
+import { Card } from '@/components/Card';
+import {
+  createHrContractExtension,
+  fetchHrContractsOverview,
+  listHrContractExtensions,
+  saveHrContract,
+  updateHrContractSettings,
+  uploadHrContractFile,
+} from '@/features/hr/hrApi';
+import type {
+  HrContract,
+  HrContractExpiryAlert,
+  HrContractExtension,
+  HrContractStatus,
+} from '@/features/hr/types';
+import { getTodayKey } from '@/features/overview/overviewPeriod';
+import { colors } from '@/theme/colors';
+
+const STATUS_OPTIONS: Array<{ value: HrContractStatus; label: string }> = [
+  { value: 'draft', label: 'Bản nháp' },
+  { value: 'active', label: 'Còn hiệu lực' },
+  { value: 'expired', label: 'Hết hạn' },
+  { value: 'terminated', label: 'Đã chấm dứt' },
+];
+
+const CONTRACT_TYPES = [
+  'Hợp đồng thử việc',
+  'Hợp đồng xác định thời hạn',
+  'Hợp đồng không xác định thời hạn',
+  'Hợp đồng cộng tác viên',
+];
+
+function statusLabel(status?: string): string {
+  return STATUS_OPTIONS.find((s) => s.value === status)?.label || status || 'Còn hiệu lực';
+}
+
+function formatViDate(val?: string): string {
+  if (!val) return '—';
+  const raw = val.slice(0, 10);
+  const parts = raw.split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : raw;
+}
+
+function daysUntilExpiry(endDate?: string): number | null {
+  if (!endDate) return null;
+  const exp = new Date(endDate);
+  if (Number.isNaN(exp.getTime())) return null;
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const expUtc = Date.UTC(exp.getFullYear(), exp.getMonth(), exp.getDate());
+  return Math.ceil((expUtc - todayUtc) / 86_400_000);
+}
+
+export function HrContractsPanel({
+  companyCode,
+  branchId,
+  canManage,
+}: {
+  companyCode?: string;
+  branchId?: string;
+  canManage: boolean;
+}) {
+  const [subTab, setSubTab] = useState<'contracts' | 'extensions'>('contracts');
+  const [contracts, setContracts] = useState<HrContract[]>([]);
+  const [extensions, setExtensions] = useState<HrContractExtension[]>([]);
+  const [expiryAlerts, setExpiryAlerts] = useState<HrContractExpiryAlert[]>([]);
+  const [expiryAlertDays, setExpiryAlertDays] = useState(20);
+  const [employees, setEmployees] = useState<Array<{ _id: string; displayName?: string; email?: string; department?: string }>>([]);
+  const [withoutContract, setWithoutContract] = useState<Array<{ id: string; name: string }>>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  // Detail modals
+  const [detailContract, setDetailContract] = useState<HrContract | null>(null);
+  const [detailExtension, setDetailExtension] = useState<HrContractExtension | null>(null);
+
+  // Create / Edit Contract Modal
+  const [editing, setEditing] = useState<HrContract | 'new' | null>(null);
+  const [cType, setCType] = useState('Hợp đồng xác định thời hạn');
+  const [cEmployeeId, setCEmployeeId] = useState('');
+  const [cStartDate, setCStartDate] = useState(() => getTodayKey());
+  const [cEndDate, setCEndDate] = useState('');
+  const [cStatus, setCStatus] = useState<HrContractStatus>('active');
+  const [cNote, setCNote] = useState('');
+  const [cFileUrl, setCFileUrl] = useState('');
+  const [cFileName, setCFileName] = useState('');
+  const [cFileMime, setCFileMime] = useState('');
+  const [cFileSize, setCFileSize] = useState(0);
+  const [cFileToken, setCFileToken] = useState('');
+  const [cSignedUrl, setCSignedUrl] = useState('');
+  const [cSignedName, setCSignedName] = useState('');
+  const [cSignedMime, setCSignedMime] = useState('');
+  const [cSignedSize, setCSignedSize] = useState(0);
+  const [cSignedToken, setCSignedToken] = useState('');
+  const [uploadingKind, setUploadingKind] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Extension Modal
+  const [extOpen, setExtOpen] = useState(false);
+  const [extContractId, setExtContractId] = useState('');
+  const [extDate, setExtDate] = useState(() => getTodayKey());
+  const [extNewEndDate, setExtNewEndDate] = useState('');
+  const [extReason, setExtReason] = useState('');
+  const [extFileUrl, setExtFileUrl] = useState('');
+  const [extFileName, setExtFileName] = useState('');
+  const [extFileMime, setExtFileMime] = useState('');
+  const [extFileSize, setExtFileSize] = useState(0);
+  const [extFileToken, setExtFileToken] = useState('');
+
+  // Settings Modal
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingDaysStr, setSettingDaysStr] = useState('20');
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setError(null);
+      try {
+        const [overview, extList] = await Promise.all([
+          fetchHrContractsOverview({ companyCode, branchId, search: search.trim() || undefined }),
+          listHrContractExtensions(companyCode, branchId).catch(() => []),
+        ]);
+        setContracts(overview.contracts);
+        setExpiryAlerts(overview.expiryAlerts);
+        setExpiryAlertDays(overview.expiryAlertDays);
+        setSettingDaysStr(String(overview.expiryAlertDays));
+        setEmployees(overview.employees);
+        setWithoutContract(overview.withoutContractEmployees);
+        setExtensions(extList);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Không tải được dữ liệu hợp đồng.');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [branchId, companyCode, search],
+  );
+
+  useEffect(() => {
+    const t = setTimeout(() => void load(), 250);
+    return () => clearTimeout(t);
+  }, [load]);
+
+  const openContractModal = useCallback((contract?: HrContract, presetEmployeeId?: string) => {
+    setEditing(contract || 'new');
+    setCType(contract?.contractType || 'Hợp đồng xác định thời hạn');
+    setCEmployeeId(contract?.employeeId || presetEmployeeId || '');
+    setCStartDate(contract?.startDate ? contract.startDate.slice(0, 10) : getTodayKey());
+    setCEndDate(contract?.endDate ? contract.endDate.slice(0, 10) : '');
+    setCStatus((contract?.status as HrContractStatus) || 'active');
+    setCNote(contract?.note || '');
+    setCFileUrl(contract?.contractFileUrl || '');
+    setCFileName(contract?.contractFileName || '');
+    setCFileMime(contract?.contractFileMimeType || '');
+    setCFileSize(contract?.contractFileSize || 0);
+    setCFileToken('');
+    setCSignedUrl(contract?.signedImageUrl || '');
+    setCSignedName(contract?.signedImageName || '');
+    setCSignedMime(contract?.signedImageMimeType || '');
+    setCSignedSize(contract?.signedImageSize || 0);
+    setCSignedToken('');
+  }, []);
+
+  const pickAndUpload = useCallback(
+    async (kind: 'contract' | 'signed' | 'extension') => {
+      try {
+        const result = await DocumentPicker.getDocumentAsync({
+          multiple: false,
+          copyToCacheDirectory: true,
+        });
+        if (result.canceled || !result.assets?.[0]) return;
+        const asset = result.assets[0];
+        if ((asset.size ?? 0) > 10 * 1024 * 1024) {
+          Alert.alert('Tệp quá lớn', 'Tệp tải lên không được vượt quá 10 MB.');
+          return;
+        }
+        setUploadingKind(kind);
+        const uploaded = await uploadHrContractFile(asset, kind, companyCode, branchId);
+        if (kind === 'contract') {
+          setCFileUrl(uploaded.url);
+          setCFileName(uploaded.name);
+          setCFileMime(uploaded.mimeType);
+          setCFileSize(uploaded.size);
+          setCFileToken(uploaded.uploadToken || '');
+        } else if (kind === 'signed') {
+          setCSignedUrl(uploaded.url);
+          setCSignedName(uploaded.name);
+          setCSignedMime(uploaded.mimeType);
+          setCSignedSize(uploaded.size);
+          setCSignedToken(uploaded.uploadToken || '');
+        } else {
+          setExtFileUrl(uploaded.url);
+          setExtFileName(uploaded.name);
+          setExtFileMime(uploaded.mimeType);
+          setExtFileSize(uploaded.size);
+          setExtFileToken(uploaded.uploadToken || '');
+        }
+        Alert.alert('Đã tải lên', `Đã tải "${uploaded.name}" thành công.`);
+      } catch (err) {
+        Alert.alert('Tải tệp thất bại', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+      } finally {
+        setUploadingKind(null);
+      }
+    },
+    [branchId, companyCode],
+  );
+
+  const onSaveContract = useCallback(async () => {
+    if (!cEmployeeId || !cType.trim() || !cStartDate.trim() || !cEndDate.trim()) {
+      Alert.alert('Thiếu thông tin', 'Hãy chọn Nhân viên, Loại hợp đồng, Ngày bắt đầu và Ngày kết thúc.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await saveHrContract(
+        {
+          contractType: cType.trim(),
+          employeeId: cEmployeeId,
+          startDate: cStartDate.trim(),
+          endDate: cEndDate.trim(),
+          status: cStatus,
+          note: cNote.trim(),
+          contractFileUrl: cFileUrl,
+          contractFileName: cFileName,
+          contractFileMimeType: cFileMime,
+          contractFileSize: cFileSize,
+          contractFileUploadToken: cFileToken,
+          signedImageUrl: cSignedUrl,
+          signedImageName: cSignedName,
+          signedImageMimeType: cSignedMime,
+          signedImageSize: cSignedSize,
+          signedImageUploadToken: cSignedToken,
+        },
+        editing && editing !== 'new' ? editing._id : undefined,
+        companyCode,
+        branchId,
+      );
+      setEditing(null);
+      Alert.alert('Thành công', 'Đã lưu hợp đồng lao động.');
+      void load(true);
+    } catch (err) {
+      Alert.alert('Lỗi lưu hợp đồng', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    branchId,
+    cEmployeeId,
+    cEndDate,
+    cFileMime,
+    cFileName,
+    cFileSize,
+    cFileToken,
+    cFileUrl,
+    cNote,
+    cSignedMime,
+    cSignedName,
+    cSignedSize,
+    cSignedToken,
+    cSignedUrl,
+    cStartDate,
+    cStatus,
+    cType,
+    companyCode,
+    editing,
+    load,
+  ]);
+
+  const openExtendModal = useCallback((contract?: HrContract) => {
+    setExtContractId(contract?._id || '');
+    setExtDate(getTodayKey());
+    setExtNewEndDate(contract?.endDate ? contract.endDate.slice(0, 10) : '');
+    setExtReason('');
+    setExtFileUrl('');
+    setExtFileName('');
+    setExtFileMime('');
+    setExtFileSize(0);
+    setExtFileToken('');
+    setExtOpen(true);
+  }, []);
+
+  const onSaveExtension = useCallback(async () => {
+    if (!extContractId || !extNewEndDate.trim()) {
+      Alert.alert('Thiếu thông tin', 'Hãy chọn hợp đồng và Ngày hết hạn mới (YYYY-MM-DD).');
+      return;
+    }
+    setSaving(true);
+    try {
+      await createHrContractExtension(
+        extContractId,
+        {
+          extensionDate: extDate.trim() || getTodayKey(),
+          newEndDate: extNewEndDate.trim(),
+          reason: extReason.trim(),
+          extensionFileUrl: extFileUrl,
+          extensionFileName: extFileName,
+          extensionFileMimeType: extFileMime,
+          extensionFileSize: extFileSize,
+          extensionFileUploadToken: extFileToken,
+        },
+        companyCode,
+        branchId,
+      );
+      setExtOpen(false);
+      Alert.alert('Thành công', 'Đã gia hạn hợp đồng.');
+      void load(true);
+    } catch (err) {
+      Alert.alert('Lỗi gia hạn', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    branchId,
+    companyCode,
+    extContractId,
+    extDate,
+    extFileMime,
+    extFileName,
+    extFileSize,
+    extFileToken,
+    extFileUrl,
+    extNewEndDate,
+    extReason,
+    load,
+  ]);
+
+  const onSaveSettings = useCallback(async () => {
+    const days = Number(settingDaysStr);
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      Alert.alert('Không hợp lệ', 'Số ngày báo trước phải là số nguyên từ 1 đến 365.');
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      const updated = await updateHrContractSettings(days, companyCode, branchId);
+      setExpiryAlertDays(updated);
+      setSettingsOpen(false);
+      Alert.alert('Đã lưu', `Cảnh báo trước ${updated} ngày khi hợp đồng sắp hết hạn.`);
+      void load(true);
+    } catch (err) {
+      Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể lưu cài đặt.');
+    } finally {
+      setSavingSettings(false);
+    }
+  }, [branchId, companyCode, load, settingDaysStr]);
+
+  const activeContracts = useMemo(
+    () => contracts.filter((c) => c.status !== 'terminated'),
+    [contracts],
+  );
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load(true);
+          }}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
+    >
+      {/* Sub-tabs: Hợp đồng | Lịch sử gia hạn */}
+      <View style={styles.segmentRow}>
+        <Pressable
+          onPress={() => setSubTab('contracts')}
+          style={[styles.segmentBtn, subTab === 'contracts' && styles.segmentBtnActive]}
+        >
+          <Text style={[styles.segmentText, subTab === 'contracts' && styles.segmentTextActive]}>
+            Hợp đồng ({contracts.length})
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setSubTab('extensions')}
+          style={[styles.segmentBtn, subTab === 'extensions' && styles.segmentBtnActive]}
+        >
+          <Text style={[styles.segmentText, subTab === 'extensions' && styles.segmentTextActive]}>
+            Gia hạn ({extensions.length})
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Search & actions */}
+      <View style={styles.searchRow}>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Tìm theo tên nhân viên, loại hợp đồng..."
+          placeholderTextColor={colors.muted}
+          style={[styles.field, { flex: 1 }]}
+        />
+        {canManage ? (
+          <>
+            <Pressable onPress={() => setSettingsOpen(true)} style={styles.iconActionBtn}>
+              <Settings size={15} color={colors.primary} />
+            </Pressable>
+            <Pressable
+              onPress={() => (subTab === 'extensions' ? openExtendModal() : openContractModal())}
+              style={styles.primaryBtn}
+            >
+              <Plus size={13} color={colors.white} />
+              <Text style={styles.primaryBtnText}>
+                {subTab === 'extensions' ? 'Gia hạn' : 'Hợp đồng'}
+              </Text>
+            </Pressable>
+          </>
+        ) : null}
+      </View>
+
+      {/* Expiry alert banner */}
+      {subTab === 'contracts' && expiryAlerts.length > 0 ? (
+        <Card style={styles.alertBanner}>
+          <View style={styles.headRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <AlertTriangle size={15} color="#B45309" />
+              <Text style={styles.alertTitle}>
+                {expiryAlerts.length} hợp đồng sắp hết hạn (trong {expiryAlertDays} ngày)
+              </Text>
+            </View>
+          </View>
+          {expiryAlerts.slice(0, 3).map((al) => (
+            <Text key={al.id} style={styles.alertItem}>
+              • {al.employeeName}: hết hạn {formatViDate(al.endDate)} (còn {al.daysRemaining} ngày)
+            </Text>
+          ))}
+        </Card>
+      ) : null}
+
+      {/* Employees without contract */}
+      {subTab === 'contracts' && canManage && withoutContract.length > 0 ? (
+        <Card style={styles.missingBanner}>
+          <Text style={styles.missingTitle}>
+            Chưa có hợp đồng ({withoutContract.length} nhân sự) — chạm để tạo nhanh:
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginTop: 6 }}>
+            {withoutContract.slice(0, 15).map((emp) => (
+              <Pressable
+                key={emp.id}
+                onPress={() => openContractModal(undefined, emp.id)}
+                style={styles.missingChip}
+              >
+                <Text style={styles.missingChipText}>+ {emp.name}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </Card>
+      ) : null}
+
+      {loading ? (
+        <Card style={styles.stateCard}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </Card>
+      ) : error ? (
+        <Card style={styles.stateCard}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable onPress={() => void load()} style={styles.primaryBtn}>
+            <Text style={styles.primaryBtnText}>Thử lại</Text>
+          </Pressable>
+        </Card>
+      ) : subTab === 'contracts' ? (
+        !contracts.length ? (
+          <Card style={styles.stateCard}>
+            <Text style={styles.muted}>Chưa có hợp đồng lao động nào.</Text>
+          </Card>
+        ) : (
+          <View style={styles.list}>
+            {contracts.map((c) => {
+              const rem = daysUntilExpiry(c.endDate);
+              const expiringSoon = c.status === 'active' && rem !== null && rem >= 1 && rem <= expiryAlertDays;
+              return (
+                <Card key={c._id} onPress={() => setDetailContract(c)} style={styles.card}>
+                  <View style={styles.headRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={styles.rowTitle}>
+                        {c.employeeName || c.employeeEmail || 'Nhân sự'}
+                      </Text>
+                      <Text style={styles.subMeta}>{c.contractType || 'Hợp đồng lao động'}</Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.statusBadge,
+                        c.status === 'active' && styles.statusActive,
+                        c.status === 'expired' && styles.statusWarn,
+                        c.status === 'terminated' && styles.statusDanger,
+                      ]}
+                    >
+                      {statusLabel(c.status)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.subMeta}>
+                    📅 {formatViDate(c.startDate)} → {formatViDate(c.endDate)}
+                    {expiringSoon ? ` · ⚠️ Còn ${rem} ngày` : ''}
+                  </Text>
+
+                  {c.note ? <Text style={styles.muted}>{c.note}</Text> : null}
+
+                  {(c.contractFileUrl || c.signedImageUrl || c.electronicSignatureUrl) ? (
+                    <View style={styles.wrapRow}>
+                      {c.contractFileUrl ? (
+                        <Pressable
+                          onPress={() => void Linking.openURL(c.contractFileUrl!)}
+                          style={styles.fileChip}
+                        >
+                          <FileText size={11} color={colors.primary} />
+                          <Text numberOfLines={1} style={styles.fileChipText}>
+                            {c.contractFileName || 'File hợp đồng'}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                      {c.signedImageUrl ? (
+                        <Pressable
+                          onPress={() => void Linking.openURL(c.signedImageUrl!)}
+                          style={styles.fileChip}
+                        >
+                          <ExternalLink size={11} color="#16885A" />
+                          <Text numberOfLines={1} style={[styles.fileChipText, { color: '#16885A' }]}>
+                            Ảnh đã ký
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                      {c.electronicSignatureUrl ? (
+                        <Pressable
+                          onPress={() => void Linking.openURL(c.electronicSignatureUrl!)}
+                          style={styles.fileChip}
+                        >
+                          <ExternalLink size={11} color="#7C3AED" />
+                          <Text numberOfLines={1} style={[styles.fileChipText, { color: '#7C3AED' }]}>
+                            Chữ ký điện tử
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  {canManage ? (
+                    <View style={styles.actionRow}>
+                      <Pressable onPress={() => openContractModal(c)} style={styles.smallEditBtn}>
+                        <Pencil size={12} color={colors.primary} />
+                        <Text style={styles.smallEditBtnText}>Sửa</Text>
+                      </Pressable>
+                      <Pressable onPress={() => openExtendModal(c)} style={styles.smallExtendBtn}>
+                        <RefreshCw size={12} color="#16885A" />
+                        <Text style={styles.smallExtendBtnText}>Gia hạn</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </Card>
+              );
+            })}
+          </View>
+        )
+      ) : !extensions.length ? (
+        <Card style={styles.stateCard}>
+          <Text style={styles.muted}>Chưa có lịch sử gia hạn hợp đồng nào.</Text>
+        </Card>
+      ) : (
+        <View style={styles.list}>
+          {extensions.map((ext) => (
+            <Card key={ext._id} onPress={() => setDetailExtension(ext)} style={styles.card}>
+              <View style={styles.headRow}>
+                <Text style={[styles.rowTitle, { flex: 1 }]}>{ext.employeeName}</Text>
+                <Text style={styles.subMeta}>Ngày GH: {formatViDate(ext.extensionDate)}</Text>
+              </View>
+              <Text style={styles.subMeta}>
+                Hạn cũ: {formatViDate(ext.previousEndDate)} →{' '}
+                <Text style={{ color: '#16885A', fontWeight: '800' }}>
+                  Hạn mới: {formatViDate(ext.newEndDate)}
+                </Text>
+              </Text>
+              {ext.reason ? <Text style={styles.muted}>Lý do: {ext.reason}</Text> : null}
+              {ext.extensionFileUrl ? (
+                <Pressable
+                  onPress={() => void Linking.openURL(ext.extensionFileUrl!)}
+                  style={[styles.fileChip, { alignSelf: 'flex-start' }]}
+                >
+                  <FileText size={11} color={colors.primary} />
+                  <Text style={styles.fileChipText}>{ext.extensionFileName || 'Phụ lục gia hạn'}</Text>
+                </Pressable>
+              ) : null}
+            </Card>
+          ))}
+        </View>
+      )}
+
+      {/* Create / Edit Contract Modal */}
+      <Modal visible={Boolean(editing)} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
+        <Pressable style={styles.backdrop} onPress={() => setEditing(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.headRow}>
+              <Text style={styles.sheetTitle}>
+                {editing === 'new' ? 'Thêm hợp đồng mới' : 'Chỉnh sửa hợp đồng'}
+              </Text>
+              <Pressable onPress={() => setEditing(null)}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
+              <View style={{ gap: 8, paddingBottom: 14 }}>
+                <Text style={styles.label}>Nhân viên *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {employees.slice(0, 35).map((emp) => {
+                    const active = cEmployeeId === emp._id;
+                    return (
+                      <Pressable
+                        key={emp._id}
+                        onPress={() => setCEmployeeId(emp._id)}
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                          {emp.displayName || emp.email}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+
+                <Text style={styles.label}>Loại hợp đồng *</Text>
+                <View style={styles.wrapRow}>
+                  {CONTRACT_TYPES.map((t) => (
+                    <Pressable
+                      key={t}
+                      onPress={() => setCType(t)}
+                      style={[styles.chip, cType === t && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, cType === t && styles.chipTextActive]}>{t}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Ngày bắt đầu *</Text>
+                    <TextInput value={cStartDate} onChangeText={setCStartDate} placeholder="YYYY-MM-DD" style={styles.field} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Ngày kết thúc *</Text>
+                    <TextInput value={cEndDate} onChangeText={setCEndDate} placeholder="YYYY-MM-DD" style={styles.field} />
+                  </View>
+                </View>
+
+                <Text style={styles.label}>Trạng thái</Text>
+                <View style={styles.wrapRow}>
+                  {STATUS_OPTIONS.map((st) => (
+                    <Pressable
+                      key={st.value}
+                      onPress={() => setCStatus(st.value)}
+                      style={[styles.chip, cStatus === st.value && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, cStatus === st.value && styles.chipTextActive]}>
+                        {st.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Text style={styles.label}>Tệp hợp đồng (PDF / DOC / DOCX)</Text>
+                <Pressable
+                  disabled={Boolean(uploadingKind)}
+                  onPress={() => void pickAndUpload('contract')}
+                  style={styles.uploadBtn}
+                >
+                  <Upload size={13} color={colors.primary} />
+                  <Text style={styles.uploadBtnText}>
+                    {uploadingKind === 'contract'
+                      ? 'Đang tải tệp...'
+                      : cFileName || (cFileUrl ? 'Đã có tệp hợp đồng (Bấm để thay)' : 'Tải tệp hợp đồng lên')}
+                  </Text>
+                </Pressable>
+
+                <Text style={styles.label}>Ảnh bản cứng đã ký (JPG / PNG)</Text>
+                <Pressable
+                  disabled={Boolean(uploadingKind)}
+                  onPress={() => void pickAndUpload('signed')}
+                  style={styles.uploadBtn}
+                >
+                  <Upload size={13} color={colors.primary} />
+                  <Text style={styles.uploadBtnText}>
+                    {uploadingKind === 'signed'
+                      ? 'Đang tải ảnh...'
+                      : cSignedName || (cSignedUrl ? 'Đã có ảnh đã ký (Bấm để thay)' : 'Tải ảnh đã ký lên')}
+                  </Text>
+                </Pressable>
+
+                <Text style={styles.label}>Ghi chú</Text>
+                <TextInput
+                  value={cNote}
+                  onChangeText={setCNote}
+                  multiline
+                  placeholder="Ghi chú thêm về hợp đồng..."
+                  placeholderTextColor={colors.muted}
+                  style={[styles.field, { minHeight: 60, textAlignVertical: 'top' }]}
+                />
+
+                <Pressable
+                  disabled={saving || Boolean(uploadingKind)}
+                  onPress={() => void onSaveContract()}
+                  style={[styles.submitBtn, (saving || Boolean(uploadingKind)) && styles.disabled]}
+                >
+                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu hợp đồng'}</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Extend Contract Modal */}
+      <Modal visible={extOpen} transparent animationType="slide" onRequestClose={() => setExtOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setExtOpen(false)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.headRow}>
+              <Text style={styles.sheetTitle}>Gia hạn hợp đồng</Text>
+              <Pressable onPress={() => setExtOpen(false)}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
+              <View style={{ gap: 8, paddingBottom: 12 }}>
+                <Text style={styles.label}>Chọn hợp đồng *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {activeContracts.map((c) => (
+                    <Pressable
+                      key={c._id}
+                      onPress={() => {
+                        setExtContractId(c._id);
+                        if (!extNewEndDate && c.endDate) setExtNewEndDate(c.endDate.slice(0, 10));
+                      }}
+                      style={[styles.chip, extContractId === c._id && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, extContractId === c._id && styles.chipTextActive]}>
+                        {c.employeeName} ({formatViDate(c.endDate)})
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Ngày gia hạn</Text>
+                    <TextInput value={extDate} onChangeText={setExtDate} placeholder="YYYY-MM-DD" style={styles.field} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Hạn mới *</Text>
+                    <TextInput value={extNewEndDate} onChangeText={setExtNewEndDate} placeholder="YYYY-MM-DD" style={styles.field} />
+                  </View>
+                </View>
+
+                <Text style={styles.label}>Lý do gia hạn</Text>
+                <TextInput
+                  value={extReason}
+                  onChangeText={setExtReason}
+                  multiline
+                  placeholder="Ghi chú lý do gia hạn..."
+                  style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]}
+                />
+
+                <Text style={styles.label}>Phụ lục gia hạn (PDF / DOC)</Text>
+                <Pressable
+                  disabled={Boolean(uploadingKind)}
+                  onPress={() => void pickAndUpload('extension')}
+                  style={styles.uploadBtn}
+                >
+                  <Upload size={13} color={colors.primary} />
+                  <Text style={styles.uploadBtnText}>
+                    {uploadingKind === 'extension'
+                      ? 'Đang tải...'
+                      : extFileName || 'Tải file phụ lục gia hạn'}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  disabled={saving || Boolean(uploadingKind)}
+                  onPress={() => void onSaveExtension()}
+                  style={[styles.submitBtn, (saving || Boolean(uploadingKind)) && styles.disabled]}
+                >
+                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Xác nhận gia hạn'}</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Settings Modal */}
+      <Modal visible={settingsOpen} transparent animationType="slide" onRequestClose={() => setSettingsOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setSettingsOpen(false)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.headRow}>
+              <Text style={styles.sheetTitle}>Cài đặt cảnh báo hết hạn</Text>
+              <Pressable onPress={() => setSettingsOpen(false)}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.label}>Báo trước số ngày (1–365)</Text>
+            <TextInput
+              value={settingDaysStr}
+              onChangeText={setSettingDaysStr}
+              keyboardType="numeric"
+              style={styles.field}
+            />
+            <Pressable
+              disabled={savingSettings}
+              onPress={() => void onSaveSettings()}
+              style={[styles.submitBtn, savingSettings && styles.disabled]}
+            >
+              <Text style={styles.submitBtnText}>{savingSettings ? 'Đang lưu...' : 'Lưu cài đặt'}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Contract Detail Modal */}
+      <Modal
+        visible={Boolean(detailContract)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDetailContract(null)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setDetailContract(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            {detailContract ? (
+              <>
+                <View style={styles.headRow}>
+                  <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>
+                    Chi tiết hợp đồng
+                  </Text>
+                  <Pressable onPress={() => setDetailContract(null)}>
+                    <Text style={styles.closeText}>Đóng</Text>
+                  </Pressable>
+                </View>
+                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+                  <View style={{ gap: 8, paddingBottom: 12 }}>
+                    <Text style={styles.rowTitle}>
+                      {detailContract.employeeName || detailContract.employeeEmail || 'Nhân sự'}
+                    </Text>
+                    <Text style={styles.subMeta}>
+                      Loại hợp đồng: {detailContract.contractType || 'Hợp đồng lao động'}
+                    </Text>
+                    <Text style={styles.subMeta}>
+                      Trạng thái: {statusLabel(detailContract.status)}
+                    </Text>
+                    <Text style={styles.subMeta}>
+                      Thời hạn: {formatViDate(detailContract.startDate)} →{' '}
+                      {formatViDate(detailContract.endDate)}
+                    </Text>
+                    {detailContract.note ? (
+                      <>
+                        <Text style={styles.label}>Ghi chú</Text>
+                        <Text style={styles.muted}>{detailContract.note}</Text>
+                      </>
+                    ) : null}
+                    {(detailContract.contractFileUrl ||
+                      detailContract.signedImageUrl ||
+                      detailContract.electronicSignatureUrl) ? (
+                      <>
+                        <Text style={styles.label}>Tệp đính kèm</Text>
+                        <View style={styles.wrapRow}>
+                          {detailContract.contractFileUrl ? (
+                            <Pressable
+                              onPress={() => void Linking.openURL(detailContract.contractFileUrl!)}
+                              style={styles.fileChip}
+                            >
+                              <FileText size={12} color={colors.primary} />
+                              <Text style={styles.fileChipText}>
+                                {detailContract.contractFileName || 'File hợp đồng'}
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                          {detailContract.signedImageUrl ? (
+                            <Pressable
+                              onPress={() => void Linking.openURL(detailContract.signedImageUrl!)}
+                              style={styles.fileChip}
+                            >
+                              <ExternalLink size={12} color="#16885A" />
+                              <Text style={[styles.fileChipText, { color: '#16885A' }]}>
+                                Ảnh đã ký
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                          {detailContract.electronicSignatureUrl ? (
+                            <Pressable
+                              onPress={() =>
+                                void Linking.openURL(detailContract.electronicSignatureUrl!)
+                              }
+                              style={styles.fileChip}
+                            >
+                              <ExternalLink size={12} color="#7C3AED" />
+                              <Text style={[styles.fileChipText, { color: '#7C3AED' }]}>
+                                Chữ ký điện tử
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      </>
+                    ) : null}
+                    {canManage ? (
+                      <View style={styles.actionRow}>
+                        <Pressable
+                          onPress={() => {
+                            const target = detailContract;
+                            setDetailContract(null);
+                            openContractModal(target);
+                          }}
+                          style={[styles.submitBtn, { flex: 1, marginTop: 0 }]}
+                        >
+                          <Text style={styles.submitBtnText}>Chỉnh sửa</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            const target = detailContract;
+                            setDetailContract(null);
+                            openExtendModal(target);
+                          }}
+                          style={[styles.submitBtn, { flex: 1, marginTop: 0, backgroundColor: '#16885A' }]}
+                        >
+                          <Text style={styles.submitBtnText}>Gia hạn</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                </ScrollView>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Extension Detail Modal */}
+      <Modal
+        visible={Boolean(detailExtension)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDetailExtension(null)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setDetailExtension(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            {detailExtension ? (
+              <>
+                <View style={styles.headRow}>
+                  <Text style={styles.sheetTitle}>Chi tiết gia hạn hợp đồng</Text>
+                  <Pressable onPress={() => setDetailExtension(null)}>
+                    <Text style={styles.closeText}>Đóng</Text>
+                  </Pressable>
+                </View>
+                <View style={{ gap: 8 }}>
+                  <Text style={styles.rowTitle}>{detailExtension.employeeName}</Text>
+                  <Text style={styles.subMeta}>
+                    Ngày gia hạn: {formatViDate(detailExtension.extensionDate)}
+                  </Text>
+                  <Text style={styles.subMeta}>
+                    Hạn cũ: {formatViDate(detailExtension.previousEndDate)} → Hạn mới:{' '}
+                    {formatViDate(detailExtension.newEndDate)}
+                  </Text>
+                  {detailExtension.reason ? (
+                    <Text style={styles.muted}>Lý do: {detailExtension.reason}</Text>
+                  ) : null}
+                  {detailExtension.extensionFileUrl ? (
+                    <Pressable
+                      onPress={() => void Linking.openURL(detailExtension.extensionFileUrl!)}
+                      style={[styles.fileChip, { alignSelf: 'flex-start' }]}
+                    >
+                      <FileText size={12} color={colors.primary} />
+                      <Text style={styles.fileChipText}>
+                        {detailExtension.extensionFileName || 'Phụ lục gia hạn'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {detailExtension.signedImageUrl ? (
+                    <Pressable
+                      onPress={() => void Linking.openURL(detailExtension.signedImageUrl!)}
+                      style={[styles.fileChip, { alignSelf: 'flex-start' }]}
+                    >
+                      <ExternalLink size={12} color="#16885A" />
+                      <Text style={[styles.fileChipText, { color: '#16885A' }]}>
+                        Ảnh gia hạn đã ký
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { paddingHorizontal: 18, paddingBottom: 28 },
+  segmentRow: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 11, padding: 3, marginBottom: 10 },
+  segmentBtn: { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
+  segmentBtnActive: { backgroundColor: colors.white },
+  segmentText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  segmentTextActive: { color: colors.ink },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  iconActionBtn: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
+  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  alertBanner: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', padding: 11, marginBottom: 10, gap: 4 },
+  alertTitle: { color: '#92400E', fontSize: 11, fontWeight: '800', flex: 1 },
+  alertItem: { color: '#92400E', fontSize: 10 },
+  missingBanner: { backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', padding: 11, marginBottom: 10 },
+  missingTitle: { color: colors.ink, fontSize: 11, fontWeight: '700' },
+  missingChip: { backgroundColor: colors.white, borderColor: '#9BC5FF', borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 99 },
+  missingChipText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+
+  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
+  list: { gap: 10 },
+  card: { padding: 13, gap: 6 },
+  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  subMeta: { color: colors.muted, fontSize: 10 },
+  statusBadge: { color: '#475569', backgroundColor: '#F1F5F9', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
+  statusActive: { color: '#16885A', backgroundColor: '#E9F8F1' },
+  statusWarn: { color: '#B45309', backgroundColor: '#FFF3E5' },
+  statusDanger: { color: '#B91C1C', backgroundColor: '#FEE2E2' },
+  fileChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  fileChipText: { color: colors.primary, fontSize: 10, fontWeight: '700', maxWidth: 150 },
+  actionRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  smallEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EAF2FF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 8 },
+  smallEditBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  smallExtendBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E9F8F1', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 8 },
+  smallExtendBtnText: { color: '#16885A', fontSize: 11, fontWeight: '700' },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '90%' },
+  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
+  wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
+  chipTextActive: { color: colors.white },
+  uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EAF2FF', borderColor: '#9BC5FF', borderWidth: 1, borderStyle: 'dashed', borderRadius: 11, paddingVertical: 10, paddingHorizontal: 12 },
+  uploadBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  disabled: { opacity: 0.45 },
+});
+

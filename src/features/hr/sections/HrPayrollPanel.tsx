@@ -1,0 +1,1059 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Play,
+  Plus,
+  Send,
+  XCircle,
+} from 'lucide-react-native';
+import { Card } from '@/components/Card';
+import {
+  approvePayrollAdjustment,
+  closePayrollRun,
+  createPayrollAdjustment,
+  getPayrollMonthlyKpi,
+  getPayrollPeriodResults,
+  getPayrollRun,
+  listHrEmployees,
+  listMyPayslips,
+  listPayrollAdjustments,
+  listPayrollPolicies,
+  markPayrollRunPaid,
+  processPayrollPeriod,
+  publishPayrollPayslips,
+  rejectPayrollAdjustment,
+  reopenPayrollRun,
+  requestMyPayslipReview,
+  reviewPayrollRun,
+} from '@/features/hr/hrApi';
+import type {
+  HrEmployee,
+  HrPayrollAdjustment,
+  HrPayrollPolicy,
+  HrPayrollRun,
+  HrPayslip,
+} from '@/features/hr/types';
+import { formatCompactMoney } from '@/features/overview/overviewPeriod';
+import { colors } from '@/theme/colors';
+
+type PayrollSection = 'overview' | 'adjustments' | 'policies' | 'mine';
+
+const STEPS = [
+  { key: 'draft', label: 'Chuẩn bị' },
+  { key: 'review', label: 'Kiểm tra' },
+  { key: 'closed', label: 'Chốt' },
+  { key: 'paid', label: 'Đã trả' },
+] as const;
+
+const ADJ_KINDS = [
+  { value: 'bonus', label: 'Thưởng' },
+  { value: 'allowance', label: 'Phụ cấp' },
+  { value: 'deduction', label: 'Khấu trừ' },
+  { value: 'advance', label: 'Tạm ứng' },
+] as const;
+
+function formatVnd(val?: number): string {
+  const n = Number(val ?? 0);
+  if (!Number.isFinite(n)) return '0 ₫';
+  return `${Math.round(n).toLocaleString('vi-VN')} ₫`;
+}
+
+function shiftPeriod(periodKey: string, deltaMonths: number): string {
+  const [y, m] = periodKey.split('-').map(Number);
+  const d = new Date(y, (m || 1) - 1 + deltaMonths, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function HrPayrollPanel({
+  companyCode,
+  branchId,
+  canViewAll,
+  canManage,
+}: {
+  companyCode?: string;
+  branchId?: string;
+  canViewAll: boolean;
+  canManage: boolean;
+}) {
+  const [section, setSection] = useState<PayrollSection>(canViewAll ? 'overview' : 'mine');
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const [run, setRun] = useState<HrPayrollRun | null>(null);
+  const [results, setResults] = useState<HrPayslip[]>([]);
+  const [kpiByEmp, setKpiByEmp] = useState<Record<string, number | null>>({});
+  const [adjustments, setAdjustments] = useState<HrPayrollAdjustment[]>([]);
+  const [policies, setPolicies] = useState<HrPayrollPolicy[]>([]);
+  const [myPayslips, setMyPayslips] = useState<HrPayslip[]>([]);
+  const [employees, setEmployees] = useState<HrEmployee[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  // Detail modals
+  const [selectedSlip, setSelectedSlip] = useState<HrPayslip | null>(null);
+  const [selectedAdj, setSelectedAdj] = useState<HrPayrollAdjustment | null>(null);
+  const [selectedPolicy, setSelectedPolicy] = useState<HrPayrollPolicy | null>(null);
+  const [reviewMsg, setReviewMsg] = useState('');
+  const [sendingReview, setSendingReview] = useState(false);
+
+  // Reopen modal
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
+
+  // Create adjustment modal
+  const [adjOpen, setAdjOpen] = useState(false);
+  const [adjEmpId, setAdjEmpId] = useState('');
+  const [adjKind, setAdjKind] = useState<string>('bonus');
+  const [adjAmount, setAdjAmount] = useState('');
+  const [adjReason, setAdjReason] = useState('');
+
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setError(null);
+      try {
+        if (section === 'mine' || !canViewAll) {
+          setMyPayslips(await listMyPayslips());
+        } else if (section === 'policies') {
+          setPolicies(await listPayrollPolicies(branchId));
+        } else if (section === 'adjustments') {
+          const [adjList, empList] = await Promise.all([
+            listPayrollAdjustments(period, branchId).catch(() => []),
+            companyCode ? listHrEmployees(companyCode, branchId).catch(() => []) : Promise.resolve([]),
+          ]);
+          setAdjustments(adjList);
+          setEmployees(empList);
+        } else {
+          const [r, lines, kpi] = await Promise.all([
+            getPayrollRun(period, branchId),
+            getPayrollPeriodResults(period, branchId).catch(() => []),
+            getPayrollMonthlyKpi(period, branchId).catch(() => ({})),
+          ]);
+          setRun(r);
+          setResults(lines);
+          setKpiByEmp(kpi);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Không tải được dữ liệu bảng lương.');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [branchId, canViewAll, companyCode, period, section],
+  );
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filteredResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return results;
+    return results.filter(
+      (r) =>
+        (r.employeeName || '').toLowerCase().includes(q) ||
+        (r.department || '').toLowerCase().includes(q) ||
+        (r.employeeCode || '').toLowerCase().includes(q),
+    );
+  }, [results, search]);
+
+  const totals = useMemo(() => {
+    let gross = 0;
+    let net = 0;
+    let ded = 0;
+    for (const r of results) {
+      gross += Number(r.grossSalary ?? 0);
+      net += Number(r.netSalary ?? 0);
+      ded += Number(r.totalDeductions ?? r.deductions ?? 0);
+    }
+    return { count: results.length, gross, net, ded };
+  }, [results]);
+
+  const runAction = useCallback(
+    async (fn: () => Promise<void>, successMsg: string) => {
+      setActionLoading(true);
+      try {
+        await fn();
+        Alert.alert('Thành công', successMsg);
+        void load(true);
+      } catch (err) {
+        Alert.alert('Lỗi', err instanceof Error ? err.message : 'Thao tác thất bại.');
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [load],
+  );
+
+  const onCreateAdjustment = useCallback(async () => {
+    const amountNum = Number(adjAmount.replace(/[^\d.-]/g, ''));
+    if (!adjEmpId || !Number.isFinite(amountNum) || amountNum <= 0 || !adjReason.trim()) {
+      Alert.alert('Thiếu thông tin', 'Hãy chọn nhân viên, nhập số tiền hợp lệ và lý do.');
+      return;
+    }
+    await runAction(async () => {
+      await createPayrollAdjustment(
+        period,
+        { employeeId: adjEmpId, kind: adjKind, amount: amountNum, reason: adjReason.trim() },
+        branchId,
+      );
+      setAdjOpen(false);
+      setAdjAmount('');
+      setAdjReason('');
+    }, 'Đã thêm khoản điều chỉnh lương.');
+  }, [adjAmount, adjEmpId, adjKind, adjReason, branchId, period, runAction]);
+
+  const onSendReviewRequest = useCallback(async () => {
+    if (!selectedSlip?.runId || !reviewMsg.trim()) {
+      Alert.alert('Thiếu nội dung', 'Hãy nhập nội dung thắc mắc / đối soát.');
+      return;
+    }
+    setSendingReview(true);
+    try {
+      await requestMyPayslipReview(selectedSlip.runId, reviewMsg.trim());
+      setReviewMsg('');
+      Alert.alert('Đã gửi', 'Yêu cầu đối soát phiếu lương đã được gửi tới bộ phận Nhân sự.');
+    } catch (err) {
+      Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể gửi yêu cầu đối soát.');
+    } finally {
+      setSendingReview(false);
+    }
+  }, [reviewMsg, selectedSlip?.runId]);
+
+  const stepIndex = run ? STEPS.findIndex((s) => s.key === run.status) : -1;
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load(true);
+          }}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
+    >
+      {/* Sub-tabs */}
+      {canViewAll ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 6, marginBottom: 10 }}
+        >
+          {(
+            [
+              { key: 'overview', label: 'Bảng lương' },
+              { key: 'adjustments', label: 'Điều chỉnh' },
+              { key: 'policies', label: 'Chính sách' },
+              { key: 'mine', label: 'Phiếu lương tôi' },
+            ] as const
+          ).map((item) => {
+            const active = section === item.key;
+            return (
+              <Pressable
+                key={item.key}
+                onPress={() => setSection(item.key)}
+                style={[styles.subTabPill, active && styles.subTabPillActive]}
+              >
+                <Text style={[styles.subTabText, active && styles.subTabTextActive]}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+
+      {/* Period switcher (for overview & adjustments) */}
+      {canViewAll && (section === 'overview' || section === 'adjustments') ? (
+        <Card style={styles.dateBar}>
+          <Pressable onPress={() => setPeriod((p) => shiftPeriod(p, -1))} style={styles.iconBtn}>
+            <ChevronLeft size={16} color={colors.primary} />
+          </Pressable>
+          <Text style={styles.dateBarText}>Kỳ lương {period}</Text>
+          <Pressable onPress={() => setPeriod((p) => shiftPeriod(p, 1))} style={styles.iconBtn}>
+            <ChevronRight size={16} color={colors.primary} />
+          </Pressable>
+        </Card>
+      ) : null}
+
+      {loading ? (
+        <Card style={styles.stateCard}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </Card>
+      ) : error ? (
+        <Card style={styles.stateCard}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable onPress={() => void load()} style={styles.primaryBtn}>
+            <Text style={styles.primaryBtnText}>Thử lại</Text>
+          </Pressable>
+        </Card>
+      ) : section === 'mine' || !canViewAll ? (
+        // ================= MY PAYSLIPS =================
+        !myPayslips.length ? (
+          <Card style={styles.stateCard}>
+            <Text style={styles.muted}>Chưa có phiếu lương nào được phát hành cho bạn.</Text>
+          </Card>
+        ) : (
+          <View style={styles.list}>
+            {myPayslips.map((slip, idx) => (
+              <Card
+                key={slip._id || slip.id || slip.runId || idx}
+                onPress={() => setSelectedSlip(slip)}
+                style={styles.card}
+              >
+                <View style={styles.headRow}>
+                  <Text style={styles.rowTitle}>Kỳ lương {slip.periodKey || period}</Text>
+                  <Text style={styles.moneyVal}>{formatVnd(slip.netSalary ?? slip.grossSalary)}</Text>
+                </View>
+                <Text style={styles.subMeta}>
+                  Thu nhập: {formatCompactMoney(slip.grossSalary)} · Khấu trừ:{' '}
+                  {formatCompactMoney(slip.totalDeductions ?? slip.deductions ?? 0)}
+                </Text>
+                <Text style={[styles.subMeta, { color: colors.primary }]}>Chạm để xem chi tiết phiếu lương ›</Text>
+              </Card>
+            ))}
+          </View>
+        )
+      ) : section === 'policies' ? (
+        // ================= POLICIES =================
+        !policies.length ? (
+          <Card style={styles.stateCard}>
+            <Text style={styles.muted}>Chưa có chính sách lương nào.</Text>
+          </Card>
+        ) : (
+          <View style={styles.list}>
+            {policies.map((pol) => (
+              <Card key={pol._id} onPress={() => setSelectedPolicy(pol)} style={styles.card}>
+                <View style={styles.headRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>{pol.name}</Text>
+                    <Text style={styles.subMeta}>{pol.code}</Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.badge,
+                      pol.status === 'active' && styles.badgeGreen,
+                      pol.status === 'retired' && styles.badgeGray,
+                    ]}
+                  >
+                    {pol.status === 'active'
+                      ? 'Đang áp dụng'
+                      : pol.status === 'retired'
+                        ? 'Ngừng dùng'
+                        : 'Bản nháp'}
+                  </Text>
+                </View>
+                {pol.effectiveFrom ? (
+                  <Text style={styles.subMeta}>
+                    Hiệu lực: {pol.effectiveFrom.slice(0, 10)}
+                    {pol.effectiveTo ? ` → ${pol.effectiveTo.slice(0, 10)}` : ''}
+                  </Text>
+                ) : null}
+              </Card>
+            ))}
+          </View>
+        )
+      ) : section === 'adjustments' ? (
+        // ================= ADJUSTMENTS =================
+        <>
+          {canManage ? (
+            <Pressable
+              onPress={() => {
+                setAdjEmpId(employees[0]?.uid || employees[0]?._id || '');
+                setAdjOpen(true);
+              }}
+              style={[styles.primaryBtn, { alignSelf: 'flex-end', marginBottom: 10 }]}
+            >
+              <Plus size={13} color={colors.white} />
+              <Text style={styles.primaryBtnText}>Thêm điều chỉnh</Text>
+            </Pressable>
+          ) : null}
+
+          {!adjustments.length ? (
+            <Card style={styles.stateCard}>
+              <Text style={styles.muted}>Chưa có khoản thưởng / phụ cấp / khấu trừ nào kỳ {period}.</Text>
+            </Card>
+          ) : (
+            <View style={styles.list}>
+              {adjustments.map((adj) => {
+                const kindLabel = ADJ_KINDS.find((k) => k.value === adj.kind)?.label || adj.kind;
+                const isPending = adj.status === 'pending';
+                return (
+                  <Card key={adj._id} onPress={() => setSelectedAdj(adj)} style={styles.card}>
+                    <View style={styles.headRow}>
+                      <Text style={styles.rowTitle}>{adj.employeeName || 'Nhân viên'}</Text>
+                      <Text style={styles.moneyVal}>{formatVnd(adj.amount)}</Text>
+                    </View>
+                    <View style={styles.headRow}>
+                      <Text style={styles.badge}>{kindLabel}</Text>
+                      <Text
+                        style={[
+                          styles.badge,
+                          adj.status === 'approved' && styles.badgeGreen,
+                          adj.status === 'rejected' && styles.badgeRed,
+                        ]}
+                      >
+                        {adj.status === 'approved'
+                          ? 'Đã duyệt'
+                          : adj.status === 'rejected'
+                            ? 'Từ chối'
+                            : 'Chờ duyệt'}
+                      </Text>
+                    </View>
+                    {adj.reason ? <Text style={styles.muted}>{adj.reason}</Text> : null}
+                    {canManage && isPending ? (
+                      <View style={styles.decideRow}>
+                        <Pressable
+                          disabled={actionLoading}
+                          onPress={() =>
+                            void runAction(
+                              () => approvePayrollAdjustment(period, adj._id, branchId),
+                              'Đã phê duyệt điều chỉnh lương.',
+                            )
+                          }
+                          style={styles.approveBtn}
+                        >
+                          <Check size={13} color={colors.white} />
+                          <Text style={styles.decideText}>Duyệt</Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={actionLoading}
+                          onPress={() =>
+                            void runAction(
+                              () => rejectPayrollAdjustment(period, adj._id, branchId),
+                              'Đã từ chối điều chỉnh lương.',
+                            )
+                          }
+                          style={styles.rejectBtn}
+                        >
+                          <XCircle size={13} color={colors.white} />
+                          <Text style={styles.decideText}>Từ chối</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </Card>
+                );
+              })}
+            </View>
+          )}
+        </>
+      ) : (
+        // ================= OVERVIEW (PERIOD RUN & RESULTS) =================
+        <>
+          {/* 4-step Payroll Pipeline */}
+          <View style={styles.stepsRow}>
+            {STEPS.map((st, idx) => {
+              const reached = stepIndex >= idx;
+              const current = stepIndex === idx;
+              return (
+                <View
+                  key={st.key}
+                  style={[
+                    styles.stepPill,
+                    reached && styles.stepPillDone,
+                    current && styles.stepPillCurrent,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.stepText,
+                      reached && styles.stepTextDone,
+                      current && styles.stepTextCurrent,
+                    ]}
+                  >
+                    {idx + 1}. {st.label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Summary KPI Grid */}
+          <View style={styles.kpiGrid}>
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiLabel}>Nhân sự</Text>
+              <Text style={styles.kpiVal}>{totals.count}</Text>
+            </View>
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiLabel}>Tổng thu nhập</Text>
+              <Text style={styles.kpiVal}>{formatCompactMoney(totals.gross)}</Text>
+            </View>
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiLabel}>Khấu trừ</Text>
+              <Text style={[styles.kpiVal, { color: '#B91C1C' }]}>{formatCompactMoney(totals.ded)}</Text>
+            </View>
+            <View style={styles.kpiCard}>
+              <Text style={styles.kpiLabel}>Thực lĩnh (Net)</Text>
+              <Text style={[styles.kpiVal, { color: '#16885A' }]}>{formatCompactMoney(totals.net)}</Text>
+            </View>
+          </View>
+
+          {/* Manager workflow actions */}
+          {canManage ? (
+            <View style={styles.actionWrap}>
+              {!run || run.status === 'draft' ? (
+                <Pressable
+                  disabled={actionLoading}
+                  onPress={() =>
+                    void runAction(
+                      () => processPayrollPeriod(period, branchId),
+                      `Đã tính bảng lương kỳ ${period}.`,
+                    )
+                  }
+                  style={[styles.primaryBtn, actionLoading && styles.disabled]}
+                >
+                  <Play size={12} color={colors.white} />
+                  <Text style={styles.primaryBtnText}>Tính / Xử lý lương</Text>
+                </Pressable>
+              ) : null}
+
+              {run?.status === 'draft' ? (
+                <Pressable
+                  disabled={actionLoading}
+                  onPress={() =>
+                    void runAction(
+                      () => reviewPayrollRun(run._id, run.version, branchId),
+                      'Đã chuyển bảng lương sang bước Kiểm tra.',
+                    )
+                  }
+                  style={[styles.outlineBtn, actionLoading && styles.disabled]}
+                >
+                  <Text style={styles.outlineBtnText}>Chuyển Kiểm tra</Text>
+                </Pressable>
+              ) : null}
+
+              {run?.status === 'review' ? (
+                <Pressable
+                  disabled={actionLoading}
+                  onPress={() =>
+                    void runAction(
+                      () => closePayrollRun(run._id, run.version, branchId),
+                      'Đã chốt bảng lương kỳ này.',
+                    )
+                  }
+                  style={[styles.primaryBtn, { backgroundColor: '#0F766E' }, actionLoading && styles.disabled]}
+                >
+                  <Lock size={12} color={colors.white} />
+                  <Text style={styles.primaryBtnText}>Chốt bảng lương</Text>
+                </Pressable>
+              ) : null}
+
+              {run?.status === 'closed' ? (
+                <>
+                  <Pressable
+                    disabled={actionLoading}
+                    onPress={() =>
+                      void runAction(
+                        () => publishPayrollPayslips(run._id, branchId),
+                        'Đã phát hành phiếu lương cho nhân viên.',
+                      )
+                    }
+                    style={[styles.outlineBtn, actionLoading && styles.disabled]}
+                  >
+                    <Send size={12} color={colors.primary} />
+                    <Text style={styles.outlineBtnText}>Phát hành phiếu</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={actionLoading}
+                    onPress={() =>
+                      void runAction(
+                        () => markPayrollRunPaid(run._id, run.version, branchId),
+                        'Đã đánh dấu trả lương hoàn tất.',
+                      )
+                    }
+                    style={[styles.primaryBtn, { backgroundColor: '#16885A' }, actionLoading && styles.disabled]}
+                  >
+                    <Check size={12} color={colors.white} />
+                    <Text style={styles.primaryBtnText}>Đánh dấu đã trả</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setReopenReason('');
+                      setReopenOpen(true);
+                    }}
+                    style={styles.outlineBtn}
+                  >
+                    <Text style={[styles.outlineBtnText, { color: '#B45309' }]}>Mở lại kỳ</Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
+          ) : null}
+
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Tìm nhân viên trong bảng lương..."
+            placeholderTextColor={colors.muted}
+            style={[styles.field, { marginBottom: 10 }]}
+          />
+
+          {!filteredResults.length ? (
+            <Card style={styles.stateCard}>
+              <Text style={styles.muted}>
+                Chưa có kết quả bảng lương kỳ {period}.
+                {canManage ? ' Bấm "Tính / Xử lý lương" để khởi tạo.' : ''}
+              </Text>
+            </Card>
+          ) : (
+            <View style={styles.list}>
+              {filteredResults.map((row, idx) => {
+                const kpi = row.employeeId ? kpiByEmp[row.employeeId] : undefined;
+                return (
+                  <Card
+                    key={row._id || row.id || row.employeeId || idx}
+                    onPress={() => setSelectedSlip(row)}
+                    style={styles.card}
+                  >
+                    <View style={styles.headRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text numberOfLines={1} style={styles.rowTitle}>
+                          {row.employeeName || 'Nhân viên'}
+                        </Text>
+                        <Text style={styles.subMeta}>
+                          {row.department || '—'}
+                          {row.actualWorkDays != null ? ` · Công: ${row.actualWorkDays}` : ''}
+                          {typeof kpi === 'number' ? ` · KPI: ${kpi.toFixed(1)}%` : ''}
+                        </Text>
+                      </View>
+                      <Text style={styles.moneyVal}>{formatVnd(row.netSalary ?? row.grossSalary)}</Text>
+                    </View>
+                    <Text style={styles.subMeta}>
+                      Gross: {formatCompactMoney(row.grossSalary)} · Khấu trừ:{' '}
+                      {formatCompactMoney(row.totalDeductions ?? row.deductions ?? 0)}
+                    </Text>
+                  </Card>
+                );
+              })}
+            </View>
+          )}
+        </>
+      )}
+
+      {/* Payslip Detail Modal */}
+      <Modal visible={Boolean(selectedSlip)} transparent animationType="slide" onRequestClose={() => setSelectedSlip(null)}>
+        <Pressable style={styles.backdrop} onPress={() => setSelectedSlip(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.headRow}>
+              <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>
+                Chi tiết phiếu lương
+              </Text>
+              <Pressable onPress={() => setSelectedSlip(null)}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            {selectedSlip ? (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+                <View style={{ gap: 8, paddingBottom: 12 }}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Nhân viên</Text>
+                    <Text style={styles.infoVal}>{selectedSlip.employeeName || 'Tôi'}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Kỳ lương</Text>
+                    <Text style={styles.infoVal}>{selectedSlip.periodKey || period}</Text>
+                  </View>
+                  {selectedSlip.actualWorkDays != null ? (
+                    <View style={styles.infoRow}>
+                      <Text style={styles.muted}>Ngày công thực tế</Text>
+                      <Text style={styles.infoVal}>
+                        {selectedSlip.actualWorkDays}
+                        {selectedSlip.standardWorkDays ? ` / ${selectedSlip.standardWorkDays}` : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {selectedSlip.baseSalary != null ? (
+                    <View style={styles.infoRow}>
+                      <Text style={styles.muted}>Lương cơ bản</Text>
+                      <Text style={styles.infoVal}>{formatVnd(selectedSlip.baseSalary)}</Text>
+                    </View>
+                  ) : null}
+                  {selectedSlip.allowances ? (
+                    <View style={styles.infoRow}>
+                      <Text style={styles.muted}>Phụ cấp</Text>
+                      <Text style={styles.infoVal}>{formatVnd(selectedSlip.allowances)}</Text>
+                    </View>
+                  ) : null}
+                  {selectedSlip.bonus ? (
+                    <View style={styles.infoRow}>
+                      <Text style={styles.muted}>Thưởng</Text>
+                      <Text style={styles.infoVal}>{formatVnd(selectedSlip.bonus)}</Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Tổng thu nhập (Gross)</Text>
+                    <Text style={styles.infoVal}>{formatVnd(selectedSlip.grossSalary)}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Tổng khấu trừ</Text>
+                    <Text style={[styles.infoVal, { color: '#B91C1C' }]}>
+                      -{formatVnd(selectedSlip.totalDeductions ?? selectedSlip.deductions ?? 0)}
+                    </Text>
+                  </View>
+                  <View style={[styles.infoRow, { borderBottomWidth: 0, paddingTop: 4 }]}>
+                    <Text style={[styles.rowTitle, { color: '#16885A' }]}>Thực lĩnh (Net)</Text>
+                    <Text style={[styles.rowTitle, { color: '#16885A', fontSize: 15 }]}>
+                      {formatVnd(selectedSlip.netSalary ?? selectedSlip.grossSalary)}
+                    </Text>
+                  </View>
+
+                  {selectedSlip.runId && section === 'mine' ? (
+                    <View style={styles.reviewBox}>
+                      <Text style={styles.label}>Gửi thắc mắc / yêu cầu đối soát</Text>
+                      <TextInput
+                        value={reviewMsg}
+                        onChangeText={setReviewMsg}
+                        multiline
+                        placeholder="Nhập nội dung cần kiểm tra lại..."
+                        placeholderTextColor={colors.muted}
+                        style={[styles.field, { minHeight: 60, textAlignVertical: 'top' }]}
+                      />
+                      <Pressable
+                        disabled={sendingReview}
+                        onPress={() => void onSendReviewRequest()}
+                        style={[styles.submitBtn, sendingReview && styles.disabled]}
+                      >
+                        <Text style={styles.submitBtnText}>
+                          {sendingReview ? 'Đang gửi...' : 'Gửi yêu cầu đối soát'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              </ScrollView>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Create Adjustment Modal */}
+      <Modal visible={adjOpen} transparent animationType="slide" onRequestClose={() => setAdjOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setAdjOpen(false)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.headRow}>
+              <Text style={styles.sheetTitle}>Thêm điều chỉnh lương</Text>
+              <Pressable onPress={() => setAdjOpen(false)}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.label}>Nhân viên *</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {employees.slice(0, 30).map((emp) => {
+                const uid = emp.uid || emp._id || emp.id || '';
+                const active = adjEmpId === uid;
+                return (
+                  <Pressable
+                    key={uid}
+                    onPress={() => setAdjEmpId(uid)}
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {emp.displayName}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Text style={styles.label}>Loại điều chỉnh</Text>
+            <View style={styles.wrapRow}>
+              {ADJ_KINDS.map((k) => (
+                <Pressable
+                  key={k.value}
+                  onPress={() => setAdjKind(k.value)}
+                  style={[styles.chip, adjKind === k.value && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, adjKind === k.value && styles.chipTextActive]}>
+                    {k.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.label}>Số tiền (VNĐ) *</Text>
+            <TextInput
+              value={adjAmount}
+              onChangeText={setAdjAmount}
+              keyboardType="numeric"
+              placeholder="VD: 500000"
+              style={styles.field}
+            />
+            <Text style={styles.label}>Lý do *</Text>
+            <TextInput
+              value={adjReason}
+              onChangeText={setAdjReason}
+              placeholder="VD: Thưởng hoàn thành dự án..."
+              style={styles.field}
+            />
+            <Pressable
+              disabled={actionLoading}
+              onPress={() => void onCreateAdjustment()}
+              style={[styles.submitBtn, actionLoading && styles.disabled]}
+            >
+              <Text style={styles.submitBtnText}>{actionLoading ? 'Đang lưu...' : 'Lưu điều chỉnh'}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Reopen Run Modal */}
+      <Modal visible={reopenOpen} transparent animationType="slide" onRequestClose={() => setReopenOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setReopenOpen(false)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.headRow}>
+              <Text style={styles.sheetTitle}>Mở lại kỳ lương {period}</Text>
+              <Pressable onPress={() => setReopenOpen(false)}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.label}>Lý do mở lại *</Text>
+            <TextInput
+              value={reopenReason}
+              onChangeText={setReopenReason}
+              multiline
+              placeholder="Nhập lý do mở lại bảng lương..."
+              style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
+            />
+            <Pressable
+              disabled={actionLoading || !reopenReason.trim()}
+              onPress={() => {
+                if (!run) return;
+                void runAction(async () => {
+                  await reopenPayrollRun(run._id, run.version, reopenReason.trim(), branchId);
+                  setReopenOpen(false);
+                }, 'Đã mở lại kỳ lương.');
+              }}
+              style={[styles.submitBtn, (actionLoading || !reopenReason.trim()) && styles.disabled]}
+            >
+              <Text style={styles.submitBtnText}>Xác nhận mở lại</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Adjustment Detail Modal */}
+      <Modal visible={Boolean(selectedAdj)} transparent animationType="slide" onRequestClose={() => setSelectedAdj(null)}>
+        <Pressable style={styles.backdrop} onPress={() => setSelectedAdj(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            {selectedAdj ? (
+              <>
+                <View style={styles.headRow}>
+                  <Text style={styles.sheetTitle}>Chi tiết điều chỉnh lương</Text>
+                  <Pressable onPress={() => setSelectedAdj(null)}>
+                    <Text style={styles.closeText}>Đóng</Text>
+                  </Pressable>
+                </View>
+                <View style={{ gap: 8 }}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Nhân viên</Text>
+                    <Text style={styles.infoVal}>{selectedAdj.employeeName || 'Nhân viên'}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Loại điều chỉnh</Text>
+                    <Text style={styles.infoVal}>
+                      {ADJ_KINDS.find((k) => k.value === selectedAdj.kind)?.label || selectedAdj.kind}
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Số tiền</Text>
+                    <Text style={[styles.infoVal, { color: '#16885A' }]}>{formatVnd(selectedAdj.amount)}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Trạng thái</Text>
+                    <Text style={styles.infoVal}>
+                      {selectedAdj.status === 'approved'
+                        ? 'Đã duyệt'
+                        : selectedAdj.status === 'rejected'
+                          ? 'Từ chối'
+                          : 'Chờ duyệt'}
+                    </Text>
+                  </View>
+                  {selectedAdj.reason ? (
+                    <>
+                      <Text style={styles.label}>Lý do</Text>
+                      <Text style={styles.muted}>{selectedAdj.reason}</Text>
+                    </>
+                  ) : null}
+                  {canManage && selectedAdj.status === 'pending' ? (
+                    <View style={styles.decideRow}>
+                      <Pressable
+                        onPress={() => {
+                          const id = selectedAdj._id;
+                          setSelectedAdj(null);
+                          void runAction(
+                            () => approvePayrollAdjustment(period, id, branchId),
+                            'Đã phê duyệt điều chỉnh lương.',
+                          );
+                        }}
+                        style={styles.approveBtn}
+                      >
+                        <Check size={13} color={colors.white} />
+                        <Text style={styles.decideText}>Duyệt</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          const id = selectedAdj._id;
+                          setSelectedAdj(null);
+                          void runAction(
+                            () => rejectPayrollAdjustment(period, id, branchId),
+                            'Đã từ chối điều chỉnh lương.',
+                          );
+                        }}
+                        style={styles.rejectBtn}
+                      >
+                        <XCircle size={13} color={colors.white} />
+                        <Text style={styles.decideText}>Từ chối</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Policy Detail Modal */}
+      <Modal visible={Boolean(selectedPolicy)} transparent animationType="slide" onRequestClose={() => setSelectedPolicy(null)}>
+        <Pressable style={styles.backdrop} onPress={() => setSelectedPolicy(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            {selectedPolicy ? (
+              <>
+                <View style={styles.headRow}>
+                  <Text style={styles.sheetTitle}>Chi tiết chính sách lương</Text>
+                  <Pressable onPress={() => setSelectedPolicy(null)}>
+                    <Text style={styles.closeText}>Đóng</Text>
+                  </Pressable>
+                </View>
+                <View style={{ gap: 8 }}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Mã chính sách</Text>
+                    <Text style={styles.infoVal}>{selectedPolicy.code}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Tên chính sách</Text>
+                    <Text style={styles.infoVal}>{selectedPolicy.name}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.muted}>Trạng thái</Text>
+                    <Text style={styles.infoVal}>
+                      {selectedPolicy.status === 'active'
+                        ? 'Đang áp dụng'
+                        : selectedPolicy.status === 'retired'
+                          ? 'Ngừng dùng'
+                          : 'Bản nháp'}
+                    </Text>
+                  </View>
+                  {selectedPolicy.effectiveFrom ? (
+                    <View style={styles.infoRow}>
+                      <Text style={styles.muted}>Hiệu lực</Text>
+                      <Text style={styles.infoVal}>
+                        {selectedPolicy.effectiveFrom.slice(0, 10)}
+                        {selectedPolicy.effectiveTo ? ` → ${selectedPolicy.effectiveTo.slice(0, 10)}` : ''}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { paddingHorizontal: 18, paddingBottom: 28 },
+  subTabPill: { backgroundColor: '#EAF2FF', borderColor: '#D6E5FF', borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 6 },
+  subTabPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  subTabText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  subTabTextActive: { color: colors.white },
+
+  dateBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 8, marginBottom: 10 },
+  dateBarText: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  iconBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#EAF2FF', alignItems: 'center', justifyContent: 'center' },
+
+  stepsRow: { flexDirection: 'row', gap: 5, marginBottom: 10 },
+  stepPill: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, paddingVertical: 6, alignItems: 'center' },
+  stepPillDone: { backgroundColor: '#E9F8F1' },
+  stepPillCurrent: { backgroundColor: '#EAF2FF', borderColor: colors.primary, borderWidth: 1 },
+  stepText: { color: colors.muted, fontSize: 9, fontWeight: '700' },
+  stepTextDone: { color: '#16885A' },
+  stepTextCurrent: { color: colors.primary, fontWeight: '800' },
+
+  kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  kpiCard: { width: '48.5%', backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 10 },
+  kpiLabel: { color: colors.muted, fontSize: 10, fontWeight: '600' },
+  kpiVal: { color: colors.ink, fontSize: 14, fontWeight: '800', marginTop: 2 },
+
+  actionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 10 },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.primary, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10 },
+  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  outlineBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10 },
+  outlineBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+
+  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
+  list: { gap: 9 },
+  card: { padding: 13, gap: 5 },
+  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  subMeta: { color: colors.muted, fontSize: 10 },
+  moneyVal: { color: '#16885A', fontSize: 13, fontWeight: '800' },
+  badge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
+  badgeGreen: { color: '#16885A', backgroundColor: '#E9F8F1' },
+  badgeRed: { color: '#B91C1C', backgroundColor: '#FEE2E2' },
+  badgeGray: { color: '#64748B', backgroundColor: '#F1F5F9' },
+
+  decideRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  approveBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#16885A', minHeight: 34, borderRadius: 9 },
+  rejectBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#B91C1C', minHeight: 34, borderRadius: 9 },
+  decideText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '88%' },
+  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingBottom: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  infoVal: { color: colors.ink, fontSize: 12, fontWeight: '700', textAlign: 'right' },
+  reviewBox: { marginTop: 8, backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 12, padding: 11, gap: 6 },
+  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
+  wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
+  chipTextActive: { color: colors.white },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  disabled: { opacity: 0.45 },
+});
+

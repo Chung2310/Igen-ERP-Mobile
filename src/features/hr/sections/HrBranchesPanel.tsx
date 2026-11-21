@@ -1,0 +1,923 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { AlertTriangle, ChevronRight, LocateFixed, MapPin, Phone, Plus, Radio } from 'lucide-react-native';
+import { Card } from '@/components/Card';
+import {
+  createHrBranch,
+  createHrBranchOwner,
+  getHrCurrentIp,
+  listHrBranches,
+  listHrEmployees,
+  updateHrBranch,
+} from '@/features/hr/hrApi';
+import type { HrBranch, HrBranchLocationConfig, HrEmployee } from '@/features/hr/types';
+import { colors } from '@/theme/colors';
+
+function expandIpv6(value: string): string[] | null {
+  const address = value.trim().toLowerCase().replace(/\/\d+$/, '');
+  if (!address.includes(':')) return null;
+  const sides = address.split('::');
+  if (sides.length > 2) return null;
+  const left = sides[0] ? sides[0].split(':') : [];
+  const right = sides[1] ? sides[1].split(':') : [];
+  const missing = 8 - left.length - right.length;
+  if (missing < 0 || (sides.length === 1 && missing !== 0)) return null;
+  const groups = [...left, ...Array(missing).fill('0'), ...right];
+  if (groups.length !== 8 || groups.some((part) => !/^[0-9a-f]{1,4}$/.test(part || '0'))) {
+    return null;
+  }
+  return groups.map((part) => Number.parseInt(part || '0', 16).toString(16));
+}
+
+function toAttendanceNetwork(value: string): string {
+  const groups = expandIpv6(value);
+  return groups ? `${groups.slice(0, 4).join(':')}::/64` : value.trim();
+}
+
+function parseLocationConfig(input: {
+  latitude: string;
+  longitude: string;
+  allowedRadius: string;
+  allowedPublicIps: string;
+}): { config?: HrBranchLocationConfig; error?: string } {
+  const latStr = input.latitude.trim();
+  const lngStr = input.longitude.trim();
+  const radStr = input.allowedRadius.trim();
+  const ips = [
+    ...new Set(
+      input.allowedPublicIps
+        .split(/[\n,]/)
+        .map((v) => v.trim())
+        .filter(Boolean)
+        .map(toAttendanceNetwork),
+    ),
+  ];
+
+  const hasAny = Boolean(latStr || lngStr || ips.length);
+  if (!hasAny) {
+    return { config: undefined };
+  }
+
+  const latitude = Number(latStr.replace(',', '.'));
+  const longitude = Number(lngStr.replace(',', '.'));
+  const allowedRadius = Number(radStr || '100');
+
+  if (!latStr || !Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    return { error: 'Vĩ độ không hợp lệ (phải nằm trong khoảng -90 đến 90).' };
+  }
+  if (!lngStr || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return { error: 'Kinh độ không hợp lệ (phải nằm trong khoảng -180 đến 180).' };
+  }
+  if (!Number.isFinite(allowedRadius) || allowedRadius < 1) {
+    return { error: 'Bán kính cho phép phải lớn hơn hoặc bằng 1 mét.' };
+  }
+  if (ips.length === 0) {
+    return { error: 'Vui lòng nhập ít nhất 1 IP công cộng được phép.' };
+  }
+
+  return {
+    config: {
+      latitude,
+      longitude,
+      allowedRadius,
+      allowedPublicIps: ips,
+    },
+  };
+}
+
+type GeolocationLike = {
+  getCurrentPosition: (
+    success: (pos: { coords: { latitude: number; longitude: number } }) => void,
+    error: (err: { code?: number; message?: string }) => void,
+    options?: { enableHighAccuracy?: boolean; timeout?: number; maximumAge?: number },
+  ) => void;
+};
+
+function requestDevicePosition(): Promise<{ latitude: number; longitude: number }> {
+  return new Promise((resolve, reject) => {
+    const geo = (globalThis as { navigator?: { geolocation?: GeolocationLike } }).navigator?.geolocation;
+    if (!geo || typeof geo.getCurrentPosition !== 'function') {
+      reject(new Error('UNSUPPORTED'));
+      return;
+    }
+    geo.getCurrentPosition(
+      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      (err) => {
+        if (err?.code === 1) {
+          reject(new Error('Ứng dụng chưa được cấp quyền truy cập vị trí.'));
+        } else if (err?.code === 2) {
+          reject(new Error('Thiết bị chưa xác định được vị trí. Hãy bật GPS rồi thử lại.'));
+        } else if (err?.code === 3) {
+          reject(new Error('Lấy vị trí quá lâu. Hãy thử lại ở nơi có tín hiệu GPS tốt hơn.'));
+        } else {
+          reject(new Error(err?.message || 'Không thể lấy vị trí hiện tại.'));
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  });
+}
+
+export function HrBranchesPanel({
+  companyCode,
+  canManage,
+  onBranchesChanged,
+}: {
+  companyCode?: string;
+  canManage: boolean;
+  onBranchesChanged?: () => void;
+}) {
+  const [branches, setBranches] = useState<HrBranch[]>([]);
+  const [employees, setEmployees] = useState<HrEmployee[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  // Detail & Edit modal
+  const [selectedBranch, setSelectedBranch] = useState<HrBranch | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Create / Edit fields
+  const [createOpen, setCreateOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
+  const [managerId, setManagerId] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [allowedRadius, setAllowedRadius] = useState('100');
+  const [allowedPublicIps, setAllowedPublicIps] = useState('');
+  const [locating, setLocating] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Create branch owner modal
+  const [ownerModalOpen, setOwnerModalOpen] = useState(false);
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [savingOwner, setSavingOwner] = useState(false);
+
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setError(null);
+      try {
+        const [branchList, empList] = await Promise.all([
+          listHrBranches(),
+          companyCode ? listHrEmployees(companyCode).catch(() => []) : Promise.resolve([]),
+        ]);
+        setBranches(branchList);
+        setEmployees(empList);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Không tải được danh sách chi nhánh.');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [companyCode],
+  );
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const employeeNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of employees) {
+      const id = e.uid || e._id || e.id;
+      if (id) map.set(id, e.displayName);
+    }
+    return map;
+  }, [employees]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return branches;
+    return branches.filter(
+      (b) =>
+        b.name.toLowerCase().includes(q) ||
+        b.code.toLowerCase().includes(q) ||
+        (b.address || '').toLowerCase().includes(q) ||
+        (b.phone || '').toLowerCase().includes(q),
+    );
+  }, [branches, search]);
+
+  const openCreate = useCallback(() => {
+    setCode('');
+    setName('');
+    setAddress('');
+    setPhone('');
+    setManagerId('');
+    setIsActive(true);
+    setLatitude('');
+    setLongitude('');
+    setAllowedRadius('100');
+    setAllowedPublicIps('');
+    setCreateOpen(true);
+  }, []);
+
+  const openDetail = useCallback((branch: HrBranch) => {
+    setSelectedBranch(branch);
+    setIsEditing(false);
+  }, []);
+
+  const startEdit = useCallback(() => {
+    if (!selectedBranch) return;
+    const cfg = selectedBranch.locationConfig;
+    setCode(selectedBranch.code || '');
+    setName(selectedBranch.name || '');
+    setAddress(selectedBranch.address || '');
+    setPhone(selectedBranch.phone || '');
+    setManagerId(selectedBranch.managerId || '');
+    setIsActive(selectedBranch.isActive !== false);
+    setLatitude(cfg?.latitude != null ? String(cfg.latitude) : '');
+    setLongitude(cfg?.longitude != null ? String(cfg.longitude) : '');
+    setAllowedRadius(cfg?.allowedRadius != null ? String(cfg.allowedRadius) : '100');
+    setAllowedPublicIps(cfg?.allowedPublicIps?.join('\n') || '');
+    setIsEditing(true);
+  }, [selectedBranch]);
+
+  const handleLatitudeChange = useCallback((val: string) => {
+    // Hỗ trợ dán nhanh tọa độ dạng "21.0285, 105.8542" từ Google Maps
+    const pair = val.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (pair) {
+      setLatitude(pair[1]);
+      setLongitude(pair[2]);
+      return;
+    }
+    setLatitude(val);
+  }, []);
+
+  const captureLocationAndIp = useCallback(async () => {
+    if (locating) return;
+    setLocating(true);
+    const [posRes, ipRes] = await Promise.allSettled([
+      requestDevicePosition(),
+      getHrCurrentIp(),
+    ]);
+
+    let gotPos = false;
+    let gotIp = false;
+
+    if (posRes.status === 'fulfilled') {
+      setLatitude(String(posRes.value.latitude));
+      setLongitude(String(posRes.value.longitude));
+      gotPos = true;
+    }
+    if (ipRes.status === 'fulfilled' && ipRes.value) {
+      const normalized = toAttendanceNetwork(ipRes.value);
+      setAllowedPublicIps((prev) => {
+        const existing = prev
+          .split(/[\n,]/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+        return [...new Set([...existing, normalized])].join('\n');
+      });
+      gotIp = true;
+    }
+
+    setLocating(false);
+
+    if (gotPos && gotIp) {
+      Alert.alert('Đã cập nhật', 'Đã lấy thành công vị trí GPS và IP mạng hiện tại.');
+    } else if (!gotPos && gotIp) {
+      const reason =
+        posRes.status === 'rejected' && posRes.reason instanceof Error && posRes.reason.message !== 'UNSUPPORTED'
+          ? posRes.reason.message
+          : 'Thiết bị chưa hỗ trợ tự động lấy GPS — bạn có thể dán trực tiếp tọa độ "vĩ độ, kinh độ" từ Google Maps vào ô Vĩ độ.';
+      Alert.alert('Đã lấy IP mạng hiện tại', reason);
+    } else if (gotPos && !gotIp) {
+      Alert.alert('Đã lấy vị trí GPS', 'Không thể lấy IP mạng hiện tại từ máy chủ.');
+    } else {
+      Alert.alert('Không thể lấy tự động', 'Không lấy được vị trí GPS và IP mạng hiện tại. Bạn có thể nhập thủ công.');
+    }
+  }, [locating]);
+
+  const onCreate = useCallback(async () => {
+    const cleanCode = code.trim().toUpperCase();
+    if (!cleanCode || !name.trim()) {
+      Alert.alert('Thiếu thông tin', 'Hãy nhập Mã chi nhánh và Tên chi nhánh.');
+      return;
+    }
+    if (!/^[A-Za-z0-9_-]+$/.test(cleanCode)) {
+      Alert.alert('Mã chi nhánh không hợp lệ', 'Chỉ dùng chữ, số, dấu gạch ngang (-) hoặc gạch dưới (_).');
+      return;
+    }
+    const { config: locationConfig, error: locErr } = parseLocationConfig({
+      latitude,
+      longitude,
+      allowedRadius,
+      allowedPublicIps,
+    });
+    if (locErr) {
+      Alert.alert('Cấu hình chấm công chưa hợp lệ', locErr);
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await createHrBranch({
+        code: cleanCode,
+        name: name.trim(),
+        address: address.trim() || undefined,
+        phone: phone.trim() || undefined,
+        managerId: managerId || undefined,
+        locationConfig,
+        isActive,
+      });
+      setBranches((prev) => [created, ...prev]);
+      setCreateOpen(false);
+      onBranchesChanged?.();
+      Alert.alert('Thành công', `Đã tạo chi nhánh "${created.name}".`);
+    } catch (err) {
+      Alert.alert('Lỗi tạo chi nhánh', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+    } finally {
+      setSaving(false);
+    }
+  }, [address, allowedPublicIps, allowedRadius, code, isActive, latitude, longitude, managerId, name, onBranchesChanged, phone]);
+
+  const onSaveEdit = useCallback(async () => {
+    if (!selectedBranch || !name.trim() || saving) {
+      if (!name.trim()) Alert.alert('Thiếu tên chi nhánh', 'Hãy nhập tên chi nhánh.');
+      return;
+    }
+    const cleanCode = code.trim().toUpperCase();
+    if (cleanCode && !/^[A-Za-z0-9_-]+$/.test(cleanCode)) {
+      Alert.alert('Mã chi nhánh không hợp lệ', 'Chỉ dùng chữ, số, dấu gạch ngang (-) hoặc gạch dưới (_).');
+      return;
+    }
+    const { config: locationConfig, error: locErr } = parseLocationConfig({
+      latitude,
+      longitude,
+      allowedRadius,
+      allowedPublicIps,
+    });
+    if (locErr) {
+      Alert.alert('Cấu hình chấm công chưa hợp lệ', locErr);
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await updateHrBranch(selectedBranch._id, {
+        code: cleanCode || undefined,
+        name: name.trim(),
+        address: address.trim(),
+        phone: phone.trim(),
+        managerId: managerId || '',
+        locationConfig,
+        isActive,
+      });
+      setBranches((prev) => prev.map((b) => (b._id === updated._id ? updated : b)));
+      setSelectedBranch(updated);
+      setIsEditing(false);
+      onBranchesChanged?.();
+      Alert.alert('Đã lưu', 'Cập nhật thông tin chi nhánh thành công.');
+    } catch (err) {
+      Alert.alert('Lỗi cập nhật', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+    } finally {
+      setSaving(false);
+    }
+  }, [address, allowedPublicIps, allowedRadius, code, isActive, latitude, longitude, managerId, name, onBranchesChanged, phone, saving, selectedBranch]);
+
+  const onCreateOwner = useCallback(async () => {
+    if (!selectedBranch || savingOwner) return;
+    if (!ownerName.trim() || !ownerEmail.trim() || ownerPassword.length < 6) {
+      Alert.alert('Thiếu thông tin', 'Nhập Họ tên, Email và Mật khẩu (tối thiểu 6 ký tự).');
+      return;
+    }
+    setSavingOwner(true);
+    try {
+      await createHrBranchOwner(selectedBranch._id, {
+        displayName: ownerName.trim(),
+        email: ownerEmail.trim(),
+        password: ownerPassword,
+        phone: ownerPhone.trim() || undefined,
+      });
+      setOwnerModalOpen(false);
+      setOwnerName('');
+      setOwnerEmail('');
+      setOwnerPassword('');
+      setOwnerPhone('');
+      Alert.alert('Thành công', 'Đã tạo tài khoản Quản lý chi nhánh.');
+      void load(true);
+    } catch (err) {
+      Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể tạo tài khoản quản lý chi nhánh.');
+    } finally {
+      setSavingOwner(false);
+    }
+  }, [load, ownerEmail, ownerName, ownerPassword, ownerPhone, savingOwner, selectedBranch]);
+
+  const renderLocationConfigEditor = () => (
+    <View style={styles.locationBox}>
+      <View style={styles.locationHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.locationTitle}>Cấu hình chấm công</Text>
+          <Text style={styles.locationHint}>Bắt buộc để nhân viên chấm công theo vị trí & IP.</Text>
+        </View>
+        <Pressable
+          disabled={locating}
+          onPress={() => void captureLocationAndIp()}
+          style={[styles.locateBtn, locating && styles.disabled]}
+        >
+          <View style={styles.iconButtonContent}>
+            {!locating ? <LocateFixed size={14} color={colors.primary} /> : null}
+            <Text style={styles.locateBtnText}>{locating ? 'Đang lấy...' : 'Vị trí & IP'}</Text>
+          </View>
+        </Pressable>
+      </View>
+
+      <View style={styles.coordRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.smallLabel}>Vĩ độ</Text>
+          <TextInput
+            value={latitude}
+            onChangeText={handleLatitudeChange}
+            keyboardType="numbers-and-punctuation"
+            placeholder="21.0285"
+            placeholderTextColor={colors.muted}
+            style={styles.locationField}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.smallLabel}>Kinh độ</Text>
+          <TextInput
+            value={longitude}
+            onChangeText={setLongitude}
+            keyboardType="numbers-and-punctuation"
+            placeholder="105.8542"
+            placeholderTextColor={colors.muted}
+            style={styles.locationField}
+          />
+        </View>
+        <View style={{ width: 84 }}>
+          <Text style={styles.smallLabel}>Bán kính (m)</Text>
+          <TextInput
+            value={allowedRadius}
+            onChangeText={setAllowedRadius}
+            keyboardType="numeric"
+            placeholder="100"
+            placeholderTextColor={colors.muted}
+            style={styles.locationField}
+          />
+        </View>
+      </View>
+
+      <Text style={[styles.smallLabel, { marginTop: 8 }]}>IP công cộng được phép</Text>
+      <TextInput
+        value={allowedPublicIps}
+        onChangeText={setAllowedPublicIps}
+        multiline
+        numberOfLines={3}
+        placeholder="Mỗi IP một dòng (VD: 113.190.232.10)"
+        placeholderTextColor={colors.muted}
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={[styles.locationField, styles.ipInput]}
+      />
+      <Text style={styles.ipHint}>
+        IPv4 được kiểm tra chính xác; IPv6 dùng chung mạng /64 cho các thiết bị cùng Wi-Fi.
+      </Text>
+    </View>
+  );
+
+  return (
+    <ScrollView
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load(true);
+          }}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
+    >
+      <View style={styles.searchRow}>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Tìm theo tên, mã chi nhánh, địa chỉ..."
+          placeholderTextColor={colors.muted}
+          style={[styles.field, { flex: 1 }]}
+        />
+        {canManage ? (
+          <Pressable onPress={openCreate} style={styles.primaryBtn}>
+            <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Chi nhánh</Text></View>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {loading ? (
+        <Card style={styles.stateCard}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </Card>
+      ) : error ? (
+        <Card style={styles.stateCard}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressable onPress={() => void load()} style={styles.primaryBtn}>
+            <Text style={styles.primaryBtnText}>Thử lại</Text>
+          </Pressable>
+        </Card>
+      ) : !filtered.length ? (
+        <Card style={styles.stateCard}>
+          <Text style={styles.muted}>Chưa có chi nhánh nào.</Text>
+        </Card>
+      ) : (
+        <View style={styles.list}>
+          {filtered.map((branch) => {
+            const isMain = branch.code?.toUpperCase() === 'MAIN';
+            const active = branch.isActive !== false;
+            const managerName = branch.managerId ? employeeNameById.get(branch.managerId) : undefined;
+            const cfg = branch.locationConfig;
+            return (
+              <Card key={branch._id} onPress={() => openDetail(branch)} style={styles.card}>
+                <View style={styles.headRow}>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.badgeRow}>
+                      <Text style={styles.codeBadge}>{branch.code}</Text>
+                      {isMain ? <Text style={styles.mainBadge}>Trụ sở chính</Text> : null}
+                      <Text style={[styles.statusBadge, !active && styles.statusInactive]}>
+                        {active ? 'Hoạt động' : 'Tạm ngưng'}
+                      </Text>
+                    </View>
+                    <Text numberOfLines={1} style={styles.rowTitle}>
+                      {branch.name}
+                    </Text>
+                  </View>
+                  <ChevronRight size={16} color={colors.muted} />
+                </View>
+                {branch.address ? (
+                  <View style={styles.metaRow}><MapPin size={13} color={colors.muted} /><Text numberOfLines={2} style={styles.muted}>{branch.address}</Text></View>
+                ) : null}
+                <View style={styles.metaRow}>
+                  <Phone size={13} color={colors.muted} />
+                  <Text style={styles.subMeta}>{branch.phone || 'Chưa có SĐT'}{managerName ? ` · QL: ${managerName}` : ''}</Text>
+                </View>
+                <View style={styles.metaRow}>
+                  {cfg ? <Radio size={13} color="#16885A" /> : <AlertTriangle size={13} color="#B45309" />}
+                  <Text style={[styles.subMeta, cfg ? styles.configOk : styles.configMissing]}>
+                    {cfg ? `Chấm công: bán kính ${cfg.allowedRadius}m · ${cfg.allowedPublicIps?.length || 0} IP` : 'Chưa cấu hình vị trí & IP chấm công'}
+                  </Text>
+                </View>
+              </Card>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Detail & Edit Branch Modal */}
+      <Modal
+        visible={Boolean(selectedBranch)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedBranch(null)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setSelectedBranch(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            {selectedBranch ? (
+              <>
+                <View style={styles.headRow}>
+                  <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>
+                    {isEditing ? 'Chỉnh sửa chi nhánh' : selectedBranch.name}
+                  </Text>
+                  <Pressable onPress={() => setSelectedBranch(null)} hitSlop={8}>
+                    <Text style={styles.closeText}>Đóng</Text>
+                  </Pressable>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+                  {isEditing ? (
+                    <View style={{ gap: 8, paddingBottom: 12 }}>
+                      <Text style={styles.label}>Mã chi nhánh *</Text>
+                      <TextInput
+                        value={code}
+                        editable={false}
+                        autoCapitalize="characters"
+                        style={[styles.field, styles.readonlyField]}
+                      />
+
+                      <Text style={styles.label}>Tên chi nhánh *</Text>
+                      <TextInput value={name} onChangeText={setName} style={styles.field} />
+
+                      <Text style={styles.label}>Địa chỉ</Text>
+                      <TextInput value={address} onChangeText={setAddress} style={styles.field} />
+
+                      <Text style={styles.label}>Số điện thoại</Text>
+                      <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.field} />
+
+                      <Text style={styles.label}>Quản lý chi nhánh</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
+                        <Pressable
+                          onPress={() => setManagerId('')}
+                          style={[styles.chip, !managerId && styles.chipActive]}
+                        >
+                          <Text style={[styles.chipText, !managerId && styles.chipTextActive]}>Chưa chỉ định</Text>
+                        </Pressable>
+                        {employees.slice(0, 25).map((emp) => {
+                          const uid = emp.uid || emp._id || emp.id || '';
+                          const active = managerId === uid;
+                          return (
+                            <Pressable
+                              key={uid}
+                              onPress={() => setManagerId(uid)}
+                              style={[styles.chip, active && styles.chipActive]}
+                            >
+                              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                                {emp.displayName}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+
+                      {renderLocationConfigEditor()}
+
+                      <View style={styles.switchRow}>
+                        <Text style={styles.label}>Đang hoạt động</Text>
+                        <Switch
+                          value={isActive}
+                          onValueChange={setIsActive}
+                          trackColor={{ true: colors.primary, false: '#CBD5E1' }}
+                        />
+                      </View>
+
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                        <Pressable onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
+                          <Text style={styles.cancelBtnText}>Hủy</Text>
+                        </Pressable>
+                        <Pressable
+                          disabled={saving}
+                          onPress={() => void onSaveEdit()}
+                          style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
+                        >
+                          <Text style={styles.submitBtnText}>
+                            {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ gap: 10, paddingBottom: 10 }}>
+                      <View style={styles.infoRow}>
+                        <Text style={styles.muted}>Mã chi nhánh</Text>
+                        <Text style={styles.infoVal}>{selectedBranch.code}</Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <Text style={styles.muted}>Trạng thái</Text>
+                        <Text style={styles.infoVal}>
+                          {selectedBranch.isActive === false ? 'Tạm ngưng' : 'Đang hoạt động'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <Text style={styles.muted}>Điện thoại</Text>
+                        <Text style={styles.infoVal}>{selectedBranch.phone || 'Chưa cập nhật'}</Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <Text style={styles.muted}>Quản lý</Text>
+                        <Text style={styles.infoVal}>
+                          {(selectedBranch.managerId && employeeNameById.get(selectedBranch.managerId)) ||
+                            'Chưa chỉ định'}
+                        </Text>
+                      </View>
+                      <View style={{ gap: 4 }}>
+                        <Text style={styles.label}>Địa chỉ</Text>
+                        <Text style={styles.muted}>
+                          {selectedBranch.address || 'Chưa cập nhật địa chỉ.'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.locationBox}>
+                        <Text style={styles.locationTitle}>Cấu hình chấm công</Text>
+                        {selectedBranch.locationConfig ? (
+                          <View style={{ gap: 6, marginTop: 4 }}>
+                            <View style={styles.infoRow}>
+                              <Text style={styles.muted}>Tọa độ (Vĩ độ, Kinh độ)</Text>
+                              <Text style={styles.infoVal}>
+                                {selectedBranch.locationConfig.latitude}, {selectedBranch.locationConfig.longitude}
+                              </Text>
+                            </View>
+                            <View style={styles.infoRow}>
+                              <Text style={styles.muted}>Bán kính cho phép</Text>
+                              <Text style={styles.infoVal}>{selectedBranch.locationConfig.allowedRadius} m</Text>
+                            </View>
+                            <View style={{ gap: 4 }}>
+                              <Text style={styles.muted}>IP công cộng được phép</Text>
+                              <View style={styles.ipChipWrap}>
+                                {(selectedBranch.locationConfig.allowedPublicIps || []).map((ip) => (
+                                  <Text key={ip} style={styles.ipChip}>
+                                    {ip}
+                                  </Text>
+                                ))}
+                              </View>
+                            </View>
+                          </View>
+                        ) : (
+                          <Text style={[styles.muted, { marginTop: 4 }]}>
+                            Chưa cấu hình vị trí GPS và IP mạng cho chi nhánh này.
+                          </Text>
+                        )}
+                      </View>
+
+                      {canManage ? (
+                        <View style={{ gap: 8, marginTop: 8 }}>
+                          <Pressable onPress={startEdit} style={styles.submitBtn}>
+                            <Text style={styles.submitBtnText}>Chỉnh sửa chi nhánh</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => setOwnerModalOpen(true)}
+                            style={styles.secondaryBtn}
+                          >
+                            <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.secondaryBtnText}>Tạo tài khoản Quản lý chi nhánh</Text></View>
+                          </Pressable>
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
+                </ScrollView>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Create Branch Modal */}
+      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.headRow}>
+              <Text style={styles.sheetTitle}>Thêm chi nhánh mới</Text>
+              <Pressable onPress={() => setCreateOpen(false)} hitSlop={8}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+              <View style={{ gap: 8, paddingBottom: 12 }}>
+                <Text style={styles.label}>Mã chi nhánh *</Text>
+                <TextInput
+                  value={code}
+                  onChangeText={setCode}
+                  autoCapitalize="characters"
+                  placeholder="VD: CN_HN"
+                  placeholderTextColor={colors.muted}
+                  style={styles.field}
+                />
+                <Text style={styles.label}>Tên chi nhánh *</Text>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="VD: Chi nhánh Hà Nội"
+                  placeholderTextColor={colors.muted}
+                  style={styles.field}
+                />
+                <Text style={styles.label}>Địa chỉ</Text>
+                <TextInput
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Số nhà, đường, quận/huyện..."
+                  placeholderTextColor={colors.muted}
+                  style={styles.field}
+                />
+                <Text style={styles.label}>Số điện thoại</Text>
+                <TextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  placeholder="0987654321"
+                  placeholderTextColor={colors.muted}
+                  style={styles.field}
+                />
+
+                {renderLocationConfigEditor()}
+
+                <Pressable
+                  disabled={saving}
+                  onPress={() => void onCreate()}
+                  style={[styles.submitBtn, saving && styles.disabled]}
+                >
+                  <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo chi nhánh'}</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Create Branch Owner Modal */}
+      <Modal
+        visible={ownerModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setOwnerModalOpen(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setOwnerModalOpen(false)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.headRow}>
+              <Text style={styles.sheetTitle}>Tạo Quản lý chi nhánh</Text>
+              <Pressable onPress={() => setOwnerModalOpen(false)} hitSlop={8}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <View style={{ gap: 8 }}>
+              <Text style={styles.label}>Họ và tên *</Text>
+              <TextInput value={ownerName} onChangeText={setOwnerName} placeholder="Nguyễn Văn A" placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Email đăng nhập *</Text>
+              <TextInput value={ownerEmail} onChangeText={setOwnerEmail} keyboardType="email-address" autoCapitalize="none" placeholder="quanly@congty.vn" placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Mật khẩu (≥ 6 ký tự) *</Text>
+              <TextInput value={ownerPassword} onChangeText={setOwnerPassword} secureTextEntry placeholder="••••••" placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Số điện thoại</Text>
+              <TextInput value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor={colors.muted} style={styles.field} />
+              <Pressable
+                disabled={savingOwner}
+                onPress={() => void onCreateOwner()}
+                style={[styles.submitBtn, savingOwner && styles.disabled]}
+              >
+                <Text style={styles.submitBtnText}>
+                  {savingOwner ? 'Đang tạo...' : 'Tạo tài khoản'}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { paddingHorizontal: 18, paddingBottom: 28 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  primaryBtn: { backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
+  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  iconButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
+  list: { gap: 10 },
+  card: { padding: 13, gap: 5 },
+  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  codeBadge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
+  mainBadge: { color: '#B45309', backgroundColor: '#FFF3E5', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
+  statusBadge: { color: '#16885A', backgroundColor: '#E9F8F1', fontSize: 9, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
+  statusInactive: { color: '#64748B', backgroundColor: '#F1F5F9' },
+  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  subMeta: { color: colors.muted, fontSize: 10, marginTop: 2 },
+  configOk: { color: '#16885A', fontWeight: '600' },
+  configMissing: { color: '#B45309', fontWeight: '600' },
+  chevron: { color: colors.muted, fontSize: 20 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 10, maxHeight: '90%' },
+  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
+  smallLabel: { color: colors.ink, fontSize: 10, fontWeight: '700', marginBottom: 4 },
+  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
+  readonlyField: { backgroundColor: '#F1F5F9', color: colors.muted },
+  locationBox: { backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 13, padding: 12, marginTop: 6 },
+  locationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 },
+  locationTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' },
+  locationHint: { color: colors.muted, fontSize: 10, marginTop: 2 },
+  locateBtn: { backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9 },
+  locateBtnText: { color: colors.white, fontSize: 10, fontWeight: '700' },
+  coordRow: { flexDirection: 'row', gap: 8 },
+  locationField: { backgroundColor: colors.white, borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 7, fontSize: 11, color: colors.ink },
+  ipInput: { minHeight: 68, textAlignVertical: 'top', fontFamily: 'monospace' },
+  ipHint: { color: colors.muted, fontSize: 10, lineHeight: 14, marginTop: 5 },
+  ipChipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  ipChip: { backgroundColor: colors.white, borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3, fontSize: 10, color: colors.ink, fontWeight: '600' },
+  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
+  chipTextActive: { color: colors.white },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingBottom: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  infoVal: { color: colors.ink, fontSize: 12, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  secondaryBtn: { backgroundColor: '#EAF2FF', minHeight: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  secondaryBtnText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  cancelBtn: { backgroundColor: '#F1F5F9', minHeight: 44, paddingHorizontal: 18, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  disabled: { opacity: 0.45 },
+});

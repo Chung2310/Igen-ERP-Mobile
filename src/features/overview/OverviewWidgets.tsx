@@ -1,0 +1,522 @@
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Card } from '@/components/Card';
+import { colors } from '@/theme/colors';
+
+export type KpiItem = {
+  id: string;
+  label: string;
+  value: string;
+  delta?: string;
+  helper?: string;
+  accent: string;
+  tone: string;
+};
+
+export function KpiGrid({ items }: { items: KpiItem[] }) {
+  return (
+    <View style={styles.kpiGrid}>
+      {items.map((item) => (
+        <Card key={item.id} style={styles.kpiCard}>
+          <View style={styles.kpiHeader}>
+            <View style={[styles.kpiDotWrap, { backgroundColor: item.tone }]}>
+              <View style={[styles.kpiDot, { backgroundColor: item.accent }]} />
+            </View>
+            {item.delta ? (
+              <Text numberOfLines={1} style={[styles.kpiDelta, { color: item.accent }]}>
+                {item.delta}
+              </Text>
+            ) : null}
+          </View>
+          <Text numberOfLines={2} style={styles.kpiLabel}>
+            {item.label}
+          </Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={styles.kpiValue}>
+            {item.value}
+          </Text>
+          {item.helper ? (
+            <Text numberOfLines={1} style={styles.kpiHelper}>
+              {item.helper}
+            </Text>
+          ) : null}
+        </Card>
+      ))}
+    </View>
+  );
+}
+
+export type BarDatum = {
+  label: string;
+  primary: number;
+  secondary?: number;
+};
+
+export function VerticalBarChart({
+  data,
+  primaryLabel,
+  secondaryLabel,
+  primaryColor = colors.primary,
+  secondaryColor = '#F2B86D',
+  emptyText = 'Chưa có phát sinh trong kỳ đã chọn.',
+}: {
+  data: BarDatum[];
+  primaryLabel: string;
+  secondaryLabel?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  emptyText?: string;
+}) {
+  const hasAny = data.some((d) => d.primary > 0 || (d.secondary ?? 0) > 0);
+  if (!data.length || !hasAny) {
+    return (
+      <Card style={styles.chartCard}>
+        <Text style={styles.emptyInline}>{emptyText}</Text>
+      </Card>
+    );
+  }
+
+  const maxValue = Math.max(
+    1,
+    ...data.flatMap((d) => [Math.max(0, d.primary), Math.max(0, d.secondary ?? 0)]),
+  );
+
+  return (
+    <Card style={styles.chartCard}>
+      <View style={styles.chartArea}>
+        {data.map((item, idx) => {
+          const h1 = item.primary > 0 ? Math.max(6, Math.round((item.primary / maxValue) * 88)) : 2;
+          const h2 =
+            secondaryLabel !== undefined
+              ? (item.secondary ?? 0) > 0
+                ? Math.max(6, Math.round(((item.secondary ?? 0) / maxValue) * 88))
+                : 2
+              : 0;
+          return (
+            <View key={`${item.label}-${idx}`} style={styles.barGroup}>
+              <View style={styles.barsRow}>
+                <View style={[styles.bar, { height: h1, backgroundColor: primaryColor }]} />
+                {secondaryLabel !== undefined ? (
+                  <View style={[styles.bar, { height: h2, backgroundColor: secondaryColor }]} />
+                ) : null}
+              </View>
+              <Text numberOfLines={1} style={styles.barAxisLabel}>
+                {item.label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+      <View style={styles.legendRow}>
+        <View style={[styles.legendDot, { backgroundColor: primaryColor }]} />
+        <Text style={styles.legendText}>{primaryLabel}</Text>
+        {secondaryLabel ? (
+          <>
+            <View style={[styles.legendDot, { backgroundColor: secondaryColor, marginLeft: 14 }]} />
+            <Text style={styles.legendText}>{secondaryLabel}</Text>
+          </>
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
+export type BreakdownRow = {
+  label: string;
+  value: number;
+  displayValue: string;
+  color: string;
+};
+
+export function BreakdownBars({
+  rows,
+  emptyText = 'Chưa có dữ liệu phân bổ.',
+}: {
+  rows: BreakdownRow[];
+  emptyText?: string;
+}) {
+  const total = rows.reduce((sum, r) => sum + Math.max(0, r.value), 0);
+  if (!rows.length || total <= 0) {
+    return (
+      <Card style={styles.sectionCard}>
+        <Text style={styles.emptyInline}>{emptyText}</Text>
+      </Card>
+    );
+  }
+
+  return (
+    <Card style={styles.sectionCard}>
+      <View style={styles.breakdownList}>
+        {rows.map((row) => {
+          const pct = Math.min(100, Math.round((Math.max(0, row.value) / total) * 100));
+          return (
+            <View key={row.label} style={styles.breakdownItem}>
+              <View style={styles.breakdownHeader}>
+                <View style={styles.breakdownLabelWrap}>
+                  <View style={[styles.smallDot, { backgroundColor: row.color }]} />
+                  <Text numberOfLines={1} style={styles.breakdownLabel}>
+                    {row.label}
+                  </Text>
+                </View>
+                <Text style={styles.breakdownValue}>
+                  {row.displayValue} · {pct}%
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.max(pct, row.value > 0 ? 4 : 0)}%`, backgroundColor: row.color },
+                  ]}
+                />
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </Card>
+  );
+}
+
+export type ListRowItem = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  badgeColor?: string;
+  badgeTone?: string;
+  dotColor?: string;
+};
+
+export function ListPanel({
+  items,
+  emptyText = 'Chưa có mục nào cần theo dõi.',
+}: {
+  items: ListRowItem[];
+  emptyText?: string;
+}) {
+  if (!items.length) {
+    return (
+      <Card style={styles.sectionCard}>
+        <Text style={styles.emptyInline}>{emptyText}</Text>
+      </Card>
+    );
+  }
+
+  return (
+    <Card style={styles.sectionCard}>
+      {items.map((item, idx) => (
+        <View key={item.id} style={[styles.listRow, idx > 0 && styles.listRowBorder]}>
+          <View style={[styles.rowBullet, { backgroundColor: item.dotColor ?? colors.primary }]} />
+          <View style={styles.rowBody}>
+            <Text numberOfLines={1} style={styles.rowTitle}>
+              {item.title}
+            </Text>
+            {item.subtitle ? (
+              <Text numberOfLines={1} style={styles.rowSubtitle}>
+                {item.subtitle}
+              </Text>
+            ) : null}
+          </View>
+          {item.badge ? (
+            <View
+              style={[
+                styles.rowBadge,
+                { backgroundColor: item.badgeTone ?? '#EAF2FF' },
+              ]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[styles.rowBadgeText, { color: item.badgeColor ?? colors.primary }]}
+              >
+                {item.badge}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ))}
+    </Card>
+  );
+}
+
+export function OverviewLoading({ label }: { label: string }) {
+  return (
+    <Card style={styles.stateCard}>
+      <ActivityIndicator size="small" color={colors.primary} />
+      <Text style={styles.stateText}>{label}</Text>
+    </Card>
+  );
+}
+
+export function OverviewError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <Card style={[styles.stateCard, styles.errorCard]}>
+      <Text style={styles.errorTitle}>Không tải được dữ liệu từ ERP</Text>
+      <Text style={styles.errorMessage}>{message}</Text>
+      <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryBtn}>
+        <Text style={styles.retryBtnText}>Thử tải lại</Text>
+      </Pressable>
+    </Card>
+  );
+}
+
+export function NoticeStrip({ text }: { text: string }) {
+  return (
+    <View style={styles.noticeStrip}>
+      <Text style={styles.noticeText}>{text}</Text>
+    </View>
+  );
+}
+
+export const CHART_COLORS = ['#2463EB', '#16885A', '#C27617', '#7754C8', '#DC2626', '#0E7490'];
+
+const styles = StyleSheet.create({
+  kpiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 9,
+    marginBottom: 18,
+  },
+  kpiCard: {
+    width: '48.5%',
+    minHeight: 96,
+    padding: 12,
+  },
+  kpiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  kpiDotWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kpiDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  kpiDelta: {
+    fontSize: 9,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  kpiLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    marginTop: 8,
+  },
+  kpiValue: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  kpiHelper: {
+    color: colors.muted,
+    fontSize: 9,
+    marginTop: 3,
+  },
+  chartCard: {
+    padding: 14,
+    marginBottom: 18,
+  },
+  chartArea: {
+    height: 112,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+  },
+  barGroup: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  barsRow: {
+    height: 92,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  bar: {
+    width: 9,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+  barAxisLabel: {
+    color: colors.muted,
+    fontSize: 8,
+    marginTop: 5,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  legendDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 5,
+  },
+  legendText: {
+    color: colors.muted,
+    fontSize: 9,
+  },
+  sectionCard: {
+    padding: 14,
+    marginBottom: 18,
+  },
+  breakdownList: {
+    gap: 12,
+  },
+  breakdownItem: {
+    gap: 6,
+  },
+  breakdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  breakdownLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 6,
+  },
+  smallDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  breakdownLabel: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+  },
+  breakdownValue: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  progressTrack: {
+    height: 7,
+    borderRadius: 99,
+    backgroundColor: '#EDF2F9',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 99,
+  },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 9,
+    gap: 10,
+  },
+  listRowBorder: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  rowBullet: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  rowBody: {
+    flex: 1,
+  },
+  rowTitle: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  rowSubtitle: {
+    color: colors.muted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  rowBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 99,
+    maxWidth: 110,
+  },
+  rowBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  emptyInline: {
+    color: colors.muted,
+    fontSize: 11,
+    textAlign: 'center',
+    paddingVertical: 14,
+  },
+  stateCard: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 18,
+  },
+  stateText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  errorCard: {
+    backgroundColor: '#FFF5F5',
+    borderColor: '#FAD4D4',
+  },
+  errorTitle: {
+    color: '#B91C1C',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  errorMessage: {
+    color: '#7F1D1D',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  retryBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  retryBtnText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  noticeStrip: {
+    backgroundColor: '#FFF8EB',
+    borderColor: '#FDE2B8',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 14,
+  },
+  noticeText: {
+    color: '#9A5B13',
+    fontSize: 10,
+    lineHeight: 15,
+  },
+});
+

@@ -6,6 +6,8 @@ export type ErpUser = {
   id?: string;
   displayName: string;
   email: string;
+  phone?: string;
+  department?: string;
   role: string;
   companyCode?: string;
   companyName?: string;
@@ -69,4 +71,42 @@ export async function signOutFromErp() {
   } finally {
     await clearAccessToken();
   }
+}
+
+export async function updateMyProfile(payload: {
+  displayName?: string;
+  photoURL?: string;
+}): Promise<ErpUser> {
+  const result = await apiRequest<{ user?: ErpUser; data?: ErpUser }>('/auth/profile', {
+    method: 'PATCH',
+    body: payload,
+  });
+  return result?.user ?? result?.data ?? (await getCurrentErpUser());
+}
+
+export async function uploadMyAvatar(
+  dataUrl: string,
+  fileName = 'avatar.jpg',
+  mimeType = 'image/jpeg',
+): Promise<string> {
+  const res = await apiRequest<{ url?: string; data?: { url?: string } }>('/media/upload', {
+    method: 'POST',
+    body: {
+      file: dataUrl,
+      folder: 'igen_erp/avatars',
+      sourceType: 'user.avatar',
+      fileName,
+      mimeType,
+    },
+  });
+  const url = res?.url || res?.data?.url;
+  if (!url) throw new Error('Máy chủ không trả về đường dẫn ảnh đại diện.');
+  return url;
+}
+
+export async function changeMyPassword(password: string): Promise<void> {
+  await apiRequest('/auth/change-password', {
+    method: 'POST',
+    body: { password },
+  });
 }
