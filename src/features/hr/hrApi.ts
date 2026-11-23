@@ -2,6 +2,7 @@ import type { DocumentPickerAsset } from 'expo-document-picker';
 import { apiRequest } from '@/core/network/apiClient';
 import type {
   HrAttendanceRecord,
+  HrAttendanceRosterEntry,
   HrBranch,
   HrCalendarEvent,
   HrContract,
@@ -165,6 +166,15 @@ export async function listMonthlyAttendanceLogs(params: {
   const res = await apiRequest<{ data?: HrAttendanceRecord[] }>(
     `/crud/timekeeping-logs?${qs.toString()}`,
     { headers: branchHeaders(params.branchId) },
+  );
+  return res?.data ?? [];
+}
+
+export async function listAttendanceRoster(branchId?: string): Promise<HrAttendanceRosterEntry[]> {
+  const query = buildQuery({ branchId });
+  const res = await apiRequest<{ data?: HrAttendanceRosterEntry[] }>(
+    `/auth/users/attendance-roster${query}`,
+    { headers: branchHeaders(branchId) },
   );
   return res?.data ?? [];
 }
