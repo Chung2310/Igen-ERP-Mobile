@@ -768,6 +768,7 @@ function AttendanceAndCalendarSection({
                         return (
                           <Pressable
                             key={day}
+                            disabled={!canEditAttendance && row.key !== (user?._id || user?.id)}
                             onPress={() => {
                               if (!log) return;
                               const ci = formatTime(log.checkIn || log.checkInTime);
@@ -777,7 +778,7 @@ function AttendanceAndCalendarSection({
                                 setEditIn(ci === '--:--' ? '' : ci);
                                 setEditOut(co === '--:--' ? '' : co);
                                 setEditNote(log.note || '');
-                              } else {
+                              } else if (canEditAttendance || row.key === (user?._id || user?.id)) {
                                 Alert.alert(
                                   `${row.name} · ${formatViDate(dateStr)}`,
                                   `Giờ vào: ${ci}\nGiờ ra: ${co}\nTrạng thái: ${log.attendanceStatus || log.status || '—'}\nHệ số công: ${coeff}`,
@@ -815,8 +816,10 @@ function AttendanceAndCalendarSection({
           )}
 
           <Text style={[styles.subMeta, { marginTop: 8, textAlign: 'center' }]}>
-            Vuốt ngang bảng để xem các ngày 1–{daysInHistMonth} · Chạm ô có dữ liệu để xem
-            {canEditAttendance ? ' / chỉnh sửa' : ''}
+            Vuốt ngang bảng để xem các ngày 1–{daysInHistMonth}
+            {canEditAttendance
+              ? ' · Chạm ô có dữ liệu để xem / chỉnh sửa'
+              : ' · Chi tiết chấm công của nhân sự khác được ẩn'}
           </Text>
         </>
       ) : (
