@@ -36,7 +36,7 @@ import {
   deleteHrCalendarEvent,
   deleteHrWorkCalendarDay,
   listHrCalendarEvents,
-  listHrEmployees,
+  listAttendanceRoster,
   listHrEmployeeWorkHours,
   listHrShiftAssignments,
   listHrWorkCalendar,
@@ -52,9 +52,9 @@ import {
 } from '@/features/hr/hrApi';
 import type {
   HrAttendanceRecord,
+  HrAttendanceRosterEntry,
   HrCalendarEvent,
   HrCalendarEventType,
-  HrEmployee,
   HrEmployeeWorkHoursRow,
   HrShiftAssignmentEmployee,
   HrWorkCalendarDay,
@@ -242,7 +242,7 @@ function AttendanceAndCalendarSection({
   const [mode, setMode] = useState<'monthly' | 'calendar'>('monthly');
   const today = useMemo(() => getTodayKey(), []);
   const [monthlyLogs, setMonthlyLogs] = useState<HrAttendanceRecord[]>([]);
-  const [monthlyEmployees, setMonthlyEmployees] = useState<HrEmployee[]>([]);
+  const [monthlyEmployees, setMonthlyEmployees] = useState<HrAttendanceRosterEntry[]>([]);
   const [monthlyDate, setMonthlyDate] = useState(() => new Date());
   const [monthlySearch, setMonthlySearch] = useState('');
   const [cellMode, setCellMode] = useState<'coeff' | 'hours'>('coeff');
@@ -313,18 +313,14 @@ function AttendanceAndCalendarSection({
         const lastDay = new Date(histYear, histMonth, 0).getDate();
         const startDate = `${histYear}-${mStr}-01`;
         const endDate = `${histYear}-${mStr}-${String(lastDay).padStart(2, '0')}`;
-        const selfUid = user?._id || user?.id;
         const [list, empList, holList] = await Promise.all([
           listMonthlyAttendanceLogs({
             companyCode,
             startDate,
             endDate,
-            uid: canEditAttendance ? undefined : selfUid,
             branchId,
           }),
-          canEditAttendance && companyCode
-            ? listHrEmployees(companyCode, branchId).catch(() => [])
-            : Promise.resolve([]),
+          listAttendanceRoster(branchId).catch(() => []),
           listHrWorkCalendar(histYear, true).catch(() => []),
         ]);
         setMonthlyLogs(list);
@@ -337,7 +333,7 @@ function AttendanceAndCalendarSection({
         setRefreshing(false);
       }
     },
-    [branchId, canEditAttendance, companyCode, histMonth, histYear, user?._id, user?.id],
+    [branchId, companyCode, histMonth, histYear],
   );
 
   useEffect(() => {
@@ -463,36 +459,29 @@ function AttendanceAndCalendarSection({
     type Row = {
       key: string;
       name: string;
-      email: string;
-      department: string;
       byDate: Map<string, HrAttendanceRecord>;
       totalCoeff: number;
       totalHours: number;
     };
     const map = new Map<string, Row>();
-    const addOrGet = (key: string, name: string, email: string, department: string): Row => {
+    const addOrGet = (key: string, name: string): Row => {
       let row = map.get(key);
       if (!row) {
-        row = { key, name, email, department, byDate: new Map(), totalCoeff: 0, totalHours: 0 };
+        row = { key, name, byDate: new Map(), totalCoeff: 0, totalHours: 0 };
         map.set(key, row);
       }
       return row;
     };
 
     for (const emp of monthlyEmployees) {
-      const uid = emp.uid || emp._id || emp.id || '';
+      const uid = emp.uid || '';
       if (!uid) continue;
-      addOrGet(uid, emp.displayName || emp.email || 'Nhân viên', emp.email || '', emp.department || '');
+      addOrGet(uid, emp.displayName || 'Nhân viên');
     }
 
     for (const log of monthlyLogs) {
-      const key = log.uid || log.employeeId || log.email || log.employeeName || 'unknown';
-      const row = addOrGet(
-        key,
-        log.employeeName || log.displayName || log.email || 'Nhân viên',
-        log.email || '',
-        log.department || '',
-      );
+      const key = log.uid || log.employeeId || log.employeeName || 'unknown';
+      const row = addOrGet(key, log.employeeName || log.displayName || 'Nhân viên');
       const dateKey = (log.date || '').slice(0, 10);
       if (dateKey) row.byDate.set(dateKey, log);
     }
@@ -500,7 +489,7 @@ function AttendanceAndCalendarSection({
     // Nếu nhân viên thường chưa có log nào, vẫn hiện chính họ
     if (!canEditAttendance && map.size === 0 && user) {
       const uid = user._id || user.id || 'self';
-      addOrGet(uid, user.displayName || user.email || 'Tôi', user.email || '', '');
+      addOrGet(uid, user.displayName || 'Tôi');
     }
 
     const q = monthlySearch.trim().toLowerCase();
@@ -508,9 +497,7 @@ function AttendanceAndCalendarSection({
     for (const row of map.values()) {
       if (
         q &&
-        !row.name.toLowerCase().includes(q) &&
-        !row.email.toLowerCase().includes(q) &&
-        !row.department.toLowerCase().includes(q)
+        !row.name.toLowerCase().includes(q)
       ) {
         continue;
       }
@@ -631,7 +618,7 @@ function AttendanceAndCalendarSection({
             <TextInput
               value={monthlySearch}
               onChangeText={setMonthlySearch}
-              placeholder="Tìm nhân viên theo tên, email, phòng ban..."
+              placeholder="Tìm nhân viên theo tên..."
               placeholderTextColor={colors.muted}
               style={[styles.field, { marginBottom: 10 }]}
             />
@@ -678,11 +665,6 @@ function AttendanceAndCalendarSection({
                       <Text numberOfLines={1} style={styles.tdName}>
                         {row.name}
                       </Text>
-                      {row.department || row.email ? (
-                        <Text numberOfLines={1} style={styles.tdSub}>
-                          {row.department || row.email}
-                        </Text>
-                      ) : null}
                     </View>
                     <View style={styles.tdTotalCol}>
                       <Text style={styles.tdTotalVal}>

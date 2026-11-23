@@ -85,6 +85,11 @@ export type HrAttendanceRecord = {
   workHours?: number;
 };
 
+export type HrAttendanceRosterEntry = {
+  uid: string;
+  displayName: string;
+};
+
 export type HrCalendarEventType = 'event' | 'leave' | 'wfh' | 'exception' | 'reminder';
 
 export type HrCalendarEvent = {
