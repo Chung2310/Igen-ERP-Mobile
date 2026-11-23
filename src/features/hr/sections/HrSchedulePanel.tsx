@@ -313,14 +313,19 @@ function AttendanceAndCalendarSection({
         const lastDay = new Date(histYear, histMonth, 0).getDate();
         const startDate = `${histYear}-${mStr}-01`;
         const endDate = `${histYear}-${mStr}-${String(lastDay).padStart(2, '0')}`;
+        const selfOnlyAttendance = user?.role === 'pos_cashier';
+        const selfUid = user?._id || user?.id;
         const [list, empList, holList] = await Promise.all([
           listMonthlyAttendanceLogs({
             companyCode,
             startDate,
             endDate,
+            uid: selfOnlyAttendance ? selfUid : undefined,
             branchId,
           }),
-          listAttendanceRoster(branchId).catch(() => []),
+          listAttendanceRoster(branchId)
+            .then((roster) => selfOnlyAttendance ? roster.filter((employee) => employee.uid === selfUid) : roster)
+            .catch(() => []),
           listHrWorkCalendar(histYear, true).catch(() => []),
         ]);
         setMonthlyLogs(list);
@@ -333,7 +338,7 @@ function AttendanceAndCalendarSection({
         setRefreshing(false);
       }
     },
-    [branchId, companyCode, histMonth, histYear],
+    [branchId, companyCode, histMonth, histYear, user],
   );
 
   useEffect(() => {
