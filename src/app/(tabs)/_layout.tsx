@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Platform, Text } from 'react-native';
+import { Platform, Pressable, Text, type PressableProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AiChatTabIcon,
@@ -14,6 +14,19 @@ import { colors } from '@/theme/colors';
 
 const TAB_INACTIVE_COLOR = '#4B5565';
 
+function NoRippleTabButton({
+  ref: _ref,
+  android_ripple: _ripple,
+  ...props
+}: Record<string, unknown>) {
+  return (
+    <Pressable
+      {...(props as PressableProps)}
+      android_ripple={undefined}
+    />
+  );
+}
+
 export default function TabLayout() {
   const { user } = useAuth();
   const showOverview = canAccessOverview(user);
@@ -27,6 +40,7 @@ export default function TabLayout() {
     headerShown: false,
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
+    tabBarButton: (props: Record<string, unknown>) => <NoRippleTabButton {...props} />,
     tabBarStyle: {
       height: 60 + bottomInset,
       paddingTop: 8,
