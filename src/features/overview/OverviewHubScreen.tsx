@@ -9,10 +9,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Building2, Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Card } from '@/components/Card';
-import { OverviewTabIcon } from '@/components/OverviewTabIcons';
+import { BranchAppIcon, OverviewTabIcon } from '@/components/OverviewTabIcons';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -440,8 +440,8 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
             onPress={() => setBranchPickerOpen(true)}
             style={styles.companyWrap}
           >
-            <Text style={styles.eyebrow}>IGEN ERP</Text>
             <View style={styles.companyValueRow}>
+              <BranchAppIcon size={24} />
               <Text numberOfLines={1} style={styles.company}>
                 {user?.companyName || user?.companyCode || 'Doanh nghiệp ERP'}
                 {activeBranchName ? ` · ${activeBranchName}` : ''}
@@ -626,9 +626,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
                     }}
                     style={[styles.modalRow, active && styles.modalRowActive]}
                   >
-                    <View style={[styles.modalIcon, { backgroundColor: '#EAF2FF' }]}>
-                      <Building2 size={18} color={colors.primary} />
-                    </View>
+                    <BranchAppIcon size={38} />
                     <View style={styles.modalRowCopy}>
                       <Text style={styles.modalRowTitle}>{branch.name}</Text>
                       {branch.code ? (
@@ -675,17 +673,11 @@ const styles = StyleSheet.create({
   companyWrap: {
     flex: 1,
   },
-  eyebrow: {
-    color: colors.primary,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-  },
   company: {
     color: colors.ink,
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontWeight: '700',
-    marginTop: 3,
+    flexShrink: 1,
   },
   avatar: {
     width: 38,
@@ -707,7 +699,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 3,
   },
-  companyValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  companyValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   switcherBar: {
     flexDirection: 'row',
     alignItems: 'center',

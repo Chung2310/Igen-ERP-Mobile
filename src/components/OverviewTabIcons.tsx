@@ -199,3 +199,45 @@ export function OverviewTabIcon({ id, size = 34 }: OverviewTabIconProps) {
     </Svg>
   );
 }
+
+/**
+ * Chi nhánh — Gradient squircle office building icon matching ModuleAppIcons / OverviewTabIcons.
+ */
+export function BranchAppIcon({ size = 34 }: { size?: number }) {
+  const accent = '#2860EE';
+
+  return (
+    <Svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      <Defs>
+        <LinearGradient id="ov_bg_branch" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0%" stopColor="#3E7EFF" />
+          <Stop offset="100%" stopColor="#1E54E8" />
+        </LinearGradient>
+      </Defs>
+
+      <Rect x="0" y="0" width="56" height="56" rx="15.5" fill="url(#ov_bg_branch)" />
+
+      {/* Secondary wing */}
+      <Path
+        d="M32 23.5H39.8C41.5 23.5 42.8 24.8 42.8 26.5V41.5H32V23.5Z"
+        fill="#FFFFFF"
+        fillOpacity={0.74}
+      />
+      {/* Main building tower */}
+      <Path
+        d="M14.2 17.2C14.2 15.2 15.8 13.6 17.8 13.6H30.4C32.4 13.6 34 15.2 34 17.2V41.5H14.2V17.2Z"
+        fill="#FFFFFF"
+      />
+      {/* Windows */}
+      <Rect x="18.5" y="18.6" width="3.8" height="3.8" rx="1.1" fill={accent} />
+      <Rect x="25.9" y="18.6" width="3.8" height="3.8" rx="1.1" fill={accent} />
+      <Rect x="18.5" y="25.4" width="3.8" height="3.8" rx="1.1" fill={accent} fillOpacity={0.78} />
+      <Rect x="25.9" y="25.4" width="3.8" height="3.8" rx="1.1" fill={accent} fillOpacity={0.78} />
+      {/* Entrance door */}
+      <Rect x="21.5" y="33.2" width="5.2" height="8.3" rx="1.6" fill={accent} />
+      {/* Side wing windows */}
+      <Rect x="36.2" y="28.2" width="3.2" height="3.2" rx="1" fill={accent} fillOpacity={0.75} />
+      <Rect x="36.2" y="34.2" width="3.2" height="3.2" rx="1" fill={accent} fillOpacity={0.75} />
+    </Svg>
+  );
+}
