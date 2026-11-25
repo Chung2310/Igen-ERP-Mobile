@@ -180,7 +180,7 @@ export default function LoginScreen() {
           {/* Centered white login card */}
           <View style={styles.cardStage}>
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Đăng nhập</Text>
+              <Text style={styles.cardTitle}>Đăng nhập vào iGen ERP</Text>
 
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Email</Text>
@@ -400,10 +400,10 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: colors.ink,
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '500',
     textAlign: 'center',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   fieldGroup: {
     gap: 7,
