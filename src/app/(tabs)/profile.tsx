@@ -14,20 +14,15 @@ import {
 import { useRouter, type Href } from 'expo-router';
 import * as Location from 'expo-location';
 import {
-  Bell,
   Building2,
   ChevronRight,
-  CircleHelp,
   Clock,
-  Eye,
-  Fingerprint,
   LogIn,
   LogOut,
   RefreshCw,
-  ShieldCheck,
 } from 'lucide-react-native';
-import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
+import { SettingsDuotoneIcon, type SettingsIconKey } from '@/components/SettingsIcons';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   authenticateBiometric,
@@ -45,13 +40,13 @@ import {
 import type { HrBranch } from '@/features/hr/types';
 import { colors } from '@/theme/colors';
 
-const settings = [
-  { key: 'notifications', label: 'Thông báo', icon: Bell, detail: 'Tin nhắn, công việc và nhắc hạn' },
-  { key: 'security', label: 'Bảo mật đăng nhập', icon: ShieldCheck, detail: 'Mật khẩu và thiết bị đăng nhập' },
-  { key: 'permissions', label: 'Quyền ứng dụng', icon: Fingerprint, detail: 'Camera, ảnh và sinh trắc học' },
-  { key: 'privacy', label: 'Quyền riêng tư', icon: Eye, detail: 'Dữ liệu cá nhân và yêu cầu xóa' },
-  { key: 'support', label: 'Trợ giúp và hỗ trợ', icon: CircleHelp, detail: 'Liên hệ bộ phận hỗ trợ' },
-] as const;
+const settings: ReadonlyArray<{ key: Exclude<SettingsIconKey, 'logout'>; label: string }> = [
+  { key: 'notifications', label: 'Thông báo' },
+  { key: 'security', label: 'Bảo mật đăng nhập' },
+  { key: 'permissions', label: 'Quyền ứng dụng' },
+  { key: 'privacy', label: 'Quyền riêng tư' },
+  { key: 'support', label: 'Trợ giúp và hỗ trợ' },
+];
 
 function formatCheckTime(value?: string | null): string {
   if (!value) return '--:--';
@@ -256,10 +251,13 @@ export default function ProfileScreen() {
           />
         }
       >
-        <Text style={styles.title}>Cài đặt cá nhân</Text>
-        <Card
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Cài đặt cá nhân</Text>
+        </View>
+
+        <Pressable
           onPress={() => router.push('/profile/account' as Href)}
-          style={styles.profileCard}
+          style={({ pressed }) => [styles.surfaceCard, styles.profileCard, pressed && styles.rowPressed]}
         >
           <View style={styles.avatar}>
             {user?.photoURL ? (
@@ -276,10 +274,10 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <ChevronRight size={17} color={colors.muted} />
-        </Card>
+        </Pressable>
 
         <Text style={styles.section}>CHẤM CÔNG HÔM NAY</Text>
-        <Card style={styles.attendanceCard}>
+        <View style={[styles.surfaceCard, styles.attendanceCard]}>
           <View style={styles.attendanceHeader}>
             <View style={styles.attendanceTitleRow}>
               <View style={styles.attendanceIcon}>
@@ -405,43 +403,46 @@ export default function ProfileScreen() {
               </Text>
             </Pressable>
           </View>
-        </Card>
-
-        <Text style={styles.section}>TÀI KHOẢN &amp; ỨNG DỤNG</Text>
-        <View style={styles.list}>
-          {settings.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Card
-                key={item.key}
-                onPress={() => router.push(`/profile/${item.key}` as Href)}
-                style={styles.row}
-              >
-                <View style={styles.rowIcon}>
-                  <Icon size={17} color={colors.primary} />
-                </View>
-                <View style={styles.rowCopy}>
-                  <Text style={styles.rowLabel}>{item.label}</Text>
-                  <Text style={styles.rowDetail}>{item.detail}</Text>
-                </View>
-                <ChevronRight size={17} color={colors.muted} />
-              </Card>
-            );
-          })}
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          disabled={signingOut}
-          onPress={() => { void onSignOut(); }}
-          style={styles.signOutButton}
-        >
-          {signingOut ? (
-            <ActivityIndicator size="small" color="#C74848" />
-          ) : (
-            <Text style={styles.signOut}>Đăng xuất</Text>
-          )}
-        </Pressable>
+        <Text style={styles.section}>TÀI KHOẢN &amp; ỨNG DỤNG</Text>
+        <View style={[styles.surfaceCard, styles.menuCard]}>
+          {settings.map((item, index) => (
+            <View key={item.key}>
+              <Pressable
+                onPress={() => router.push(`/profile/${item.key}` as Href)}
+                style={({ pressed }) => [styles.menuRow, pressed && styles.rowPressed]}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+              >
+                <View style={styles.menuIconWrap}>
+                  <SettingsDuotoneIcon name={item.key} size={22} />
+                </View>
+                <Text style={styles.menuLabel}>{item.label}</Text>
+              </Pressable>
+              {index < settings.length - 1 ? <View style={styles.divider} /> : null}
+            </View>
+          ))}
+        </View>
+
+        <View style={[styles.surfaceCard, styles.signOutCard]}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={signingOut}
+            onPress={() => { void onSignOut(); }}
+            style={({ pressed }) => [styles.menuRow, pressed && styles.rowPressed]}
+          >
+            <View style={styles.menuIconWrap}>
+              {signingOut ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <SettingsDuotoneIcon name="logout" size={22} />
+              )}
+            </View>
+            <Text style={styles.menuLabel}>Đăng xuất</Text>
+          </Pressable>
+        </View>
+
         <Text style={styles.version}>ERP Mobile · Kết nối Igen ERP</Text>
       </ScrollView>
     </Screen>
@@ -449,55 +450,125 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 20, paddingTop: 14, paddingBottom: 28 },
-  title: { color: colors.ink, fontSize: 25, fontWeight: '800', marginBottom: 16 },
-  profileCard: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+  content: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 28,
+  },
+  headerRow: {
+    paddingHorizontal: 4,
+    marginBottom: 14,
+  },
+  title: {
+    color: colors.ink,
+    fontSize: 21,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  surfaceCard: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5EAF2',
+  },
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+  },
   profileCopy: { flex: 1 },
-  avatar: { width: 54, height: 54, borderRadius: 18, backgroundColor: '#DCE8FF', alignItems: 'center', justifyContent: 'center', marginRight: 13, overflow: 'hidden' },
-  avatarImage: { width: 54, height: 54 },
-  avatarText: { color: colors.primary, fontWeight: '800', fontSize: 15 },
-  name: { color: colors.ink, fontSize: 15, fontWeight: '800' },
-  email: { color: colors.muted, fontSize: 11, marginTop: 3 },
-  company: { color: colors.primary, fontSize: 10, fontWeight: '600', marginTop: 6 },
-  section: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 22, marginBottom: 10 },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: '#DCE8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  avatarImage: { width: 50, height: 50 },
+  avatarText: { color: colors.primary, fontWeight: '700', fontSize: 15 },
+  name: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  email: { color: colors.muted, fontSize: 11.5, marginTop: 2 },
+  company: { color: colors.primary, fontSize: 10.5, fontWeight: '600', marginTop: 4 },
+  section: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    paddingHorizontal: 4,
+    marginTop: 18,
+    marginBottom: 8,
+  },
   attendanceCard: { padding: 14, gap: 12 },
   attendanceHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   attendanceTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  attendanceIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#EAF2FF', alignItems: 'center', justifyContent: 'center' },
-  attendanceDate: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  attendanceShift: { color: colors.muted, fontSize: 10, marginTop: 2 },
+  attendanceIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#EAF2FF', alignItems: 'center', justifyContent: 'center' },
+  attendanceDate: { color: colors.ink, fontSize: 12.5, fontWeight: '600' },
+  attendanceShift: { color: colors.muted, fontSize: 10.5, marginTop: 2 },
   attendanceHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
-  statusBadgeText: { fontSize: 10, fontWeight: '700' },
-  refreshIconBtn: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4F7FC' },
+  statusBadgeText: { fontSize: 10, fontWeight: '600' },
+  refreshIconBtn: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4F7FC' },
   branchPickerRow: { gap: 6 },
   branchPickerLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  branchPickerLabel: { color: colors.muted, fontSize: 10, fontWeight: '600' },
+  branchPickerLabel: { color: colors.muted, fontSize: 10.5, fontWeight: '600' },
   branchChips: { gap: 6 },
-  branchChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: '#F0F4FA', borderWidth: 1, borderColor: 'transparent' },
+  branchChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: '#F0F4FA', borderWidth: StyleSheet.hairlineWidth, borderColor: 'transparent' },
   branchChipActive: { backgroundColor: '#EAF2FF', borderColor: colors.primary },
-  branchChipText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  branchChipTextActive: { color: colors.primary, fontWeight: '700' },
+  branchChipText: { color: colors.muted, fontSize: 11, fontWeight: '500' },
+  branchChipTextActive: { color: colors.primary, fontWeight: '600' },
   timeGrid: { flexDirection: 'row', gap: 10 },
-  timeBox: { flex: 1, backgroundColor: '#F6F8FC', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12 },
-  timeLabel: { color: colors.muted, fontSize: 10, fontWeight: '600' },
-  timeValue: { color: colors.ink, fontSize: 16, fontWeight: '800', marginTop: 3 },
+  timeBox: { flex: 1, backgroundColor: '#F6F8FC', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
+  timeLabel: { color: colors.muted, fontSize: 10.5, fontWeight: '500' },
+  timeValue: { color: colors.ink, fontSize: 16, fontWeight: '700', marginTop: 2 },
   checkActions: { flexDirection: 'row', gap: 10 },
-  checkInBtn: { flex: 1, minHeight: 42, borderRadius: 12, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  checkInText: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  biometricCheckText: { fontSize: 10 },
-  checkOutBtn: { flex: 1, minHeight: 42, borderRadius: 12, backgroundColor: '#EAF2FF', borderWidth: 1, borderColor: '#C9DDFD', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  checkOutText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  checkInBtn: { flex: 1, minHeight: 42, borderRadius: 10, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  checkInText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
+  biometricCheckText: { fontSize: 10.5 },
+  checkOutBtn: { flex: 1, minHeight: 42, borderRadius: 10, backgroundColor: '#EAF2FF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#C9DDFD', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  checkOutText: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
   btnDisabled: { opacity: 0.45 },
-  list: { gap: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', padding: 12 },
-  rowIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#F0F4FA', alignItems: 'center', justifyContent: 'center' },
-  rowCopy: { flex: 1, marginLeft: 11 },
-  rowLabel: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  rowDetail: { color: colors.muted, fontSize: 10, marginTop: 3 },
-  signOutButton: { minHeight: 46, justifyContent: 'center', marginTop: 16, borderRadius: 13, backgroundColor: '#FCEBEC' },
-  signOut: { color: '#C74848', fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  version: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: 22 },
+  menuCard: {
+    overflow: 'hidden',
+  },
+  signOutCard: {
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+  },
+  rowPressed: {
+    backgroundColor: '#F6F8FC',
+  },
+  menuIconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuLabel: {
+    marginLeft: 14,
+    color: '#1F2937',
+    fontSize: 14.5,
+    fontWeight: '400',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#EEF2F7',
+    marginHorizontal: 16,
+  },
+  version: {
+    color: colors.muted,
+    fontSize: 10.5,
+    textAlign: 'center',
+    marginTop: 20,
+  },
 });
 
 function getInitials(name?: string) {
