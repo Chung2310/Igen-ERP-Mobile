@@ -575,12 +575,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         >
           {renderSection()}
         </Animated.View>
-
-        {/* Footer */}
-        <Text style={styles.footerNote}>
-          Nguồn dữ liệu trực tiếp từ Igen ERP
-          {updatedAt ? ` · Cập nhật lúc ${formatClock(updatedAt)}` : ''}
-        </Text>
       </ScrollView>
 
       {/* Bottom sheet modal to choose among all overview pages */}
@@ -839,13 +833,6 @@ const styles = StyleSheet.create({
   comparisonText: {
     color: colors.muted,
     fontSize: 9,
-  },
-  footerNote: {
-    color: colors.muted,
-    fontSize: 9,
-    textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 6,
   },
   modalBackdrop: {
     flex: 1,
