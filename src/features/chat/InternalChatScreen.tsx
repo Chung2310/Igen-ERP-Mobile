@@ -16,8 +16,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ArrowLeft, Check, Hand, Heart, Paperclip, Pin, Plus, Smile, ThumbsUp, X } from 'lucide-react-native';
-import { Card } from '@/components/Card';
+import { ArrowLeft, Check, Hand, Heart, Paperclip, Pin, Plus, Search, Smile, ThumbsUp, X } from 'lucide-react-native';
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -651,44 +651,43 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
 
   // --- Room List View ---
   const listView = (
-    <>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={roomsRefreshing}
-            onRefresh={() => {
-              setRoomsRefreshing(true);
-              void loadRooms(true);
-            }}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
-      >
-        <View style={[styles.headerRow, { marginBottom: 12 }]}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.title}>Trò chuyện nội bộ</Text>
-          </View>
+    <View style={styles.listRoot}>
+      {/* Top pastel icy-aqua gradient backdrop matching the reference style */}
+      <View pointerEvents="none" style={styles.topBackdrop}>
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="chatTopBg" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#DFF3FC" />
+              <Stop offset="55%" stopColor="#E9F3FC" />
+              <Stop offset="100%" stopColor="#DCEEFB" />
+            </LinearGradient>
+            <RadialGradient id="chatTopGlow" cx="85%" cy="18%" rx="55%" ry="60%">
+              <Stop offset="0%" stopColor="#B8E9FB" stopOpacity="0.65" />
+              <Stop offset="100%" stopColor="#B8E9FB" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#chatTopBg)" />
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#chatTopGlow)" />
+        </Svg>
+      </View>
+
+      {/* Top header & pill filter chips on pastel sky area */}
+      <View style={styles.topZone}>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Trò chuyện</Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => {
               void openNewChatModal();
             }}
-            style={styles.newChatBtn}
+            style={({ pressed }) => [styles.newChatBtn, pressed && styles.newChatBtnPressed]}
           >
-            <View style={styles.newChatBtnContent}><Plus size={15} color={colors.white} /><Text style={styles.newChatBtnText}>Mới</Text></View>
+            <View style={styles.newChatBtnContent}>
+              <Plus size={15} color={colors.white} />
+              <Text style={styles.newChatBtnText}>Mới</Text>
+            </View>
           </Pressable>
         </View>
-
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Tìm theo tên đồng nghiệp, nhóm..."
-          placeholderTextColor={colors.muted}
-          style={styles.searchInput}
-        />
 
         <View style={styles.filters}>
           {(
@@ -712,78 +711,119 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
             );
           })}
         </View>
+      </View>
 
-        {roomsLoading && !rooms.length ? (
-          <Card style={styles.stateCard}>
-            <BrandLoader size={42} label="Đang tải danh sách hội thoại từ ERP..." />
-          </Card>
-        ) : roomsError && !rooms.length ? (
-          <Card style={styles.stateCard}>
-            <PopupError error={roomsError} />
-            <Pressable
-              onPress={() => {
-                void loadRooms();
+      {/* Rounded white sheet containing search bar & flat conversation list */}
+      <View style={styles.whiteSheet}>
+        <View style={styles.searchWrap}>
+          <Search size={17} color="#94A3B8" strokeWidth={1.9} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Tìm theo tên đồng nghiệp, nhóm..."
+            placeholderTextColor="#94A3B8"
+            style={styles.searchInput}
+          />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.sheetScrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={roomsRefreshing}
+              onRefresh={() => {
+                setRoomsRefreshing(true);
+                void loadRooms(true);
               }}
-              style={styles.retryBtn}
-            >
-              <Text style={styles.retryBtnText}>Thử tải lại</Text>
-            </Pressable>
-          </Card>
-        ) : !filteredRooms.length ? (
-          <Card style={styles.stateCard}>
-            <Text style={styles.stateText}>
-              {rooms.length
-                ? 'Không có hội thoại nào khớp bộ lọc.'
-                : 'Chưa có cuộc trò chuyện nội bộ nào. Bấm "Mới" để bắt đầu.'}
-            </Text>
-          </Card>
-        ) : (
-          <View style={styles.list}>
-            {filteredRooms.map((room, idx) => {
-              const name = getRoomDisplayName(room, myId);
-              const unread = room.unreadCount ?? 0;
-              const pinned = isRoomPinned(room, myId);
-              return (
-                <Card
-                  key={room._id}
-                  onPress={() => openRoom(room)}
-                  style={styles.row}
-                >
-                  <View
-                    style={[
-                      styles.avatar,
-                      { backgroundColor: AVATAR_TONES[idx % AVATAR_TONES.length] },
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          {roomsLoading && !rooms.length ? (
+            <View style={styles.stateBox}>
+              <BrandLoader size={42} label="Đang tải danh sách hội thoại từ ERP..." />
+            </View>
+          ) : roomsError && !rooms.length ? (
+            <View style={styles.stateBox}>
+              <PopupError error={roomsError} />
+              <Pressable
+                onPress={() => {
+                  void loadRooms();
+                }}
+                style={styles.retryBtn}
+              >
+                <Text style={styles.retryBtnText}>Thử tải lại</Text>
+              </Pressable>
+            </View>
+          ) : !filteredRooms.length ? (
+            <View style={styles.stateBox}>
+              <Text style={styles.stateText}>
+                {rooms.length
+                  ? 'Không có hội thoại nào khớp bộ lọc.'
+                  : 'Chưa có cuộc trò chuyện nội bộ nào. Bấm "Mới" để bắt đầu.'}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {filteredRooms.map((room, idx) => {
+                const name = getRoomDisplayName(room, myId);
+                const unread = room.unreadCount ?? 0;
+                const pinned = isRoomPinned(room, myId);
+                return (
+                  <Pressable
+                    key={room._id}
+                    onPress={() => openRoom(room)}
+                    style={({ pressed }) => [
+                      styles.row,
+                      idx > 0 && styles.rowDivider,
+                      pressed && styles.rowPressed,
                     ]}
                   >
-                    <Text style={styles.initials}>{getInitials(name)}</Text>
-                  </View>
-                  <View style={styles.copy}>
-                    <View style={styles.nameLine}>
-                      <View style={styles.roomNameWrap}>{pinned ? <Pin size={12} color={colors.primary} /> : null}<Text numberOfLines={1} style={styles.name}>{name}</Text></View>
-                      <Text style={styles.time}>
-                        {formatMessageTime(room.lastMessage?.createdAt || room.updatedAt)}
-                      </Text>
-                    </View>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.message, unread > 0 && styles.messageUnread]}
+                    <View
+                      style={[
+                        styles.avatar,
+                        { backgroundColor: AVATAR_TONES[idx % AVATAR_TONES.length] },
+                      ]}
                     >
-                      {formatLastMessagePreview(room)}
-                    </Text>
-                  </View>
-                  {unread > 0 ? (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadBadgeText}>
-                        {unread > 99 ? '99+' : unread}
-                      </Text>
+                      <Text style={styles.initials}>{getInitials(name)}</Text>
                     </View>
-                  ) : null}
-                </Card>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
+                    <View style={styles.copy}>
+                      <View style={styles.nameLine}>
+                        <View style={styles.roomNameWrap}>
+                          {pinned ? <Pin size={12} color={colors.primary} /> : null}
+                          <Text numberOfLines={1} style={styles.name}>
+                            {name}
+                          </Text>
+                        </View>
+                        <Text style={styles.time}>
+                          {formatMessageTime(room.lastMessage?.createdAt || room.updatedAt)}
+                        </Text>
+                      </View>
+                      <View style={styles.previewLine}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.message, unread > 0 && styles.messageUnread]}
+                        >
+                          {formatLastMessagePreview(room)}
+                        </Text>
+                        {unread > 0 ? (
+                          <View style={styles.unreadBadge}>
+                            <Text style={styles.unreadBadgeText}>
+                              {unread > 99 ? '99+' : unread}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+      </View>
 
       {/* New Chat Modal */}
       <Modal
@@ -882,10 +922,10 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
           </Pressable>
         </Pressable>
       </Modal>
-    </>
+    </View>
   );
 
-  return embedded ? listView : <Screen>{listView}</Screen>;
+  return embedded ? listView : <Screen backgroundColor="#DFF3FC">{listView}</Screen>;
 }
 
 export function EmbeddedInternalChatScreen() {
@@ -893,54 +933,85 @@ export function EmbeddedInternalChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 18, paddingTop: 14, paddingBottom: 28 },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 },
-  headerCopy: { flex: 1 },
-  eyebrow: { color: colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
-  title: { color: colors.ink, fontSize: 25, fontWeight: '800', marginTop: 4 },
-  subtitle: { color: colors.muted, fontSize: 11, marginTop: 5 },
+  listRoot: { flex: 1, backgroundColor: '#DFF3FC' },
+  topBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, height: 150 },
+  topZone: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  title: { color: colors.ink, fontSize: 21, fontWeight: '700', letterSpacing: -0.2 },
   newChatBtn: {
     backgroundColor: colors.primary,
     paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 11,
+    paddingVertical: 7,
+    borderRadius: 999,
   },
-  newChatBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  newChatBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-  searchInput: {
-    backgroundColor: colors.white,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 13,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-    fontSize: 12,
-    color: colors.ink,
-    marginTop: 14,
-  },
-  filters: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 14 },
+  newChatBtnPressed: { opacity: 0.85 },
+  newChatBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  newChatBtnText: { color: colors.white, fontSize: 12, fontWeight: '600' },
+  filters: { flexDirection: 'row', gap: 8, marginTop: 12 },
   filterPill: {
     backgroundColor: colors.white,
-    borderColor: colors.border,
-    borderWidth: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: 15,
     paddingVertical: 7,
-    borderRadius: 10,
+    borderRadius: 999,
   },
-  filterPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  filterTextActive: { color: colors.white, fontWeight: '700' },
-  list: { gap: 9 },
-  row: { flexDirection: 'row', alignItems: 'center', padding: 12 },
-  avatar: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  initials: { color: colors.ink, fontSize: 11, fontWeight: '800' },
-  copy: { flex: 1, marginLeft: 12 },
+  filterPillActive: { backgroundColor: colors.primary },
+  filterText: { color: '#334155', fontSize: 13, fontWeight: '500' },
+  filterTextActive: { color: colors.white, fontWeight: '600' },
+  whiteSheet: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingTop: 14,
+    overflow: 'hidden',
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F5F8',
+    borderRadius: 12,
+    height: 42,
+    paddingHorizontal: 13,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    gap: 9,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13.5,
+    color: colors.ink,
+    paddingVertical: 0,
+  },
+  sheetScrollContent: { paddingBottom: 24, flexGrow: 1 },
+  list: {},
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    backgroundColor: colors.white,
+  },
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#F1F4F9',
+  },
+  rowPressed: { backgroundColor: '#F7F9FC' },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initials: { color: colors.ink, fontSize: 14, fontWeight: '700' },
+  copy: { flex: 1, marginLeft: 13 },
   nameLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  roomNameWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  name: { color: colors.ink, fontSize: 12, fontWeight: '700', flex: 1 },
-  time: { color: colors.muted, fontSize: 10 },
-  message: { color: colors.muted, fontSize: 11, marginTop: 4 },
-  messageUnread: { color: colors.ink, fontWeight: '700' },
+  roomNameWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  name: { color: colors.ink, fontSize: 15, fontWeight: '600', flex: 1 },
+  time: { color: '#8A96A8', fontSize: 12, fontWeight: '400' },
+  previewLine: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  message: { flex: 1, color: '#64748B', fontSize: 13.5 },
+  messageUnread: { color: colors.ink, fontWeight: '600' },
   unreadBadge: {
     minWidth: 20,
     height: 20,
@@ -949,11 +1020,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
-    marginLeft: 8,
   },
-  unreadBadgeText: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  stateCard: { padding: 20, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  stateText: { color: colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 17 },
+  unreadBadgeText: { color: colors.white, fontSize: 10.5, fontWeight: '700' },
+  stateBox: { padding: 28, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  stateText: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center', lineHeight: 18 },
   retryBtn: {
     backgroundColor: colors.primary,
@@ -962,7 +1032,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 4,
   },
-  retryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  retryBtnText: { color: colors.white, fontSize: 12, fontWeight: '600' },
 
   // Thread view
   threadContainer: { flex: 1, backgroundColor: colors.background },
