@@ -276,7 +276,7 @@ export default function ProfileScreen() {
           <ChevronRight size={17} color={colors.muted} />
         </Pressable>
 
-        <Text style={styles.section}>CHẤM CÔNG HÔM NAY</Text>
+        <Text style={styles.section}>Chấm công hôm nay</Text>
         <View style={[styles.surfaceCard, styles.attendanceCard]}>
           <View style={styles.attendanceHeader}>
             <View style={styles.attendanceTitleRow}>
@@ -405,7 +405,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <Text style={styles.section}>TÀI KHOẢN &amp; ỨNG DỤNG</Text>
+        <Text style={styles.section}>Tài khoản &amp; Ứng dụng</Text>
         <View style={[styles.surfaceCard, styles.menuCard]}>
           {settings.map((item, index) => (
             <View key={item.key}>
@@ -493,13 +493,13 @@ const styles = StyleSheet.create({
   email: { color: colors.muted, fontSize: 11.5, marginTop: 2 },
   company: { color: colors.primary, fontSize: 10.5, fontWeight: '600', marginTop: 4 },
   section: {
-    color: colors.muted,
-    fontSize: 10,
+    color: '#111827',
+    fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.8,
+    letterSpacing: -0.2,
     paddingHorizontal: 4,
-    marginTop: 18,
-    marginBottom: 8,
+    marginTop: 20,
+    marginBottom: 10,
   },
   attendanceCard: { padding: 14, gap: 12 },
   attendanceHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
