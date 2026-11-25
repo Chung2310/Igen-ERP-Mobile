@@ -381,8 +381,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   topLogo: {
-    width: 148,
-    height: 32,
+    width: 110,
+    height: 24,
   },
   cardStage: {
     flex: 1,
