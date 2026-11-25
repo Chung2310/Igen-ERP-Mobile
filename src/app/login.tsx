@@ -19,7 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Eye, EyeOff, Fingerprint, Lock, Mail } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
-import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   ERP_PRIVACY_POLICY_URL,
@@ -180,7 +180,27 @@ export default function LoginScreen() {
           {/* Centered white login card */}
           <View style={styles.cardStage}>
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Đăng nhập vào iGen ERP</Text>
+              <View style={styles.cardTitleRow}>
+                <Text style={styles.cardTitle}>Đăng nhập vào </Text>
+                <Svg width={92} height={26} style={styles.cardTitleBrandSvg}>
+                  <Defs>
+                    <LinearGradient id="igenTitleBrandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <Stop offset="0%" stopColor="#00AEF0" />
+                      <Stop offset="50%" stopColor="#067AF0" />
+                      <Stop offset="100%" stopColor="#1D5CE8" />
+                    </LinearGradient>
+                  </Defs>
+                  <SvgText
+                    x="0"
+                    y="20"
+                    fontSize="20"
+                    fontWeight="600"
+                    fill="url(#igenTitleBrandGrad)"
+                  >
+                    iGen ERP
+                  </SvgText>
+                </Svg>
+              </View>
 
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Email</Text>
@@ -380,8 +400,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   topLogo: {
-    width: 176,
-    height: 38,
+    width: 148,
+    height: 32,
   },
   cardStage: {
     flex: 1,
@@ -398,12 +418,20 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 16,
   },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   cardTitle: {
     color: colors.ink,
     fontSize: 20,
+    lineHeight: 26,
     fontWeight: '500',
-    textAlign: 'center',
-    marginBottom: 4,
+  },
+  cardTitleBrandSvg: {
+    marginTop: 1,
   },
   fieldGroup: {
     gap: 7,
