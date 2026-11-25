@@ -182,7 +182,7 @@ export default function LoginScreen() {
             <View style={styles.card}>
               <View style={styles.cardTitleRow}>
                 <Text style={styles.cardTitle}>Đăng nhập vào </Text>
-                <Svg width={92} height={26} style={styles.cardTitleBrandSvg}>
+                <Svg width={102} height={28} style={styles.cardTitleBrandSvg}>
                   <Defs>
                     <LinearGradient id="igenTitleBrandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                       <Stop offset="0%" stopColor="#00AEF0" />
@@ -192,8 +192,8 @@ export default function LoginScreen() {
                   </Defs>
                   <SvgText
                     x="0"
-                    y="20"
-                    fontSize="20"
+                    y="22"
+                    fontSize="22"
                     fontWeight="600"
                     fill="url(#igenTitleBrandGrad)"
                   >
@@ -426,8 +426,8 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: colors.ink,
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: '500',
   },
   cardTitleBrandSvg: {
