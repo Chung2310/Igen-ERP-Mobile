@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Eye, EyeOff, Fingerprint, Lock, Mail } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   ERP_PRIVACY_POLICY_URL,
@@ -269,6 +270,16 @@ export default function LoginScreen() {
                   pressed && !busy && styles.submitPressed,
                 ]}
               >
+                <Svg pointerEvents="none" width="100%" height="100%" style={StyleSheet.absoluteFill}>
+                  <Defs>
+                    <LinearGradient id="loginSubmitBrandGrad" x1="0" y1="0" x2="1" y2="0.25">
+                      <Stop offset="0%" stopColor="#00AEF0" />
+                      <Stop offset="52%" stopColor="#067AF0" />
+                      <Stop offset="100%" stopColor="#1D5CE8" />
+                    </LinearGradient>
+                  </Defs>
+                  <Rect x="0" y="0" width="100%" height="100%" fill="url(#loginSubmitBrandGrad)" />
+                </Svg>
                 {busy ? (
                   <ActivityIndicator color={colors.white} />
                 ) : (
@@ -438,7 +449,8 @@ const styles = StyleSheet.create({
   submit: {
     height: 48,
     borderRadius: 10,
-    backgroundColor: '#0A74F5',
+    backgroundColor: '#067AF0',
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
