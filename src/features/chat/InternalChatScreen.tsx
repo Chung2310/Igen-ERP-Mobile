@@ -1,4 +1,5 @@
 import { BrandLoader } from '@/components/BrandLoader';
+import { IgenEmptyState } from '@/components/EmptyStateIllustration';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -759,11 +760,13 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
             </View>
           ) : !filteredRooms.length ? (
             <View style={styles.stateBox}>
-              <Text style={styles.stateText}>
-                {rooms.length
-                  ? 'Không có hội thoại nào khớp bộ lọc.'
-                  : 'Chưa có cuộc trò chuyện nội bộ nào. Bấm "Mới" để bắt đầu.'}
-              </Text>
+              <IgenEmptyState
+                message={
+                  rooms.length
+                    ? 'Không có hội thoại nào khớp bộ lọc.'
+                    : 'Chưa có cuộc trò chuyện nội bộ nào. Bấm "Mới" để bắt đầu.'
+                }
+              />
             </View>
           ) : (
             <View style={styles.list}>

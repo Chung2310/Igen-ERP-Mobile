@@ -1,4 +1,5 @@
 import { BrandLoader } from '@/components/BrandLoader';
+import { IgenEmptyState } from '@/components/EmptyStateIllustration';
 import { PopupError } from '@/components/PopupError';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/theme/colors';
@@ -70,7 +71,7 @@ export function VerticalBarChart({
   if (!data.length || !hasAny) {
     return (
       <View style={styles.chartCard}>
-        <Text style={styles.emptyInline}>{emptyText}</Text>
+        <IgenEmptyState message={emptyText} compact />
       </View>
     );
   }
@@ -147,7 +148,7 @@ export function BreakdownBars({
   if (!rows.length || total <= 0) {
     return (
       <View style={styles.sectionCard}>
-        <Text style={styles.emptyInline}>{emptyText}</Text>
+        <IgenEmptyState message={emptyText} compact />
       </View>
     );
   }
@@ -206,7 +207,7 @@ export function ListPanel({
   if (!items.length) {
     return (
       <View style={styles.sectionCard}>
-        <Text style={styles.emptyInline}>{emptyText}</Text>
+        <IgenEmptyState message={emptyText} compact />
       </View>
     );
   }
