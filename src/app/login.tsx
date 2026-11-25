@@ -28,6 +28,7 @@ import {
 import { colors } from '@/theme/colors';
 
 const IGEN_FULL_LOGO = require('../../assets/images/logo-igenerp-transparent.png');
+const IGEN_PEEKING_ROBOT = require('../../assets/images/login-robot-peeking.png');
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -177,8 +178,15 @@ export default function LoginScreen() {
             <Image source={IGEN_FULL_LOGO} style={styles.topLogo} resizeMode="contain" />
           </View>
 
-          {/* Centered white login card */}
+          {/* Centered white login card with peeking iGen robot gripping top edge */}
           <View style={styles.cardStage}>
+            <View pointerEvents="none" style={styles.peekingRobotWrap}>
+              <Image
+                source={IGEN_PEEKING_ROBOT}
+                style={styles.peekingRobot}
+                resizeMode="contain"
+              />
+            </View>
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Đăng nhập vào iGen ERP</Text>
 
@@ -389,15 +397,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
   },
+  peekingRobotWrap: {
+    alignItems: 'center',
+    zIndex: 2,
+    marginBottom: -18,
+  },
+  peekingRobot: {
+    width: 194,
+    height: 150,
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5ECF6',
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 28,
     paddingBottom: 24,
     gap: 16,
+    zIndex: 1,
   },
   cardTitle: {
     color: colors.ink,
