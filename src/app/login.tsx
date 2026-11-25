@@ -281,10 +281,11 @@ export default function LoginScreen() {
               >
                 <Svg pointerEvents="none" width="100%" height="100%" style={StyleSheet.absoluteFill}>
                   <Defs>
-                    <LinearGradient id="loginSubmitBrandGrad" x1="0" y1="0" x2="1" y2="0.25">
-                      <Stop offset="0%" stopColor="#00AEF0" />
-                      <Stop offset="52%" stopColor="#067AF0" />
-                      <Stop offset="100%" stopColor="#1D5CE8" />
+                    <LinearGradient id="loginSubmitBrandGrad" x1="0" y1="0" x2="1" y2="0.6">
+                      <Stop offset="0%" stopColor="#0D8EF4" />
+                      <Stop offset="35%" stopColor="#0B7FF1" />
+                      <Stop offset="70%" stopColor="#0F71EC" />
+                      <Stop offset="100%" stopColor="#1664E6" />
                     </LinearGradient>
                   </Defs>
                   <Rect x="0" y="0" width="100%" height="100%" fill="url(#loginSubmitBrandGrad)" />
