@@ -112,6 +112,43 @@ export async function createAssistantAgent(agent: UserAssistantAgent): Promise<U
   return res.data;
 }
 
+export async function updateAssistantAgent(
+  agentId: string,
+  agent: Omit<UserAssistantAgent, 'id'>,
+): Promise<UserAssistantAgent> {
+  const res = await apiRequest<{ data: UserAssistantAgent }>(
+    `/chatbot/agents/${encodeURIComponent(agentId)}`,
+    { method: 'PUT', body: agent },
+  );
+  return res.data;
+}
+
+export async function extractAssistantAgentLink(url: string): Promise<{ title: string; text: string }> {
+  const res = await apiRequest<{ data?: { title?: string; text?: string } }>(
+    '/chatbot/agents/extract-link',
+    { method: 'POST', body: { url } },
+  );
+  return { title: res?.data?.title || url, text: res?.data?.text || '' };
+}
+
+export async function extractAssistantAgentFile(asset: {
+  uri: string;
+  name: string;
+  mimeType?: string | null;
+}): Promise<{ fileName: string; text: string }> {
+  const form = new FormData();
+  form.append('file', {
+    uri: asset.uri,
+    name: asset.name,
+    type: asset.mimeType || 'application/octet-stream',
+  } as unknown as Blob);
+  const res = await apiRequest<{ data?: { fileName?: string; text?: string } }>(
+    '/chatbot/agents/extract',
+    { method: 'POST', body: form },
+  );
+  return { fileName: res?.data?.fileName || asset.name, text: res?.data?.text || '' };
+}
+
 export async function setAssistantAgentFavorite(
   agentId: string,
   favorite: boolean,
@@ -172,6 +209,35 @@ export async function saveAssistantProjects(
   return res?.data ?? projects;
 }
 
+export async function uploadAssistantProjectFile(
+  projectId: string,
+  asset: { uri: string; name: string; mimeType?: string | null },
+  options: AssistantScope = {},
+): Promise<AssistantProject['files'][number]> {
+  const form = new FormData();
+  form.append('file', {
+    uri: asset.uri,
+    name: asset.name,
+    type: asset.mimeType || 'application/octet-stream',
+  } as unknown as Blob);
+  const res = await apiRequest<{ data: AssistantProject['files'][number] }>(
+    `/chatbot/assistant/projects/${encodeURIComponent(projectId)}/files`,
+    { method: 'POST', body: form, headers: scopeHeaders(options.branchId), signal: options.signal },
+  );
+  return res.data;
+}
+
+export async function downloadAssistantProjectFile(
+  projectId: string,
+  fileId: string,
+  options: AssistantScope = {},
+): Promise<Blob> {
+  return apiRequest<Blob>(
+    `/chatbot/assistant/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}`,
+    { responseType: 'blob', headers: scopeHeaders(options.branchId), signal: options.signal },
+  );
+}
+
 // --- Prompt Library (/chatbot/assistant/prompt-templates) ---
 export async function listPromptTemplates(
   signal?: AbortSignal,
@@ -222,6 +288,14 @@ export async function createAssistantMemory(content: string): Promise<AssistantM
   return res.data.item;
 }
 
+export async function updateAssistantMemory(id: string, content: string): Promise<AssistantMemory> {
+  const res = await apiRequest<{ data: AssistantMemory }>(
+    `/chatbot/assistant/memory/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: { content } },
+  );
+  return res.data;
+}
+
 export async function deleteAssistantMemory(id: string): Promise<void> {
   await apiRequest(`/chatbot/assistant/memory/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
@@ -253,6 +327,26 @@ export async function saveAssistantWorkflow(
         })),
       },
     },
+  );
+  return res.data;
+}
+
+export async function interpretAssistantWorkflow(
+  actionId: string,
+  version: number,
+  text: string,
+): Promise<AssistantWorkflow> {
+  const res = await apiRequest<{ data: AssistantWorkflow }>(
+    `/chatbot/assistant/workflows/${encodeURIComponent(actionId)}/interpret`,
+    { method: 'POST', body: { version, text } },
+  );
+  return res.data;
+}
+
+export async function resetAssistantWorkflow(actionId: string, version: number): Promise<AssistantWorkflow> {
+  const res = await apiRequest<{ data: AssistantWorkflow }>(
+    `/chatbot/assistant/workflows/${encodeURIComponent(actionId)}/reset`,
+    { method: 'POST', body: { version } },
   );
   return res.data;
 }
@@ -303,11 +397,126 @@ export async function listStudioAssets(signal?: AbortSignal): Promise<{
 export async function createStudioSlideDeck(input: {
   prompt: string;
   pageCount: number;
-  style: string;
+  style: 'rewrite' | 'preserve' | 'shorten';
+  file?: { uri: string; name: string; mimeType?: string | null };
 }): Promise<{ id: string; title?: string }> {
+  if (input.file) {
+    const form = new FormData();
+    form.append('prompt', input.prompt);
+    form.append('pageCount', String(input.pageCount));
+    form.append('style', input.style);
+    form.append('document', {
+      uri: input.file.uri,
+      name: input.file.name,
+      type: input.file.mimeType || 'application/octet-stream',
+    } as unknown as Blob);
+    const res = await apiRequest<{ data: { id: string; title?: string } }>(
+      '/chatbot/assistant/studio/slides',
+      { method: 'POST', body: form },
+    );
+    return res.data;
+  }
   const res = await apiRequest<{ data: { id: string; title?: string } }>(
     '/chatbot/assistant/studio/slides',
     { method: 'POST', body: input },
   );
   return res.data;
+}
+
+export async function createStudioMindmap(input: {
+  prompt: string;
+  sourceType: 'text' | 'document';
+  file?: { uri: string; name: string; mimeType?: string | null };
+  locale?: 'vi' | 'en' | 'ja';
+  writeMode?: 'ai' | 'preserve';
+}): Promise<{ id?: string; title?: string }> {
+  const form = new FormData();
+  form.append('sourceType', input.sourceType);
+  form.append('prompt', input.prompt);
+  form.append('locale', input.locale || 'vi');
+  form.append('writeMode', input.writeMode || 'ai');
+  if (input.file) {
+    form.append('document', {
+      uri: input.file.uri,
+      name: input.file.name,
+      type: input.file.mimeType || 'application/octet-stream',
+    } as unknown as Blob);
+  }
+  const res = await apiRequest<{ data?: { id?: string; title?: string } }>(
+    '/chatbot/assistant/studio/mindmaps',
+    { method: 'POST', body: form },
+  );
+  return res?.data ?? {};
+}
+
+export async function createStudioChart(input: {
+  file: { uri: string; name: string; mimeType?: string | null };
+  prompt: string;
+  chartType: string;
+}): Promise<{ id?: string; title?: string }> {
+  const form = new FormData();
+  form.append('file', {
+    uri: input.file.uri,
+    name: input.file.name,
+    type: input.file.mimeType || 'application/octet-stream',
+  } as unknown as Blob);
+  form.append('prompt', input.prompt);
+  form.append('chartType', input.chartType);
+  const res = await apiRequest<{ data?: { id?: string; title?: string } }>(
+    '/chatbot/assistant/studio/charts',
+    { method: 'POST', body: form },
+  );
+  return res?.data ?? {};
+}
+
+export async function transcribeStudioAudio(asset: {
+  uri: string;
+  name: string;
+  mimeType?: string | null;
+}): Promise<AssistantStudioTranscript> {
+  const form = new FormData();
+  form.append('audio', {
+    uri: asset.uri,
+    name: asset.name,
+    type: asset.mimeType || 'audio/mpeg',
+  } as unknown as Blob);
+  const res = await apiRequest<{ data: AssistantStudioTranscript }>(
+    '/chatbot/assistant/studio/transcriptions',
+    { method: 'POST', body: form },
+  );
+  return res.data;
+}
+
+export async function createStudioImages(input: {
+  prompt: string;
+  aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '3:2' | '2:3';
+  count: number;
+  referenceImage?: string;
+}): Promise<{ images: Array<{ url: string }>; model?: string; aspectRatio?: string }> {
+  const res = await apiRequest<{ data?: { images?: Array<{ url: string }>; model?: string; aspectRatio?: string } }>(
+    '/chatbot/assistant/studio/images',
+    { method: 'POST', body: input },
+  );
+  return { images: res?.data?.images ?? [], model: res?.data?.model, aspectRatio: res?.data?.aspectRatio };
+}
+
+export async function editStudioImage(input: {
+  sourceImage: string;
+  prompt: string;
+  mode: 'custom' | 'erase' | 'remove-background' | 'change-background' | 'enhance';
+}): Promise<{ image: { url: string }; model?: string }> {
+  const res = await apiRequest<{ data?: { image?: { url?: string }; model?: string } }>(
+    '/chatbot/assistant/studio/images/edit',
+    { method: 'POST', body: input },
+  );
+  if (!res?.data?.image?.url) throw new Error('Trợ lý chưa trả về ảnh đã chỉnh sửa.');
+  return { image: { url: res.data.image.url }, model: res.data.model };
+}
+
+export async function createStudioSpeech(input: { text: string; voice?: string }): Promise<Blob> {
+  return apiRequest<Blob>('/chatbot/assistant/speech', {
+    method: 'POST',
+    body: input,
+    responseType: 'blob',
+  });
 }
