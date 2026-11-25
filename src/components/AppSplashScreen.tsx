@@ -111,7 +111,7 @@ export function AppSplashScreen({ fadingOut, onFadeComplete }: AppSplashScreenPr
         </Svg>
       </View>
 
-      {/* Center brand lockup: official iGen ERP logo + tagline */}
+      {/* Center brand lockup: official iGen ERP logo + 2-line tagline right below robot */}
       <Animated.View
         style={[
           styles.brandBlock,
@@ -127,7 +127,7 @@ export function AppSplashScreen({ fadingOut, onFadeComplete }: AppSplashScreenPr
           resizeMode="contain"
         />
         <Text style={styles.tagline}>
-          Điều hành cả doanh nghiệp trên một hệ thống
+          Điều hành cả doanh nghiệp{'\n'}trên một hệ thống
         </Text>
       </Animated.View>
 
@@ -147,7 +147,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: '#FFFFFF',
     zIndex: 999,
-    justifyContent: 'space-between',
   },
   heroContainer: {
     width: '100%',
@@ -167,22 +166,23 @@ const styles = StyleSheet.create({
   brandBlock: {
     alignItems: 'center',
     paddingHorizontal: 28,
-    marginTop: -6,
+    marginTop: -26,
   },
   logoImage: {
-    width: 215,
-    height: 66,
+    width: 205,
+    height: 60,
   },
   tagline: {
-    marginTop: 8,
-    color: '#4B5565',
-    fontSize: 13.5,
-    lineHeight: 20,
-    fontWeight: '600',
+    marginTop: 10,
+    color: '#2B3A55',
+    fontSize: 17,
+    lineHeight: 25,
+    fontWeight: '700',
     textAlign: 'center',
-    letterSpacing: 0.1,
+    letterSpacing: 0.15,
   },
   footer: {
+    marginTop: 'auto',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 20,
