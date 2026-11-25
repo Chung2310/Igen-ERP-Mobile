@@ -33,7 +33,6 @@ import {
   Smartphone,
   Trash2,
 } from 'lucide-react-native';
-import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import {
   changeMyPassword,
@@ -111,7 +110,7 @@ export default function ProfileSectionScreen() {
   const title = SECTION_TITLES[key] || 'Cài đặt cá nhân';
 
   return (
-    <Screen>
+    <Screen edges={['left', 'right', 'bottom']}>
       <Stack.Screen options={{ title }} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {key === 'account' ? (
@@ -203,7 +202,7 @@ function AppPermissionsDetailSection() {
 
   return (
     <View style={styles.stack}>
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Quyền thiết bị</Text>
         <View style={styles.permissionRow}>
           <View style={styles.iconCircle}><Camera size={17} color={colors.primary} /></View>
@@ -216,7 +215,7 @@ function AppPermissionsDetailSection() {
             <Text style={styles.permissionButtonText}>{busy === 'camera' ? 'Đang xử lý…' : permissionActionLabel(cameraPermission)}</Text>
           </Pressable>
         </View>
-        <View style={styles.permissionRow}>
+        <View style={[styles.permissionRow, styles.lastRow]}>
           <View style={styles.iconCircle}><Images size={17} color={colors.primary} /></View>
           <View style={styles.permissionCopy}>
             <Text style={styles.rowTitle}>Ảnh và video</Text>
@@ -227,11 +226,11 @@ function AppPermissionsDetailSection() {
             <Text style={styles.permissionButtonText}>{busy === 'photos' ? 'Đang xử lý…' : permissionActionLabel(photoPermission)}</Text>
           </Pressable>
         </View>
-      </Card>
+      </View>
 
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Sinh trắc học</Text>
-        <View style={styles.permissionRow}>
+        <View style={[styles.permissionRow, styles.lastRow]}>
           <View style={styles.iconCircle}><Fingerprint size={17} color={colors.primary} /></View>
           <View style={styles.permissionCopy}>
             <Text style={styles.rowTitle}>Face ID, khuôn mặt hoặc vân tay</Text>
@@ -241,11 +240,11 @@ function AppPermissionsDetailSection() {
             </Text>
           </View>
         </View>
-      </Card>
+      </View>
 
       <BiometricSettingsCard />
 
-      <Text style={styles.muted}>
+      <Text style={styles.footerNote}>
         ERP Mobile chỉ xin quyền khi bạn mở tính năng cần dùng. Chọn tệp qua hộp thoại hệ thống không cần quyền lưu trữ riêng.
       </Text>
     </View>
@@ -317,10 +316,10 @@ function BiometricSettingsCard() {
   }, [biometricBusy, biometricSettings, updateBiometricSettings]);
 
   return (
-    <Card style={styles.card}>
+    <View style={styles.card}>
       <Text style={styles.cardTitle}>Bật / tắt sinh trắc học</Text>
       {biometricRows.map((row, idx) => (
-        <View key={row.key} style={[styles.switchRow, idx === biometricRows.length - 1 && { borderBottomWidth: 0 }]}>
+        <View key={row.key} style={[styles.switchRow, idx === biometricRows.length - 1 && styles.lastRow]}>
           <View style={styles.iconCircle}><Fingerprint size={17} color={colors.primary} /></View>
           <View style={{ flex: 1, paddingHorizontal: 10 }}>
             <Text style={styles.rowTitle}>{row.title}</Text>
@@ -334,8 +333,8 @@ function BiometricSettingsCard() {
           />
         </View>
       ))}
-      <Text style={styles.muted}>Sinh trắc học được kiểm tra bởi hệ điều hành và không gửi mẫu lên máy chủ ERP.</Text>
-    </Card>
+      <Text style={styles.helperText}>Sinh trắc học được kiểm tra bởi hệ điều hành và không gửi mẫu lên máy chủ ERP.</Text>
+    </View>
   );
 }
 
@@ -435,9 +434,18 @@ function AccountDetailSection() {
     }
   }, [displayName, photoURL, refreshUser]);
 
+  const accountInfoRows = [
+    { label: 'Email đăng nhập', value: user?.email || '—' },
+    { label: 'Doanh nghiệp', value: user?.companyName || user?.companyCode || '—' },
+    { label: 'Chi nhánh', value: user?.branchName || 'Toàn công ty' },
+    { label: 'Vai trò', value: user?.role || '—' },
+    ...(user?.department ? [{ label: 'Phòng ban', value: user.department }] : []),
+    ...(user?.phone ? [{ label: 'Số điện thoại', value: user.phone }] : []),
+  ];
+
   return (
     <View style={styles.stack}>
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Ảnh đại diện</Text>
         <View style={styles.avatarRow}>
           <View style={styles.avatarPreview}>
@@ -476,41 +484,22 @@ function AccountDetailSection() {
             )}
           </View>
         </View>
-      </Card>
+      </View>
 
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Thông tin tài khoản ERP</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.muted}>Email đăng nhập</Text>
-          <Text style={styles.infoVal}>{user?.email || '—'}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.muted}>Doanh nghiệp</Text>
-          <Text style={styles.infoVal}>{user?.companyName || user?.companyCode || '—'}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.muted}>Chi nhánh</Text>
-          <Text style={styles.infoVal}>{user?.branchName || 'Toàn công ty'}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.muted}>Vai trò</Text>
-          <Text style={styles.infoVal}>{user?.role || '—'}</Text>
-        </View>
-        {user?.department ? (
-          <View style={styles.infoRow}>
-            <Text style={styles.muted}>Phòng ban</Text>
-            <Text style={styles.infoVal}>{user.department}</Text>
+        {accountInfoRows.map((row, idx) => (
+          <View
+            key={row.label}
+            style={[styles.infoRow, idx === accountInfoRows.length - 1 && styles.lastRow]}
+          >
+            <Text style={styles.muted}>{row.label}</Text>
+            <Text style={styles.infoVal}>{row.value}</Text>
           </View>
-        ) : null}
-        {user?.phone ? (
-          <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
-            <Text style={styles.muted}>Số điện thoại</Text>
-            <Text style={styles.infoVal}>{user.phone}</Text>
-          </View>
-        ) : null}
-      </Card>
+        ))}
+      </View>
 
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Chỉnh sửa hồ sơ</Text>
         <Text style={styles.label}>Họ và tên hiển thị *</Text>
         <TextInput
@@ -527,7 +516,7 @@ function AccountDetailSection() {
         >
           <Text style={styles.primaryBtnText}>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</Text>
         </Pressable>
-      </Card>
+      </View>
     </View>
   );
 }
@@ -578,12 +567,12 @@ function NotificationsDetailSection() {
   ];
 
   return (
-    <Card style={styles.card}>
+    <View style={styles.card}>
       <Text style={styles.cardTitle}>Tùy chỉnh nhận thông báo</Text>
       {rows.map((r, idx) => (
         <View
           key={r.key}
-          style={[styles.switchRow, idx === rows.length - 1 && { borderBottomWidth: 0 }]}
+          style={[styles.switchRow, idx === rows.length - 1 && styles.lastRow]}
         >
           <View style={{ flex: 1, paddingRight: 10 }}>
             <Text style={styles.rowTitle}>{r.title}</Text>
@@ -596,7 +585,7 @@ function NotificationsDetailSection() {
           />
         </View>
       ))}
-    </Card>
+    </View>
   );
 }
 
@@ -633,7 +622,7 @@ function SecurityDetailSection() {
 
   return (
     <View style={styles.stack}>
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Đổi mật khẩu</Text>
         <Text style={styles.label}>Mật khẩu mới (tối thiểu 6 ký tự) *</Text>
         <TextInput
@@ -662,9 +651,9 @@ function SecurityDetailSection() {
             {saving ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
           </Text>
         </Pressable>
-      </Card>
+      </View>
 
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Thiết bị & phiên hiện tại</Text>
         <View style={styles.deviceRow}>
           <View style={styles.iconCircle}>
@@ -693,7 +682,7 @@ function SecurityDetailSection() {
         >
           <Text style={styles.dangerBtnText}>Đăng xuất khỏi thiết bị này</Text>
         </Pressable>
-      </Card>
+      </View>
     </View>
   );
 }
@@ -717,7 +706,7 @@ function PrivacyDetailSection() {
 
   return (
     <View style={styles.stack}>
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Dữ liệu cá nhân trong Igen ERP</Text>
         <Text style={styles.muted}>
           Tài khoản {user?.email || ''} thuộc doanh nghiệp{' '}
@@ -725,9 +714,9 @@ function PrivacyDetailSection() {
           đơn từ, tài liệu và tin nhắn nội bộ được lưu trữ và phân quyền truy cập theo chính sách của
           doanh nghiệp.
         </Text>
-      </Card>
+      </View>
 
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Quyền truy cập thiết bị</Text>
         <View style={styles.infoRow}>
           <Text style={styles.muted}>Bộ nhớ & Tệp</Text>
@@ -737,13 +726,13 @@ function PrivacyDetailSection() {
           <Text style={styles.muted}>Vị trí & Mạng</Text>
           <Text style={styles.infoVal}>Cấu hình chi nhánh & chấm công</Text>
         </View>
-        <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+        <View style={[styles.infoRow, styles.lastRow]}>
           <Text style={styles.muted}>Phiên đăng nhập</Text>
           <Text style={styles.infoVal}>Mã hóa bằng SecureStore</Text>
         </View>
-      </Card>
+      </View>
 
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Yêu cầu xuất hoặc xóa dữ liệu</Text>
         <Text style={styles.muted}>
           Để yêu cầu trích xuất bản sao dữ liệu hoặc xóa tài khoản khỏi hệ thống, vui lòng gửi yêu
@@ -770,7 +759,7 @@ function PrivacyDetailSection() {
           <ExternalLink size={14} color={colors.primary} />
           <Text style={styles.outlineBtnText}>Mở điều khoản sử dụng trên ERP</Text>
         </Pressable>
-      </Card>
+      </View>
     </View>
   );
 }
@@ -802,7 +791,7 @@ function SupportDetailSection() {
 
   return (
     <View style={styles.stack}>
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <View style={styles.headRow}>
           <Text style={styles.cardTitle}>Trạng thái kết nối ERP</Text>
           <Pressable disabled={checking} onPress={() => void checkHealth()} style={styles.refreshBtn}>
@@ -820,9 +809,9 @@ function SupportDetailSection() {
             <Text style={[styles.rowTitle, { color: '#16885A' }]}>Kết nối ổn định</Text>
           </View>
         )}
-      </Card>
+      </View>
 
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Liên hệ bộ phận hỗ trợ</Text>
         <Pressable
           onPress={() => void Linking.openURL('mailto:igentech1@gmail.com')}
@@ -836,7 +825,7 @@ function SupportDetailSection() {
         </Pressable>
         <Pressable
           onPress={() => void Linking.openURL('tel:0815971508')}
-          style={[styles.contactRow, { borderBottomWidth: 0 }]}
+          style={[styles.contactRow, styles.lastRow]}
         >
           <Phone size={16} color={colors.primary} />
           <View style={{ flex: 1 }}>
@@ -844,39 +833,46 @@ function SupportDetailSection() {
             <Text style={styles.muted}>0815971508</Text>
           </View>
         </Pressable>
-      </Card>
+      </View>
 
-      <Card style={styles.card}>
+      <View style={styles.card}>
         <Text style={styles.cardTitle}>Thông tin ứng dụng</Text>
         <View style={styles.infoRow}>
           <Text style={styles.muted}>Ứng dụng</Text>
           <Text style={styles.infoVal}>Igen ERP Mobile</Text>
         </View>
-        <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+        <View style={[styles.infoRow, styles.lastRow]}>
           <Text style={styles.muted}>Phiên bản</Text>
           <Text style={styles.infoVal}>1.0.0</Text>
         </View>
-      </Card>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 18, paddingBottom: 32 },
+  content: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 32 },
   stack: { gap: 12 },
-  card: { padding: 15, gap: 10 },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5EAF2',
+    padding: 16,
+    gap: 8,
+  },
+  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
   avatarPreview: {
-    width: 76,
-    height: 76,
-    borderRadius: 24,
+    width: 72,
+    height: 72,
+    borderRadius: 18,
     backgroundColor: '#DCE8FF',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  avatarImage: { width: 76, height: 76 },
-  avatarInitials: { color: colors.primary, fontSize: 22, fontWeight: '800' },
+  avatarImage: { width: 72, height: 72 },
+  avatarInitials: { color: colors.primary, fontSize: 22, fontWeight: '700' },
   changePhotoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -884,7 +880,7 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: colors.primary,
     minHeight: 40,
-    borderRadius: 11,
+    borderRadius: 10,
     paddingHorizontal: 14,
   },
   removePhotoBtn: {
@@ -897,75 +893,82 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
   },
-  removePhotoText: { color: '#C74848', fontSize: 11, fontWeight: '700' },
-  cardTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  removePhotoText: { color: '#C74848', fontSize: 11.5, fontWeight: '600' },
+  cardTitle: { color: colors.ink, fontSize: 14, fontWeight: '600', marginBottom: 2 },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  rowTitle: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  rowTitle: { color: '#1F2937', fontSize: 13, fontWeight: '500' },
+  muted: { color: colors.muted, fontSize: 11.5, lineHeight: 16.5 },
+  helperText: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 4 },
+  footerNote: { color: colors.muted, fontSize: 11, lineHeight: 16, paddingHorizontal: 4 },
+  label: { color: colors.ink, fontSize: 11.5, fontWeight: '600', marginTop: 4 },
   field: {
     backgroundColor: colors.background,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 11,
+    borderColor: '#E5EAF2',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 12,
+    fontSize: 13,
     color: colors.ink,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 10,
-    paddingBottom: 8,
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#EEF2F7',
   },
-  infoVal: { color: colors.ink, fontSize: 12, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
+  infoVal: { color: '#1F2937', fontSize: 12.5, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 11,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#EEF2F7',
   },
   permissionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 9,
+    paddingVertical: 11,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#EEF2F7',
   },
   permissionCopy: { flex: 1, gap: 3 },
-  permissionStatus: { color: '#A86B16', fontSize: 10, fontWeight: '700' },
+  permissionStatus: { color: '#A86B16', fontSize: 10.5, fontWeight: '600' },
   permissionGranted: { color: '#16885A' },
   permissionButton: {
     minHeight: 34,
     justifyContent: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     borderRadius: 9,
     backgroundColor: '#EAF2FF',
   },
-  permissionButtonText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  deviceRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  permissionButtonText: { color: colors.primary, fontSize: 11, fontWeight: '600' },
+  deviceRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 4 },
   iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: '#EAF2FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  healthRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  healthRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    paddingVertical: 9,
+    paddingVertical: 11,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#EEF2F7',
+  },
+  lastRow: {
+    borderBottomWidth: 0,
+    paddingBottom: 2,
   },
   refreshBtn: {
     flexDirection: 'row',
@@ -976,36 +979,36 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 9,
   },
-  refreshText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  refreshText: { color: colors.primary, fontSize: 11, fontWeight: '600' },
   primaryBtn: {
     backgroundColor: colors.primary,
-    minHeight: 44,
-    borderRadius: 12,
+    minHeight: 42,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
+    marginTop: 6,
   },
-  primaryBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   outlineBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#EAF2FF',
-    minHeight: 42,
-    borderRadius: 12,
+    minHeight: 40,
+    borderRadius: 10,
     marginTop: 2,
   },
-  outlineBtnText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  outlineBtnText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
   dangerBtn: {
     backgroundColor: '#FCEBEC',
-    minHeight: 42,
-    borderRadius: 12,
+    minHeight: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
   },
-  dangerBtnText: { color: '#C74848', fontSize: 12, fontWeight: '700' },
+  dangerBtnText: { color: '#C74848', fontSize: 12, fontWeight: '600' },
   errorText: { color: '#B91C1C', fontSize: 12 },
   disabled: { opacity: 0.45 },
 });
