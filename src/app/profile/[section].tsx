@@ -467,9 +467,10 @@ function AccountDetailSection() {
   ];
 
   const coverHeight = topInset + 132;
+  const bottomInset = Math.max(insets.bottom + 28, 48);
 
   return (
-    <View style={styles.accountContainer}>
+    <View style={[styles.accountContainer, { paddingBottom: bottomInset }]}>
       {/* Soft mountain cover header */}
       <View style={[styles.coverWrap, { height: coverHeight }]}>
         <Svg
@@ -494,26 +495,14 @@ function AccountDetailSection() {
         >
           <ChevronLeft size={24} color="#334155" strokeWidth={2.2} />
         </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Thay đổi ảnh đại diện"
-          disabled={uploadingAvatar}
-          onPress={() => void onPickAvatar()}
-          style={[styles.coverCameraBtn, uploadingAvatar && styles.disabled]}
-        >
-          {uploadingAvatar ? (
-            <ActivityIndicator size="small" color="#1F2937" />
-          ) : (
-            <Camera size={17} color="#1F2937" strokeWidth={2} />
-          )}
-        </Pressable>
       </View>
 
       {/* Main white profile sheet overlapping cover */}
       <View style={styles.profileSheet}>
         <View style={styles.avatarCenterWrap}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Thay đổi ảnh đại diện"
             disabled={uploadingAvatar}
             onPress={() => void onPickAvatar()}
             style={styles.heroAvatarRing}
@@ -525,6 +514,13 @@ function AccountDetailSection() {
                 <Text style={styles.heroAvatarInitials}>
                   {getInitials(displayName || user?.displayName)}
                 </Text>
+              )}
+            </View>
+            <View style={[styles.avatarCameraBadge, uploadingAvatar && styles.disabled]}>
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color="#1F2937" />
+              ) : (
+                <Camera size={14} color="#1F2937" strokeWidth={2.1} />
               )}
             </View>
           </Pressable>
@@ -540,7 +536,7 @@ function AccountDetailSection() {
               style={styles.heroRemovePhotoPill}
             >
               <Trash2 size={13} color="#C74848" />
-              <Text style={styles.heroRemovePhotoText}>Gỡ ảnh đại diện</Text>
+              <Text style={styles.heroRemovePhotoText}>Dùng ảnh mặc định</Text>
             </Pressable>
           ) : null}
         </View>
@@ -951,19 +947,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  coverCameraBtn: {
-    position: 'absolute',
-    right: 16,
-    bottom: 24,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E2E8F0',
-  },
   profileSheet: {
     backgroundColor: colors.white,
     borderTopLeftRadius: 16,
@@ -985,6 +968,20 @@ const styles = StyleSheet.create({
     padding: 3.5,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  avatarCameraBadge: {
+    position: 'absolute',
+    right: -1,
+    bottom: 1,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   heroAvatarInner: {
     width: '100%',
