@@ -273,8 +273,8 @@ function BiometricSettingsCard() {
       key: 'appLockEnabled',
       title: 'Khóa ứng dụng bằng sinh trắc học',
       description: Platform.OS === 'android'
-        ? 'Yêu cầu vân tay hoặc sinh trắc học Android cấp mạnh khi mở lại ERP Mobile.'
-        : 'Yêu cầu Face ID hoặc Touch ID khi mở lại ERP Mobile.',
+        ? 'Yêu cầu vân tay hoặc sinh trắc học cấp mạnh nếu ERP Mobile ở nền liên tục 5 phút.'
+        : 'Yêu cầu Face ID hoặc Touch ID nếu ERP Mobile ở nền liên tục 5 phút.',
     },
   ];
 

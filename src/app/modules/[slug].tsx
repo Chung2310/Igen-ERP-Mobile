@@ -1,15 +1,25 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Redirect, Stack, useLocalSearchParams } from 'expo-router';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
+import { useAuth } from '@/core/auth/AuthProvider';
 import { getFeatureScreen } from '@/features/modules/featureScreenRegistry';
-import { getModuleBySlug } from '@/features/modules/moduleCatalog';
+import { canAccessModule, getModuleBySlug } from '@/features/modules/moduleCatalog';
 import { Check } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 
 export default function ModuleScaffoldScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { user, isLoading } = useAuth();
   const module = getModuleBySlug(slug);
+
+  if (isLoading) {
+    return <Screen><View style={styles.missing}><ActivityIndicator color={colors.primary} /></View></Screen>;
+  }
+
+  if (module && !canAccessModule(user, module.slug)) {
+    return <Redirect href="/(tabs)/modules" />;
+  }
 
   if (!module) {
     return <Screen><View style={styles.missing}><Text style={styles.title}>Không tìm thấy phân hệ</Text><Text style={styles.body}>Phân hệ này chưa được khai báo trong danh mục ứng dụng.</Text></View></Screen>;

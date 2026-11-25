@@ -31,7 +31,81 @@ export const moduleCatalog: ModuleDefinition[] = [
   { slug: 'resources', name: 'Quản lý tài nguyên', category: 'Tài liệu', icon: FolderOpen, color: '#EAF2FF', shortDescription: 'Tài liệu doanh nghiệp và chia sẻ tệp', description: 'Tìm kiếm và chia sẻ tài nguyên doanh nghiệp với quyền truy cập phù hợp.', capabilities: ['Tìm và xem tài liệu', 'Tải tệp lên', 'Chia sẻ theo quyền'] },
   { slug: 'quotes', name: 'Báo giá', category: 'Kinh doanh', icon: FileText, color: '#F1EBFF', shortDescription: 'Lập, duyệt và chia sẻ báo giá', description: 'Tạo báo giá, theo dõi phê duyệt và gửi tài liệu cho khách hàng.', capabilities: ['Tạo và sửa báo giá', 'Xem chi tiết và duyệt', 'Chia sẻ báo giá PDF'] },
   { slug: 'inventory', name: 'Kho & Sản phẩm', category: 'Hàng hóa', icon: Package, color: '#FFF3E5', shortDescription: 'Sản phẩm và nghiệp vụ kho', description: 'Tra cứu hàng hóa và theo dõi biến động kho theo phạm vi được phân quyền.', capabilities: ['Danh mục sản phẩm và tồn kho', 'Nhập, xuất và điều chuyển', 'Kiểm kê và tra cứu theo quyền'] },
+  { slug: 'student-partners', name: 'Đối tác học viên', category: 'Đối tác', icon: Users, color: '#E7F5FF', shortDescription: 'Đối tác giới thiệu học viên', description: 'Quản lý đối tác giới thiệu học viên và theo dõi chính sách hợp tác.', capabilities: ['Danh sách và hồ sơ đối tác', 'Chính sách giới thiệu học viên', 'Lịch sử hoạt động'] },
+  { slug: 'labor-partners', name: 'Đối tác lao động', category: 'Đối tác', icon: BriefcaseBusiness, color: '#E8F7FA', shortDescription: 'Đối tác giới thiệu lao động', description: 'Quản lý đối tác lao động, chính sách giới thiệu và nghiệp vụ hợp tác.', capabilities: ['Danh sách và hồ sơ đối tác', 'Chính sách và hoa hồng', 'Đối soát và lịch sử hợp tác'] },
+  { slug: 'retail-partners', name: 'Đối tác bán lẻ', category: 'Đối tác', icon: Package, color: '#FFF3E5', shortDescription: 'Đối tác trong nghiệp vụ bán lẻ', description: 'Quản lý đối tác bán lẻ và các chính sách, hoạt động liên quan.', capabilities: ['Danh sách và hồ sơ đối tác', 'Chính sách đối tác bán lẻ', 'Lịch sử hoạt động'] },
 ];
+
+const MODULE_KEYS_BY_SLUG: Record<string, string[]> = {
+  hr: ['hr'],
+  inventory: ['inventory'],
+  resources: ['resource'],
+  quotes: ['quotation'],
+  'worker-management': ['worker'],
+  'student-management': ['student'],
+  chat: ['chat'],
+  'student-partners': ['student', 'student-partner'],
+  'labor-partners': ['worker', 'labor-partner'],
+  'retail-partners': ['retail', 'retail-partner'],
+};
+
+const MODULES_REQUIRING_EXPLICIT_ENABLE = new Set([
+  'retail',
+  'finance',
+  'social-marketing',
+  'omni-inbox',
+  'company-knowledge',
+  'legal-reference',
+  'quotation',
+  'healthcare',
+  'architect-assistant',
+]);
+
+const MODULE_READ_PERMISSIONS_BY_SLUG: Record<string, string[]> = {
+  chat: ['chat:read'],
+  hr: ['hr:read', 'access:read', 'work:read', 'timekeeping:read'],
+  inventory: ['inventory:read'],
+  resources: ['resource:read'],
+  quotes: ['quotation:read', 'quotation:manage'],
+  'worker-management': ['people:read', 'people:manage', 'labor-partner:read'],
+  'student-management': ['people:read', 'people:manage'],
+  'student-partners': ['relationship:read', 'relationship:manage'],
+  'labor-partners': ['labor-partner:read', 'labor-partner:manage'],
+  'retail-partners': [
+    'retail-partner:read',
+    'retail-partner:manage',
+    'retail-partner-policy:manage',
+    'retail-partner-self:read',
+  ],
+};
+
+/** Matches the web ERP's tenant module switches, including legacy partner flags. */
+export function isTenantModuleEnabled(user: ErpUser | null, key: string): boolean {
+  if (!user) return false;
+  const enabledModules = user.enabledModules;
+
+  if (key === 'retail-partner') {
+    return Boolean(enabledModules?.includes('retail') && enabledModules.includes(key));
+  }
+  if ((key === 'student-partner' || key === 'labor-partner') && enabledModules?.includes('partner')) {
+    return true;
+  }
+  if (MODULES_REQUIRING_EXPLICIT_ENABLE.has(key)) {
+    return Boolean(enabledModules?.includes(key));
+  }
+  if (!enabledModules) return true;
+  if (enabledModules.length === 0) return false;
+  return enabledModules.includes(key);
+}
+
+export function isModuleVisibleForTenant(user: ErpUser | null, slug: string): boolean {
+  if (!user) return false;
+  const isAdmin = user.role === 'admin' || user.role === 'superadmin';
+  if (slug === 'users') return isAdmin;
+  if (slug === 'ai-plans') return true;
+  const requiredModules = MODULE_KEYS_BY_SLUG[slug];
+  return !requiredModules || requiredModules.every((key) => isTenantModuleEnabled(user, key));
+}
 
 const AI_PLAN_PERMISSIONS = [
   'marketing:read',
@@ -45,7 +119,7 @@ const AI_PLAN_PERMISSIONS = [
 ];
 
 export function canAccessModule(user: ErpUser | null, slug: string): boolean {
-  if (!user) return false;
+  if (!user || !isModuleVisibleForTenant(user, slug)) return false;
   const isAdmin = user.role === 'admin' || user.role === 'superadmin';
   const perms = user.permissions ?? [];
   if (slug === 'users') {
@@ -54,12 +128,14 @@ export function canAccessModule(user: ErpUser | null, slug: string): boolean {
   if (slug === 'ai-plans') {
     return Boolean(user.companyCode) && (isAdmin || perms.includes('*') || perms.some((code) => AI_PLAN_PERMISSIONS.includes(code)));
   }
+  const requiredPermissions = MODULE_READ_PERMISSIONS_BY_SLUG[slug] ?? [];
   if (slug === 'worker-management') {
-    return (user.role === 'superadmin' || Boolean(user.companyCode)) && (isAdmin || perms.includes('*') || perms.some((code) => ['people:read', 'people:manage'].includes(code)));
+    return (user.role === 'superadmin' || Boolean(user.companyCode)) && (isAdmin || perms.includes('*') || perms.some((code) => requiredPermissions.includes(code)));
   }
   if (slug === 'student-management') {
-    return (user.role === 'superadmin' || Boolean(user.companyCode)) && (isAdmin || perms.includes('*') || perms.some((code) => ['people:read', 'people:manage'].includes(code)));
+    return (user.role === 'superadmin' || Boolean(user.companyCode)) && (isAdmin || perms.includes('*') || perms.some((code) => requiredPermissions.includes(code)));
   }
+  if (requiredPermissions.length > 0) return isAdmin || perms.includes('*') || perms.some((code) => requiredPermissions.includes(code));
   return true;
 }
 
