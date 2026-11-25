@@ -38,7 +38,8 @@ export default function TabLayout() {
 
   const tabOptions = {
     headerShown: false,
-    animation: 'shift' as const,
+    animation: 'none' as const,
+    sceneStyle: { backgroundColor: colors.background },
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
     tabBarButton: (props: Record<string, unknown>) => <NoRippleTabButton {...props} />,

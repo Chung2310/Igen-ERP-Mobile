@@ -596,14 +596,15 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
         </View>
 
         {/* Message action modal */}
-        <Modal
-          visible={Boolean(actionMessage)}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setActionMessage(null)}
-        >
+        {actionMessage ? (
+          <Modal
+            visible
+            transparent
+            animationType="fade"
+            onRequestClose={() => setActionMessage(null)}
+          >
           <Pressable style={styles.modalBackdrop} onPress={() => setActionMessage(null)}>
-            <Pressable style={styles.actionSheet} onPress={() => {}}>
+            <Pressable style={styles.actionSheet} onPress={() => { }}>
               {actionMessage ? (
                 <>
                   <View style={styles.emojiBar}>
@@ -643,6 +644,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
             </Pressable>
           </Pressable>
         </Modal>
+        ) : null}
       </KeyboardAvoidingView>
     );
 
@@ -826,14 +828,15 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
       </View>
 
       {/* New Chat Modal */}
-      <Modal
-        visible={newChatOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setNewChatOpen(false)}
-      >
+      {newChatOpen ? (
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          onRequestClose={() => setNewChatOpen(false)}
+        >
         <Pressable style={styles.modalBackdrop} onPress={() => setNewChatOpen(false)}>
-          <Pressable style={styles.newChatSheet} onPress={() => {}}>
+          <Pressable style={styles.newChatSheet} onPress={() => { }}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Cuộc trò chuyện mới</Text>
@@ -922,6 +925,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
           </Pressable>
         </Pressable>
       </Modal>
+      ) : null}
     </View>
   );
 
