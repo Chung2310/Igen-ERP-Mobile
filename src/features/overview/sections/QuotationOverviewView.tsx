@@ -78,12 +78,12 @@ export function QuotationOverviewView({
     },
     {
       id: 'q-value',
-      label: `Giá trị báo giá (${primaryValue?.currency ?? 'VND'})`,
-      value: formatCompactMoney(primaryValue?.customer ?? 0, ''),
+      label: 'Giá trị báo giá (VND)',
+      value: `${Math.round(primaryValue?.customer ?? 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')} VND`,
       delta: formatDeltaBadge(
         computePercentDelta(primaryValue?.customer, prevPrimaryValue?.customer),
       ),
-      helper: `Đã duyệt: ${formatCompactMoney(primaryValue?.approvedCustomer ?? 0, '')}`,
+      helper: `Đã duyệt: ${Math.round(primaryValue?.approvedCustomer ?? 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')} VND`,
       accent: '#7754C8',
       tone: '#F1EBFF',
     },

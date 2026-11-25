@@ -1,3 +1,4 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -114,7 +115,7 @@ export function MemoryPanel() {
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -192,7 +193,7 @@ export function WorkflowsPanel() {
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -440,7 +441,7 @@ export function SettingsPanel() {
     return (
       <View style={styles.content}>
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error || 'Chưa tải được cài đặt.'}</Text>
+          <PopupError error={error || 'Chưa tải được cài đặt.'} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>

@@ -1,3 +1,5 @@
+import { PopupError } from '@/components/PopupError';
+import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -151,8 +153,8 @@ export function CrmScreen() {
   async function startOcr(camera: boolean) {
     try {
       const result = camera
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85 })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
+        ? await withAppLockSuspended(() => ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85 }))
+        : await withAppLockSuspended(() => ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 }));
       if (result.canceled || !result.assets[0]) return;
 
       setLeadDraft(emptyLead);
@@ -209,7 +211,7 @@ export function CrmScreen() {
         <Text style={styles.eyebrow}>KHÁCH HÀNG &amp; BÁN HÀNG</Text>
         <Text style={styles.title}>CRM &amp; Hộp thư</Text>
         <Text style={styles.subtitle}>Hộp thư, Lead và AI từ hệ thống ERP.</Text>
-        {!!workspaceNotice && <Card style={styles.apiNotice}><Text style={styles.apiNoticeText}>{workspaceNotice}</Text></Card>}
+        {!!workspaceNotice && <PopupError error={workspaceNotice} />}
 
         <View style={styles.sectionTabs}>
           <SectionTab label={`Hộp thư ${unreadTotal(conversations)}`} active={section === 'inbox'} onPress={() => setSection('inbox')} />
@@ -331,7 +333,7 @@ function ConversationDetail({
       <ScrollView contentContainerStyle={styles.messageList} showsVerticalScrollIndicator={false}>
         <Text style={styles.dayLabel}>HÔM NAY</Text>
         {loading && <ActivityIndicator color={colors.primary} style={styles.loading} />}
-        {!!error && <Text style={styles.apiNoticeText}>{error}</Text>}
+        {!!error && <PopupError error={error} />}
         {conversation.messages.map((message) => <MessageBubble key={message.id} message={message} />)}
         {conversation.mode === 'ai' && <View style={styles.aiStatusRow}><Sparkles size={12} color={colors.primary} /><Text style={styles.aiStatus}>AI đang trả lời dựa trên tài liệu và kịch bản đã bật</Text></View>}
         {conversation.mode === 'human' && <Text style={styles.handoverHint}>Để ERP tạm dừng AI, hãy gửi tin nhắn với tư cách nhân viên.</Text>}

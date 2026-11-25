@@ -109,6 +109,10 @@ function hasPerm(user: ErpUser | null, code: string): boolean {
   return perms.includes('*') || perms.includes(code);
 }
 
+export function canAccessOverview(user: ErpUser | null): boolean {
+  return hasPerm(user, 'dashboard:read');
+}
+
 /**
  * Lọc danh sách trang tổng quan theo gói module và quyền ERP của tài khoản
  * (đồng bộ với DashboardTab.tsx trên web ERP).

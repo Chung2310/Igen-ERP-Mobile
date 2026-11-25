@@ -1,9 +1,12 @@
+import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,8 +16,10 @@ import {
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import {
   AlertTriangle,
+  CalendarDays,
   ExternalLink,
   FileText,
   Pencil,
@@ -66,6 +71,10 @@ function formatViDate(val?: string): string {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : raw;
 }
 
+function toDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function daysUntilExpiry(endDate?: string): number | null {
   if (!endDate) return null;
   const exp = new Date(endDate);
@@ -108,6 +117,10 @@ export function HrContractsPanel({
   const [cEmployeeId, setCEmployeeId] = useState('');
   const [cStartDate, setCStartDate] = useState(() => getTodayKey());
   const [cEndDate, setCEndDate] = useState('');
+  const [activeContractDatePicker, setActiveContractDatePicker] = useState<{
+    target: 'start' | 'end';
+    value: Date;
+  } | null>(null);
   const [cStatus, setCStatus] = useState<HrContractStatus>('active');
   const [cNote, setCNote] = useState('');
   const [cFileUrl, setCFileUrl] = useState('');
@@ -123,17 +136,89 @@ export function HrContractsPanel({
   const [uploadingKind, setUploadingKind] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const openContractDatePicker = (target: 'start' | 'end') => {
+    const currentDate = target === 'start' ? cStartDate : cEndDate;
+    const dateKey = currentDate.slice(0, 10);
+    const [year, month, day] = dateKey.split('-').map(Number);
+    const value = /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+      ? new Date(year, month - 1, day, 12)
+      : new Date();
+
+    if (Platform.OS !== 'android') {
+      setActiveContractDatePicker({ target, value });
+      return;
+    }
+
+    DateTimePickerAndroid.open({
+      value,
+      mode: 'date',
+      display: 'calendar',
+      onChange: (event, selectedDate) => {
+        if (event.type !== 'set' || !selectedDate) return;
+        const selectedDateKey = toDateKey(selectedDate);
+        if (target === 'start') setCStartDate(selectedDateKey);
+        else setCEndDate(selectedDateKey);
+      },
+    });
+  };
+
+  const savePickedContractDate = () => {
+    if (!activeContractDatePicker) return;
+    const selectedDateKey = toDateKey(activeContractDatePicker.value);
+    if (activeContractDatePicker.target === 'start') setCStartDate(selectedDateKey);
+    else setCEndDate(selectedDateKey);
+    setActiveContractDatePicker(null);
+  };
+
   // Extension Modal
   const [extOpen, setExtOpen] = useState(false);
   const [extContractId, setExtContractId] = useState('');
   const [extDate, setExtDate] = useState(() => getTodayKey());
   const [extNewEndDate, setExtNewEndDate] = useState('');
+  const [activeExtensionDatePicker, setActiveExtensionDatePicker] = useState<{
+    target: 'extensionDate' | 'newEndDate';
+    value: Date;
+  } | null>(null);
   const [extReason, setExtReason] = useState('');
   const [extFileUrl, setExtFileUrl] = useState('');
   const [extFileName, setExtFileName] = useState('');
   const [extFileMime, setExtFileMime] = useState('');
   const [extFileSize, setExtFileSize] = useState(0);
   const [extFileToken, setExtFileToken] = useState('');
+
+  const openExtensionDatePicker = (target: 'extensionDate' | 'newEndDate') => {
+    const currentDate = target === 'extensionDate' ? extDate : extNewEndDate;
+    const dateKey = currentDate.slice(0, 10);
+    const [year, month, day] = dateKey.split('-').map(Number);
+    const value = /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+      ? new Date(year, month - 1, day, 12)
+      : new Date();
+
+    if (Platform.OS !== 'android') {
+      setActiveExtensionDatePicker({ target, value });
+      return;
+    }
+
+    DateTimePickerAndroid.open({
+      value,
+      mode: 'date',
+      display: 'calendar',
+      onChange: (event, selectedDate) => {
+        if (event.type !== 'set' || !selectedDate) return;
+        const selectedDateKey = toDateKey(selectedDate);
+        if (target === 'extensionDate') setExtDate(selectedDateKey);
+        else setExtNewEndDate(selectedDateKey);
+      },
+    });
+  };
+
+  const savePickedExtensionDate = () => {
+    if (!activeExtensionDatePicker) return;
+    const selectedDateKey = toDateKey(activeExtensionDatePicker.value);
+    if (activeExtensionDatePicker.target === 'extensionDate') setExtDate(selectedDateKey);
+    else setExtNewEndDate(selectedDateKey);
+    setActiveExtensionDatePicker(null);
+  };
 
   // Settings Modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -194,10 +279,10 @@ export function HrContractsPanel({
   const pickAndUpload = useCallback(
     async (kind: 'contract' | 'signed' | 'extension') => {
       try {
-        const result = await DocumentPicker.getDocumentAsync({
+        const result = await withAppLockSuspended(() => DocumentPicker.getDocumentAsync({
           multiple: false,
           copyToCacheDirectory: true,
-        });
+        }));
         if (result.canceled || !result.assets?.[0]) return;
         const asset = result.assets[0];
         if ((asset.size ?? 0) > 10 * 1024 * 1024) {
@@ -311,7 +396,7 @@ export function HrContractsPanel({
 
   const onSaveExtension = useCallback(async () => {
     if (!extContractId || !extNewEndDate.trim()) {
-      Alert.alert('Thiếu thông tin', 'Hãy chọn hợp đồng và Ngày hết hạn mới (YYYY-MM-DD).');
+      Alert.alert('Thiếu thông tin', 'Hãy chọn hợp đồng và ngày hết hạn mới.');
       return;
     }
     setSaving(true);
@@ -487,7 +572,7 @@ export function HrContractsPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -666,11 +751,29 @@ export function HrContractsPanel({
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Ngày bắt đầu *</Text>
-                    <TextInput value={cStartDate} onChangeText={setCStartDate} placeholder="YYYY-MM-DD" style={styles.field} />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openContractDatePicker('start')}
+                      style={styles.datePickerField}
+                    >
+                      <Text style={styles.datePickerText}>
+                        {cStartDate ? formatViDate(cStartDate) : 'Chọn ngày'}
+                      </Text>
+                      <CalendarDays size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Ngày kết thúc *</Text>
-                    <TextInput value={cEndDate} onChangeText={setCEndDate} placeholder="YYYY-MM-DD" style={styles.field} />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openContractDatePicker('end')}
+                      style={styles.datePickerField}
+                    >
+                      <Text style={styles.datePickerText}>
+                        {cEndDate ? formatViDate(cEndDate) : 'Chọn ngày'}
+                      </Text>
+                      <CalendarDays size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                 </View>
 
@@ -740,6 +843,49 @@ export function HrContractsPanel({
         </Pressable>
       </Modal>
 
+      {Platform.OS !== 'android' && activeContractDatePicker ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveContractDatePicker(null)}
+        >
+          <Pressable style={styles.backdrop} onPress={() => setActiveContractDatePicker(null)}>
+            <Pressable style={styles.sheet} onPress={() => {}}>
+              <Text style={styles.sheetTitle}>
+                {activeContractDatePicker.target === 'start'
+                  ? 'Chọn ngày bắt đầu'
+                  : 'Chọn ngày kết thúc'}
+              </Text>
+              <DateTimePicker
+                value={activeContractDatePicker.value}
+                mode="date"
+                display="spinner"
+                locale="vi-VN"
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) {
+                    setActiveContractDatePicker((current) =>
+                      current ? { ...current, value: selectedDate } : current,
+                    );
+                  }
+                }}
+              />
+              <View style={styles.datePickerActions}>
+                <Pressable
+                  onPress={() => setActiveContractDatePicker(null)}
+                  style={styles.outlineBtn}
+                >
+                  <Text style={styles.outlineBtnText}>Hủy</Text>
+                </Pressable>
+                <Pressable onPress={savePickedContractDate} style={styles.primaryBtn}>
+                  <Text style={styles.primaryBtnText}>Xác nhận</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+
       {/* Extend Contract Modal */}
       <Modal visible={extOpen} transparent animationType="slide" onRequestClose={() => setExtOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setExtOpen(false)}>
@@ -773,11 +919,27 @@ export function HrContractsPanel({
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Ngày gia hạn</Text>
-                    <TextInput value={extDate} onChangeText={setExtDate} placeholder="YYYY-MM-DD" style={styles.field} />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openExtensionDatePicker('extensionDate')}
+                      style={styles.datePickerField}
+                    >
+                      <Text style={styles.datePickerText}>{formatViDate(extDate)}</Text>
+                      <CalendarDays size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Hạn mới *</Text>
-                    <TextInput value={extNewEndDate} onChangeText={setExtNewEndDate} placeholder="YYYY-MM-DD" style={styles.field} />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openExtensionDatePicker('newEndDate')}
+                      style={styles.datePickerField}
+                    >
+                      <Text style={styles.datePickerText}>
+                        {extNewEndDate ? formatViDate(extNewEndDate) : 'Chọn ngày'}
+                      </Text>
+                      <CalendarDays size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                 </View>
 
@@ -816,6 +978,49 @@ export function HrContractsPanel({
           </Pressable>
         </Pressable>
       </Modal>
+
+      {Platform.OS !== 'android' && activeExtensionDatePicker ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveExtensionDatePicker(null)}
+        >
+          <Pressable style={styles.backdrop} onPress={() => setActiveExtensionDatePicker(null)}>
+            <Pressable style={styles.sheet} onPress={() => {}}>
+              <Text style={styles.sheetTitle}>
+                {activeExtensionDatePicker.target === 'extensionDate'
+                  ? 'Chọn ngày gia hạn'
+                  : 'Chọn hạn mới'}
+              </Text>
+              <DateTimePicker
+                value={activeExtensionDatePicker.value}
+                mode="date"
+                display="spinner"
+                locale="vi-VN"
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) {
+                    setActiveExtensionDatePicker((current) =>
+                      current ? { ...current, value: selectedDate } : current,
+                    );
+                  }
+                }}
+              />
+              <View style={styles.datePickerActions}>
+                <Pressable
+                  onPress={() => setActiveExtensionDatePicker(null)}
+                  style={styles.outlineBtn}
+                >
+                  <Text style={styles.outlineBtnText}>Hủy</Text>
+                </Pressable>
+                <Pressable onPress={savePickedExtensionDate} style={styles.primaryBtn}>
+                  <Text style={styles.primaryBtnText}>Xác nhận</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
 
       {/* Settings Modal */}
       <Modal visible={settingsOpen} transparent animationType="slide" onRequestClose={() => setSettingsOpen(false)}>
@@ -1067,6 +1272,11 @@ const styles = StyleSheet.create({
   closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
+  datePickerField: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  datePickerText: { color: colors.ink, fontSize: 12 },
+  datePickerActions: { flexDirection: 'row', justifyContent: 'flex-end', alignSelf: 'stretch', gap: 8, marginTop: 8 },
+  outlineBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10 },
+  outlineBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },

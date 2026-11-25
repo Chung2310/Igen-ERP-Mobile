@@ -1,3 +1,4 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -221,7 +222,7 @@ export function AgentsPanel() {
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>

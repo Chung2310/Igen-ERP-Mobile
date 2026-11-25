@@ -1,3 +1,4 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -791,7 +792,7 @@ export function OrgChartPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void loadData()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>

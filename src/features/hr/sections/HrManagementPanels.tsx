@@ -1,3 +1,4 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -78,7 +79,7 @@ export function ContractsPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -300,7 +301,7 @@ export function DepartmentsPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -626,7 +627,7 @@ export function RecruitmentPanel({ branchId }: { branchId?: string }) {
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -713,7 +714,7 @@ export function TrainingPanel({ companyCode }: { companyCode?: string }) {
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -776,7 +777,7 @@ export function HrWorkflowsPanel({ companyCode }: { companyCode?: string }) {
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -829,7 +830,7 @@ export function PayrollPanel({
       const list =
         scope === 'period' && canViewAll
           ? await getPayrollPeriodResults(currentPeriod, branchId)
-          : await listMyPayslips();
+          : await listMyPayslips(branchId);
       setRows(list);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không tải được dữ liệu bảng lương.');
@@ -872,7 +873,7 @@ export function PayrollPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>

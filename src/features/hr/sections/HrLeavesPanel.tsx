@@ -1,9 +1,12 @@
+import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -13,7 +16,9 @@ import {
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import {
+  CalendarDays,
   Check,
   ExternalLink,
   FileText,
@@ -83,6 +88,10 @@ function formatViDate(val?: string): string {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : raw;
 }
 
+function toDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 export function HrLeavesPanel({
   companyCode,
   branchId,
@@ -120,9 +129,48 @@ export function HrLeavesPanel({
   const [appType, setAppType] = useState('leave');
   const [startDate, setStartDate] = useState(() => getTodayKey());
   const [endDate, setEndDate] = useState(() => getTodayKey());
+  const [activeApplicationDatePicker, setActiveApplicationDatePicker] = useState<{
+    target: 'startDate' | 'endDate';
+    value: Date;
+  } | null>(null);
   const [reason, setReason] = useState('');
   const [appFiles, setAppFiles] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const applyApplicationDate = (target: 'startDate' | 'endDate', date: Date) => {
+    const value = toDateKey(date);
+    if (target === 'startDate') setStartDate(value);
+    else setEndDate(value);
+  };
+
+  const openApplicationDatePicker = (target: 'startDate' | 'endDate') => {
+    const currentValue = target === 'startDate' ? startDate : endDate;
+    const dateKey = currentValue.slice(0, 10);
+    const [year, month, day] = dateKey.split('-').map(Number);
+    const value = /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+      ? new Date(year, month - 1, day, 12)
+      : new Date();
+
+    if (Platform.OS !== 'android') {
+      setActiveApplicationDatePicker({ target, value });
+      return;
+    }
+
+    DateTimePickerAndroid.open({
+      value,
+      mode: 'date',
+      display: 'calendar',
+      onChange: (event, selectedDate) => {
+        if (event.type === 'set' && selectedDate) applyApplicationDate(target, selectedDate);
+      },
+    });
+  };
+
+  const savePickedApplicationDate = () => {
+    if (!activeApplicationDatePicker) return;
+    applyApplicationDate(activeApplicationDatePicker.target, activeApplicationDatePicker.value);
+    setActiveApplicationDatePicker(null);
+  };
 
   // Reject reason modal
   const [rejectTarget, setRejectTarget] = useState<HrLeaveApplication | null>(null);
@@ -131,11 +179,27 @@ export function HrLeavesPanel({
 
   // Templates modal
   const [templatesModalOpen, setTemplatesModalOpen] = useState(false);
+  const [templateEditorOpen, setTemplateEditorOpen] = useState(false);
   const [tplName, setTplName] = useState('');
   const [tplKind, setTplKind] = useState<HrRequestKind>('leave');
   const [tplUrl, setTplUrl] = useState('');
   const [tplFile, setTplFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [savingTpl, setSavingTpl] = useState(false);
+
+  const openTemplateEditor = () => {
+    setTplName('');
+    setTplKind('leave');
+    setTplUrl('');
+    setTplFile(null);
+    setTemplatesModalOpen(false);
+    setTemplateEditorOpen(true);
+  };
+
+  const closeTemplateEditor = () => {
+    if (savingTpl) return;
+    setTemplateEditorOpen(false);
+    setTemplatesModalOpen(true);
+  };
 
   const load = useCallback(
     async (silent = false) => {
@@ -217,10 +281,10 @@ export function HrLeavesPanel({
 
   const pickAppFiles = useCallback(async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
+      const result = await withAppLockSuspended(() => DocumentPicker.getDocumentAsync({
         multiple: true,
         copyToCacheDirectory: true,
-      });
+      }));
       if (!result.canceled && result.assets?.length) {
         setAppFiles((prev) => [...prev, ...result.assets]);
       }
@@ -231,10 +295,10 @@ export function HrLeavesPanel({
 
   const pickTplFile = useCallback(async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
+      const result = await withAppLockSuspended(() => DocumentPicker.getDocumentAsync({
         multiple: false,
         copyToCacheDirectory: true,
-      });
+      }));
       if (!result.canceled && result.assets?.[0]) {
         const picked = result.assets[0];
         setTplFile(picked);
@@ -262,13 +326,13 @@ export function HrLeavesPanel({
 
   const onCreateApp = useCallback(async () => {
     if (!startDate.trim() || !endDate.trim()) {
-      Alert.alert('Thiếu ngày', 'Vui lòng nhập đầy đủ Từ ngày và Đến ngày (YYYY-MM-DD).');
+      Alert.alert('Thiếu ngày', 'Vui lòng chọn đầy đủ Từ ngày và Đến ngày.');
       return;
     }
     const startDt = new Date(`${startDate.trim()}T00:00:00`);
     const endDt = new Date(`${endDate.trim()}T23:59:59`);
     if (Number.isNaN(startDt.getTime()) || Number.isNaN(endDt.getTime())) {
-      Alert.alert('Ngày không hợp lệ', 'Định dạng ngày cần là YYYY-MM-DD (VD: 2026-11-25).');
+      Alert.alert('Ngày không hợp lệ', 'Vui lòng chọn ngày hợp lệ.');
       return;
     }
     if (endDt < startDt) {
@@ -420,6 +484,8 @@ export function HrLeavesPanel({
       setTplName('');
       setTplUrl('');
       setTplFile(null);
+      setTemplateEditorOpen(false);
+      setTemplatesModalOpen(true);
       Alert.alert('Thành công', 'Đã tải lên biểu mẫu mới.');
     } catch (err) {
       Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể tải lên biểu mẫu.');
@@ -558,7 +624,7 @@ export function HrLeavesPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -770,12 +836,26 @@ export function HrLeavesPanel({
 
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Từ ngày (YYYY-MM-DD) *</Text>
-                    <TextInput value={startDate} onChangeText={setStartDate} style={styles.field} />
+                    <Text style={styles.label}>Từ ngày *</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openApplicationDatePicker('startDate')}
+                      style={styles.datePickerField}
+                    >
+                      <Text style={styles.datePickerText}>{formatViDate(startDate)}</Text>
+                      <CalendarDays size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Đến ngày (YYYY-MM-DD) *</Text>
-                    <TextInput value={endDate} onChangeText={setEndDate} style={styles.field} />
+                    <Text style={styles.label}>Đến ngày *</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openApplicationDatePicker('endDate')}
+                      style={styles.datePickerField}
+                    >
+                      <Text style={styles.datePickerText}>{formatViDate(endDate)}</Text>
+                      <CalendarDays size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                 </View>
 
@@ -831,6 +911,52 @@ export function HrLeavesPanel({
         </Pressable>
       </Modal>
 
+      {Platform.OS !== 'android' && activeApplicationDatePicker ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveApplicationDatePicker(null)}
+        >
+          <Pressable
+            style={styles.backdrop}
+            onPress={() => setActiveApplicationDatePicker(null)}
+          >
+            <Pressable style={styles.sheet} onPress={() => {}}>
+              <Text style={styles.sheetTitle}>
+                {activeApplicationDatePicker.target === 'startDate'
+                  ? 'Chọn ngày bắt đầu'
+                  : 'Chọn ngày kết thúc'}
+              </Text>
+              <DateTimePicker
+                value={activeApplicationDatePicker.value}
+                mode="date"
+                display="spinner"
+                locale="vi-VN"
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) {
+                    setActiveApplicationDatePicker((current) =>
+                      current ? { ...current, value: selectedDate } : current,
+                    );
+                  }
+                }}
+              />
+              <View style={styles.datePickerActions}>
+                <Pressable
+                  onPress={() => setActiveApplicationDatePicker(null)}
+                  style={styles.outlineBtn}
+                >
+                  <Text style={styles.outlineBtnText}>Hủy</Text>
+                </Pressable>
+                <Pressable onPress={savePickedApplicationDate} style={styles.primaryBtn}>
+                  <Text style={styles.primaryBtnText}>Xác nhận</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+
       {/* Reject Reason Modal */}
       <Modal
         visible={Boolean(rejectTarget)}
@@ -880,7 +1006,13 @@ export function HrLeavesPanel({
         <Pressable style={styles.backdrop} onPress={() => setTemplatesModalOpen(false)}>
           <Pressable style={styles.sheet} onPress={() => {}}>
             <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Biểu mẫu đơn từ ({templates.length})</Text>
+              <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>Biểu mẫu đơn từ ({templates.length})</Text>
+              {canApprove ? (
+                <Pressable onPress={openTemplateEditor} style={styles.primaryBtn}>
+                  <Plus size={13} color={colors.white} />
+                  <Text style={styles.primaryBtnText}>Thêm</Text>
+                </Pressable>
+              ) : null}
               <Pressable onPress={() => setTemplatesModalOpen(false)}>
                 <Text style={styles.closeText}>Đóng</Text>
               </Pressable>
@@ -914,66 +1046,83 @@ export function HrLeavesPanel({
                   ))
                 )}
 
-                {canApprove ? (
-                  <View style={styles.addTplBox}>
-                    <Text style={styles.rowTitle}>Thêm biểu mẫu mới</Text>
-                    <Text style={styles.label}>Tên biểu mẫu *</Text>
-                    <TextInput
-                      value={tplName}
-                      onChangeText={setTplName}
-                      placeholder="VD: Đơn xin nghỉ phép năm"
-                      placeholderTextColor={colors.muted}
-                      style={styles.field}
-                    />
-                    <Text style={styles.label}>Nhóm yêu cầu</Text>
-                    <View style={styles.wrapRow}>
-                      {REQUEST_KINDS.map((k) => (
-                        <Pressable
-                          key={k.value}
-                          onPress={() => setTplKind(k.value)}
-                          style={[styles.chip, tplKind === k.value && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, tplKind === k.value && styles.chipTextActive]}>
-                            {k.label}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <Text style={styles.label}>Tệp biểu mẫu *</Text>
-                    <Pressable onPress={() => void pickTplFile()} style={styles.uploadBtn}>
-                      <Upload size={14} color={colors.primary} />
-                      <Text style={styles.uploadBtnText}>
-                        {tplFile ? `Đã chọn: ${tplFile.name}` : 'Chọn tệp biểu mẫu từ thiết bị'}
-                      </Text>
-                    </Pressable>
-                    {tplFile ? (
-                      <Pressable onPress={() => setTplFile(null)} style={{ alignSelf: 'flex-start' }}>
-                        <Text style={{ color: '#B91C1C', fontSize: 10, fontWeight: '700' }}>
-                          Bỏ tệp đã chọn
-                        </Text>
-                      </Pressable>
-                    ) : null}
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
-                    <Text style={styles.label}>Hoặc dán link tệp (tùy chọn)</Text>
-                    <TextInput
-                      value={tplUrl}
-                      onChangeText={setTplUrl}
-                      autoCapitalize="none"
-                      placeholder="https://..."
-                      placeholderTextColor={colors.muted}
-                      style={styles.field}
-                    />
+      {/* Add template in a dedicated modal. */}
+      <Modal
+        visible={templateEditorOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={closeTemplateEditor}
+      >
+        <Pressable style={styles.backdrop} onPress={closeTemplateEditor}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.headRow}>
+              <Text style={styles.sheetTitle}>Thêm biểu mẫu mới</Text>
+              <Pressable disabled={savingTpl} onPress={closeTemplateEditor}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+              <View style={{ gap: 8, paddingBottom: 12 }}>
+                <Text style={styles.label}>Tên biểu mẫu *</Text>
+                <TextInput
+                  value={tplName}
+                  onChangeText={setTplName}
+                  placeholder="VD: Đơn xin nghỉ phép năm"
+                  placeholderTextColor={colors.muted}
+                  style={styles.field}
+                />
+                <Text style={styles.label}>Nhóm yêu cầu</Text>
+                <View style={styles.wrapRow}>
+                  {REQUEST_KINDS.map((kind) => (
                     <Pressable
-                      disabled={savingTpl}
-                      onPress={() => void onCreateTemplate()}
-                      style={[styles.submitBtn, savingTpl && styles.disabled]}
+                      key={kind.value}
+                      onPress={() => setTplKind(kind.value)}
+                      style={[styles.chip, tplKind === kind.value && styles.chipActive]}
                     >
-                      <Text style={styles.submitBtnText}>
-                        {savingTpl ? 'Đang tải lên...' : '+ Tải lên biểu mẫu'}
+                      <Text style={[styles.chipText, tplKind === kind.value && styles.chipTextActive]}>
+                        {kind.label}
                       </Text>
                     </Pressable>
-                  </View>
+                  ))}
+                </View>
+                <Text style={styles.label}>Tệp biểu mẫu *</Text>
+                <Pressable onPress={() => void pickTplFile()} style={styles.uploadBtn}>
+                  <Upload size={14} color={colors.primary} />
+                  <Text style={styles.uploadBtnText}>
+                    {tplFile ? `Đã chọn: ${tplFile.name}` : 'Chọn tệp biểu mẫu từ thiết bị'}
+                  </Text>
+                </Pressable>
+                {tplFile ? (
+                  <Pressable onPress={() => setTplFile(null)} style={{ alignSelf: 'flex-start' }}>
+                    <Text style={{ color: '#B91C1C', fontSize: 10, fontWeight: '700' }}>
+                      Bỏ tệp đã chọn
+                    </Text>
+                  </Pressable>
                 ) : null}
+                <Text style={styles.label}>Hoặc dán link tệp (tùy chọn)</Text>
+                <TextInput
+                  value={tplUrl}
+                  onChangeText={setTplUrl}
+                  autoCapitalize="none"
+                  placeholder="https://..."
+                  placeholderTextColor={colors.muted}
+                  style={styles.field}
+                />
+                <Pressable
+                  disabled={savingTpl}
+                  onPress={() => void onCreateTemplate()}
+                  style={[styles.submitBtn, savingTpl && styles.disabled]}
+                >
+                  <Text style={styles.submitBtnText}>
+                    {savingTpl ? 'Đang tải lên...' : 'Tải lên biểu mẫu'}
+                  </Text>
+                </Pressable>
               </View>
             </ScrollView>
           </Pressable>
@@ -1149,9 +1298,11 @@ const styles = StyleSheet.create({
   closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
+  datePickerField: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  datePickerText: { color: colors.ink, fontSize: 12 },
+  datePickerActions: { flexDirection: 'row', justifyContent: 'flex-end', alignSelf: 'stretch', gap: 8, marginTop: 8 },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   tplCard: { backgroundColor: '#F8FAFC', borderColor: colors.border, borderWidth: 1, borderRadius: 11, padding: 11 },
-  addTplBox: { backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 13, padding: 12, gap: 6, marginTop: 4 },
   submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
   disabled: { opacity: 0.45 },

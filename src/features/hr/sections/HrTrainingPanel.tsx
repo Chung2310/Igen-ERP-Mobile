@@ -1,7 +1,7 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Modal,
   Pressable,
@@ -33,7 +33,9 @@ import {
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { HrNoticeHost, showHrNotice } from '@/features/hr/components/HrNoticeModal';
 import { useAuth } from '@/core/auth/AuthProvider';
+import { ApiError } from '@/core/network/apiClient';
 import {
   createTrainingCourse,
   createTrainingEnrollment,
@@ -278,12 +280,12 @@ export function HrTrainingPanel({
         } else if (hasQuiz) {
           setActiveIndex(lessons.length);
         } else {
-          Alert.alert('Chúc mừng', `Bạn đã hoàn thành khóa học "${selectedCourse.title || selectedCourse.name}"!`);
+          showHrNotice('Chúc mừng', `Bạn đã hoàn thành khóa học "${selectedCourse.title || selectedCourse.name}"!`);
           setSelectedCourse(null);
           void load(true);
         }
       } catch (err) {
-        Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể lưu tiến độ bài học.');
+        showHrNotice('Lỗi', err instanceof Error ? err.message : 'Không thể lưu tiến độ bài học.');
       } finally {
         setSubmittingProgress(false);
       }
@@ -298,7 +300,7 @@ export function HrTrainingPanel({
 
     const unanswered = quizzes.some((_, idx) => quizAnswers[idx] === undefined);
     if (unanswered) {
-      Alert.alert('Chưa hoàn tất', 'Vui lòng trả lời đầy đủ tất cả các câu hỏi trắc nghiệm.');
+      showHrNotice('Chưa hoàn tất', 'Vui lòng trả lời đầy đủ tất cả các câu hỏi trắc nghiệm.');
       return;
     }
 
@@ -315,7 +317,7 @@ export function HrTrainingPanel({
     setQuizErrors(errs);
 
     if (!allCorrect) {
-      Alert.alert('Chưa đạt', 'Có câu trả lời chưa đúng. Hãy kiểm tra lại các câu được đánh dấu đỏ.');
+      showHrNotice('Chưa đạt', 'Có câu trả lời chưa đúng. Hãy kiểm tra lại các câu được đánh dấu đỏ.');
       return;
     }
 
@@ -339,9 +341,13 @@ export function HrTrainingPanel({
       setMyEnrollments((prev) =>
         prev.map((e) => (e.id === enroll.id ? { ...e, quizPassed: true, progress, status } : e)),
       );
-      Alert.alert('Xuất sắc!', 'Bạn đã trả lời đúng 100% các câu hỏi trắc nghiệm!');
+      showHrNotice('Xuất sắc!', 'Bạn đã trả lời đúng 100% các câu hỏi trắc nghiệm!');
     } catch (err) {
-      Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể lưu kết quả bài thi.');
+      if (err instanceof ApiError && [502, 503, 504].includes(err.status)) {
+        showHrNotice('ERP đang tạm thời gián đoạn', 'Câu trả lời của bạn vẫn được giữ lại. Hãy thử nộp lại sau giây lát.', 'error');
+      } else {
+        showHrNotice('Lỗi', err instanceof Error ? err.message : 'Không thể lưu kết quả bài thi.', 'error');
+      }
     } finally {
       setSubmittingProgress(false);
     }
@@ -361,11 +367,11 @@ export function HrTrainingPanel({
       setMyEnrollments((prev) =>
         prev.map((e) => (e.id === enroll.id ? { ...e, progress: 100, status: 'completed' } : e)),
       );
-      Alert.alert('Hoàn thành', `Đã đánh dấu hoàn thành khóa học "${selectedCourse.title || selectedCourse.name}".`);
+      showHrNotice('Hoàn thành', `Đã đánh dấu hoàn thành khóa học "${selectedCourse.title || selectedCourse.name}".`);
       setSelectedCourse(null);
       void load(true);
     } catch (err) {
-      Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể hoàn thành khóa học.');
+      showHrNotice('Lỗi', err instanceof Error ? err.message : 'Không thể hoàn thành khóa học.');
     } finally {
       setSubmittingProgress(false);
     }
@@ -401,12 +407,12 @@ export function HrTrainingPanel({
 
   const handleSaveCourse = useCallback(async () => {
     if (!formTitle.trim() || savingCourse) {
-      if (!formTitle.trim()) Alert.alert('Thiếu tên khóa học', 'Vui lòng nhập tên khóa học.');
+      if (!formTitle.trim()) showHrNotice('Thiếu tên khóa học', 'Vui lòng nhập tên khóa học.');
       return;
     }
     const comp = companyCode || user?.companyCode || '';
     if (!comp) {
-      Alert.alert('Lỗi', 'Không xác định được mã doanh nghiệp.');
+      showHrNotice('Lỗi', 'Không xác định được mã doanh nghiệp.');
       return;
     }
     const cleanLessons = formLessons
@@ -442,20 +448,21 @@ export function HrTrainingPanel({
         if (selectedCourse?.id === editingCourse.id) {
           setSelectedCourse((prev) => (prev ? { ...prev, ...updated } : prev));
         }
-        Alert.alert('Đã lưu', 'Cập nhật khóa học thành công.');
+        showHrNotice('Đã lưu', 'Cập nhật khóa học thành công.');
       } else {
         const created = await createTrainingCourse({
           ...payload,
+          icon: 'book',
           creatorUid: currentUid,
           enrolledCount: 0,
           companyProgress: 0,
         });
         setCourses((prev) => [created, ...prev]);
-        Alert.alert('Thành công', `Đã tạo khóa học "${created.title}".`);
+        showHrNotice('Thành công', `Đã tạo khóa học "${created.title}".`);
       }
       setFormOpen(false);
     } catch (err) {
-      Alert.alert('Lỗi lưu khóa học', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+      showHrNotice('Lỗi lưu khóa học', err instanceof Error ? err.message : 'Vui lòng thử lại.');
     } finally {
       setSavingCourse(false);
     }
@@ -490,7 +497,7 @@ export function HrTrainingPanel({
             setCourses((prev) => prev.filter((c) => c.id !== course.id));
             if (selectedCourse?.id === course.id) setSelectedCourse(null);
           } catch (err) {
-            Alert.alert('Lỗi xóa', err instanceof Error ? err.message : 'Không thể xóa khóa học.');
+            showHrNotice('Lỗi xóa', err instanceof Error ? err.message : 'Không thể xóa khóa học.');
           }
         },
       });
@@ -603,7 +610,7 @@ export function HrTrainingPanel({
             <Pressable
               onPress={() => {
                 if (!isLessonsDone) {
-                  Alert.alert('Chưa mở khóa', 'Bạn cần hoàn thành tất cả bài giảng trước khi thi sát hạch.');
+                  showHrNotice('Chưa mở khóa', 'Bạn cần hoàn thành tất cả bài giảng trước khi thi sát hạch.');
                   return;
                 }
                 setActiveIndex(lessons.length);
@@ -660,7 +667,7 @@ export function HrTrainingPanel({
                 } else if (quizzes.length > 0) {
                   setActiveIndex(0);
                 } else {
-                  Alert.alert('Thông báo', 'Khóa học chưa có nội dung bài giảng.');
+                  showHrNotice('Thông báo', 'Khóa học chưa có nội dung bài giảng.');
                 }
               }}
               style={styles.submitBtn}
@@ -769,9 +776,6 @@ export function HrTrainingPanel({
                         );
                       })}
                     </View>
-                    {isErr ? (
-                      <Text style={styles.quizErrorText}>Câu trả lời chưa chính xác. Vui lòng chọn lại.</Text>
-                    ) : null}
                   </View>
                 );
               })}
@@ -807,6 +811,7 @@ export function HrTrainingPanel({
         ) : null}
 
         {renderCourseFormModal()}
+        <HrNoticeHost />
       </ScrollView>
     );
   }
@@ -1120,7 +1125,7 @@ export function HrTrainingPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -1265,6 +1270,7 @@ export function HrTrainingPanel({
       </Modal>
 
       {renderCourseFormModal()}
+      <HrNoticeHost />
     </ScrollView>
   );
 }

@@ -1,7 +1,8 @@
+import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -43,7 +44,7 @@ import {
 import { Stack } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Card } from '@/components/Card';
-import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { showAppAlert, showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { fetchCompanyBranches, type ErpBranch } from '@/features/overview/overviewApi';
 import {
@@ -82,6 +83,7 @@ import type {
   QuotationScope,
 } from '@/features/quotation/types';
 import { saveAndShareExport } from '@/features/quotation/fileExport';
+import { DateTimeField } from '@/features/quotation/DateTimeField';
 import { BudgetPlannerPanel, CatalogPanel, ContractWorkflowPanel, GeneratedFileActions, QuoteTemplatePanel } from '@/features/quotation/QuotationExtraPanels';
 import { colors } from '@/theme/colors';
 
@@ -159,12 +161,12 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
 }
 
-function formatMoney(amount: number, currency = 'VND') {
-  try {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount || 0);
-  } catch {
-    return `${new Intl.NumberFormat('vi-VN').format(amount || 0)} ${currency}`;
-  }
+function formatMoney(amount: number, _currency = 'VND') {
+  const num = Number(amount ?? 0);
+  const safe = Number.isFinite(num) ? Math.round(num) : 0;
+  const sign = safe < 0 ? '-' : '';
+  const digits = Math.abs(safe).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${sign}${digits} VND`;
 }
 
 function errorMessage(error: unknown) {
@@ -174,14 +176,17 @@ function errorMessage(error: unknown) {
 type QuotationSection = 'budget' | 'customerQuotes' | 'estimates' | 'contracts' | 'acceptance' | 'templates' | 'catalog';
 
 export function QuotationModuleScreen() {
-  const { user } = useAuth();
+  const {
+    user,
+    activeBranchId: selectedBranchId,
+    setActiveBranchId: setSelectedBranchId,
+  } = useAuth();
   const [quoteForContract, setQuoteForContract] = useState<Quote | null>(null);
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const userBranchId = user?.branchId;
   const companyCode = user?.companyCode;
   const canSwitchBranch = isAdmin || !userBranchId;
   const [branches, setBranches] = useState<ErpBranch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState(user?.branchId ?? '');
   const [branchModalOpen, setBranchModalOpen] = useState(false);
   useEffect(() => {
     if (!companyCode || (!canSwitchBranch && userBranchId)) {
@@ -355,7 +360,7 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
     setDetailLoading(true);
     void getQuote(scope, selectedId)
       .then((quote) => { if (active) setDetailQuote(quote); })
-      .catch((cause) => { if (active) Alert.alert('Không tải được báo giá', errorMessage(cause)); })
+      .catch((cause) => { if (active) showAppAlert({ title: 'Không tải được báo giá', message: errorMessage(cause), tone: 'danger' }); })
       .finally(() => { if (active) setDetailLoading(false); });
     return () => { active = false; };
   }, [scope, selectedId, reloadKey]);
@@ -379,7 +384,7 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
       setReloadKey((value) => value + 1);
       if (action === 'delete') setSelectedId(null);
     } catch (cause) {
-      Alert.alert('Chưa cập nhật được báo giá', errorMessage(cause));
+      showAppAlert({ title: 'Chưa cập nhật được báo giá', message: errorMessage(cause), tone: 'danger' });
     } finally {
       setActionBusy(false);
     }
@@ -392,8 +397,12 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
       const updated = await updateQuote(scope, detailQuote, { ...changes, ...(recalculateWithAi ? { recalculateWithAi: true } : {}) });
       setDetailQuote(updated);
       setReloadKey((value) => value + 1);
-      Alert.alert(recalculateWithAi ? 'Đã tính lại dự toán' : 'Đã lưu báo giá', recalculateWithAi ? 'AI đã cập nhật dự toán theo thông tin mới.' : 'Các thay đổi đã được lưu vào ERP.');
-    } catch (cause) { Alert.alert('Chưa lưu được báo giá', errorMessage(cause)); }
+      showAppAlert({
+        title: recalculateWithAi ? 'Đã tính lại dự toán' : 'Đã lưu báo giá',
+        message: recalculateWithAi ? 'AI đã cập nhật dự toán theo thông tin mới.' : 'Các thay đổi đã được lưu vào ERP.',
+        tone: 'success',
+      });
+    } catch (cause) { showAppAlert({ title: 'Chưa lưu được báo giá', message: errorMessage(cause), tone: 'danger' }); }
     finally { setActionBusy(false); }
   }
 
@@ -434,8 +443,8 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
 
         <View style={styles.listHeading}><View><Text style={styles.listTitle}>{kind === 'estimate' ? 'Danh sách dự toán' : 'Danh sách báo giá khách'}</Text><Text style={styles.listSubtitle}>{total} chứng từ trong ERP</Text></View><View style={styles.listHeadingActions}>{canCreate && <Pressable onPress={() => setCreating(true)} style={styles.primaryIconButton} accessibilityLabel="Tạo báo giá"><Plus size={19} color={colors.white} /></Pressable>}<Text style={styles.pageLabel}>{page}/{totalPages}</Text></View></View>
 
-        {!scopeReady && <Card style={styles.errorCard}><CircleAlert size={17} color="#B54745" /><Text style={styles.errorText}>Chưa xác định được doanh nghiệp hoặc chi nhánh làm việc trong ERP.</Text></Card>}
-        {!!error && <Card style={styles.errorCard}><CircleAlert size={17} color="#B54745" /><Text style={styles.errorText}>{error}</Text><Pressable onPress={refresh}><Text style={styles.retryText}>Thử lại</Text></Pressable></Card>}
+        {!scopeReady && <PopupError error="Chưa xác định được doanh nghiệp hoặc chi nhánh làm việc trong ERP." title="Chưa có phạm vi làm việc" />}
+        {!!error && <PopupError error={error} title="Không tải được báo giá" onRetry={refresh} />}
 
         {loading ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : quotes.map((quote) => <QuoteRow key={quote._id} quote={quote} onPress={() => setSelectedId(quote._id)} />)}
         {scopeReady && !loading && !error && quotes.length === 0 && <Card style={styles.emptyCard}><FileText size={24} color={colors.muted} /><Text style={styles.emptyTitle}>Chưa có báo giá</Text><Text style={styles.emptyCopy}>{search || status ? 'Thử đổi bộ lọc hoặc từ khóa tìm kiếm.' : 'Báo giá được tạo trên ERP sẽ xuất hiện tại đây.'}</Text>{canCreate && <Pressable style={styles.emptyButton} onPress={() => setCreating(true)}><Plus size={15} color={colors.primary} /><Text style={styles.emptyButtonText}>Tạo báo giá</Text></Pressable>}</Card>}
@@ -668,22 +677,30 @@ function QuoteDetail({
 
   function saveEdits(recalculateWithAi = false) {
     try { void (recalculateWithAi ? onRecalculate(quoteEditPayload(true)) : onSave(quoteEditPayload(false))); }
-    catch (cause) { Alert.alert('Thông tin chưa hợp lệ', errorMessage(cause)); }
+    catch (cause) { showAppAlert({ title: 'Thông tin chưa hợp lệ', message: errorMessage(cause), tone: 'danger' }); }
   }
 
   function approveCurrentQuote() {
     if (approvalBlockers || hasIncompleteSupplementalProduct) {
-      Alert.alert('Cần hoàn tất thông tin', approvalItems.concat(hasIncompleteSupplementalProduct ? ['Hoàn thiện tên, đơn vị, số lượng và đơn giá cho hạng mục bổ sung'] : []).join('\n'));
+      showAppAlert({
+        title: 'Cần hoàn tất thông tin',
+        message: approvalItems.concat(hasIncompleteSupplementalProduct ? ['Hoàn thiện tên, đơn vị, số lượng và đơn giá cho hạng mục bổ sung'] : []).join('\n'),
+        tone: 'info',
+      });
       return;
     }
     try {
       const changes = hasUnsavedChanges ? quoteEditPayload(false) : undefined;
-      Alert.alert('Duyệt báo giá?', `${quote.quoteNumber} · ${quote.customerName}\nTổng tạm tính: ${formatMoney(liveTotal, quote.currency)}${changes ? '\nCác thay đổi sẽ được lưu trước khi duyệt.' : ''}`, [
-        { text: 'Hủy', style: 'cancel' },
-        { text: 'Duyệt báo giá', onPress: () => onApprove(changes) },
-      ]);
+      showHrConfirm({
+        title: 'Duyệt báo giá?',
+        message: `${quote.quoteNumber} · ${quote.customerName}\nTổng tạm tính: ${formatMoney(liveTotal, quote.currency)}${changes ? '\nCác thay đổi sẽ được lưu trước khi duyệt.' : ''}`,
+        confirmLabel: 'Duyệt báo giá',
+        destructive: false,
+        tone: 'success',
+        onConfirm: () => onApprove(changes),
+      });
     }
-    catch (cause) { Alert.alert('Thông tin chưa hợp lệ', errorMessage(cause)); }
+    catch (cause) { showAppAlert({ title: 'Thông tin chưa hợp lệ', message: errorMessage(cause), tone: 'danger' }); }
   }
 
   function updateSupplemental(index: number, changes: Partial<(typeof supplementalProducts)[number]>) {
@@ -739,7 +756,7 @@ function QuoteDetail({
       <Text style={styles.fieldLabel}>VAT (%)</Text><View style={styles.twoInputs}><TextInput editable={!busy} value={taxRate} onChangeText={setTaxRate} style={[styles.input, styles.halfInput]} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.muted} /><Pressable onPress={() => setTaxConfirmed((value) => !value)} style={[styles.confirmChip, taxConfirmed && styles.confirmChipActive]}><Check size={13} color={taxConfirmed ? '#16885A' : colors.muted} /><Text style={styles.confirmChipText}>{taxConfirmed ? 'Đã xác nhận' : 'Cần xác nhận'}</Text></Pressable></View>
       <Text style={styles.fieldLabel}>Vận chuyển</Text><View style={styles.customerModeTabs}><Pressable onPress={() => setShippingMode('unconfirmed')} style={[styles.customerModeTab, shippingMode === 'unconfirmed' && styles.customerModeTabActive]}><Text style={styles.customerModeText}>Chưa chốt</Text></Pressable><Pressable onPress={() => setShippingMode('free')} style={[styles.customerModeTab, shippingMode === 'free' && styles.customerModeTabActive]}><Text style={styles.customerModeText}>Miễn phí</Text></Pressable><Pressable onPress={() => setShippingMode('paid')} style={[styles.customerModeTab, shippingMode === 'paid' && styles.customerModeTabActive]}><Text style={styles.customerModeText}>Có phí</Text></Pressable></View>
       {shippingMode === 'paid' && <TextInput editable={!busy} value={shippingFee} onChangeText={setShippingFee} style={[styles.input, styles.topInput]} keyboardType="decimal-pad" placeholder="Phí vận chuyển" placeholderTextColor={colors.muted} />}
-      <View style={styles.twoInputs}><View style={styles.halfInput}><Text style={styles.fieldLabel}>Hiệu lực (ngày)</Text><TextInput editable={!busy} value={validityDays} onChangeText={setValidityDays} style={styles.input} keyboardType="number-pad" placeholder="Không giới hạn" placeholderTextColor={colors.muted} /></View><View style={styles.halfInput}><Text style={styles.fieldLabel}>Ngày hoàn thành</Text><TextInput editable={!busy} value={completionDate} onChangeText={setCompletionDate} style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor={colors.muted} /></View></View>
+      <View style={styles.twoInputs}><View style={styles.halfInput}><Text style={styles.fieldLabel}>Hiệu lực (ngày)</Text><TextInput editable={!busy} value={validityDays} onChangeText={setValidityDays} style={styles.input} keyboardType="number-pad" placeholder="Không giới hạn" placeholderTextColor={colors.muted} /></View><View style={styles.halfInput}><Text style={styles.fieldLabel}>Ngày hoàn thành</Text><DateTimeField mode="date" value={completionDate} onChange={setCompletionDate} disabled={busy} allowClear placeholder="Chọn ngày" /></View></View>
       {!!editableInformationFields.length && <View style={styles.subSection}><Text style={styles.sectionTitle}>Thông tin còn thiếu hoặc cần xác nhận</Text>{editableInformationFields.map((field) => <View key={field}><Text style={styles.mutedText}>{field}</Text><TextInput editable={!busy} value={additionalInformation[field] ?? ''} onChangeText={(value) => setAdditionalInformation((current) => ({ ...current, [field]: value }))} style={styles.input} placeholder="Nhập thông tin bổ sung" placeholderTextColor={colors.muted} /></View>)}</View>}
       {quote.kind !== 'customer' && <><Text style={styles.fieldLabel}>Yêu cầu chỉnh sửa để AI tính lại</Text><TextInput editable={!busy} value={revisionRequirements} onChangeText={setRevisionRequirements} style={[styles.input, styles.multilineInput]} placeholder="Mô tả thay đổi về quy cách, số lượng, thời gian hoặc phạm vi..." placeholderTextColor={colors.muted} multiline maxLength={10000} /></>}
     </Card>}
@@ -764,7 +781,7 @@ function QuoteDetail({
     {quote.kind === 'customer' && <Card style={styles.exportCard}>
       <View style={styles.warningHeading}><Files size={15} color={colors.primary} /><Text style={styles.sectionTitle}>File báo giá theo mẫu</Text></View>
       <Text style={styles.mutedText}>{hasUnsavedChanges ? 'Lưu thay đổi trước khi tạo hoặc tải file báo giá.' : customerExportOutdated ? 'Báo giá đã thay đổi sau lần xuất file gần nhất. Hãy tạo lại file trước khi gửi khách.' : savedExport ? `Đã lưu: ${savedExport.filename}` : exportJobStatus === 'queued' || exportJobStatus === 'running' ? 'ERP đang điền mẫu và tạo file...' : exportJobStatus === 'failed' ? 'Lần tạo file gần nhất chưa thành công.' : 'Chưa có file báo giá đã lưu.'}</Text>
-      {!!exportError && <Text style={styles.exportErrorText}>{exportError}</Text>}
+      {!!exportError && <PopupError error={exportError} title="Không xuất được tệp" />}
       <View style={styles.actionRow}>
         {savedExport && !customerExportOutdated && <Pressable disabled={exportBusy || hasUnsavedChanges} onPress={() => { void downloadExport(); }} style={[styles.secondaryButton, (exportBusy || hasUnsavedChanges) && styles.disabled]}>{exportBusy ? <ActivityIndicator size="small" color={colors.primary} /> : <Files size={14} color={colors.primary} />}<Text style={styles.secondaryText}>Tải / chia sẻ file</Text></Pressable>}
         {canUseAi && <Pressable disabled={exportBusy || hasUnsavedChanges || exportJobStatus === 'queued' || exportJobStatus === 'running'} onPress={() => { void createOrRetryExport(); }} style={[styles.secondaryButton, (exportBusy || hasUnsavedChanges || exportJobStatus === 'queued' || exportJobStatus === 'running') && styles.disabled]}>{exportBusy || exportJobStatus === 'queued' || exportJobStatus === 'running' ? <ActivityIndicator size="small" color={colors.primary} /> : <RefreshCw size={14} color={colors.primary} />}<Text style={styles.secondaryText}>{hasUnsavedChanges ? 'Lưu thay đổi trước' : customerExportOutdated ? 'Tạo file mới' : savedExport ? 'Tạo lại file' : exportJobStatus === 'failed' ? 'Thử lại tạo file' : 'Tạo file báo giá'}</Text></Pressable>}
@@ -812,8 +829,8 @@ function EstimateFromCustomerQuoteSheet({ scope, quote, onClose, onCreated }: { 
       const estimate = await createEstimateFromCustomerQuote(scope, { sourceQuoteId: quote._id, templateId, sourceRequirements: requirements.trim(), idempotencyKey });
       let exportWarning = '';
       try { await queueDraftEstimateExport(scope, estimate._id); } catch (cause) { exportWarning = errorMessage(cause); }
-      if (exportWarning) Alert.alert('Đã tạo dự toán', `Dự toán đã được lưu. Chưa xếp được file dự thảo: ${exportWarning}`);
-      else Alert.alert('Đã tạo dự toán', `${estimate.quoteNumber} đã được tạo từ ${quote.quoteNumber}.`);
+      if (exportWarning) showAppAlert({ title: 'Đã tạo dự toán', message: `Dự toán đã được lưu. Chưa xếp được file dự thảo: ${exportWarning}`, tone: 'info' });
+      else showAppAlert({ title: 'Đã tạo dự toán', message: `${estimate.quoteNumber} đã được tạo từ ${quote.quoteNumber}.`, tone: 'success' });
       onCreated();
     } catch (cause) { setError(errorMessage(cause)); }
     finally { setBusy(false); }
@@ -826,7 +843,7 @@ function EstimateFromCustomerQuoteSheet({ scope, quote, onClose, onCreated }: { 
       <Text style={styles.fieldLabel}>Yêu cầu cụ thể để tính dự toán *</Text><TextInput value={requirements} onChangeText={setRequirements} style={[styles.input, styles.multilineInput]} placeholder="Nêu số lượng, quy cách, vật liệu, lắp đặt hoặc thời hạn cần đáp ứng..." placeholderTextColor={colors.muted} multiline maxLength={10000} />
       <Text style={styles.helperText}>AI sẽ điều chỉnh hạng mục và đơn giá theo yêu cầu; nội dung vẫn cần được kiểm tra trước khi gửi khách.</Text>
       <Text style={styles.fieldLabel}>Mẫu dự toán</Text>{loading ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : templates.length ? templates.map((item) => <Pressable key={item.id} onPress={() => setTemplateId(item.id)} style={[styles.choiceRow, templateId === item.id && styles.choiceSelected]}><Text numberOfLines={1} style={styles.rowTitle}>{item.name || item.originalFilename} · {item.extension?.toUpperCase()}</Text>{templateId === item.id && <Check size={14} color={colors.primary} />}</Pressable>) : <Text style={styles.emptyCopy}>Chưa có mẫu dự toán trong ERP.</Text>}
-      {!!error && <View style={styles.formError}><CircleAlert size={15} color="#B54745" /><Text style={styles.formErrorText}>{error}</Text></View>}
+      {!!error && <View style={styles.formError}><CircleAlert size={15} color="#B54745" /><PopupError error={error} /></View>}
       <View style={styles.footerActions}><Pressable onPress={onClose} disabled={busy} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable onPress={() => { void create(); }} disabled={busy || loading || !templateId || !requirements.trim()} style={[styles.primaryButton, (busy || loading || !templateId || !requirements.trim()) && styles.buttonDisabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryButtonText}>{busy ? 'Đang tạo...' : 'Tạo dự toán'}</Text></Pressable></View>
     </ScrollView>
   </View></KeyboardAvoidingView></View>;
@@ -857,6 +874,9 @@ function NewQuoteSheet({ kind, scope, canSelectErpCustomers, onClose, onCreated 
   const [search, setSearch] = useState('');
   const [selectedCatalogIds, setSelectedCatalogIds] = useState<string[]>([]);
   const [customerMode, setCustomerMode] = useState<'manual' | 'ai'>('manual');
+  const [aiSuggested, setAiSuggested] = useState(false);
+  const [aiSuggestedIds, setAiSuggestedIds] = useState<string[]>([]);
+  const [manualPickerOpen, setManualPickerOpen] = useState(false);
   const [missingProducts, setMissingProducts] = useState<string[]>([]);
   const [suggestionNotes, setSuggestionNotes] = useState<string[]>([]);
   const [suggestionQuestions, setSuggestionQuestions] = useState<string[]>([]);
@@ -890,6 +910,11 @@ function NewQuoteSheet({ kind, scope, canSelectErpCustomers, onClose, onCreated 
     const query = search.trim().toLocaleLowerCase('vi');
     return catalog.filter((item) => !query || `${item.sku} ${item.name} ${item.description ?? ''}`.toLocaleLowerCase('vi').includes(query)).slice(0, 100);
   }, [catalog, search]);
+
+  const selectedCatalogItems = useMemo(
+    () => catalog.filter((item) => selectedCatalogIds.includes(item._id)),
+    [catalog, selectedCatalogIds],
+  );
 
   function invalidateAnalysis() {
     setAnalysis(null);
@@ -992,7 +1017,7 @@ function NewQuoteSheet({ kind, scope, canSelectErpCustomers, onClose, onCreated 
         exportWarning = errorMessage(cause);
       }
       onCreated();
-      if (exportWarning) Alert.alert('Đã lưu dự toán', `Dự toán đã được lưu. Chưa tạo được file dự thảo: ${exportWarning}`);
+      if (exportWarning) showAppAlert({ title: 'Đã lưu dự toán', message: `Dự toán đã được lưu. Chưa tạo được file dự thảo: ${exportWarning}`, tone: 'info' });
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -1041,7 +1066,14 @@ function NewQuoteSheet({ kind, scope, canSelectErpCustomers, onClose, onCreated 
     setBusy(true); setError('');
     try {
       const result = await suggestCustomerQuote(scope, requirements.trim());
-      setSelectedCatalogIds(result.items.map((item) => item.catalogItemId).filter((id) => catalog.some((item) => item._id === id)));
+      const matchedIds = result.items
+        .map((item) => item.catalogItemId)
+        .filter((id) => catalog.some((item) => item._id === id));
+      setSelectedCatalogIds(matchedIds);
+      setAiSuggestedIds(matchedIds);
+      setAiSuggested(true);
+      setManualPickerOpen(false);
+      setSearch('');
       setMissingProducts(result.missingProducts ?? []);
       setSuggestionNotes(result.notes ?? []);
       setSuggestionQuestions(result.questions ?? []);
@@ -1051,11 +1083,11 @@ function NewQuoteSheet({ kind, scope, canSelectErpCustomers, onClose, onCreated 
 
   async function chooseRequestFile() {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
+      const result = await withAppLockSuspended(() => DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv'],
         multiple: false,
         copyToCacheDirectory: true,
-      });
+      }));
       if (result.canceled) return;
       const asset = result.assets[0];
       const extension = asset.name.split('.').pop()?.toLowerCase();
@@ -1124,27 +1156,108 @@ function NewQuoteSheet({ kind, scope, canSelectErpCustomers, onClose, onCreated 
                 <Pressable onPress={() => setCustomerMode('manual')} style={[styles.customerModeTab, customerMode === 'manual' && styles.customerModeTabActive]}><Package size={14} color={customerMode === 'manual' ? colors.primary : colors.muted} /><Text style={[styles.customerModeText, customerMode === 'manual' && styles.customerModeTextActive]}>Chọn sản phẩm</Text></Pressable>
                 <Pressable onPress={() => setCustomerMode('ai')} style={[styles.customerModeTab, customerMode === 'ai' && styles.customerModeTabActive]}><Sparkles size={14} color={customerMode === 'ai' ? colors.primary : colors.muted} /><Text style={[styles.customerModeText, customerMode === 'ai' && styles.customerModeTextActive]}>AI gợi ý</Text></Pressable>
               </View>
-              {customerMode === 'ai' && <View style={styles.aiSuggestionCard}>
-                <Text style={styles.fieldLabel}>Mô tả sản phẩm khách cần</Text>
-                <TextInput value={requirements} onChangeText={setRequirements} style={[styles.input, styles.multilineInput]} placeholder="Ví dụ: lát nền phòng khách bằng gạch porcelain, gồm vật tư và nhân công..." placeholderTextColor={colors.muted} multiline maxLength={3000} />
-                <Pressable disabled={busy || !requirements.trim()} onPress={() => { void suggestCustomerItems(); }} style={[styles.secondaryButton, (busy || !requirements.trim()) && styles.disabled]}>{busy ? <ActivityIndicator size="small" color={colors.primary} /> : <Sparkles size={14} color={colors.primary} />}<Text style={styles.secondaryText}>{busy ? 'AI đang gợi ý...' : 'Gợi ý hạng mục'}</Text></Pressable>
-                {!!suggestionNotes.length && <Text style={styles.helperText}>{suggestionNotes.join(' · ')}</Text>}
-                {!!suggestionQuestions.length && <View style={styles.analysisNotice}><CircleAlert size={14} color="#9A6500" /><Text style={styles.analysisNoticeText}>AI cần thêm thông tin: {suggestionQuestions.join(' · ')}</Text></View>}
-                {!!missingProducts.length && <View style={styles.missingProductNotice}><Text style={styles.rowTitle}>Chưa có trong bảng giá</Text>{missingProducts.map((name) => <Text key={name} style={styles.mutedText}>• {name}</Text>)}</View>}
-              </View>}
-              <View style={styles.sectionHeading}><Package size={16} color={colors.primary} /><Text style={styles.sectionTitle}>Hạng mục đã chọn</Text><Text style={styles.countPill}>{selectedCatalogIds.length + missingProducts.length}</Text></View>
-              <View style={styles.searchBox}><Search size={15} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} style={styles.searchInput} placeholder="Tìm tên hoặc mã sản phẩm..." placeholderTextColor={colors.muted} /></View>
-              {catalogLoading ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : visibleCatalog.map((item) => {
-                const chosen = selectedCatalogIds.includes(item._id);
-                return <Pressable key={item._id} onPress={() => toggleCatalogItem(item)} style={styles.catalogRow}><View style={[styles.checkbox, chosen && styles.checkboxActive]}>{chosen && <Check size={13} color={colors.white} />}</View><View style={styles.catalogCopy}><Text style={styles.catalogName}>{item.name}</Text><Text style={styles.catalogMeta}>{item.sku} · {item.unit} · {formatMoney(item.price, item.currency)}</Text></View>{chosen && <Check size={14} color={colors.primary} />}</Pressable>;
-              })}
+              {customerMode === 'ai' ? <>
+                <View style={styles.aiSuggestionCard}>
+                  <Text style={styles.fieldLabel}>Mô tả sản phẩm khách cần</Text>
+                  <TextInput value={requirements} onChangeText={setRequirements} style={[styles.input, styles.multilineInput]} placeholder="Ví dụ: lát nền phòng khách bằng gạch porcelain, gồm vật tư và nhân công..." placeholderTextColor={colors.muted} multiline maxLength={3000} />
+                  <Pressable disabled={busy || !requirements.trim()} onPress={() => { void suggestCustomerItems(); }} style={[styles.secondaryButton, (busy || !requirements.trim()) && styles.disabled]}>{busy ? <ActivityIndicator size="small" color={colors.primary} /> : <Sparkles size={14} color={colors.primary} />}<Text style={styles.secondaryText}>{busy ? 'AI đang gợi ý...' : 'Gợi ý hạng mục'}</Text></Pressable>
+                  {!!suggestionNotes.length && <Text style={styles.helperText}>{suggestionNotes.join(' · ')}</Text>}
+                  {!!suggestionQuestions.length && <View style={styles.analysisNotice}><CircleAlert size={14} color="#9A6500" /><Text style={styles.analysisNoticeText}>AI cần thêm thông tin: {suggestionQuestions.join(' · ')}</Text></View>}
+                  {!!missingProducts.length && <View style={styles.missingProductNotice}><Text style={styles.rowTitle}>Chưa có trong bảng giá</Text>{missingProducts.map((name) => <Text key={name} style={styles.mutedText}>• {name}</Text>)}</View>}
+                </View>
+
+                <View style={styles.sectionHeadingRow}>
+                  <View style={styles.sectionHeadingLeft}>
+                    <Package size={16} color={colors.primary} />
+                    <Text style={styles.sectionTitle}>{aiSuggested ? 'Sản phẩm AI gợi ý' : 'Hạng mục đã chọn'}</Text>
+                    <Text style={styles.countPill}>{selectedCatalogIds.length + missingProducts.length}</Text>
+                  </View>
+                  <Pressable onPress={() => { setSearch(''); setManualPickerOpen(true); }} style={styles.addProductButton}>
+                    <Plus size={14} color={colors.primary} />
+                    <Text style={styles.addProductButtonText}>Thêm sản phẩm</Text>
+                  </Pressable>
+                </View>
+
+                {catalogLoading ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : selectedCatalogItems.length ? selectedCatalogItems.map((item) => {
+                  const isFromAi = aiSuggestedIds.includes(item._id);
+                  return (
+                    <View key={item._id} style={styles.catalogRow}>
+                      <View style={[styles.checkbox, styles.checkboxActive]}><Check size={13} color={colors.white} /></View>
+                      <View style={styles.catalogCopy}>
+                        <View style={styles.catalogNameRow}>
+                          <Text numberOfLines={2} style={styles.catalogName}>{item.name}</Text>
+                          {isFromAi && <View style={styles.aiTag}><Sparkles size={10} color={colors.primary} /><Text style={styles.aiTagText}>AI</Text></View>}
+                        </View>
+                        <Text style={styles.catalogMeta}>{item.sku} · {item.unit} · {formatMoney(item.price, item.currency)}</Text>
+                      </View>
+                      <Pressable onPress={() => toggleCatalogItem(item)} style={styles.removeProductButton} accessibilityLabel={`Bỏ ${item.name}`}>
+                        <X size={15} color="#B54745" />
+                      </Pressable>
+                    </View>
+                  );
+                }) : (
+                  <View style={styles.emptySuggestionBox}>
+                    <Text style={styles.emptyCopy}>
+                      {aiSuggested
+                        ? 'AI chưa tìm thấy sản phẩm khớp trong bảng giá. Bấm “Thêm sản phẩm” để chọn thủ công.'
+                        : 'Bấm “Gợi ý hạng mục” để AI đề xuất sản phẩm, hoặc bấm “Thêm sản phẩm” để chọn thủ công.'}
+                    </Text>
+                  </View>
+                )}
+              </> : <>
+                <View style={styles.sectionHeading}><Package size={16} color={colors.primary} /><Text style={styles.sectionTitle}>Hạng mục đã chọn</Text><Text style={styles.countPill}>{selectedCatalogIds.length + missingProducts.length}</Text></View>
+                <View style={styles.searchBox}><Search size={15} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} style={styles.searchInput} placeholder="Tìm tên hoặc mã sản phẩm..." placeholderTextColor={colors.muted} /></View>
+                {catalogLoading ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : visibleCatalog.map((item) => {
+                  const chosen = selectedCatalogIds.includes(item._id);
+                  return <Pressable key={item._id} onPress={() => toggleCatalogItem(item)} style={styles.catalogRow}><View style={[styles.checkbox, chosen && styles.checkboxActive]}>{chosen && <Check size={13} color={colors.white} />}</View><View style={styles.catalogCopy}><Text style={styles.catalogName}>{item.name}</Text><Text style={styles.catalogMeta}>{item.sku} · {item.unit} · {formatMoney(item.price, item.currency)}</Text></View>{chosen && <Check size={14} color={colors.primary} />}</Pressable>;
+                })}
+              </>}
             </>}
           </>}
-          {!!error && <View style={styles.formError}><CircleAlert size={15} color="#B54745" /><Text style={styles.formErrorText}>{error}</Text></View>}
+          {!!error && <View style={styles.formError}><CircleAlert size={15} color="#B54745" /><PopupError error={error} /></View>}
           {(kind === 'customer' || analysis) && <View style={styles.footerActions}><Pressable onPress={onClose} disabled={busy} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={busy || templateLoading || !templates.length || (kind === 'estimate' && !analysis) || (kind === 'customer' && (catalogLoading || (!selectedCatalogIds.length && !missingProducts.length)))} onPress={() => { void (kind === 'estimate' ? saveEstimate() : saveCustomerQuote()); }} style={[styles.primaryButton, (busy || !templates.length || (kind === 'customer' && !selectedCatalogIds.length && !missingProducts.length)) && styles.buttonDisabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={16} color={colors.white} />}<Text style={styles.primaryButtonText}>{busy ? 'Đang lưu...' : kind === 'estimate' ? 'Tạo dự toán' : 'Tạo báo giá'}</Text></Pressable></View>}
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
+    {manualPickerOpen && (
+      <View style={styles.pickerOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setManualPickerOpen(false)} />
+        <View style={styles.pickerCard}>
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={styles.sheetTitle}>Thêm sản phẩm</Text>
+              <Text style={styles.sheetSubtitle}>Đã chọn {selectedCatalogIds.length} sản phẩm</Text>
+            </View>
+            <Pressable onPress={() => setManualPickerOpen(false)} style={styles.closeButton} accessibilityLabel="Đóng chọn sản phẩm">
+              <X size={18} color={colors.muted} />
+            </Pressable>
+          </View>
+          <View style={[styles.searchBox, styles.pickerSearch]}>
+            <Search size={15} color={colors.muted} />
+            <TextInput value={search} onChangeText={setSearch} style={styles.searchInput} placeholder="Tìm tên hoặc mã sản phẩm..." placeholderTextColor={colors.muted} />
+          </View>
+          <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {catalogLoading ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : visibleCatalog.length ? visibleCatalog.map((item) => {
+              const chosen = selectedCatalogIds.includes(item._id);
+              return (
+                <Pressable key={item._id} onPress={() => toggleCatalogItem(item)} style={styles.catalogRow}>
+                  <View style={[styles.checkbox, chosen && styles.checkboxActive]}>{chosen && <Check size={13} color={colors.white} />}</View>
+                  <View style={styles.catalogCopy}>
+                    <Text style={styles.catalogName}>{item.name}</Text>
+                    <Text style={styles.catalogMeta}>{item.sku} · {item.unit} · {formatMoney(item.price, item.currency)}</Text>
+                  </View>
+                  {chosen && <Check size={14} color={colors.primary} />}
+                </Pressable>
+              );
+            }) : <Text style={styles.emptyCopy}>Không tìm thấy sản phẩm phù hợp.</Text>}
+          </ScrollView>
+          <Pressable onPress={() => setManualPickerOpen(false)} style={styles.pickerDoneButton}>
+            <Check size={15} color={colors.white} />
+            <Text style={styles.primaryButtonText}>Xong ({selectedCatalogIds.length})</Text>
+          </Pressable>
+        </View>
+      </View>
+    )}
   </View>;
 }
 
@@ -1182,7 +1295,7 @@ function ErpCustomerPicker({ enabled, disabled, scope, onSelect }: { enabled: bo
         <View style={styles.customerResultCopy}><Text numberOfLines={1} style={styles.rowTitle}>{customer.name}</Text><Text numberOfLines={1} style={styles.mutedText}>{[customer.customerCode, customer.phone, customer.email].filter(Boolean).join(' · ')}</Text></View>
         <ChevronRight size={14} color={colors.muted} />
       </Pressable>)}
-      {!!error && <Text style={styles.formErrorText}>{error}</Text>}
+      {!!error && <PopupError error={error} />}
       {!loading && !error && !customers.length && <Text style={styles.emptyCopy}>Không tìm thấy khách hàng phù hợp.</Text>}
     </View>}
   </View>;
@@ -1392,9 +1505,23 @@ const styles = StyleSheet.create({
   countPill: { minWidth: 19, overflow: 'hidden', color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 8, fontWeight: '800', textAlign: 'center', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 8 },
   formError: { flexDirection: 'row', gap: 6, padding: 9, marginTop: 10, borderRadius: 10, backgroundColor: '#FFF0EF' },
   formErrorText: { flex: 1, color: '#A33D3A', fontSize: 9, lineHeight: 14 },
-  footerActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  cancelButton: { justifyContent: 'center', paddingHorizontal: 12, borderRadius: 11, backgroundColor: '#E9EDF4' },
+  footerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
+  cancelButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, marginTop: 10, borderRadius: 11, backgroundColor: '#E9EDF4' },
   cancelText: { color: colors.ink, fontSize: 9, fontWeight: '800' },
   primaryButton: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 13, marginTop: 10, borderRadius: 11, backgroundColor: colors.primary },
   primaryButtonText: { color: colors.white, fontSize: 9, fontWeight: '800' },
+  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 15, marginBottom: 8 },
+  sectionHeadingLeft: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 1 },
+  addProductButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: '#EAF2FF', borderWidth: 1, borderColor: '#C9DAFF' },
+  addProductButtonText: { color: colors.primary, fontSize: 9, fontWeight: '800' },
+  catalogNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  aiTag: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 99, backgroundColor: '#EAF2FF' },
+  aiTagText: { color: colors.primary, fontSize: 8, fontWeight: '800' },
+  removeProductButton: { width: 28, height: 28, borderRadius: 9, backgroundColor: '#FFF0EF', alignItems: 'center', justifyContent: 'center' },
+  emptySuggestionBox: { padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, marginTop: 4 },
+  pickerOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(12, 24, 45, 0.45)', zIndex: 20 },
+  pickerCard: { maxHeight: '82%', backgroundColor: colors.background, borderRadius: 24, overflow: 'hidden', padding: 16 },
+  pickerSearch: { marginTop: 10, marginBottom: 6 },
+  pickerList: { maxHeight: 380 },
+  pickerDoneButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, borderRadius: 12, backgroundColor: colors.primary },
 });

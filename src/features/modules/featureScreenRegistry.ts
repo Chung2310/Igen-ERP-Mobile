@@ -9,6 +9,12 @@ import { EmbeddedOverviewScreen } from '@/features/overview/OverviewHubScreen';
 import { ResourcesScreen } from '@/features/ResourcesScreen';
 import { QuotationModuleScreen } from '@/features/quotation/QuotationModuleScreen';
 import { InventoryModuleScreen } from '@/features/inventory/InventoryModuleScreen';
+import { AccountManagementScreen } from '@/features/AccountsScreen';
+import { RetailPartnersScreen } from '@/features/PartnersScreen';
+import { LaborPartnersScreen } from '@/features/LaborPartnersScreen';
+import { StudentPartnersScreen } from '@/features/StudentPartnersScreen';
+import { WorkerManagementScreen } from '@/features/WorkerManagementScreen';
+import { StudentManagementScreen } from '@/features/StudentManagementScreen';
 
 export type FeatureScreenProps = { module: ModuleDefinition };
 
@@ -23,6 +29,12 @@ const featureScreens: Partial<Record<string, ComponentType<FeatureScreenProps>>>
   resources: ResourcesScreen,
   quotes: QuotationModuleScreen,
   inventory: InventoryModuleScreen,
+  users: AccountManagementScreen,
+  'retail-partners': RetailPartnersScreen,
+  'labor-partners': LaborPartnersScreen,
+  'student-partners': StudentPartnersScreen,
+  'worker-management': WorkerManagementScreen,
+  'student-management': StudentManagementScreen,
 };
 
 export function getFeatureScreen(slug: string) {

@@ -11,7 +11,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Cho phép ERP Mobile chọn ảnh để tạo Lead bằng OCR.",
+          "photosPermission": "Cho phép ERP Mobile truy cập ảnh bạn chọn để cập nhật ảnh đại diện hoặc tạo Lead bằng OCR.",
           "cameraPermission": "Cho phép ERP Mobile chụp tài liệu để tạo Lead bằng OCR.",
           "microphonePermission": false
         }
@@ -24,8 +24,21 @@
           "recordAudioAndroid": false
         }
       ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Cho phép ERP Mobile dùng Face ID để đăng nhập, mở khóa ứng dụng và xác nhận chấm công."
+        }
+      ],
       "expo-secure-store",
-      "expo-sharing"
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Cho phép ERP Mobile truy cập vị trí để cấu hình chi nhánh."
+        }
+      ],
+      "expo-sharing",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

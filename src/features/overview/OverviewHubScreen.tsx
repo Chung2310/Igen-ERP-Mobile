@@ -92,7 +92,11 @@ function formatClock(timestamp: number) {
 }
 
 export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } = {}) {
-  const { user } = useAuth();
+  const {
+    user,
+    activeBranchId: selectedBranchId,
+    setActiveBranchId: setSelectedBranchId,
+  } = useAuth();
   const allowedPages = useMemo(() => resolveAllowedOverviewPages(user), [user]);
 
   const [selectedPageId, setSelectedPageId] = useState<OverviewPageId>('executive');
@@ -103,8 +107,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   const canSwitchBranch = user?.role === 'admin' || user?.role === 'superadmin' || !user?.branchId;
   const [branches, setBranches] = useState<ErpBranch[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(Boolean(canSwitchBranch && user?.companyCode));
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(user?.branchId ?? '');
-
   useEffect(() => {
     if (!user?.companyCode) {
       setBranches([]);

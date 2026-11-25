@@ -1,10 +1,12 @@
+import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { Check, ChevronDown, ChevronRight, EllipsisVertical, File, FileImage, FileSpreadsheet, FileText, Folder, HardDrive, Plus, Presentation, RefreshCw, Upload, X } from 'lucide-react-native';
 import { Card } from '@/components/Card';
-import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { showAppAlert, showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { getChatColleagues, getChatRooms } from '@/features/chat/chatApi';
 import type { ChatColleague, ChatRoom } from '@/features/chat/types';
@@ -151,7 +153,7 @@ export function ResourcesScreen() {
       setMoveFolders(rows.filter((item) => item.type === 'folder' && item._id !== moveItem._id && item.managedType !== 'system'));
       setMoveBreadcrumb(trail);
     }).catch((cause: unknown) => {
-      if (active) Alert.alert('Không tải được thư mục', cause instanceof Error ? cause.message : 'ERP không trả về danh sách thư mục.');
+      if (active) showAppAlert({ title: 'Không tải được thư mục', message: cause instanceof Error ? cause.message : 'ERP không trả về danh sách thư mục.', tone: 'danger' });
     }).finally(() => {
       if (active) setLoadingMoveFolders(false);
     });
@@ -206,7 +208,7 @@ export function ResourcesScreen() {
 
   async function pickAndUpload() {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', multiple: true, copyToCacheDirectory: true });
+      const result = await withAppLockSuspended(() => DocumentPicker.getDocumentAsync({ type: '*/*', multiple: true, copyToCacheDirectory: true }));
       if (result.canceled) return;
       setUploading(true);
       let uploaded = 0;
@@ -215,9 +217,9 @@ export function ResourcesScreen() {
         uploaded += 1;
       }
       refresh();
-      Alert.alert('Đã tải tệp lên', `${uploaded} tệp đã được lưu vào thư mục hiện tại.`);
+      showAppAlert({ title: 'Đã tải tệp lên', message: `${uploaded} tệp đã được lưu vào thư mục hiện tại.`, tone: 'success' });
     } catch (cause) {
-      Alert.alert('Chưa tải được tệp', cause instanceof Error ? cause.message : 'ERP không xử lý được tệp đã chọn.');
+      showAppAlert({ title: 'Chưa tải được tệp', message: cause instanceof Error ? cause.message : 'ERP không xử lý được tệp đã chọn.', tone: 'danger' });
     } finally {
       setUploading(false);
     }
@@ -233,7 +235,7 @@ export function ResourcesScreen() {
       setFolderName('');
       refresh();
     } catch (cause) {
-      Alert.alert('Chưa tạo được thư mục', cause instanceof Error ? cause.message : 'ERP không tạo được thư mục.');
+      showAppAlert({ title: 'Chưa tạo được thư mục', message: cause instanceof Error ? cause.message : 'ERP không tạo được thư mục.', tone: 'danger' });
     } finally {
       setSavingFolder(false);
     }
@@ -251,7 +253,7 @@ export function ResourcesScreen() {
       setShareRooms(chatRooms.filter((room) => room.isGroup));
     } catch (cause) {
       setSharingItem(null);
-      Alert.alert('Không tải được chia sẻ', cause instanceof Error ? cause.message : 'Không lấy được danh sách người và nhóm.');
+      showAppAlert({ title: 'Không tải được chia sẻ', message: cause instanceof Error ? cause.message : 'Không lấy được danh sách người và nhóm.', tone: 'danger' });
     } finally {
       setLoadingShares(false);
     }
@@ -280,9 +282,9 @@ export function ResourcesScreen() {
       await updateResourceShares(sharingItem._id, shareTargets);
       setSharingItem(null);
       refresh();
-      Alert.alert('Đã cập nhật chia sẻ', 'Quyền truy cập tài nguyên đã được cập nhật.');
+      showAppAlert({ title: 'Đã cập nhật chia sẻ', message: 'Quyền truy cập tài nguyên đã được cập nhật.', tone: 'success' });
     } catch (cause) {
-      Alert.alert('Chưa cập nhật được chia sẻ', cause instanceof Error ? cause.message : 'ERP không lưu được thay đổi.');
+      showAppAlert({ title: 'Chưa cập nhật được chia sẻ', message: cause instanceof Error ? cause.message : 'ERP không lưu được thay đổi.', tone: 'danger' });
     } finally {
       setSavingShares(false);
     }
@@ -300,7 +302,7 @@ export function ResourcesScreen() {
           await removeResource(item._id);
           refresh();
         } catch (cause: unknown) {
-          Alert.alert('Chưa xóa được tài nguyên', cause instanceof Error ? cause.message : 'ERP không xóa được mục này.');
+          showAppAlert({ title: 'Chưa xóa được tài nguyên', message: cause instanceof Error ? cause.message : 'ERP không xóa được mục này.', tone: 'danger' });
         }
       },
     });
@@ -312,7 +314,7 @@ export function ResourcesScreen() {
       setActionItem(null);
       refresh();
     } catch (cause) {
-      Alert.alert('Chưa khôi phục được', cause instanceof Error ? cause.message : 'ERP không khôi phục được tài nguyên.');
+      showAppAlert({ title: 'Chưa khôi phục được', message: cause instanceof Error ? cause.message : 'ERP không khôi phục được tài nguyên.', tone: 'danger' });
     }
   }
 
@@ -325,7 +327,7 @@ export function ResourcesScreen() {
       setActionItem(null);
       refresh();
     } catch (cause) {
-      Alert.alert('Chưa đổi được tên', cause instanceof Error ? cause.message : 'ERP không lưu được tên mới.');
+      showAppAlert({ title: 'Chưa đổi được tên', message: cause instanceof Error ? cause.message : 'ERP không lưu được tên mới.', tone: 'danger' });
     } finally {
       setRenaming(false);
     }
@@ -340,7 +342,7 @@ export function ResourcesScreen() {
       setActionItem(null);
       refresh();
     } catch (cause) {
-      Alert.alert('Chưa di chuyển được', cause instanceof Error ? cause.message : 'ERP không di chuyển được mục này.');
+      showAppAlert({ title: 'Chưa di chuyển được', message: cause instanceof Error ? cause.message : 'ERP không di chuyển được mục này.', tone: 'danger' });
     } finally {
       setMoving(false);
     }
@@ -348,10 +350,10 @@ export function ResourcesScreen() {
 
   function openFile(item: ResourceItem) {
     if (!item.fileUrl) {
-      Alert.alert('Chưa có liên kết', 'Tài nguyên này chưa có đường dẫn để mở.');
+      showAppAlert({ title: 'Chưa có liên kết', message: 'Tài nguyên này chưa có đường dẫn để mở.', tone: 'info' });
       return;
     }
-    void Linking.openURL(item.fileUrl).catch(() => Alert.alert('Không mở được tệp', 'Thiết bị không mở được liên kết tài nguyên này.'));
+    void Linking.openURL(item.fileUrl).catch(() => showAppAlert({ title: 'Không mở được tệp', message: 'Thiết bị không mở được liên kết tài nguyên này.', tone: 'danger' }));
   }
 
   return (
@@ -398,7 +400,7 @@ export function ResourcesScreen() {
           <Text style={styles.countText}>{counts.folders} thư mục · {counts.files} tệp</Text>
         </View>
 
-        {!!error && <Card style={styles.errorCard}><Text style={styles.errorText}>{error}</Text><Pressable onPress={refresh}><Text style={styles.retry}>Thử lại</Text></Pressable></Card>}
+        {!!error && <PopupError error={error} onRetry={refresh} />}
 
         <View style={styles.list}>
           {visibleItems.map((item) => <ResourceRow
@@ -419,7 +421,7 @@ export function ResourcesScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={spaceModal} transparent animationType="slide" onRequestClose={() => setSpaceModal(false)}>
+      <Modal visible={spaceModal} transparent animationType="fade" onRequestClose={() => setSpaceModal(false)}>
         <Sheet onClose={() => setSpaceModal(false)} title="Chọn không gian" scrollable>
           <ActionMenuButton label={`Cá nhân${!selectedRoomId ? ' · Đang chọn' : ''}`} onPress={() => { setSelectedRoomId(null); setLocalView('mine'); setFolderId(null); setSpaceModal(false); }} />
           {loadingRooms && <ActivityIndicator color={colors.primary} style={styles.loading} />}
@@ -432,7 +434,7 @@ export function ResourcesScreen() {
         </Sheet>
       </Modal>
 
-      <Modal visible={folderModal} transparent animationType="slide" onRequestClose={() => setFolderModal(false)}>
+      <Modal visible={folderModal} transparent animationType="fade" onRequestClose={() => setFolderModal(false)}>
         <Sheet onClose={() => setFolderModal(false)} title="Tạo thư mục">
           <Text style={styles.fieldLabel}>Tên thư mục</Text>
           <TextInput value={folderName} onChangeText={setFolderName} placeholder="Nhập tên thư mục" placeholderTextColor={colors.muted} style={styles.fieldInput} autoFocus />
@@ -440,7 +442,7 @@ export function ResourcesScreen() {
         </Sheet>
       </Modal>
 
-      <Modal visible={Boolean(detailItem)} transparent animationType="slide" onRequestClose={() => setDetailItem(null)}>
+      <Modal visible={Boolean(detailItem)} transparent animationType="fade" onRequestClose={() => setDetailItem(null)}>
         {detailItem && <Sheet onClose={() => setDetailItem(null)} title="Chi tiết tài nguyên">
           <View style={styles.detailHero}>
             <View style={[styles.fileIconContainer, { backgroundColor: detailIcon?.tint }]}>
@@ -456,7 +458,7 @@ export function ResourcesScreen() {
         </Sheet>}
       </Modal>
 
-      <Modal visible={Boolean(actionItem)} transparent animationType="slide" onRequestClose={() => setActionItem(null)}>
+      <Modal visible={Boolean(actionItem)} transparent animationType="fade" onRequestClose={() => setActionItem(null)}>
         {actionItem && <Sheet onClose={() => setActionItem(null)} title="Thao tác">
           <Text style={styles.actionItemName} numberOfLines={2}>{actionItem.name}</Text>
           <ActionMenuButton label="Chi tiết" onPress={() => { setDetailItem(actionItem); setActionItem(null); }} />
@@ -474,7 +476,7 @@ export function ResourcesScreen() {
         </Sheet>}
       </Modal>
 
-      <Modal visible={Boolean(renameItem)} transparent animationType="slide" onRequestClose={() => setRenameItem(null)}>
+      <Modal visible={Boolean(renameItem)} transparent animationType="fade" onRequestClose={() => setRenameItem(null)}>
         {renameItem && <Sheet onClose={() => setRenameItem(null)} title="Đổi tên">
           <Text style={styles.fieldLabel}>Tên mới</Text>
           <TextInput value={renameValue} onChangeText={setRenameValue} style={styles.fieldInput} autoFocus />
@@ -482,7 +484,7 @@ export function ResourcesScreen() {
         </Sheet>}
       </Modal>
 
-      <Modal visible={Boolean(sharingItem)} transparent animationType="slide" onRequestClose={() => setSharingItem(null)}>
+      <Modal visible={Boolean(sharingItem)} transparent animationType="fade" onRequestClose={() => setSharingItem(null)}>
         {sharingItem && <Sheet onClose={() => setSharingItem(null)} title="Chia sẻ tài nguyên" scrollable>
           {loadingShares ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : <>
             <Text style={styles.actionItemName} numberOfLines={1}>{sharingItem.name}</Text>
@@ -505,7 +507,7 @@ export function ResourcesScreen() {
         </Sheet>}
       </Modal>
 
-      <Modal visible={Boolean(moveItem)} transparent animationType="slide" onRequestClose={() => setMoveItem(null)}>
+      <Modal visible={Boolean(moveItem)} transparent animationType="fade" onRequestClose={() => setMoveItem(null)}>
         {moveItem && <Sheet onClose={() => setMoveItem(null)} title="Di chuyển tài nguyên" scrollable>
           <Text style={styles.actionItemName} numberOfLines={1}>{moveItem.name}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumb}>
@@ -545,11 +547,10 @@ function ResourceRow({ item, onOpen, onMore, inTrash = false, canManage = false,
 }
 
 function Sheet({ children, title, onClose, scrollable = false }: { children: ReactNode; title: string; onClose: () => void; scrollable?: boolean }) {
-  return <View style={styles.modalBackdrop}><View style={styles.sheet}>
-    <View style={styles.sheetHandle} />
+  return <Pressable style={styles.modalBackdrop} onPress={onClose}><Pressable style={styles.sheet} onPress={() => {}}>
     <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>{title}</Text><Pressable onPress={onClose} accessibilityLabel="Đóng"><X size={19} color={colors.muted} /></Pressable></View>
     {scrollable ? <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>{children}</ScrollView> : <View>{children}</View>}
-  </View></View>;
+  </Pressable></Pressable>;
 }
 
 function ActionButton({ label, onPress, secondary = false, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
@@ -618,9 +619,8 @@ const styles = StyleSheet.create({
   errorText: { color: '#A43B36', fontSize: 9, lineHeight: 14 },
   retry: { color: colors.primary, fontSize: 9, fontWeight: '800', marginTop: 7 },
   disabled: { opacity: 0.55 },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(18,30,49,0.38)' },
-  sheet: { maxHeight: '88%', backgroundColor: '#F5F7FB', borderTopLeftRadius: 23, borderTopRightRadius: 23, paddingHorizontal: 18, paddingTop: 9, paddingBottom: Platform.OS === 'ios' ? 26 : 18 },
-  sheetHandle: { alignSelf: 'center', width: 38, height: 4, borderRadius: 3, backgroundColor: '#CDD4E0', marginBottom: 12 },
+  modalBackdrop: { flex: 1, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(18,30,49,0.42)' },
+  sheet: { maxHeight: '86%', backgroundColor: '#F5F7FB', borderRadius: 24, overflow: 'hidden', paddingHorizontal: 18, paddingVertical: 16 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 11 },
   sheetTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   fieldLabel: { color: colors.ink, fontSize: 9, fontWeight: '700', marginBottom: 6 },

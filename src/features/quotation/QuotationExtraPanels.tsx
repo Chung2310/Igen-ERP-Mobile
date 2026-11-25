@@ -1,10 +1,12 @@
+import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { strToU8, zipSync } from 'fflate';
 import { ArrowDownWideNarrow, BadgeCheck, BriefcaseBusiness, Check, ChevronLeft, ChevronRight, CircleAlert, CircleDollarSign, Download, FileSpreadsheet, FileText, Files, Package, Plus, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react-native';
 import { Card } from '@/components/Card';
-import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { showAppAlert, showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import {
   CATALOG_PAGE_SIZE,
   applyCatalogBulk,
@@ -30,6 +32,7 @@ import {
   listCatalogItemsPage,
   listContracts,
   listQuotes,
+  loadCatalog,
   loadDocumentTemplates,
   loadQuoteTemplates,
   loadPriceLists,
@@ -40,7 +43,6 @@ import {
   queueAcceptanceFile,
   queueBudgetExport,
   queueContractFile,
-  queueSettlementFile,
   signContract,
   updateAcceptanceRecord,
   updateContract,
@@ -62,12 +64,25 @@ import type {
   TemplateCategory,
 } from '@/features/quotation/types';
 import { saveAndShareExport } from '@/features/quotation/fileExport';
+import { DateTimeField } from '@/features/quotation/DateTimeField';
 import { colors } from '@/theme/colors';
 
 function messageOf(error: unknown) { return error instanceof Error ? error.message : 'Không thể hoàn tất thao tác với ERP.'; }
-function money(value: number, currency = 'VND') {
-  try { return new Intl.NumberFormat('vi-VN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value || 0); }
-  catch { return `${new Intl.NumberFormat('vi-VN').format(value || 0)} ${currency}`; }
+function money(value: number, _currency = 'VND') {
+  const num = Number(value ?? 0);
+  const safe = Number.isFinite(num) ? Math.round(num) : 0;
+  const sign = safe < 0 ? '-' : '';
+  const digits = Math.abs(safe).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${sign}${digits} VND`;
+}
+function formatVndInput(raw: string | number | null | undefined) {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+function parseVndInput(raw: string) {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  return digits ? Number(digits) : 0;
 }
 function date(value?: string | null) {
   if (!value) return 'Chưa cập nhật';
@@ -75,7 +90,7 @@ function date(value?: string | null) {
   return Number.isNaN(d.getTime()) ? 'Chưa cập nhật' : new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
 }
 function today() { const value = new Date(); return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`; }
-function messageAlert(title: string, cause: unknown) { Alert.alert(title, messageOf(cause)); }
+function messageAlert(title: string, cause: unknown) { showAppAlert({ title, message: messageOf(cause), tone: 'danger' }); }
 
 function PanelTopAction({ action }: { action?: { label: string; onPress: () => void; disabled?: boolean } }) {
   if (!action) return null;
@@ -124,7 +139,7 @@ export function GeneratedFileActions({ scope, sourceId, kind, updatedAt, canGene
   return <View style={styles.generatedFilePanel}>
     <View style={styles.warningHeading}><Files size={14} color={colors.primary} /><Text style={styles.rowTitle}>{label}</Text></View>
     <Text style={styles.mutedText}>{blocked ? 'Lưu thay đổi và tính lại dự toán trước khi tải hoặc tạo file.' : outdated ? 'Dữ liệu đã thay đổi sau lần xuất file gần nhất.' : file ? `Đã lưu: ${file.filename}` : status === 'queued' || status === 'running' ? 'ERP đang tạo file...' : status === 'failed' ? 'Lần tạo file gần nhất chưa thành công.' : 'Chưa có file đã lưu.'}</Text>
-    {!!error && <Text style={styles.exportError}>{error}</Text>}
+    {!!error && <PopupError error={error} title="Không xuất được tệp" />}
     <View style={styles.actionRow}>
       {file && !outdated && <Pressable disabled={busy || blocked} onPress={() => { void download(); }} style={[styles.secondaryButton, (busy || blocked) && styles.disabled]}><Files size={14} color={colors.primary} /><Text style={styles.secondaryText}>Tải / chia sẻ</Text></Pressable>}
       {canGenerate && <Pressable disabled={busy || blocked || status === 'queued' || status === 'running'} onPress={() => { void generate(); }} style={[styles.secondaryButton, (busy || blocked || status === 'queued' || status === 'running') && styles.disabled]}>{busy || status === 'queued' || status === 'running' ? <ActivityIndicator size="small" color={colors.primary} /> : <RefreshCw size={14} color={colors.primary} />}<Text style={styles.secondaryText}>{blocked ? 'Lưu thay đổi trước' : outdated ? 'Tạo file mới' : file ? 'Tạo lại file' : status === 'failed' ? 'Thử lại' : 'Tạo file'}</Text></Pressable>}
@@ -216,12 +231,12 @@ export function BudgetPlannerPanel({ scope, canManage, canManageCatalog, canUseA
       <Card style={styles.formCard}>
         <Text style={styles.sectionTitle}>Lập phương án sơ bộ</Text>
         <TextInput value={description} onChangeText={setDescription} style={[styles.input, styles.multiline]} placeholder="Mô tả mục tiêu, phạm vi và yêu cầu..." placeholderTextColor={colors.muted} multiline maxLength={5000} />
-        <TextInput value={budget} onChangeText={setBudget} style={styles.input} placeholder="Ngân sách dự kiến" placeholderTextColor={colors.muted} keyboardType="decimal-pad" />
+        <TextInput value={budget} onChangeText={setBudget} style={styles.input} placeholder="Ngân sách dự kiến (VND)" placeholderTextColor={colors.muted} keyboardType="decimal-pad" />
         <View style={styles.twoColumns}><Field label="Diện tích (m², không bắt buộc)" value={area} onChangeText={setArea} keyboardType="decimal-pad" /><Field label="Số tầng (không bắt buộc)" value={floors} onChangeText={setFloors} keyboardType="number-pad" /></View>
         <Pressable disabled={!canManage || !canUseAi || busy === 'create'} onPress={() => { void create(); }} style={[styles.primaryButton, (!canManage || !canUseAi || busy === 'create') && styles.disabled]}>{busy === 'create' ? <ActivityIndicator size="small" color={colors.white} /> : <CircleDollarSign size={16} color={colors.white} />}<Text style={styles.primaryText}>{!canManage ? 'Cần quyền quotation:manage' : !canUseAi ? 'Cần quyền quotation-ai:manage' : busy === 'create' ? 'Đang tư vấn...' : 'Tạo phương án bằng AI'}</Text></Pressable>
       </Card>
 
-      {!!error && <Card style={styles.errorCard}><CircleAlert size={16} color="#B54745" /><Text style={styles.errorText}>{error}</Text></Card>}
+      {!!error && <PopupError error={error} />}
 
       {selected && <Card style={styles.detailCard}>
         <View style={styles.detailTitleRow}><View style={styles.detailTitleCopy}><Text style={styles.sectionTitle}>Phương án đang xem</Text><Text style={styles.mutedText}>{selected.input.description}</Text></View><Pressable onPress={() => { setSelected(null); }}><X size={18} color={colors.muted} /></Pressable></View>
@@ -274,7 +289,7 @@ export function QuoteTemplatePanel({ scope, canManage }: { scope: QuotationScope
     try {
       if (category === 'quote' || category === 'estimate') {
         const result = await loadQuoteTemplates(scope, category);
-        setTemplates(result.templates); setDefaultTemplateId(result.defaultTemplateId);
+        setTemplates(result.templates as QuotationTemplate[]); setDefaultTemplateId(result.defaultTemplateId);
       } else {
         const items = await listAllQuoteTemplates(scope, category);
         setTemplates(items); setDefaultTemplateId(items[0]?.id ?? null);
@@ -291,10 +306,10 @@ export function QuoteTemplatePanel({ scope, canManage }: { scope: QuotationScope
   async function upload() {
     if (!canManage || busy) return;
     try {
-      const picked = await DocumentPicker.getDocumentAsync({ type: category === 'contract' || category === 'acceptance' ? ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'] : ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], copyToCacheDirectory: true });
+      const picked = await withAppLockSuspended(() => DocumentPicker.getDocumentAsync({ type: category === 'contract' || category === 'acceptance' ? ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'] : ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], copyToCacheDirectory: true }));
       if (picked.canceled) return;
       const asset = picked.assets[0];
-      if (!asset || (asset.size && asset.size > 10 * 1024 * 1024)) { Alert.alert('File mẫu không hợp lệ', 'Chọn file Word, Excel hoặc PDF tối đa 10 MB.'); return; }
+      if (!asset || (asset.size && asset.size > 10 * 1024 * 1024)) { showAppAlert({ title: 'File mẫu không hợp lệ', message: 'Chọn file Word, Excel hoặc PDF tối đa 10 MB.', tone: 'danger' }); return; }
       setBusy(true); setError('');
       const blob = await fetch(asset.uri).then((response) => response.blob());
       const filename = asset.name || 'mau-bao-gia';
@@ -473,7 +488,7 @@ export function CatalogPanel({ scope, canManage }: { scope: QuotationScope; canM
       if (sortBy === 'name_desc') exportedProducts = [...exportedProducts].sort((a, b) => b.name.localeCompare(a.name, 'vi'));
       if (sortBy === 'price_asc') exportedProducts = [...exportedProducts].sort((a, b) => a.price - b.price);
       if (sortBy === 'price_desc') exportedProducts = [...exportedProducts].sort((a, b) => b.price - a.price);
-      if (!exportedProducts.length) { Alert.alert('Không có sản phẩm', 'Không có sản phẩm phù hợp với bộ lọc hiện tại.'); return; }
+      if (!exportedProducts.length) { showAppAlert({ title: 'Không có sản phẩm', message: 'Không có sản phẩm phù hợp với bộ lọc hiện tại.', tone: 'info' }); return; }
       const attributeKeys = [...new Set(exportedProducts.flatMap((item) => Object.keys(item.attributes ?? {})))];
       const headers = ['Mã hàng', 'Tên sản phẩm', 'Quy cách / mô tả', 'Đơn vị', 'Đơn giá', 'Tiền tệ', 'Trạng thái', 'Hiệu lực từ', 'Hiệu lực đến', ...attributeKeys.map((key) => `Thuộc tính: ${key}`)];
       const rows: Array<Record<string, string | number>> = exportedProducts.map((item) => ({
@@ -484,8 +499,8 @@ export function CatalogPanel({ scope, canManage }: { scope: QuotationScope; canM
       }));
       const bytes = makeCatalogWorkbook(rows, headers);
       const filename = `bang-gia-${currentDate}${selectionOnly ? '-da-chon' : ''}.xlsx`;
-      await saveAndShareExport(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      Alert.alert('Đã xuất Excel', `${exportedProducts.length} sản phẩm đã được xuất theo bộ lọc hiện tại.`);
+      await saveAndShareExport(bytes, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      showAppAlert({ title: 'Đã xuất Excel', message: `${exportedProducts.length} sản phẩm đã được xuất theo bộ lọc hiện tại.`, tone: 'success' });
     } catch (cause) { setError(messageOf(cause)); }
     finally { setExporting(false); }
   }
@@ -494,7 +509,7 @@ export function CatalogPanel({ scope, canManage }: { scope: QuotationScope; canM
     setError('');
     try {
       const parsedAttributes = Object.fromEntries(draft.attributes.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => { const [key, ...value] = line.split('='); return [key.trim(), value.join('=').trim()]; }).filter(([key, value]) => key && value));
-      const values = { sku: draft.sku.trim(), name: draft.name.trim(), description: draft.description.trim(), unit: draft.unit.trim(), price: Number(draft.price), currency: draft.currency.trim().toUpperCase() || 'VND', active: duplicateSource ? false : draft.active, effectiveFrom: draft.effectiveFrom || undefined, effectiveTo: draft.effectiveTo || undefined, attributes: parsedAttributes };
+      const values = { sku: draft.sku.trim(), name: draft.name.trim(), description: draft.description.trim(), unit: draft.unit.trim(), price: parseVndInput(draft.price), currency: draft.currency.trim().toUpperCase() || 'VND', active: duplicateSource ? false : draft.active, effectiveFrom: draft.effectiveFrom || undefined, effectiveTo: draft.effectiveTo || undefined, attributes: parsedAttributes };
       if (!values.sku || !values.name || !values.unit || !Number.isFinite(values.price) || values.price < 0) throw new Error('Nhập mã, tên, đơn vị và đơn giá hợp lệ.');
       if (duplicateSource) await duplicateCatalogItem(scope, duplicateSource, values);
       else if (editor !== 'new' && editor?._id) await updateCatalogItem(scope, editor, values);
@@ -537,20 +552,35 @@ export function CatalogPanel({ scope, canManage }: { scope: QuotationScope; canM
       const preview = await previewCatalogBulk(scope, action, selected, adjustment);
       const changes = preview.rows.slice(0, 4).map((row) => `${row.sku}: ${money(Number(row.before.price), row.currency)} → ${money(Number(row.after.price), row.currency)}`).join('\n');
       const labels = { activate: 'sẽ được kích hoạt', deactivate: 'sẽ ngừng áp dụng', delete: 'sẽ chuyển vào mục đã xóa', restore: 'sẽ được khôi phục', price: 'sẽ được điều chỉnh giá' };
-      Alert.alert('Xem trước thao tác', `${preview.rows.length} sản phẩm ${labels[action]}.${changes ? `\n\n${changes}${preview.rows.length > 4 ? '\n…' : ''}` : ''}`, [
-        { text: 'Hủy', style: 'cancel', onPress: () => setBulkBusy(false) },
-        { text: 'Áp dụng', style: action === 'delete' ? 'destructive' : 'default', onPress: () => { void applyCatalogBulk(scope, action, selected, preview.previewHash, adjustment).then(async () => { await refresh(); Alert.alert('Đã cập nhật bảng giá', `${selected.length} sản phẩm đã được cập nhật.`); }).catch((cause) => setError(messageOf(cause))).finally(() => setBulkBusy(false)); } },
-      ]);
+      setBulkBusy(false);
+      showHrConfirm({
+        title: 'Xem trước thao tác',
+        message: `${preview.rows.length} sản phẩm ${labels[action]}.${changes ? `\n\n${changes}${preview.rows.length > 4 ? '\n…' : ''}` : ''}`,
+        confirmLabel: 'Áp dụng',
+        destructive: action === 'delete',
+        onConfirm: async () => {
+          setBulkBusy(true);
+          try {
+            await applyCatalogBulk(scope, action, selected, preview.previewHash, adjustment);
+            await refresh();
+            showAppAlert({ title: 'Đã cập nhật bảng giá', message: `${selected.length} sản phẩm đã được cập nhật.`, tone: 'success' });
+          } catch (cause) {
+            setError(messageOf(cause));
+          } finally {
+            setBulkBusy(false);
+          }
+        },
+      });
     } catch (cause) { setError(messageOf(cause)); setBulkBusy(false); }
   }
 
   async function choosePriceList() {
     if (!canManage || importBusy) return;
     try {
-      const picked = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'], copyToCacheDirectory: true });
+      const picked = await withAppLockSuspended(() => DocumentPicker.getDocumentAsync({ type: ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'], copyToCacheDirectory: true }));
       if (picked.canceled) return;
       const asset = picked.assets[0];
-      if (!asset || (asset.size && asset.size > 5 * 1024 * 1024) || !/\.(csv|xlsx|xls)$/i.test(asset?.name ?? '')) { Alert.alert('File bảng giá không hợp lệ', 'Chọn file CSV, XLSX hoặc XLS tối đa 5 MB.'); return; }
+      if (!asset || (asset.size && asset.size > 5 * 1024 * 1024) || !/\.(csv|xlsx|xls)$/i.test(asset?.name ?? '')) { showAppAlert({ title: 'File bảng giá không hợp lệ', message: 'Chọn file CSV, XLSX hoặc XLS tối đa 5 MB.', tone: 'danger' }); return; }
       setImportBusy(true); setError('');
       const blob = await fetch(asset.uri).then((response) => response.blob());
       const result = await previewPriceList(scope, blob, asset.name);
@@ -583,13 +613,13 @@ export function CatalogPanel({ scope, canManage }: { scope: QuotationScope; canM
       const requiredRoles = sheet.roles.filter((role) => role === 'name' || role === 'price');
       const uniqueRoles = sheet.roles.filter((role) => role !== 'attribute' && role !== 'ignore');
       return requiredRoles.filter((role) => role === 'name').length !== 1 || requiredRoles.filter((role) => role === 'price').length !== 1 || new Set(uniqueRoles).size !== uniqueRoles.length || sheet.roles.filter((role) => role === 'attribute').length > 50;
-    })) { Alert.alert('Cần ghép cột bảng giá', 'Chọn ít nhất một sheet, ghép đúng một cột tên và đơn giá; mỗi cột dữ liệu chỉ dùng một lần.'); return; }
+    })) { showAppAlert({ title: 'Cần ghép cột bảng giá', message: 'Chọn ít nhất một sheet, ghép đúng một cột tên và đơn giá; mỗi cột dữ liệu chỉ dùng một lần.', tone: 'info' }); return; }
     setImportBusy(true); setError('');
     try {
       const result = await importPriceList(scope, pendingImport.file, pendingImport.filename, selected.map((sheet) => ({ sheet: sheet.sheet, headerRow: sheet.headerRow, roles: sheet.roles })));
       setPendingImport(null);
       await refresh();
-      Alert.alert('Đã nhập bảng giá', `Thêm ${result.imported.inserted}, cập nhật ${result.imported.updated}${result.imported.skippedRows ? `, bỏ qua ${result.imported.skippedRows} dòng` : ''}.`);
+      showAppAlert({ title: 'Đã nhập bảng giá', message: `Thêm ${result.imported.inserted}, cập nhật ${result.imported.updated}${result.imported.skippedRows ? `, bỏ qua ${result.imported.skippedRows} dòng` : ''}.`, tone: 'success' });
     } catch (cause) { setError(messageOf(cause)); }
     finally { setImportBusy(false); }
   }
@@ -608,13 +638,13 @@ export function CatalogPanel({ scope, canManage }: { scope: QuotationScope; canM
       const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds.includes(id));
       if (allSelected) { setSelectedIds((current) => current.filter((id) => !filteredIds.includes(id))); return; }
       const nextIds = [...selectedIds, ...filteredIds.filter((id) => !selectedIds.includes(id))];
-      if (nextIds.length > 200) { Alert.alert('Giới hạn chọn sản phẩm', 'Có thể chọn tối đa 200 sản phẩm cho mỗi thao tác.'); return; }
+      if (nextIds.length > 200) { showAppAlert({ title: 'Giới hạn chọn sản phẩm', message: 'Có thể chọn tối đa 200 sản phẩm cho mỗi thao tác.', tone: 'info' }); return; }
       setSelectedIds(nextIds);
     }} style={styles.pageSelectButton}><View style={[styles.checkbox, filtered.length > 0 && filtered.every((item) => selectedIds.includes(item._id)) && styles.checkboxActive]}>{filtered.length > 0 && filtered.every((item) => selectedIds.includes(item._id)) && <Check size={12} color={colors.white} />}</View><Text style={styles.secondaryText}>{filtered.length > 0 && filtered.every((item) => selectedIds.includes(item._id)) ? 'Bỏ chọn sản phẩm đã tải' : 'Chọn sản phẩm đã tải'}</Text></Pressable>}
     {!!selectedIds.length && canManage && <View style={styles.bulkActions}><View style={styles.catalogToolbar}><Text style={styles.mutedText}>{selectedIds.length} / 200 sản phẩm đã chọn</Text><Pressable disabled={exporting || !filtered.some((item) => selectedIds.includes(item._id))} onPress={() => { void exportExcel(true); }} style={[styles.secondaryButton, (exporting || !filtered.some((item) => selectedIds.includes(item._id))) && styles.disabled]}><FileSpreadsheet size={13} color={colors.primary} /><Text style={styles.secondaryText}>Xuất đã chọn</Text></Pressable></View><View style={styles.chipWrap}>{status === 'deleted' ? <Pressable disabled={bulkBusy} onPress={() => { void runBulkAction('restore'); }} style={styles.secondaryButton}><RefreshCw size={13} color={colors.primary} /><Text style={styles.secondaryText}>Khôi phục</Text></Pressable> : <><Pressable disabled={bulkBusy} onPress={() => { void runBulkAction('activate'); }} style={styles.secondaryButton}><Check size={13} color={colors.primary} /><Text style={styles.secondaryText}>Kích hoạt</Text></Pressable><Pressable disabled={bulkBusy} onPress={() => { void runBulkAction('deactivate'); }} style={styles.secondaryButton}><X size={13} color={colors.primary} /><Text style={styles.secondaryText}>Ngừng áp dụng</Text></Pressable><Pressable disabled={bulkBusy} onPress={() => setBulkPriceOpen(true)} style={styles.secondaryButton}><CircleDollarSign size={13} color={colors.primary} /><Text style={styles.secondaryText}>Điều chỉnh giá</Text></Pressable><Pressable disabled={bulkBusy} onPress={() => { void runBulkAction('delete'); }} style={[styles.secondaryButton, styles.dangerButton]}><Trash2 size={13} color="#B54745" /><Text style={[styles.secondaryText, styles.dangerText]}>Xóa</Text></Pressable></>}</View></View>}
     {!!error && <ErrorCard error={error} />}
     {loading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : filtered.map((item) => <View key={item._id} style={styles.catalogRow}>
-      {canManage && <Pressable onPress={() => { if (selectedIds.includes(item._id)) setSelectedIds((ids) => ids.filter((id) => id !== item._id)); else if (selectedIds.length >= 200) Alert.alert('Giới hạn chọn sản phẩm', 'Có thể chọn tối đa 200 sản phẩm cho mỗi thao tác.'); else setSelectedIds((ids) => [...ids, item._id]); }} style={[styles.checkbox, selectedIds.includes(item._id) && styles.checkboxActive]}>{selectedIds.includes(item._id) && <Check size={12} color={colors.white} />}</Pressable>}
+      {canManage && <Pressable onPress={() => { if (selectedIds.includes(item._id)) setSelectedIds((ids) => ids.filter((id) => id !== item._id)); else if (selectedIds.length >= 200) showAppAlert({ title: 'Giới hạn chọn sản phẩm', message: 'Có thể chọn tối đa 200 sản phẩm cho mỗi thao tác.', tone: 'info' }); else setSelectedIds((ids) => [...ids, item._id]); }} style={[styles.checkbox, selectedIds.includes(item._id) && styles.checkboxActive]}>{selectedIds.includes(item._id) && <Check size={12} color={colors.white} />}</Pressable>}
       <Pressable onPress={() => { if (canManage && status !== 'deleted') { setDuplicateSource(null); setEditor(item); } }} style={styles.rowCopy}><Text style={styles.rowTitle}>{item.name}</Text><Text style={styles.mutedText}>{item.sku} · {item.unit} · {money(item.price, item.currency)}</Text><Text style={styles.mutedText}>{catalogStatusLabel(item, currentDate)} · Hiệu lực {item.effectiveFrom || 'ngay'} đến {item.effectiveTo || 'không thời hạn'}</Text>{Boolean(Object.keys(item.attributes ?? {}).length) && <Text numberOfLines={2} style={styles.mutedText}>{Object.entries(item.attributes ?? {}).map(([key, value]) => `${key}: ${value}`).join(' · ')}</Text>}</Pressable>
       {canManage && status === 'deleted' && <Pressable onPress={() => { void restore(item); }} style={styles.iconButton}><RefreshCw size={15} color={colors.primary} /></Pressable>}
       {canManage && status !== 'deleted' && <Pressable onPress={() => { void toggleActive(item); }} style={styles.iconButton}><BadgeCheck size={15} color={item.active ? '#16885A' : colors.muted} /></Pressable>}
@@ -694,7 +724,7 @@ function CatalogEditor({ visible, item, duplicate, onClose, onSave }: { visible:
   const [saving, setSaving] = useState(false);
   useEffect(() => {
     const source = item ?? duplicate;
-    setDraft(source ? { sku: duplicate ? `${source.sku}-COPY` : source.sku, name: duplicate ? `${source.name} (bản sao)` : source.name, description: source.description ?? '', unit: source.unit, price: String(source.price), currency: source.currency, active: source.active, effectiveFrom: source.effectiveFrom ?? '', effectiveTo: source.effectiveTo ?? '', attributes: Object.entries(source.attributes ?? {}).map(([key, value]) => `${key}=${value}`).join('\n') } : { sku: '', name: '', description: '', unit: '', price: '', currency: 'VND', active: true, effectiveFrom: '', effectiveTo: '', attributes: '' });
+    setDraft(source ? { sku: duplicate ? `${source.sku}-COPY` : source.sku, name: duplicate ? `${source.name} (bản sao)` : source.name, description: source.description ?? '', unit: source.unit, price: formatVndInput(source.price), currency: source.currency, active: source.active, effectiveFrom: source.effectiveFrom ?? '', effectiveTo: source.effectiveTo ?? '', attributes: Object.entries(source.attributes ?? {}).map(([key, value]) => `${key}=${value}`).join('\n') } : { sku: '', name: '', description: '', unit: '', price: '', currency: 'VND', active: true, effectiveFrom: '', effectiveTo: '', attributes: '' });
   }, [item, duplicate, visible]);
   function update<K extends keyof CatalogDraft>(key: K, value: CatalogDraft[K]) { setDraft((current) => ({ ...current, [key]: value })); }
   async function submit() { setSaving(true); try { await onSave(draft); } finally { setSaving(false); } }
@@ -702,9 +732,9 @@ function CatalogEditor({ visible, item, duplicate, onClose, onSave }: { visible:
     <Field label="Mã SKU *" value={draft.sku} onChangeText={(value) => update('sku', value)} />
     <Field label="Tên sản phẩm *" value={draft.name} onChangeText={(value) => update('name', value)} />
     <Field label="Mô tả" value={draft.description} onChangeText={(value) => update('description', value)} multiline />
-    <View style={styles.twoColumns}><Field label="Đơn vị *" value={draft.unit} onChangeText={(value) => update('unit', value)} /><Field label="Đơn giá *" value={draft.price} onChangeText={(value) => update('price', value)} keyboardType="decimal-pad" /></View>
-    <View style={styles.twoColumns}><Field label="Tiền tệ" value={draft.currency} onChangeText={(value) => update('currency', value)} /><Field label="Hiệu lực từ (YYYY-MM-DD)" value={draft.effectiveFrom} onChangeText={(value) => update('effectiveFrom', value)} /></View>
-    <Field label="Hiệu lực đến (YYYY-MM-DD)" value={draft.effectiveTo} onChangeText={(value) => update('effectiveTo', value)} />
+    <View style={styles.twoColumns}><Field label="Đơn vị *" value={draft.unit} onChangeText={(value) => update('unit', value)} /><Field label="Đơn giá (VND) *" value={draft.price} onChangeText={(value) => update('price', formatVndInput(value))} keyboardType="number-pad" /></View>
+    <View style={styles.twoColumns}><Field label="Tiền tệ" value={draft.currency} onChangeText={(value) => update('currency', value)} /><DateTimeField label="Hiệu lực từ" mode="date" value={draft.effectiveFrom} onChange={(value) => update('effectiveFrom', value)} allowClear /></View>
+    <DateTimeField label="Hiệu lực đến" mode="date" value={draft.effectiveTo} onChange={(value) => update('effectiveTo', value)} allowClear />
     <Field label="Thuộc tính (mỗi dòng: tên=giá trị)" value={draft.attributes} onChangeText={(value) => update('attributes', value)} multiline />
     <View style={styles.modalActions}><Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={saving} onPress={() => { void submit(); }} style={[styles.primaryButton, saving && styles.disabled]}>{saving ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryText}>{saving ? 'Đang lưu...' : 'Lưu sản phẩm'}</Text></Pressable></View>
   </ScrollView></View></View></Modal>;
@@ -792,7 +822,7 @@ export function ContractWorkflowPanel({ scope, view, initialQuote, onInitialQuot
     setBusy(true); setError('');
     try {
       const contract = await createContract(scope, { ...form, quoteId: quote._id, templateId: templateId || undefined, depositAmount: Number(form.depositAmount || 0) });
-      try { await queueContractFile(scope, contract._id); } catch (cause) { Alert.alert('Đã lưu hợp đồng', `Hợp đồng đã được lưu; chưa xếp được file: ${messageOf(cause)}`); }
+      try { await queueContractFile(scope, contract._id); } catch (cause) { showAppAlert({ title: 'Đã lưu hợp đồng', message: `Hợp đồng đã được lưu; chưa xếp được file: ${messageOf(cause)}`, tone: 'info' }); }
       setCreating(false); await refresh(); setSelected(await getContract(scope, contract._id));
     } catch (cause) { setError(messageOf(cause)); }
     finally { setBusy(false); }
@@ -800,23 +830,40 @@ export function ContractWorkflowPanel({ scope, view, initialQuote, onInitialQuot
 
   async function saveContractDraft(form: ContractForm, contract: QuotationContract) {
     setBusy(true); setError('');
-    try { const updated = await updateContract(scope, contract, contractPayload(form)); setSelected(updated); setContracts((items) => items.map((item) => item._id === updated._id ? updated : item)); Alert.alert('Đã lưu hợp đồng', 'Bản nháp đã được cập nhật.'); }
+    try { const updated = await updateContract(scope, contract, contractPayload(form)); setSelected(updated); setContracts((items) => items.map((item) => item._id === updated._id ? updated : item)); showAppAlert({ title: 'Đã lưu hợp đồng', message: 'Bản nháp đã được cập nhật.', tone: 'success' }); }
     catch (cause) { setError(messageOf(cause)); }
     finally { setBusy(false); }
   }
 
   async function signDraft(form: ContractForm, contract: QuotationContract) {
-    Alert.alert('Xác nhận hợp đồng đã ký?', `${contract.contractNumber} sẽ được khóa nội dung.`, [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Xác nhận đã ký', onPress: () => { setBusy(true); setError(''); void updateContract(scope, contract, contractPayload(form)).then((saved) => signContract(scope, saved, form.signedDate || today())).then(async (updated) => { try { await queueContractFile(scope, updated._id); } catch {} await refresh(); setSelected(updated); }).catch((cause) => setError(messageOf(cause))).finally(() => setBusy(false)); } },
-    ]);
+    showHrConfirm({
+      title: 'Xác nhận hợp đồng đã ký?',
+      message: `${contract.contractNumber} sẽ được khóa nội dung.`,
+      confirmLabel: 'Xác nhận đã ký',
+      destructive: false,
+      tone: 'success',
+      onConfirm: async () => {
+        setBusy(true); setError('');
+        try {
+          const saved = await updateContract(scope, contract, contractPayload(form));
+          const updated = await signContract(scope, saved, form.signedDate || today());
+          try { await queueContractFile(scope, updated._id); } catch {}
+          await refresh();
+          setSelected(updated);
+        } catch (cause) {
+          setError(messageOf(cause));
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
   }
 
   async function saveAcceptance(form: AcceptanceForm, contract: QuotationContract, templateId: string) {
     setBusy(true); setError('');
     try {
       const record = await createAcceptanceRecord(scope, { ...form, contractId: contract._id, templateId: templateId || undefined, settlementAmount: Number(form.settlementAmount), amountPaid: Number(form.amountPaid), paymentDueDays: form.paymentDueDays ? Number(form.paymentDueDays) : null, lines: form.lines.map((line) => ({ ...line, acceptedQuantity: Number(line.acceptedQuantity) })) });
-      try { await queueAcceptanceFile(scope, record._id); } catch (cause) { Alert.alert('Đã lưu nghiệm thu', `Biên bản đã được lưu; chưa xếp được file: ${messageOf(cause)}`); }
+      try { await queueAcceptanceFile(scope, record._id); } catch (cause) { showAppAlert({ title: 'Đã lưu nghiệm thu', message: `Biên bản đã được lưu; chưa xếp được file: ${messageOf(cause)}`, tone: 'info' }); }
       setRecordFormOpen(false); setSelected(null); setAcceptanceContractToCreate(null); await refresh(); await openAcceptanceRecord(record._id);
     } catch (cause) { setError(messageOf(cause)); }
     finally { setBusy(false); }
@@ -827,29 +874,46 @@ export function ContractWorkflowPanel({ scope, view, initialQuote, onInitialQuot
     try {
       const updated = await updateAcceptanceRecord(scope, record, acceptancePayload(form));
       setSelectedRecord(updated); setRecords((items) => items.map((item) => item._id === updated._id ? updated : item));
-      Alert.alert('Đã lưu nghiệm thu', 'Bản nháp đã được cập nhật.');
+      showAppAlert({ title: 'Đã lưu nghiệm thu', message: 'Bản nháp đã được cập nhật.', tone: 'success' });
     } catch (cause) { setError(messageOf(cause)); }
     finally { setBusy(false); }
   }
 
   async function completeAcceptance(form: AcceptanceForm, record: AcceptanceRecord) {
-    Alert.alert('Hoàn tất nghiệm thu?', `${record.acceptanceNumber} sẽ được khóa để đối chiếu.`, [
-      { text: 'Hủy', style: 'cancel' },
-      { text: 'Hoàn tất', onPress: () => {
+    showHrConfirm({
+      title: 'Hoàn tất nghiệm thu?',
+      message: `${record.acceptanceNumber} sẽ được khóa để đối chiếu.`,
+      confirmLabel: 'Hoàn tất',
+      destructive: false,
+      tone: 'success',
+      onConfirm: async () => {
         setBusy(true); setError('');
-        void updateAcceptanceRecord(scope, record, acceptancePayload(form)).then((saved) => completeAcceptanceRecord(scope, saved)).then(async (completed) => {
-          setSelectedRecord(completed); setRecords((items) => items.map((item) => item._id === completed._id ? completed : item));
+        try {
+          const saved = await updateAcceptanceRecord(scope, record, acceptancePayload(form));
+          const completed = await completeAcceptanceRecord(scope, saved);
+          setSelectedRecord(completed);
+          setRecords((items) => items.map((item) => item._id === completed._id ? completed : item));
           try { await queueAcceptanceFile(scope, completed._id); } catch {}
-        }).catch((cause) => setError(messageOf(cause))).finally(() => setBusy(false));
-      } },
-    ]);
+        } catch (cause) {
+          setError(messageOf(cause));
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
   }
 
   const signedContractsWithoutRecord = contracts.filter((contract) => contract.status === 'signed' && !records.some((record) => record.contractId === contract._id));
   const createAcceptanceFor = async (contract: QuotationContract) => {
     if (!canManageAcceptance || !canReadContracts) return;
-    try { const detail = await getContract(scope, contract._id); setAcceptanceContractToCreate(detail); setRecordFormOpen(true); }
-    catch (cause) { setError(messageOf(cause)); }
+    try {
+      const detail = await getContract(scope, contract._id);
+      setSelected(null);
+      setAcceptanceContractToCreate(detail);
+      setRecordFormOpen(true);
+    } catch (cause) {
+      setError(messageOf(cause));
+    }
   };
 
   return <View style={styles.container}><ScrollView contentContainerStyle={styles.pageContent} showsVerticalScrollIndicator={false}>
@@ -898,7 +962,7 @@ function ContractDetailSheet({ scope, contract, canManage, canManageAcceptance, 
   function set(key: string, value: string) { setForm((current) => ({ ...current, [key]: value })); }
   const fields: Array<[string, string, boolean?]> = [
     ['projectName', 'Tên công trình / dự án *'], ['projectAddress', 'Địa điểm thực hiện *'], ['signingPlace', 'Địa điểm ký *'],
-    ['signedDate', 'Ngày ký dự kiến (YYYY-MM-DD) *'], ['scope', 'Phạm vi công việc *', true], ['deliverables', 'Hồ sơ / sản phẩm bàn giao *', true],
+    ['signedDate', 'Ngày ký dự kiến *'], ['scope', 'Phạm vi công việc *', true], ['deliverables', 'Hồ sơ / sản phẩm bàn giao *', true],
     ['depositAmount', 'Tiền đặt cọc / tạm ứng'], ['bankDetails', 'Thông tin tài khoản'], ['paymentTerms', 'Điều khoản thanh toán *', true],
     ['deliveryTerms', 'Tiến độ và bàn giao *', true], ['otherTerms', 'Điều khoản bổ sung', true],
   ];
@@ -908,7 +972,7 @@ function ContractDetailSheet({ scope, contract, canManage, canManageAcceptance, 
     {[['Khách hàng', contract.customerName], ['Địa chỉ khách hàng', contract.customerAddress], ['Người đại diện', contract.customerRepresentative], ['Email / điện thoại', [contract.customerEmail, contract.customerPhone].filter(Boolean).join(' · ')], ['Đơn vị thực hiện', contract.companyName], ['Đại diện bên thực hiện', contract.companyRepresentative], ['Địa chỉ đơn vị', contract.companyAddress], ['MST đơn vị', contract.companyTaxId]].map(([label, value]) => <InfoRow key={label} label={label} value={value} />)}
     <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Hạng mục hợp đồng ({contract.lines.length})</Text></View>
     {contract.lines.map((line, index) => <View key={`${line.catalogItemId}-${index}`} style={styles.budgetLine}><View style={styles.budgetLineCopy}><Text style={styles.rowTitle}>{line.name}</Text><Text style={styles.mutedText}>{line.quantity} {line.unit} · {money(line.unitPrice, line.currency)}</Text></View><Text style={styles.lineTotal}>{money(line.lineTotal, line.currency)}</Text></View>)}
-    <View style={styles.subSection}><Text style={styles.sectionTitle}>Điều khoản</Text>{fields.map(([key, label, multiline]) => editable ? <Field key={key} label={label} value={form[key] ?? ''} onChangeText={(value) => set(key, value)} multiline={multiline} keyboardType={key === 'depositAmount' ? 'decimal-pad' : undefined} /> : <InfoRow key={key} label={label.replace(' *', '')} value={key === 'depositAmount' ? money(contract.depositAmount ?? 0, contract.currency) : form[key] ?? ''} />)}</View>
+    <View style={styles.subSection}><Text style={styles.sectionTitle}>Điều khoản</Text>{fields.map(([key, label, multiline]) => editable ? (key === 'signedDate' ? <DateTimeField key={key} label={label} mode="date" value={form[key] ?? ''} onChange={(value) => set(key, value)} /> : <Field key={key} label={label} value={form[key] ?? ''} onChangeText={(value) => set(key, value)} multiline={multiline} keyboardType={key === 'depositAmount' ? 'decimal-pad' : undefined} />) : <InfoRow key={key} label={label.replace(' *', '')} value={key === 'depositAmount' ? money(contract.depositAmount ?? 0, contract.currency) : key === 'signedDate' ? date(form[key]) : form[key] ?? ''} />)}</View>
     {!!contract.template && <InfoRow label="Mẫu sử dụng" value={contract.template.name || contract.template.originalFilename} />}
     {!!error && <ErrorCard error={error} />}
     {canUseAi && <GeneratedFileActions scope={scope} sourceId={contract._id} kind="contract" updatedAt={contract.updatedAt} label="File hợp đồng" canGenerate onGenerate={() => queueContractFile(scope, contract._id)} />}
@@ -942,8 +1006,8 @@ function AcceptanceDetailSheet({ scope, record, contract, canManage, canUseAi, b
   return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.detailSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>{record.acceptanceNumber}</Text><Text style={styles.sheetSubtitle}>Hợp đồng {contract.contractNumber} · {contract.customerName}</Text></View><Pressable onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
     <View style={styles.budgetTotals}><View><Text style={styles.metaLabel}>Giá trị quyết toán</Text><Text style={styles.metric}>{money(record.settlementAmount, contract.currency)}</Text></View><View><Text style={styles.metaLabel}>Còn phải thu</Text><Text style={styles.metric}>{money(Math.max(0, record.settlementAmount - record.amountPaid), contract.currency)}</Text></View><StatusPill label={record.status === 'completed' ? 'Hoàn tất' : 'Bản nháp'} complete={record.status === 'completed'} /></View>
     {editable ? <>
-      <View style={styles.twoColumns}><Field label="Ngày nghiệm thu (YYYY-MM-DD) *" value={form.acceptedDate} onChangeText={(value) => set('acceptedDate', value)} /><Field label="Địa điểm nghiệm thu *" value={form.location} onChangeText={(value) => set('location', value)} /></View>
-      <View style={styles.twoColumns}><Field label="Giờ bắt đầu *" value={form.startTime} onChangeText={(value) => set('startTime', value)} /><Field label="Giờ kết thúc *" value={form.endTime} onChangeText={(value) => set('endTime', value)} /></View>
+      <View style={styles.twoColumns}><DateTimeField label="Ngày nghiệm thu *" mode="date" value={form.acceptedDate} onChange={(value) => set('acceptedDate', value)} /><Field label="Địa điểm nghiệm thu *" value={form.location} onChangeText={(value) => set('location', value)} /></View>
+      <View style={styles.twoColumns}><DateTimeField label="Giờ bắt đầu *" mode="time" value={form.startTime} onChange={(value) => set('startTime', value)} /><DateTimeField label="Giờ kết thúc *" mode="time" value={form.endTime} onChange={(value) => set('endTime', value)} /></View>
       <Field label="Kết quả nghiệm thu *" value={form.result} onChangeText={(value) => set('result', value)} multiline />
       <Field label="Hồ sơ / sản phẩm bàn giao *" value={form.handoverDetails} onChangeText={(value) => set('handoverDetails', value)} multiline />
       <Field label="Đánh giá chất lượng *" value={form.qualityAssessment} onChangeText={(value) => set('qualityAssessment', value)} multiline />
@@ -960,7 +1024,7 @@ function AcceptanceDetailSheet({ scope, record, contract, canManage, canUseAi, b
     })}</View>
     {!!record.template && <InfoRow label="Mẫu sử dụng" value={record.template.name || record.template.originalFilename} />}
     {!!error && <ErrorCard error={error} />}
-    {canUseAi && <><GeneratedFileActions scope={scope} sourceId={record._id} kind="acceptance" updatedAt={record.updatedAt} label="File biên bản nghiệm thu" canGenerate onGenerate={() => queueAcceptanceFile(scope, record._id)} /><GeneratedFileActions scope={scope} sourceId={record._id} kind="settlement" updatedAt={record.updatedAt} label="File quyết toán" canGenerate onGenerate={() => queueSettlementFile(scope, record._id)} /></>}
+    {canUseAi && <GeneratedFileActions scope={scope} sourceId={record._id} kind="acceptance" updatedAt={record.updatedAt} label="File biên bản nghiệm thu" canGenerate onGenerate={() => queueAcceptanceFile(scope, record._id)} />}
     <View style={styles.actionRow}>{editable && <Pressable disabled={busy} onPress={() => { void onSave(form, record); }} style={[styles.secondaryButton, busy && styles.disabled]}><Check size={14} color={colors.primary} /><Text style={styles.secondaryText}>Lưu bản nháp</Text></Pressable>}</View>
     {editable && <Pressable disabled={busy || !form.lines.some((line) => Number(line.acceptedQuantity) > 0)} onPress={() => onComplete(form, record)} style={[styles.primaryButton, busy && styles.disabled]}><BadgeCheck size={15} color={colors.white} /><Text style={styles.primaryText}>Hoàn tất nghiệm thu</Text></Pressable>}
   </ScrollView></View></View></Modal>;
@@ -979,11 +1043,12 @@ function ContractCreateSheet({ visible, quotes, preselectedQuoteId, templates, c
   }, [visible, quotes, templates, company, preselectedQuoteId]);
   const quote = quotes.find((item) => item._id === quoteId);
   function set(key: string, value: string) { setForm((current) => ({ ...current, [key]: value })); }
-  const fields: Array<[string, string, boolean?]> = [['customerName', 'Tên khách hàng *', true], ['customerAddress', 'Địa chỉ khách hàng *', true], ['customerRepresentative', 'Người đại diện khách hàng *', true], ['customerTaxId', 'Mã số thuế khách hàng'], ['customerPhone', 'Điện thoại khách hàng'], ['customerEmail', 'Email khách hàng'], ['projectName', 'Tên công trình / dự án *', true], ['projectAddress', 'Địa điểm thực hiện *', true], ['signedDate', 'Ngày ký dự kiến (YYYY-MM-DD) *'], ['signingPlace', 'Địa điểm ký *', true], ['scope', 'Phạm vi công việc *', true], ['deliverables', 'Hồ sơ / sản phẩm bàn giao *', true], ['paymentTerms', 'Điều khoản thanh toán *', true], ['deliveryTerms', 'Tiến độ / điều khoản giao hàng *', true], ['depositAmount', 'Tiền đặt cọc'], ['bankDetails', 'Thông tin tài khoản'], ['otherTerms', 'Điều khoản bổ sung']];
+  const fields: Array<[string, string, boolean?]> = [['customerName', 'Tên khách hàng *', true], ['customerAddress', 'Địa chỉ khách hàng *', true], ['customerRepresentative', 'Người đại diện khách hàng *', true], ['customerTaxId', 'Mã số thuế khách hàng'], ['customerPhone', 'Điện thoại khách hàng'], ['customerEmail', 'Email khách hàng'], ['projectName', 'Tên công trình / dự án *', true], ['projectAddress', 'Địa điểm thực hiện *', true], ['signedDate', 'Ngày ký dự kiến *'], ['signingPlace', 'Địa điểm ký *', true], ['scope', 'Phạm vi công việc *', true], ['deliverables', 'Hồ sơ / sản phẩm bàn giao *', true], ['paymentTerms', 'Điều khoản thanh toán *', true], ['deliveryTerms', 'Tiến độ / điều khoản giao hàng *', true], ['depositAmount', 'Tiền đặt cọc'], ['bankDetails', 'Thông tin tài khoản'], ['otherTerms', 'Điều khoản bổ sung']];
+  if (!visible) return null;
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.editorSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Tạo hợp đồng từ dự toán</Text><Pressable onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
     <Text style={styles.fieldLabel}>Dự toán đã duyệt</Text>{quotes.map((item) => <Pressable key={item._id} onPress={() => { setQuoteId(item._id); setForm((current) => ({ ...current, customerName: item.customerName, customerEmail: item.customerEmail, customerPhone: item.customerPhone ?? '' })); }} style={[styles.choiceRow, quoteId === item._id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.quoteNumber} · {item.customerName} · {money(item.total, item.currency)}</Text>{quoteId === item._id && <Check size={14} color={colors.primary} />}</Pressable>)}
-    <Text style={styles.fieldLabel}>Mẫu hợp đồng</Text>{templates.map((item) => <Pressable key={item.id} onPress={() => setTemplateId(item.id)} style={[styles.choiceRow, templateId === item.id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.name || item.originalFilename} · {item.extension.toUpperCase()}</Text>{templateId === item.id && <Check size={14} color={colors.primary} />}</Pressable>)}
-    {fields.map(([key, label, multiline]) => <Field key={key} label={label} value={form[key] ?? ''} onChangeText={(value) => set(key, value)} multiline={multiline} keyboardType={key === 'depositAmount' ? 'decimal-pad' : undefined} />)}
+    <Text style={styles.fieldLabel}>Mẫu hợp đồng</Text>{(templates ?? []).map((item, idx) => <Pressable key={`${item.id || item.originalFilename || 'tpl'}-${idx}`} onPress={() => setTemplateId(item.id)} style={[styles.choiceRow, templateId === item.id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.name || item.originalFilename} · {(item.extension ?? '').toUpperCase()}</Text>{templateId === item.id && <Check size={14} color={colors.primary} />}</Pressable>)}
+    {fields.map(([key, label, multiline]) => key === 'signedDate' ? <DateTimeField key={key} label={label} mode="date" value={form[key] ?? ''} onChange={(value) => set(key, value)} /> : <Field key={key} label={label} value={form[key] ?? ''} onChangeText={(value) => set(key, value)} multiline={multiline} keyboardType={key === 'depositAmount' ? 'decimal-pad' : undefined} />)}
     {!!error && <ErrorCard error={error} />}
     <View style={styles.modalActions}><Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={busy || !quote} onPress={() => { if (quote) void onSave(form, quote, templateId); }} style={[styles.primaryButton, busy && styles.disabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryText}>Tạo hợp đồng</Text></Pressable></View>
   </ScrollView></View></View></Modal>;
@@ -994,19 +1059,43 @@ function AcceptanceCreateSheet({ visible, contracts, selectedContract, templates
   const [contractId, setContractId] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [form, setForm] = useState<AcceptanceForm>({ acceptedDate: today(), startTime: '09:00', endTime: '17:00', location: '', result: '', handoverDetails: '', qualityAssessment: '', settlementAmount: '0', amountPaid: '0', paymentDueDays: '', notes: '', lines: [] });
+  const safeContracts = contracts ?? [];
+  const seenTemplateIds = new Set<string>();
+  const safeTemplates = (templates ?? []).filter((item) => {
+    const ext = (item?.extension ?? '').toLowerCase();
+    if (ext !== 'docx' && ext !== 'xlsx') return false;
+    const key = item.id || item.originalFilename;
+    if (key && seenTemplateIds.has(key)) return false;
+    if (key) seenTemplateIds.add(key);
+    return true;
+  });
   useEffect(() => {
-    const contract = selectedContract || contracts.find((item) => item._id === contractId) || contracts[0];
-    if (!visible || !contract) return;
-    setContractId(contract._id); setTemplateId(templates.find((item) => item.extension === 'docx' || item.extension === 'xlsx')?.id ?? '');
-    setForm((current) => ({ ...current, acceptedDate: today(), settlementAmount: String(contract.total), amountPaid: String(contract.depositAmount ?? 0), lines: contract.lines.map((_, index) => ({ lineIndex: index, acceptedQuantity: String(contract.lines[index]?.quantity ?? 0), acceptedDetails: '' })) }));
+    const targetContract = selectedContract || safeContracts.find((item) => item._id === contractId) || safeContracts[0];
+    if (!visible || !targetContract) return;
+    const contractLines = targetContract.lines ?? [];
+    setContractId(targetContract._id);
+    setTemplateId(safeTemplates[0]?.id ?? '');
+    setForm((current) => ({
+      ...current,
+      acceptedDate: today(),
+      settlementAmount: String(targetContract.total ?? 0),
+      amountPaid: String(targetContract.depositAmount ?? 0),
+      lines: contractLines.map((line, index) => ({
+        lineIndex: index,
+        acceptedQuantity: String(line?.quantity ?? 0),
+        acceptedDetails: '',
+      })),
+    }));
   }, [visible, selectedContract, contracts, templates]);
-  const contract = selectedContract ?? contracts.find((item) => item._id === contractId) ?? undefined;
+  const contract = selectedContract ?? safeContracts.find((item) => item._id === contractId) ?? undefined;
+  const contractLines = contract?.lines ?? [];
   function set(key: keyof Omit<AcceptanceForm, 'lines'>, value: string) { setForm((current) => ({ ...current, [key]: value })); }
+  if (!visible) return null;
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.editorSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Tạo biên bản nghiệm thu</Text><Pressable onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
-    <Text style={styles.fieldLabel}>Hợp đồng đã ký</Text>{contracts.map((item) => <Pressable key={item._id} onPress={() => { setContractId(item._id); setForm((current) => ({ ...current, settlementAmount: String(item.total), amountPaid: String(item.depositAmount ?? 0), lines: item.lines.map((_, index) => ({ lineIndex: index, acceptedQuantity: String(item.lines[index]?.quantity ?? 0), acceptedDetails: '' })) })); }} style={[styles.choiceRow, contractId === item._id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.contractNumber} · {item.customerName}</Text>{contractId === item._id && <Check size={14} color={colors.primary} />}</Pressable>)}
-    <Text style={styles.fieldLabel}>Mẫu nghiệm thu / quyết toán</Text>{templates.filter((item) => item.extension === 'docx' || item.extension === 'xlsx').map((item) => <Pressable key={item.id} onPress={() => setTemplateId(item.id)} style={[styles.choiceRow, templateId === item.id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.name || item.originalFilename}</Text>{templateId === item.id && <Check size={14} color={colors.primary} />}</Pressable>)}
-    <Field label="Ngày nghiệm thu (YYYY-MM-DD) *" value={form.acceptedDate} onChangeText={(value) => set('acceptedDate', value)} />
-    <View style={styles.twoColumns}><Field label="Bắt đầu (HH:mm) *" value={form.startTime} onChangeText={(value) => set('startTime', value)} /><Field label="Kết thúc (HH:mm) *" value={form.endTime} onChangeText={(value) => set('endTime', value)} /></View>
+    <Text style={styles.fieldLabel}>Hợp đồng đã ký</Text>{safeContracts.map((item) => <Pressable key={item._id} onPress={() => { const itemLines = item.lines ?? []; setContractId(item._id); setForm((current) => ({ ...current, settlementAmount: String(item.total ?? 0), amountPaid: String(item.depositAmount ?? 0), lines: itemLines.map((line, index) => ({ lineIndex: index, acceptedQuantity: String(line?.quantity ?? 0), acceptedDetails: '' })) })); }} style={[styles.choiceRow, contractId === item._id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.contractNumber} · {item.customerName}</Text>{contractId === item._id && <Check size={14} color={colors.primary} />}</Pressable>)}
+    <Text style={styles.fieldLabel}>Mẫu nghiệm thu / quyết toán</Text>{safeTemplates.map((item, idx) => <Pressable key={`${item.id || item.originalFilename || 'tpl'}-${idx}`} onPress={() => setTemplateId(item.id)} style={[styles.choiceRow, templateId === item.id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.name || item.originalFilename}</Text>{templateId === item.id && <Check size={14} color={colors.primary} />}</Pressable>)}
+    <DateTimeField label="Ngày nghiệm thu *" mode="date" value={form.acceptedDate} onChange={(value) => set('acceptedDate', value)} />
+    <View style={styles.twoColumns}><DateTimeField label="Giờ bắt đầu *" mode="time" value={form.startTime} onChange={(value) => set('startTime', value)} /><DateTimeField label="Giờ kết thúc *" mode="time" value={form.endTime} onChange={(value) => set('endTime', value)} /></View>
     <Field label="Địa điểm nghiệm thu *" value={form.location} onChangeText={(value) => set('location', value)} />
     <Field label="Kết quả nghiệm thu *" value={form.result} onChangeText={(value) => set('result', value)} multiline />
     <Field label="Hồ sơ bàn giao *" value={form.handoverDetails} onChangeText={(value) => set('handoverDetails', value)} multiline />
@@ -1014,7 +1103,7 @@ function AcceptanceCreateSheet({ visible, contracts, selectedContract, templates
     <View style={styles.twoColumns}><Field label="Giá trị quyết toán" value={form.settlementAmount} onChangeText={(value) => set('settlementAmount', value)} keyboardType="decimal-pad" /><Field label="Đã thanh toán" value={form.amountPaid} onChangeText={(value) => set('amountPaid', value)} keyboardType="decimal-pad" /></View>
     <Field label="Hạn thanh toán (ngày, để trống nếu chưa chốt)" value={form.paymentDueDays} onChangeText={(value) => set('paymentDueDays', value)} keyboardType="number-pad" />
     <Field label="Ghi chú" value={form.notes} onChangeText={(value) => set('notes', value)} multiline />
-    {!!contract && <View style={styles.subSection}><Text style={styles.sectionTitle}>Khối lượng nghiệm thu</Text>{contract.lines.map((line, index) => <View key={`${line.catalogItemId}-${index}`} style={styles.acceptanceLine}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{line.name}</Text><Text style={styles.mutedText}>Theo hợp đồng: {line.quantity} {line.unit}</Text></View><TextInput value={form.lines[index]?.acceptedQuantity ?? '0'} onChangeText={(value) => setForm((current) => ({ ...current, lines: current.lines.map((entry) => entry.lineIndex === index ? { ...entry, acceptedQuantity: value } : entry) }))} style={styles.quantityInput} keyboardType="decimal-pad" /></View>)}</View>}
+    {!!contract && <View style={styles.subSection}><Text style={styles.sectionTitle}>Khối lượng nghiệm thu</Text>{contractLines.map((line, index) => <View key={`${line.catalogItemId || 'line'}-${index}`} style={styles.acceptanceLine}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{line.name}</Text><Text style={styles.mutedText}>Theo hợp đồng: {line.quantity} {line.unit}</Text></View><TextInput value={form.lines[index]?.acceptedQuantity ?? '0'} onChangeText={(value) => setForm((current) => ({ ...current, lines: current.lines.map((entry) => entry.lineIndex === index ? { ...entry, acceptedQuantity: value } : entry) }))} style={styles.quantityInput} keyboardType="decimal-pad" /></View>)}</View>}
     {!!error && <ErrorCard error={error} />}
     <View style={styles.modalActions}><Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={busy || !contract} onPress={() => { if (contract) void onSave(form, contract, templateId); }} style={[styles.primaryButton, busy && styles.disabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryText}>Lưu nghiệm thu</Text></Pressable></View>
   </ScrollView></View></View></Modal>;
@@ -1027,17 +1116,17 @@ function Field({ label, value, onChangeText, multiline, keyboardType }: { label:
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) { return <View style={styles.infoRow}><Text style={styles.metaLabel}>{label}</Text><Text style={styles.infoValue}>{value || 'Chưa cập nhật'}</Text></View>; }
-function ErrorCard({ error }: { error: string }) { return <Card style={styles.errorCard}><CircleAlert size={16} color="#B54745" /><Text style={styles.errorText}>{error}</Text></Card>; }
+function ErrorCard({ error }: { error: string }) { return <PopupError error={error} />; }
 
 const styles = StyleSheet.create({
   container: { flex: 1 }, pageContent: { padding: 16, paddingBottom: 30 },
   panelTopAction: { alignItems: 'flex-end', marginBottom: 8 }, headerAction: { flexDirection: 'row', gap: 5, alignItems: 'center', paddingHorizontal: 10, paddingVertical: 9, borderRadius: 11, backgroundColor: colors.primary }, headerActionText: { color: colors.white, fontSize: 9, fontWeight: '800' },
-  formCard: { padding: 13, marginBottom: 13 }, sectionTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' }, input: { minHeight: 41, color: colors.ink, fontSize: 10, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white }, multiline: { minHeight: 70, textAlignVertical: 'top' }, field: { flex: 1, marginBottom: 9 }, fieldLabel: { color: colors.ink, fontSize: 9, fontWeight: '700', marginBottom: 5 }, multilineSpacer: { height: 1 }, twoColumns: { flexDirection: 'row', gap: 8 }, primaryButton: { minHeight: 39, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12, marginTop: 10, borderRadius: 10, backgroundColor: colors.primary }, primaryText: { color: colors.white, fontSize: 9, fontWeight: '800' }, secondaryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: '#EEF4FF' }, secondaryText: { color: colors.primary, fontSize: 9, fontWeight: '800' }, cancelButton: { justifyContent: 'center', paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#E9EDF4' }, cancelText: { color: colors.ink, fontSize: 9, fontWeight: '800' }, disabled: { opacity: 0.5 },
+  formCard: { padding: 13, marginBottom: 13 }, sectionTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' }, input: { minHeight: 41, color: colors.ink, fontSize: 10, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white }, multiline: { minHeight: 70, textAlignVertical: 'top' }, field: { flex: 1, marginBottom: 9 }, fieldLabel: { color: colors.ink, fontSize: 9, fontWeight: '700', marginBottom: 5 }, multilineSpacer: { height: 1 }, twoColumns: { flexDirection: 'row', gap: 8 }, primaryButton: { minHeight: 39, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12, marginTop: 10, borderRadius: 10, backgroundColor: colors.primary }, primaryText: { color: colors.white, fontSize: 9, fontWeight: '800' }, secondaryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: '#EEF4FF' }, secondaryText: { color: colors.primary, fontSize: 9, fontWeight: '800' }, cancelButton: { minHeight: 39, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, marginTop: 10, borderRadius: 10, backgroundColor: '#E9EDF4' }, cancelText: { color: colors.ink, fontSize: 9, fontWeight: '800' }, disabled: { opacity: 0.5 },
   errorCard: { flexDirection: 'row', alignItems: 'center', gap: 7, padding: 10, marginVertical: 8, borderColor: '#F2D3D1' }, errorText: { flex: 1, color: '#A33D3A', fontSize: 9, lineHeight: 14 }, warningCard: { padding: 10, marginTop: 9, borderColor: '#F1D99B', backgroundColor: '#FFFCF2' }, warningHeading: { flexDirection: 'row', alignItems: 'center', gap: 6 }, warningTitle: { color: '#805600', fontSize: 10, fontWeight: '800', marginBottom: 5 }, dangerText: { color: '#B54745' }, successText: { color: '#16885A' }, mutedText: { color: colors.muted, fontSize: 9, lineHeight: 14, marginTop: 3 }, metaLabel: { color: colors.muted, fontSize: 8 }, metric: { color: colors.ink, fontSize: 10, fontWeight: '800', marginTop: 3 }, loader: { paddingVertical: 24 }, empty: { alignItems: 'center', padding: 20 }, emptyText: { color: colors.muted, fontSize: 10, textAlign: 'center', marginTop: 8 },
   detailCard: { padding: 12, marginBottom: 15, borderColor: '#D5E2FA' }, detailTitleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }, detailTitleCopy: { flex: 1 }, budgetTotals: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 11, marginTop: 8, borderBottomWidth: 1, borderTopWidth: 1, borderColor: colors.border }, budgetLine: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, borderBottomWidth: 1, borderColor: '#F0F2F6' }, budgetLineCopy: { flex: 1 }, quantityEditor: { flexDirection: 'row', alignItems: 'center', gap: 4 }, quantityInput: { width: 48, minHeight: 32, textAlign: 'center', color: colors.ink, fontSize: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 8 }, smallButton: { padding: 7 }, lineTotal: { color: colors.ink, fontSize: 9, fontWeight: '800' }, subSection: { marginTop: 13, gap: 7 }, questionCard: { padding: 9, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, borderRadius: 10, gap: 7 }, actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 11 }, planRow: { flexDirection: 'row', alignItems: 'center', padding: 11, marginBottom: 7, borderRadius: 14 }, rowIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEF4FF', borderRadius: 10 }, rowCopy: { flex: 1, marginHorizontal: 8 }, rowTitle: { color: colors.ink, fontSize: 10, fontWeight: '800' }, rowMetric: { color: colors.muted, fontSize: 8, marginRight: 5 }, sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 8 }, sectionHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 7 }, searchBox: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 40, paddingHorizontal: 10, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 10 }, searchInput: { flex: 1, color: colors.ink, fontSize: 10, paddingVertical: 8 },
   chips: { gap: 7, paddingBottom: 10 }, chip: { paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.white }, chipActive: { borderColor: '#C9DAFF', backgroundColor: '#EEF4FF' }, chipText: { color: colors.muted, fontSize: 8, fontWeight: '700' }, chipTextActive: { color: colors.primary }, chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, templateRow: { flexDirection: 'row', alignItems: 'center', padding: 10, marginTop: 7, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, borderRadius: 12 }, defaultBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 5, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 7, backgroundColor: '#E8F7F0' }, defaultBadgeText: { color: '#16885A', fontSize: 8, fontWeight: '700' }, iconButton: { padding: 7 }, moveCard: { padding: 10, marginTop: 8 },
   bulkBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 7 }, bulkActions: { gap: 6, paddingVertical: 7 }, dangerButton: { backgroundColor: '#FFF8F7' }, catalogToolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6 }, pageSelectButton: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 8 }, catalogPagination: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 5, paddingVertical: 10, marginTop: 6, borderTopWidth: 1, borderColor: colors.border }, pageSizeButton: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: '#EEF4FF' }, paginationButtons: { flexDirection: 'row', alignItems: 'center', gap: 4 }, pageNumber: { color: colors.ink, fontSize: 9, fontWeight: '700' }, catalogRow: { flexDirection: 'row', alignItems: 'center', gap: 7, padding: 9, marginTop: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white }, checkbox: { width: 19, height: 19, borderWidth: 1, borderColor: '#BBC5D3', borderRadius: 6, alignItems: 'center', justifyContent: 'center' }, checkboxActive: { borderColor: colors.primary, backgroundColor: colors.primary }, fileRow: { flexDirection: 'row', gap: 7, alignItems: 'center', padding: 10, marginTop: 6 },
   workflowCard: { padding: 12, marginBottom: 8 }, workflowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, workflowMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderColor: colors.border }, statusPill: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: '#EEF1F6' }, statusPillComplete: { backgroundColor: '#E8F7F0' }, statusPillText: { color: '#52627A', fontSize: 8, fontWeight: '800' }, statusPillTextComplete: { color: '#16885A' }, alignStart: { alignSelf: 'flex-start', marginTop: 9 }, choiceList: { gap: 3, marginTop: 3 }, choiceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 7, padding: 9, marginTop: 5, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white }, choiceSelected: { borderColor: '#AFC7F6', backgroundColor: '#F5F8FF' }, lineDetailInput: { minHeight: 35, marginTop: 6, fontSize: 9 },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(12,24,45,0.38)' }, editorSheet: { maxHeight: '94%', minHeight: '62%', backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 15, paddingBottom: 20 }, detailSheet: { maxHeight: '90%', minHeight: '55%', backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 15, paddingBottom: 18 }, importSheet: { maxHeight: '96%', minHeight: '74%', backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 15, paddingBottom: 20 }, importSheetCard: { padding: 10, marginTop: 10 }, mappingColumn: { paddingTop: 8, marginTop: 8, borderTopWidth: 1, borderColor: colors.border }, roleOptions: { gap: 5, paddingVertical: 6 }, sheetHandle: { width: 38, height: 4, borderRadius: 3, alignSelf: 'center', marginVertical: 10, backgroundColor: '#CBD3DF' }, sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 11, borderBottomWidth: 1, borderColor: colors.border }, sheetTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' }, sheetSubtitle: { color: colors.muted, fontSize: 9, marginTop: 3 }, formContent: { paddingTop: 10, paddingBottom: 20 }, modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingTop: 9 }, infoRow: { flexDirection: 'row', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderColor: '#EDF0F5' }, infoValue: { flex: 1, color: colors.ink, fontSize: 9, textAlign: 'right' }, acceptanceLine: { flexDirection: 'row', alignItems: 'center', padding: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10 },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(12,24,45,0.38)' }, editorSheet: { maxHeight: '94%', minHeight: '62%', backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 15, paddingBottom: 20 }, detailSheet: { maxHeight: '90%', minHeight: '55%', backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 15, paddingBottom: 18 }, importSheet: { maxHeight: '96%', minHeight: '74%', backgroundColor: colors.background, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 15, paddingBottom: 20 }, importSheetCard: { padding: 10, marginTop: 10 }, mappingColumn: { paddingTop: 8, marginTop: 8, borderTopWidth: 1, borderColor: colors.border }, roleOptions: { gap: 5, paddingVertical: 6 }, sheetHandle: { width: 38, height: 4, borderRadius: 3, alignSelf: 'center', marginVertical: 10, backgroundColor: '#CBD3DF' }, sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 11, borderBottomWidth: 1, borderColor: colors.border }, sheetTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' }, sheetSubtitle: { color: colors.muted, fontSize: 9, marginTop: 3 }, formContent: { paddingTop: 10, paddingBottom: 20 }, modalActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8, paddingTop: 9 }, infoRow: { flexDirection: 'row', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderColor: '#EDF0F5' }, infoValue: { flex: 1, color: colors.ink, fontSize: 9, textAlign: 'right' }, acceptanceLine: { flexDirection: 'row', alignItems: 'center', padding: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10 },
   generatedFilePanel: { padding: 10, marginTop: 10, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 12, backgroundColor: colors.white, gap: 5 }, exportError: { color: '#A33D3A', fontSize: 9, lineHeight: 14 },
 });

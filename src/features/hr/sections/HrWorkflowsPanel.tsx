@@ -1,3 +1,5 @@
+import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,16 +14,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Check, ChevronLeft, ChevronRight, Paperclip, Plus } from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import { Check, ChevronLeft, ChevronRight, Paperclip, Plus, X } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { useAuth } from '@/core/auth/AuthProvider';
 import {
   createHrWorkflow,
   deleteHrWorkflow,
   listHrWorkflows,
+  uploadHrWorkflowAttachment,
   updateHrWorkflow,
 } from '@/features/hr/hrApi';
-import type { HrWorkflow, HrWorkflowStep } from '@/features/hr/types';
+import type { HrWorkflow, HrWorkflowAttachment, HrWorkflowStep } from '@/features/hr/types';
 import { colors } from '@/theme/colors';
 
 function makeId(prefix: string) {
@@ -35,6 +40,8 @@ export function HrWorkflowsPanel({
   companyCode?: string;
   canManage?: boolean;
 }) {
+  const { user } = useAuth();
+  const creatorUid = user?._id || user?.id || '';
   const [workflows, setWorkflows] = useState<HrWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,6 +63,8 @@ export function HrWorkflowsPanel({
   const [stepNote, setStepNote] = useState('');
   const [stepDeliverable, setStepDeliverable] = useState('');
   const [stepSubTasksText, setStepSubTasksText] = useState('');
+  const [stepAttachments, setStepAttachments] = useState<HrWorkflowAttachment[]>([]);
+  const [uploadingStepAttachments, setUploadingStepAttachments] = useState(false);
   const [savingStep, setSavingStep] = useState(false);
 
   // Create workflow modal
@@ -117,6 +126,7 @@ export function HrWorkflowsPanel({
     setStepNote('');
     setStepDeliverable('');
     setStepSubTasksText('');
+    setStepAttachments([]);
     setStepModalOpen(true);
   }, [selectedWorkflow?.steps?.length]);
 
@@ -128,11 +138,55 @@ export function HrWorkflowsPanel({
     setStepNote(step.note || '');
     setStepDeliverable(step.deliverable || '');
     setStepSubTasksText((step.subTasks ?? []).map((t) => t.title).join('\n'));
+    setStepAttachments(step.attachments ?? []);
     setStepModalOpen(true);
   }, []);
 
+  const pickStepAttachments = useCallback(async () => {
+    try {
+      const result = await withAppLockSuspended(() => DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+      }));
+      if (result.canceled || !result.assets?.length) return;
+
+      setUploadingStepAttachments(true);
+      for (const asset of result.assets) {
+        if (asset.size && asset.size > 25 * 1024 * 1024) {
+          Alert.alert('Tệp quá lớn', `Tệp "${asset.name}" vượt quá giới hạn 25 MB.`);
+          continue;
+        }
+        try {
+          const uploaded = await uploadHrWorkflowAttachment(asset, companyCode);
+          setStepAttachments((current) => [
+            ...current,
+            {
+              id: makeId('att'),
+              name: uploaded.name,
+              url: uploaded.url,
+              type: uploaded.type,
+              size: uploaded.size,
+            },
+          ]);
+        } catch (err) {
+          Alert.alert(
+            'Không tải được tệp',
+            err instanceof Error ? `${asset.name}: ${err.message}` : `Không tải được tệp ${asset.name}.`,
+          );
+        }
+      }
+    } catch (err) {
+      Alert.alert(
+        'Lỗi chọn tệp',
+        err instanceof Error ? err.message : 'Không mở được trình chọn tệp.',
+      );
+    } finally {
+      setUploadingStepAttachments(false);
+    }
+  }, []);
+
   const onSaveStep = useCallback(async () => {
-    if (!selectedWorkflow || savingStep) return;
+    if (!selectedWorkflow || savingStep || uploadingStepAttachments) return;
     if (!stepTitle.trim()) {
       Alert.alert('Thiếu tên bước', 'Vui lòng nhập tên bước thực hiện.');
       return;
@@ -144,7 +198,6 @@ export function HrWorkflowsPanel({
       .map((title) => ({ id: makeId('sub'), title }));
 
     const currentSteps = selectedWorkflow.steps ?? [];
-    const existing = editingStepId ? currentSteps.find((s) => s.id === editingStepId) : undefined;
     const nextStep: HrWorkflowStep = {
       id: editingStepId || makeId('step'),
       title: stepTitle.trim(),
@@ -152,7 +205,7 @@ export function HrWorkflowsPanel({
       note: stepNote.trim(),
       deliverable: stepDeliverable.trim(),
       subTasks,
-      attachments: existing?.attachments ?? [],
+      attachments: stepAttachments,
     };
     const nextSteps = editingStepId
       ? currentSteps.map((s) => (s.id === editingStepId ? nextStep : s))
@@ -176,8 +229,10 @@ export function HrWorkflowsPanel({
     stepDeliverable,
     stepDesc,
     stepNote,
+    stepAttachments,
     stepSubTasksText,
     stepTitle,
+    uploadingStepAttachments,
   ]);
 
   const onDeleteStep = useCallback(
@@ -208,10 +263,15 @@ export function HrWorkflowsPanel({
       if (!wfName.trim()) Alert.alert('Thiếu tên quy trình', 'Hãy nhập tên quy trình.');
       return;
     }
+    if (!creatorUid) {
+      Alert.alert('Lỗi', 'Không xác định được người tạo quy trình.');
+      return;
+    }
     setSavingWf(true);
     try {
       const created = await createHrWorkflow({
         companyCode: companyCode || 'SYSTEM',
+        creatorUid,
         name: wfName.trim(),
         category: wfCategory.trim() || 'Chung',
         description: wfDesc.trim(),
@@ -228,7 +288,7 @@ export function HrWorkflowsPanel({
     } finally {
       setSavingWf(false);
     }
-  }, [companyCode, savingWf, wfCategory, wfDesc, wfName]);
+  }, [companyCode, creatorUid, savingWf, wfCategory, wfDesc, wfName]);
 
   const onDeleteWorkflow = useCallback((wf: HrWorkflow) => {
     showHrConfirm({
@@ -501,13 +561,68 @@ export function HrWorkflowsPanel({
                     style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
                   />
 
+                  <View style={styles.attachmentSection}>
+                    <View style={styles.attachmentHeading}>
+                      <Text style={styles.label}>Tệp đính kèm ({stepAttachments.length})</Text>
+                      <Pressable
+                        onPress={() => void pickStepAttachments()}
+                        disabled={uploadingStepAttachments || savingStep}
+                        style={[
+                          styles.attachmentAddBtn,
+                          (uploadingStepAttachments || savingStep) && styles.disabled,
+                        ]}
+                      >
+                        {uploadingStepAttachments ? (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        ) : (
+                          <Paperclip size={14} color={colors.primary} />
+                        )}
+                        <Text style={styles.attachmentAddText}>
+                          {uploadingStepAttachments ? 'Đang tải...' : 'Thêm tệp'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                    {stepAttachments.length ? (
+                      <View style={{ gap: 6 }}>
+                        {stepAttachments.map((attachment, index) => (
+                          <View key={attachment.id || `${attachment.url}-${index}`} style={styles.attachmentRow}>
+                            <Paperclip size={14} color={colors.primary} />
+                            <Text numberOfLines={1} style={styles.attachmentName}>
+                              {attachment.name || 'Tệp đính kèm'}
+                            </Text>
+                            <Pressable
+                              onPress={() =>
+                                setStepAttachments((current) =>
+                                  current.filter((_, itemIndex) => itemIndex !== index),
+                                )
+                              }
+                              hitSlop={8}
+                              accessibilityLabel={`Gỡ tệp ${attachment.name}`}
+                            >
+                              <X size={16} color={colors.muted} />
+                            </Pressable>
+                          </View>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={styles.muted}>Chưa có tệp đính kèm.</Text>
+                    )}
+                  </View>
+
                   <Pressable
-                    disabled={savingStep}
+                    disabled={savingStep || uploadingStepAttachments}
                     onPress={() => void onSaveStep()}
-                    style={[styles.submitBtn, savingStep && styles.disabled]}
+                    style={[
+                      styles.submitBtn,
+                      (savingStep || uploadingStepAttachments) && styles.disabled,
+                    ]}
                   >
                     <Text style={styles.submitBtnText}>
-                      {savingStep ? 'Đang lưu...' : 'Lưu bước'}
+                      {uploadingStepAttachments
+                        ? 'Đang tải tệp...'
+                        : savingStep
+                          ? 'Đang lưu...'
+                          : 'Lưu bước'}
                     </Text>
                   </Pressable>
                 </View>
@@ -579,7 +694,7 @@ export function HrWorkflowsPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -750,6 +865,12 @@ const styles = StyleSheet.create({
   subTaskText: { color: colors.ink, fontSize: 12, flex: 1 },
   attachBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
   attachBtnText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  attachmentSection: { gap: 8, marginTop: 2, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
+  attachmentHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  attachmentAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 7, backgroundColor: '#EAF2FF' },
+  attachmentAddText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  attachmentRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 9, backgroundColor: colors.background },
+  attachmentName: { flex: 1, color: colors.ink, fontSize: 11 },
   label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
   submitBtn: { backgroundColor: colors.primary, minHeight: 42, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },

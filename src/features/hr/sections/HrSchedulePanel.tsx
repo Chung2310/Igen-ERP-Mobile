@@ -1,8 +1,10 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,6 +14,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import * as Location from 'expo-location';
 import {
   CalendarCheck,
   CalendarDays,
@@ -30,11 +34,18 @@ import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
+  authenticateBiometric,
+  biometricErrorMessage,
+  getBiometricAvailability,
+  isBiometricCancellation,
+} from '@/core/auth/biometricAuth';
+import {
   assignHrWorkShift,
   createHrCalendarEvent,
   createHrWorkCalendarDay,
   deleteHrCalendarEvent,
   deleteHrWorkCalendarDay,
+  getTodayTimekeeping,
   listHrCalendarEvents,
   listAttendanceRoster,
   listHrEmployeeWorkHours,
@@ -43,9 +54,10 @@ import {
   listHrWorkShifts,
   listMonthlyAttendanceLogs,
   saveHrWorkShift,
+  syncHrWorkCalendar,
   submitCheckIn,
   submitCheckOut,
-  syncHrWorkCalendar,
+  type TodayTimekeepingData,
   updateAttendanceLog,
   updateHrEmployeeWorkHours,
   updateHrWorkCalendarDay,
@@ -104,6 +116,10 @@ function shiftDateKey(dateKey: string, delta: number): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+function toDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function formatViDate(dateKey?: string): string {
@@ -238,7 +254,7 @@ function AttendanceAndCalendarSection({
   canEditAttendance: boolean;
   canManageCalendar: boolean;
 }) {
-  const { user } = useAuth();
+  const { user, biometricSettings } = useAuth();
   const [mode, setMode] = useState<'monthly' | 'calendar'>('monthly');
   const today = useMemo(() => getTodayKey(), []);
   const [monthlyLogs, setMonthlyLogs] = useState<HrAttendanceRecord[]>([]);
@@ -251,7 +267,8 @@ function AttendanceAndCalendarSection({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [checking, setChecking] = useState<'in' | 'out' | null>(null);
+  const [todayAttendance, setTodayAttendance] = useState<TodayTimekeepingData | null>(null);
+  const [actionChecking, setActionChecking] = useState<'in' | 'out' | null>(null);
 
   const histYear = monthlyDate.getFullYear();
   const histMonth = monthlyDate.getMonth() + 1; // 1-12
@@ -336,29 +353,81 @@ function AttendanceAndCalendarSection({
     [branchId, companyCode, histMonth, histYear],
   );
 
+  const loadTodayAttendance = useCallback(async () => {
+    if (!branchId) {
+      setTodayAttendance(null);
+      return;
+    }
+    try {
+      const result = await getTodayTimekeeping({
+        uid: user?._id || user?.id,
+        companyCode,
+        branchId,
+      });
+      setTodayAttendance(result);
+    } catch {
+      // Keep the check-in buttons available if today's status cannot be loaded.
+    }
+  }, [branchId, companyCode, user?._id, user?.id]);
+
+  useEffect(() => {
+    void loadTodayAttendance();
+  }, [loadTodayAttendance]);
+
+  const onCheck = useCallback(async (type: 'in' | 'out') => {
+    if (actionChecking) return;
+    if (!branchId) {
+      Alert.alert('Chưa có chi nhánh', 'Chọn chi nhánh trước khi chấm công.');
+      return;
+    }
+
+    setActionChecking(type);
+    try {
+      if (biometricSettings.attendanceEnabled) {
+        const availability = await getBiometricAvailability('attendanceEnabled');
+        if (!availability.available) throw new Error(availability.message || 'Thiết bị chưa sẵn sàng cho xác thực chấm công.');
+        const result = await authenticateBiometric(
+          'attendanceEnabled',
+          type === 'in' ? 'Xác thực khuôn mặt để check-in' : 'Xác thực khuôn mặt để check-out',
+        );
+        if (!result.success) {
+          if (isBiometricCancellation(result)) return;
+          throw new Error(biometricErrorMessage(result.error));
+        }
+      }
+
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Chưa có quyền vị trí', 'Cấp quyền vị trí để ghi nhận địa điểm chấm công.');
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }).catch(() => null);
+      if (!position) {
+        Alert.alert('Không xác định được vị trí', 'Bật định vị và thử chấm công lại.');
+        return;
+      }
+
+      const payload = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        deviceInfo: `ERP-Mobile (${Platform.OS} ${String(Platform.Version)})`,
+      };
+      const response = type === 'in'
+        ? await submitCheckIn(branchId, payload)
+        : await submitCheckOut(branchId, payload);
+      Alert.alert(type === 'in' ? 'Check-in thành công' : 'Check-out thành công', response.message || 'Đã ghi nhận chấm công.');
+      await Promise.all([loadTodayAttendance(), loadMonthly(true)]);
+    } catch (error) {
+      Alert.alert('Chấm công thất bại', error instanceof Error ? error.message : 'Vui lòng thử lại.');
+    } finally {
+      setActionChecking(null);
+    }
+  }, [actionChecking, biometricSettings.attendanceEnabled, branchId, loadMonthly, loadTodayAttendance]);
+
   useEffect(() => {
     if (mode === 'monthly') void loadMonthly();
     else void loadCalendar();
   }, [loadCalendar, loadMonthly, mode]);
-
-  const onCheck = useCallback(
-    async (type: 'in' | 'out') => {
-      setChecking(type);
-      try {
-        const res = type === 'in' ? await submitCheckIn(branchId) : await submitCheckOut(branchId);
-        Alert.alert(
-          type === 'in' ? 'Check-in thành công' : 'Check-out thành công',
-          res?.message || 'Đã ghi nhận chấm công.',
-        );
-        void loadMonthly(true);
-      } catch (err) {
-        Alert.alert('Chấm công thất bại', err instanceof Error ? err.message : 'Vui lòng thử lại.');
-      } finally {
-        setChecking(null);
-      }
-    },
-    [branchId, loadMonthly],
-  );
 
   const onSaveRec = useCallback(async () => {
     if (!editingRec?._id || savingRec) return;
@@ -454,6 +523,8 @@ function AttendanceAndCalendarSection({
 
   const pickedEvents = useMemo(() => eventsForDay(pickedDayKey), [eventsForDay, pickedDayKey]);
   const pickedHoliday = holidayMap.get(pickedDayKey);
+  const hasTodayCheckIn = Boolean(todayAttendance?.log?.checkIn?.time);
+  const hasTodayCheckOut = Boolean(todayAttendance?.log?.checkOut?.time);
 
   const monthlyRows = useMemo(() => {
     type Row = {
@@ -481,7 +552,10 @@ function AttendanceAndCalendarSection({
 
     for (const log of monthlyLogs) {
       const key = log.uid || log.employeeId || log.employeeName || 'unknown';
-      const row = addOrGet(key, log.employeeName || log.displayName || 'Nhân viên');
+      const row = addOrGet(
+        key,
+        log.employeeName || log.displayName || 'Nhân viên',
+      );
       const dateKey = (log.date || '').slice(0, 10);
       if (dateKey) row.byDate.set(dateKey, log);
     }
@@ -553,28 +627,43 @@ function AttendanceAndCalendarSection({
         </Pressable>
       </View>
 
+      <Card style={styles.quickCheckCard}>
+        <View style={styles.quickCheckHeading}>
+          <Text style={styles.sectionTitle}>Chấm công hôm nay</Text>
+          <Text style={styles.subMeta}>
+            {biometricSettings.attendanceEnabled
+              ? Platform.OS === 'ios' ? 'Xác thực bằng Face ID' : 'Xác thực bằng khuôn mặt'
+              : 'Check-in / check-out bằng tài khoản hiện tại'}
+          </Text>
+        </View>
+        <View style={styles.quickCheckButtons}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={actionChecking !== null || hasTodayCheckIn || !branchId}
+            onPress={() => { void onCheck('in'); }}
+            style={[styles.quickCheckButton, styles.quickCheckInButton, (actionChecking !== null || hasTodayCheckIn || !branchId) && styles.quickCheckDisabled]}
+          >
+            {actionChecking === 'in' ? <ActivityIndicator size="small" color={colors.white} /> : <LogIn size={15} color={colors.white} />}
+            <Text numberOfLines={1} style={styles.quickCheckInText}>
+              {actionChecking === 'in' ? 'Đang xử lý…' : hasTodayCheckIn ? 'Đã check-in' : biometricSettings.attendanceEnabled ? Platform.OS === 'ios' ? 'Face ID · Check-in' : 'Khuôn mặt · Check-in' : 'Check-in'}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={actionChecking !== null || !hasTodayCheckIn || hasTodayCheckOut || !branchId}
+            onPress={() => { void onCheck('out'); }}
+            style={[styles.quickCheckButton, styles.quickCheckOutButton, (actionChecking !== null || !hasTodayCheckIn || hasTodayCheckOut || !branchId) && styles.quickCheckDisabled]}
+          >
+            {actionChecking === 'out' ? <ActivityIndicator size="small" color={colors.primary} /> : <LogOut size={15} color={colors.primary} />}
+            <Text numberOfLines={1} style={styles.quickCheckOutText}>
+              {actionChecking === 'out' ? 'Đang xử lý…' : hasTodayCheckOut ? 'Đã check-out' : biometricSettings.attendanceEnabled ? Platform.OS === 'ios' ? 'Face ID · Check-out' : 'Khuôn mặt · Check-out' : 'Check-out'}
+            </Text>
+          </Pressable>
+        </View>
+      </Card>
+
       {mode === 'monthly' ? (
         <>
-          {/* Quick Check-in / Check-out */}
-          <View style={styles.checkRow}>
-            <Pressable
-              disabled={checking !== null}
-              onPress={() => void onCheck('in')}
-              style={[styles.checkBtn, styles.checkInBtn, checking !== null && styles.disabled]}
-            >
-              <LogIn size={15} color={colors.white} />
-              <Text style={styles.checkBtnText}>{checking === 'in' ? 'Đang gửi...' : 'Check-in'}</Text>
-            </Pressable>
-            <Pressable
-              disabled={checking !== null}
-              onPress={() => void onCheck('out')}
-              style={[styles.checkBtn, styles.checkOutBtn, checking !== null && styles.disabled]}
-            >
-              <LogOut size={15} color={colors.white} />
-              <Text style={styles.checkBtnText}>{checking === 'out' ? 'Đang gửi...' : 'Check-out'}</Text>
-            </Pressable>
-          </View>
-
           {/* Month Navigator + Coeff/Hours toggle */}
           <View style={[styles.headRow, { marginBottom: 10 }]}>
             <Card style={[styles.dateBar, { flex: 1, marginBottom: 0 }]}>
@@ -630,7 +719,7 @@ function AttendanceAndCalendarSection({
             </Card>
           ) : error ? (
             <Card style={styles.stateCard}>
-              <Text style={styles.errorText}>{error}</Text>
+              <PopupError error={error} />
               <Pressable onPress={() => void loadMonthly()} style={styles.primaryBtn}>
                 <Text style={styles.primaryBtnText}>Thử lại</Text>
               </Pressable>
@@ -682,51 +771,10 @@ function AttendanceAndCalendarSection({
                 showsHorizontalScrollIndicator
                 style={{ flex: 1 }}
               >
-                <View>
-                  {/* Day Header Row */}
-                  <View style={styles.tableHeaderRow}>
-                    {dayColumns.map((day) => {
-                      const dObj = new Date(histYear, histMonth - 1, day);
-                      const dow = dObj.getDay();
-                      const dateStr = `${histYear}-${String(histMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                      const hol = holidayMap.get(dateStr);
-                      const isWeekend =
-                        hol && hol.isApplied
-                          ? hol.dayType !== 'working_override'
-                          : dow === 0 || dow === 6;
-                      const isToday = dateStr === today;
-                      return (
-                        <View
-                          key={day}
-                          style={[
-                            styles.dayHeaderCell,
-                            isWeekend && styles.dayHeaderWeekend,
-                            isToday && styles.dayHeaderToday,
-                          ]}
-                        >
-                          <Text style={[styles.dayDowText, isToday && { color: colors.primary }]}>
-                            {DOW_SHORT[dow]}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.dayNumText,
-                              isWeekend && { color: '#64748B' },
-                              isToday && { color: colors.primary },
-                            ]}
-                          >
-                            {day}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-
-                  {/* Employee Day Rows */}
-                  {monthlyRows.map((row, rIdx) => (
-                    <View
-                      key={row.key}
-                      style={[styles.tableBodyRow, rIdx % 2 === 1 && styles.tableRowAlt]}
-                    >
+                  {/* Day Columns 1..daysInMonth */}
+                  <View>
+                    {/* Day Header Row */}
+                    <View style={styles.tableHeaderRow}>
                       {dayColumns.map((day) => {
                         const dObj = new Date(histYear, histMonth - 1, day);
                         const dow = dObj.getDay();
@@ -736,81 +784,123 @@ function AttendanceAndCalendarSection({
                           hol && hol.isApplied
                             ? hol.dayType !== 'working_override'
                             : dow === 0 || dow === 6;
-                        const isFuture = dateStr > today;
                         const isToday = dateStr === today;
-                        const log = row.byDate.get(dateStr);
-
-                        if (isWeekend && !log) {
-                          return (
-                            <View key={day} style={[styles.dayCell, styles.dayCellWeekend]}>
-                              <Text style={styles.dayCellDash}>—</Text>
-                            </View>
-                          );
-                        }
-                        if (isFuture && !log) {
-                          return (
-                            <View key={day} style={[styles.dayCell, isToday && styles.dayCellToday]}>
-                              <Text style={styles.dayCellDot}>·</Text>
-                            </View>
-                          );
-                        }
-
-                        const coeff = calcLogCoeff(log);
-                        const isFull = coeff >= 1;
-                        const isAbsent = coeff === 0;
-                        const statusTxt = shortAttendanceStatus(log?.attendanceStatus || log?.status);
-                        const cellColor = isAbsent
-                          ? '#DC2626'
-                          : isFull
-                            ? '#059669'
-                            : '#D97706';
-
                         return (
-                          <Pressable
+                          <View
                             key={day}
-                            disabled={!canEditAttendance && row.key !== (user?._id || user?.id)}
-                            onPress={() => {
-                              if (!log) return;
-                              const ci = formatTime(log.checkIn || log.checkInTime);
-                              const co = formatTime(log.checkOut || log.checkOutTime);
-                              if (canEditAttendance && log._id) {
-                                setEditingRec(log);
-                                setEditIn(ci === '--:--' ? '' : ci);
-                                setEditOut(co === '--:--' ? '' : co);
-                                setEditNote(log.note || '');
-                              } else if (canEditAttendance || row.key === (user?._id || user?.id)) {
-                                Alert.alert(
-                                  `${row.name} · ${formatViDate(dateStr)}`,
-                                  `Giờ vào: ${ci}\nGiờ ra: ${co}\nTrạng thái: ${log.attendanceStatus || log.status || '—'}\nHệ số công: ${coeff}`,
-                                );
-                              }
-                            }}
-                            style={[styles.dayCell, isToday && styles.dayCellToday]}
+                            style={[
+                              styles.dayHeaderCell,
+                              isWeekend && styles.dayHeaderWeekend,
+                              isToday && styles.dayHeaderToday,
+                            ]}
                           >
-                            <Text style={[styles.dayCellVal, { color: cellColor }]}>
-                              {cellMode === 'coeff'
-                                ? coeff === 1
-                                  ? '1'
-                                  : coeff === 0
-                                    ? '0'
-                                    : String(coeff)
-                                : log?.workHours && log.workHours > 0
-                                  ? `${log.workHours}h`
-                                  : isFull
-                                    ? '8h'
-                                    : '0h'}
+                            <Text style={[styles.dayDowText, isToday && { color: colors.primary }]}>
+                              {DOW_SHORT[dow]}
                             </Text>
-                            {statusTxt ? (
-                              <Text numberOfLines={1} style={[styles.dayCellStatus, { color: cellColor }]}>
-                                {statusTxt}
-                              </Text>
-                            ) : null}
-                          </Pressable>
+                            <Text
+                              style={[
+                                styles.dayNumText,
+                                isWeekend && { color: '#64748B' },
+                                isToday && { color: colors.primary },
+                              ]}
+                            >
+                              {day}
+                            </Text>
+                          </View>
                         );
                       })}
                     </View>
-                  ))}
-                </View>
+
+                    {/* Employee Day Rows */}
+                    {monthlyRows.map((row, rIdx) => (
+                      <View
+                        key={row.key}
+                        style={[styles.tableBodyRow, rIdx % 2 === 1 && styles.tableRowAlt]}
+                      >
+                        {dayColumns.map((day) => {
+                          const dObj = new Date(histYear, histMonth - 1, day);
+                          const dow = dObj.getDay();
+                          const dateStr = `${histYear}-${String(histMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                          const hol = holidayMap.get(dateStr);
+                          const isWeekend =
+                            hol && hol.isApplied
+                              ? hol.dayType !== 'working_override'
+                              : dow === 0 || dow === 6;
+                          const isFuture = dateStr > today;
+                          const isToday = dateStr === today;
+                          const log = row.byDate.get(dateStr);
+
+                          if (isWeekend && !log) {
+                            return (
+                              <View key={day} style={[styles.dayCell, styles.dayCellWeekend]}>
+                                <Text style={styles.dayCellDash}>—</Text>
+                              </View>
+                            );
+                          }
+                          if (isFuture && !log) {
+                            return (
+                              <View key={day} style={[styles.dayCell, isToday && styles.dayCellToday]}>
+                                <Text style={styles.dayCellDot}>·</Text>
+                              </View>
+                            );
+                          }
+
+                          const coeff = calcLogCoeff(log);
+                          const isFull = coeff >= 1;
+                          const isAbsent = coeff === 0;
+                          const statusTxt = shortAttendanceStatus(log?.attendanceStatus || log?.status);
+                          const cellColor = isAbsent
+                            ? '#DC2626'
+                            : isFull
+                              ? '#059669'
+                              : '#D97706';
+
+                          return (
+                            <Pressable
+                              key={day}
+                              disabled={!canEditAttendance && row.key !== (user?._id || user?.id)}
+                              onPress={() => {
+                                if (!log) return;
+                                const ci = formatTime(log.checkIn || log.checkInTime);
+                                const co = formatTime(log.checkOut || log.checkOutTime);
+                                if (canEditAttendance && log._id) {
+                                  setEditingRec(log);
+                                  setEditIn(ci === '--:--' ? '' : ci);
+                                  setEditOut(co === '--:--' ? '' : co);
+                                  setEditNote(log.note || '');
+                                } else if (canEditAttendance || row.key === (user?._id || user?.id)) {
+                                  Alert.alert(
+                                    `${row.name} · ${formatViDate(dateStr)}`,
+                                    `Giờ vào: ${ci}\nGiờ ra: ${co}\nTrạng thái: ${log.attendanceStatus || log.status || '—'}\nHệ số công: ${coeff}`,
+                                  );
+                                }
+                              }}
+                              style={[styles.dayCell, isToday && styles.dayCellToday]}
+                            >
+                              <Text style={[styles.dayCellVal, { color: cellColor }]}>
+                                {cellMode === 'coeff'
+                                  ? coeff === 1
+                                    ? '1'
+                                    : coeff === 0
+                                      ? '0'
+                                      : String(coeff)
+                                  : log?.workHours && log.workHours > 0
+                                    ? `${log.workHours}h`
+                                    : isFull
+                                      ? '8h'
+                                      : '0h'}
+                              </Text>
+                              {statusTxt ? (
+                                <Text numberOfLines={1} style={[styles.dayCellStatus, { color: cellColor }]}>
+                                  {statusTxt}
+                                </Text>
+                              ) : null}
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </View>
               </ScrollView>
             </View>
           )}
@@ -1031,6 +1121,7 @@ function AttendanceAndCalendarSection({
           </Pressable>
         </Pressable>
       </Modal>
+
     </ScrollView>
   );
 }
@@ -1052,14 +1143,83 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
   const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [isDefault, setIsDefault] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeTimePicker, setActiveTimePicker] = useState<{
+    target: 'startTime' | 'endTime' | 'lunchStart' | 'lunchEnd';
+    value: Date;
+  } | null>(null);
 
   // Assignment
   const [assignShiftId, setAssignShiftId] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState(() => getTodayKey());
+  const [activeEffectiveDatePicker, setActiveEffectiveDatePicker] = useState<Date | null>(null);
   const [selectedEmpIds, setSelectedEmpIds] = useState<string[]>([]);
   const [assigning, setAssigning] = useState(false);
 
   const shiftMap = useMemo(() => new Map(shifts.map((s) => [s._id, s])), [shifts]);
+
+  const openShiftTimePicker = (target: 'startTime' | 'endTime' | 'lunchStart' | 'lunchEnd') => {
+    const currentValue = { startTime, endTime, lunchStart, lunchEnd }[target];
+    const [hour, minute] = currentValue.split(':').map(Number);
+    const value = new Date();
+    value.setHours(Number.isFinite(hour) ? hour : 8, Number.isFinite(minute) ? minute : 0, 0, 0);
+
+    if (Platform.OS !== 'android') {
+      setActiveTimePicker({ target, value });
+      return;
+    }
+
+    DateTimePickerAndroid.open({
+      value,
+      mode: 'time',
+      display: 'clock',
+      is24Hour: true,
+      onChange: (event, selectedTime) => {
+        if (event.type !== 'set' || !selectedTime) return;
+        const formattedTime = `${String(selectedTime.getHours()).padStart(2, '0')}:${String(selectedTime.getMinutes()).padStart(2, '0')}`;
+        if (target === 'startTime') setStartTime(formattedTime);
+        else if (target === 'endTime') setEndTime(formattedTime);
+        else if (target === 'lunchStart') setLunchStart(formattedTime);
+        else setLunchEnd(formattedTime);
+      },
+    });
+  };
+
+  const savePickedShiftTime = () => {
+    if (!activeTimePicker) return;
+    const { target, value } = activeTimePicker;
+    const formattedTime = `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
+    if (target === 'startTime') setStartTime(formattedTime);
+    else if (target === 'endTime') setEndTime(formattedTime);
+    else if (target === 'lunchStart') setLunchStart(formattedTime);
+    else setLunchEnd(formattedTime);
+    setActiveTimePicker(null);
+  };
+
+  const openEffectiveDatePicker = () => {
+    const [year, month, day] = effectiveFrom.split('-').map(Number);
+    const hasValidDate = /^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom);
+    const value = hasValidDate ? new Date(year, month - 1, day, 12) : new Date();
+
+    if (Platform.OS !== 'android') {
+      setActiveEffectiveDatePicker(value);
+      return;
+    }
+
+    DateTimePickerAndroid.open({
+      value,
+      mode: 'date',
+      display: 'calendar',
+      onChange: (event, selectedDate) => {
+        if (event.type === 'set' && selectedDate) setEffectiveFrom(toDateKey(selectedDate));
+      },
+    });
+  };
+
+  const savePickedEffectiveDate = () => {
+    if (!activeEffectiveDatePicker) return;
+    setEffectiveFrom(toDateKey(activeEffectiveDatePicker));
+    setActiveEffectiveDatePicker(null);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1224,8 +1384,15 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
         </ScrollView>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Hiệu lực từ (YYYY-MM-DD)</Text>
-            <TextInput value={effectiveFrom} onChangeText={setEffectiveFrom} style={styles.field} />
+            <Text style={styles.label}>Hiệu lực từ</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={openEffectiveDatePicker}
+              style={styles.pickerField}
+            >
+              <Text style={styles.pickerFieldText}>{formatViDate(effectiveFrom)}</Text>
+              <CalendarDays size={15} color={colors.primary} />
+            </Pressable>
           </View>
           <Pressable
             disabled={assigning || !selectedEmpIds.length || !assignShiftId}
@@ -1318,22 +1485,50 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Bắt đầu (HH:mm)</Text>
-                    <TextInput value={startTime} onChangeText={setStartTime} style={styles.field} />
+                    <Text style={styles.label}>Bắt đầu</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openShiftTimePicker('startTime')}
+                      style={styles.pickerField}
+                    >
+                      <Text style={styles.pickerFieldText}>{startTime}</Text>
+                      <Clock3 size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Kết thúc (HH:mm)</Text>
-                    <TextInput value={endTime} onChangeText={setEndTime} style={styles.field} />
+                    <Text style={styles.label}>Kết thúc</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openShiftTimePicker('endTime')}
+                      style={styles.pickerField}
+                    >
+                      <Text style={styles.pickerFieldText}>{endTime}</Text>
+                      <Clock3 size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Nghỉ trưa từ</Text>
-                    <TextInput value={lunchStart} onChangeText={setLunchStart} style={styles.field} />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openShiftTimePicker('lunchStart')}
+                      style={styles.pickerField}
+                    >
+                      <Text style={styles.pickerFieldText}>{lunchStart}</Text>
+                      <Clock3 size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Đến</Text>
-                    <TextInput value={lunchEnd} onChangeText={setLunchEnd} style={styles.field} />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openShiftTimePicker('lunchEnd')}
+                      style={styles.pickerField}
+                    >
+                      <Text style={styles.pickerFieldText}>{lunchEnd}</Text>
+                      <Clock3 size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                 </View>
                 <Text style={styles.label}>Ngày làm việc trong tuần</Text>
@@ -1367,6 +1562,78 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {Platform.OS !== 'android' && activeTimePicker ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveTimePicker(null)}
+        >
+          <Pressable style={styles.backdrop} onPress={() => setActiveTimePicker(null)}>
+            <Pressable style={[styles.sheet, styles.timePickerSheet]} onPress={() => {}}>
+              <Text style={styles.sheetTitle}>Chọn giờ</Text>
+              <DateTimePicker
+                value={activeTimePicker.value}
+                mode="time"
+                display="spinner"
+                locale="vi-VN"
+                is24Hour
+                onChange={(_event, selectedTime) => {
+                  if (selectedTime) {
+                    setActiveTimePicker((current) =>
+                      current ? { ...current, value: selectedTime } : current,
+                    );
+                  }
+                }}
+              />
+              <View style={styles.timePickerActions}>
+                <Pressable onPress={() => setActiveTimePicker(null)} style={styles.outlineBtn}>
+                  <Text style={styles.outlineBtnText}>Hủy</Text>
+                </Pressable>
+                <Pressable onPress={savePickedShiftTime} style={styles.primaryBtn}>
+                  <Text style={styles.primaryBtnText}>Xác nhận</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+
+      {Platform.OS !== 'android' && activeEffectiveDatePicker ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveEffectiveDatePicker(null)}
+        >
+          <Pressable style={styles.backdrop} onPress={() => setActiveEffectiveDatePicker(null)}>
+            <Pressable style={[styles.sheet, styles.timePickerSheet]} onPress={() => {}}>
+              <Text style={styles.sheetTitle}>Chọn ngày hiệu lực</Text>
+              <DateTimePicker
+                value={activeEffectiveDatePicker}
+                mode="date"
+                display="spinner"
+                locale="vi-VN"
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) setActiveEffectiveDatePicker(selectedDate);
+                }}
+              />
+              <View style={styles.timePickerActions}>
+                <Pressable
+                  onPress={() => setActiveEffectiveDatePicker(null)}
+                  style={styles.outlineBtn}
+                >
+                  <Text style={styles.outlineBtnText}>Hủy</Text>
+                </Pressable>
+                <Pressable onPress={savePickedEffectiveDate} style={styles.primaryBtn}>
+                  <Text style={styles.primaryBtnText}>Xác nhận</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
     </ScrollView>
   );
 }
@@ -1385,6 +1652,7 @@ function WorkHolidaysSection() {
   const [fDate, setFDate] = useState(`${new Date().getFullYear()}-01-01`);
   const [fName, setFName] = useState('');
   const [fType, setFType] = useState<HrWorkCalendarDayType>('holiday');
+  const [activeHolidayDatePicker, setActiveHolidayDatePicker] = useState<Date | null>(null);
 
   const [disableTarget, setDisableTarget] = useState<HrWorkCalendarDay | null>(null);
   const [disableReason, setDisableReason] = useState('');
@@ -1464,6 +1732,32 @@ function WorkHolidaysSection() {
     } catch (err) {
       Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể lưu ngày.');
     }
+  };
+
+  const openHolidayDatePicker = () => {
+    const [year, month, day] = fDate.split('-').map(Number);
+    const hasValidDate = /^\d{4}-\d{2}-\d{2}$/.test(fDate);
+    const value = hasValidDate ? new Date(year, month - 1, day, 12) : new Date();
+
+    if (Platform.OS !== 'android') {
+      setActiveHolidayDatePicker(value);
+      return;
+    }
+
+    DateTimePickerAndroid.open({
+      value,
+      mode: 'date',
+      display: 'calendar',
+      onChange: (event, selectedDate) => {
+        if (event.type === 'set' && selectedDate) setFDate(toDateKey(selectedDate));
+      },
+    });
+  };
+
+  const savePickedHolidayDate = () => {
+    if (!activeHolidayDatePicker) return;
+    setFDate(toDateKey(activeHolidayDatePicker));
+    setActiveHolidayDatePicker(null);
   };
 
   const onDeleteDay = (day: HrWorkCalendarDay) => {
@@ -1574,8 +1868,15 @@ function WorkHolidaysSection() {
                 <Text style={styles.closeText}>Đóng</Text>
               </Pressable>
             </View>
-            <Text style={styles.label}>Ngày (YYYY-MM-DD) *</Text>
-            <TextInput value={fDate} onChangeText={setFDate} style={styles.field} />
+            <Text style={styles.label}>Ngày *</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={openHolidayDatePicker}
+              style={styles.pickerField}
+            >
+              <Text style={styles.pickerFieldText}>{formatViDate(fDate)}</Text>
+              <CalendarDays size={15} color={colors.primary} />
+            </Pressable>
             <Text style={styles.label}>Tên ngày *</Text>
             <TextInput value={fName} onChangeText={setFName} placeholder="VD: Tết Dương Lịch" style={styles.field} />
             <Text style={styles.label}>Loại ngày</Text>
@@ -1594,6 +1895,41 @@ function WorkHolidaysSection() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {Platform.OS !== 'android' && activeHolidayDatePicker ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveHolidayDatePicker(null)}
+        >
+          <Pressable style={styles.backdrop} onPress={() => setActiveHolidayDatePicker(null)}>
+            <Pressable style={[styles.sheet, styles.timePickerSheet]} onPress={() => {}}>
+              <Text style={styles.sheetTitle}>Chọn ngày</Text>
+              <DateTimePicker
+                value={activeHolidayDatePicker}
+                mode="date"
+                display="spinner"
+                locale="vi-VN"
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) setActiveHolidayDatePicker(selectedDate);
+                }}
+              />
+              <View style={styles.timePickerActions}>
+                <Pressable
+                  onPress={() => setActiveHolidayDatePicker(null)}
+                  style={styles.outlineBtn}
+                >
+                  <Text style={styles.outlineBtnText}>Hủy</Text>
+                </Pressable>
+                <Pressable onPress={savePickedHolidayDate} style={styles.primaryBtn}>
+                  <Text style={styles.primaryBtnText}>Xác nhận</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
 
       {/* Disable Reason Modal */}
       <Modal visible={Boolean(disableTarget)} transparent animationType="slide" onRequestClose={() => setDisableTarget(null)}>
@@ -1642,6 +1978,69 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
     officialDate: '',
   });
   const [saving, setSaving] = useState(false);
+  const [activeWorkHoursPicker, setActiveWorkHoursPicker] = useState<{
+    target: 'officialDate' | 'checkInLimit' | 'checkOutLimit' | 'lunchBreakStart' | 'lunchBreakEnd';
+    value: Date;
+  } | null>(null);
+
+  const applyPickedWorkHoursValue = (
+    target: 'officialDate' | 'checkInLimit' | 'checkOutLimit' | 'lunchBreakStart' | 'lunchBreakEnd',
+    date: Date,
+  ) => {
+    const value = target === 'officialDate'
+      ? toDateKey(date)
+      : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    setForm((current) => ({ ...current, [target]: value }));
+  };
+
+  const openWorkHoursPicker = (
+    target: 'officialDate' | 'checkInLimit' | 'checkOutLimit' | 'lunchBreakStart' | 'lunchBreakEnd',
+  ) => {
+    const isDatePicker = target === 'officialDate';
+    let value: Date;
+
+    if (isDatePicker) {
+      const dateKey = (form.officialDate || '').slice(0, 10);
+      const [year, month, day] = dateKey.split('-').map(Number);
+      value = /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+        ? new Date(year, month - 1, day, 12)
+        : new Date();
+    } else {
+      const defaults = {
+        checkInLimit: '08:30',
+        checkOutLimit: '17:30',
+        lunchBreakStart: '12:00',
+        lunchBreakEnd: '13:00',
+      };
+      const currentValue = form[target] || defaults[target];
+      const [hour, minute] = currentValue.split(':').map(Number);
+      value = new Date();
+      value.setHours(Number.isFinite(hour) ? hour : 8, Number.isFinite(minute) ? minute : 0, 0, 0);
+    }
+
+    if (Platform.OS !== 'android') {
+      setActiveWorkHoursPicker({ target, value });
+      return;
+    }
+
+    DateTimePickerAndroid.open({
+      value,
+      mode: isDatePicker ? 'date' : 'time',
+      display: isDatePicker ? 'calendar' : 'clock',
+      is24Hour: true,
+      onChange: (event, selectedValue) => {
+        if (event.type === 'set' && selectedValue) {
+          applyPickedWorkHoursValue(target, selectedValue);
+        }
+      },
+    });
+  };
+
+  const savePickedWorkHoursValue = () => {
+    if (!activeWorkHoursPicker) return;
+    applyPickedWorkHoursValue(activeWorkHoursPicker.target, activeWorkHoursPicker.value);
+    setActiveWorkHoursPicker(null);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1784,12 +2183,16 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Ngày chính thức</Text>
-                    <TextInput
-                      value={form.officialDate || ''}
-                      onChangeText={(v) => setForm((f) => ({ ...f, officialDate: v }))}
-                      placeholder="YYYY-MM-DD"
-                      style={styles.field}
-                    />
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => openWorkHoursPicker('officialDate')}
+                      style={styles.pickerField}
+                    >
+                      <Text style={styles.pickerFieldText}>
+                        {form.officialDate ? formatViDate(form.officialDate) : 'Chọn ngày'}
+                      </Text>
+                      <CalendarDays size={15} color={colors.primary} />
+                    </Pressable>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Phép năm riêng</Text>
@@ -1809,38 +2212,50 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
                   <>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Giờ vào (HH:mm)</Text>
-                        <TextInput
-                          value={form.checkInLimit || ''}
-                          onChangeText={(v) => setForm((f) => ({ ...f, checkInLimit: v }))}
-                          style={styles.field}
-                        />
+                        <Text style={styles.label}>Giờ vào</Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => openWorkHoursPicker('checkInLimit')}
+                          style={styles.pickerField}
+                        >
+                          <Text style={styles.pickerFieldText}>{form.checkInLimit || '08:30'}</Text>
+                          <Clock3 size={15} color={colors.primary} />
+                        </Pressable>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Giờ ra (HH:mm)</Text>
-                        <TextInput
-                          value={form.checkOutLimit || ''}
-                          onChangeText={(v) => setForm((f) => ({ ...f, checkOutLimit: v }))}
-                          style={styles.field}
-                        />
+                        <Text style={styles.label}>Giờ ra</Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => openWorkHoursPicker('checkOutLimit')}
+                          style={styles.pickerField}
+                        >
+                          <Text style={styles.pickerFieldText}>{form.checkOutLimit || '17:30'}</Text>
+                          <Clock3 size={15} color={colors.primary} />
+                        </Pressable>
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.label}>Nghỉ trưa từ</Text>
-                        <TextInput
-                          value={form.lunchBreakStart || ''}
-                          onChangeText={(v) => setForm((f) => ({ ...f, lunchBreakStart: v }))}
-                          style={styles.field}
-                        />
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => openWorkHoursPicker('lunchBreakStart')}
+                          style={styles.pickerField}
+                        >
+                          <Text style={styles.pickerFieldText}>{form.lunchBreakStart || '12:00'}</Text>
+                          <Clock3 size={15} color={colors.primary} />
+                        </Pressable>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.label}>Đến</Text>
-                        <TextInput
-                          value={form.lunchBreakEnd || ''}
-                          onChangeText={(v) => setForm((f) => ({ ...f, lunchBreakEnd: v }))}
-                          style={styles.field}
-                        />
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => openWorkHoursPicker('lunchBreakEnd')}
+                          style={styles.pickerField}
+                        >
+                          <Text style={styles.pickerFieldText}>{form.lunchBreakEnd || '13:00'}</Text>
+                          <Clock3 size={15} color={colors.primary} />
+                        </Pressable>
                       </View>
                     </View>
                     <Text style={styles.label}>Ngày làm việc</Text>
@@ -1877,6 +2292,51 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {Platform.OS !== 'android' && activeWorkHoursPicker ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveWorkHoursPicker(null)}
+        >
+          <Pressable style={styles.backdrop} onPress={() => setActiveWorkHoursPicker(null)}>
+            <Pressable style={[styles.sheet, styles.timePickerSheet]} onPress={() => {}}>
+              <Text style={styles.sheetTitle}>
+                {activeWorkHoursPicker.target === 'officialDate'
+                  ? 'Chọn ngày chính thức'
+                  : 'Chọn giờ'}
+              </Text>
+              <DateTimePicker
+                value={activeWorkHoursPicker.value}
+                mode={activeWorkHoursPicker.target === 'officialDate' ? 'date' : 'time'}
+                display="spinner"
+                locale="vi-VN"
+                is24Hour
+                onChange={(_event, selectedValue) => {
+                  if (selectedValue) {
+                    setActiveWorkHoursPicker((current) =>
+                      current ? { ...current, value: selectedValue } : current,
+                    );
+                  }
+                }}
+              />
+              <View style={styles.timePickerActions}>
+                <Pressable
+                  onPress={() => setActiveWorkHoursPicker(null)}
+                  style={styles.outlineBtn}
+                >
+                  <Text style={styles.outlineBtnText}>Hủy</Text>
+                </Pressable>
+                <Pressable onPress={savePickedWorkHoursValue} style={styles.primaryBtn}>
+                  <Text style={styles.primaryBtnText}>Xác nhận</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+
     </ScrollView>
   );
 }
@@ -1902,16 +2362,20 @@ const styles = StyleSheet.create({
 
   content: { paddingHorizontal: 18, paddingBottom: 28 },
   segmentRow: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 11, padding: 3, marginBottom: 12 },
+  quickCheckCard: { padding: 12, gap: 9, marginBottom: 12 },
+  quickCheckHeading: { gap: 3 },
+  quickCheckButtons: { flexDirection: 'row', gap: 8 },
+  quickCheckButton: { flex: 1, minHeight: 40, borderRadius: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 6 },
+  quickCheckInButton: { backgroundColor: colors.primary },
+  quickCheckOutButton: { backgroundColor: '#EAF2FF', borderWidth: 1, borderColor: '#C9DDFD' },
+  quickCheckInText: { color: colors.white, fontSize: 10, fontWeight: '800' },
+  quickCheckOutText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
+  quickCheckDisabled: { opacity: 0.45 },
   segmentBtn: { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   segmentBtnActive: { backgroundColor: colors.white },
   segmentText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   segmentTextActive: { color: colors.ink },
 
-  checkRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  checkBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 42, borderRadius: 12 },
-  checkInBtn: { backgroundColor: '#16885A' },
-  checkOutBtn: { backgroundColor: '#D97706' },
-  checkBtnText: { color: colors.white, fontSize: 12, fontWeight: '800' },
 
   dateBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 8, marginBottom: 10 },
   dateBarText: { color: colors.ink, fontSize: 12, fontWeight: '800' },
@@ -1949,7 +2413,8 @@ const styles = StyleSheet.create({
   modeToggleActive: { backgroundColor: colors.primary },
   modeToggleText: { color: colors.muted, fontSize: 10, fontWeight: '800' },
   modeToggleTextActive: { color: colors.white },
-  tableWrap: { flexDirection: 'row', backgroundColor: colors.white, borderColor: '#DCE7F4', borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  tableWrap: { backgroundColor: colors.white, borderColor: '#DCE7F4', borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  tableContentRow: { flexDirection: 'row' },
   tableLeft: { width: 174, borderRightWidth: 1.5, borderRightColor: '#BCEAFF', backgroundColor: colors.white },
   tableHeaderRow: { flexDirection: 'row', alignItems: 'center', height: 46, backgroundColor: '#E8F7FF', borderBottomWidth: 1, borderBottomColor: '#DCE7F4' },
   tableHeaderLeft: { paddingLeft: 2 },
@@ -1990,6 +2455,10 @@ const styles = StyleSheet.create({
   closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
+  pickerField: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pickerFieldText: { color: colors.ink, fontSize: 12 },
+  timePickerSheet: { alignItems: 'center' },
+  timePickerActions: { flexDirection: 'row', justifyContent: 'flex-end', alignSelf: 'stretch', gap: 8, marginTop: 8 },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },

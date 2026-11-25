@@ -1,3 +1,4 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,6 +16,7 @@ import {
 import {
   BriefcaseBusiness,
   CalendarClock,
+  ChevronDown,
   ExternalLink,
   Pencil,
   Plus,
@@ -23,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { DateTimeField } from '@/features/quotation/DateTimeField';
 import {
   changeRecruitmentJobStatus,
   createRecruitmentApplicant,
@@ -32,6 +35,8 @@ import {
   deleteRecruitmentInterview,
   deleteRecruitmentJob,
   getRecruitmentPipeline,
+  listHrDepartments,
+  listHrEmployees,
   listRecruitmentApplicantHistory,
   listRecruitmentApplicants,
   listRecruitmentInterviews,
@@ -42,6 +47,8 @@ import {
   updateRecruitmentJob,
 } from '@/features/hr/hrApi';
 import type {
+  HrDepartment,
+  HrEmployee,
   HrRecruitmentApplicant,
   HrRecruitmentHistory,
   HrRecruitmentInterview,
@@ -94,14 +101,17 @@ function formatDateTime(val?: string | null): string {
 }
 
 export function HrRecruitmentPanel({
+  companyCode,
   branchId,
   canManage,
 }: {
+  companyCode?: string;
   branchId?: string;
   canManage: boolean;
 }) {
   const [view, setView] = useState<RecruitmentView>('jobs');
   const [jobs, setJobs] = useState<HrRecruitmentJob[]>([]);
+  const [departments, setDepartments] = useState<HrDepartment[]>([]);
   const [pipeline, setPipeline] = useState<HrRecruitmentPipeline | null>(null);
   const [applicants, setApplicants] = useState<HrRecruitmentApplicant[]>([]);
   const [interviews, setInterviews] = useState<HrRecruitmentInterview[]>([]);
@@ -118,6 +128,7 @@ export function HrRecruitmentPanel({
   // Job detail & editor
   const [selectedJob, setSelectedJob] = useState<HrRecruitmentJob | null>(null);
   const [jobModalMode, setJobModalMode] = useState<'new' | 'edit' | null>(null);
+  const [jobDepartmentOpen, setJobDepartmentOpen] = useState(false);
   const [jTitle, setJTitle] = useState('');
   const [jDept, setJDept] = useState('');
   const [jLocation, setJLocation] = useState('');
@@ -134,6 +145,9 @@ export function HrRecruitmentPanel({
   const [appModalOpen, setAppModalOpen] = useState(false);
   const [editingApp, setEditingApp] = useState<HrRecruitmentApplicant | null>(null);
   const [aJobId, setAJobId] = useState('');
+  const [aDepartment, setADepartment] = useState('');
+  const [appDepartmentOpen, setAppDepartmentOpen] = useState(false);
+  const [appJobOpen, setAppJobOpen] = useState(false);
   const [aName, setAName] = useState('');
   const [aEmail, setAEmail] = useState('');
   const [aPhone, setAPhone] = useState('');
@@ -148,6 +162,7 @@ export function HrRecruitmentPanel({
   const [aNotes, setANotes] = useState('');
 
   // Interview detail / create / update
+  const [employees, setEmployees] = useState<HrEmployee[]>([]);
   const [selectedInterview, setSelectedInterview] = useState<HrRecruitmentInterview | null>(null);
   const [ivResultDraft, setIvResultDraft] = useState('');
   const [ivNotesDraft, setIvNotesDraft] = useState('');
@@ -156,9 +171,12 @@ export function HrRecruitmentPanel({
   const [ivDate, setIvDate] = useState(() => getTodayKey());
   const [ivStart, setIvStart] = useState('09:00');
   const [ivEnd, setIvEnd] = useState('10:00');
-  const [ivFormat, setIvFormat] = useState<'onsite' | 'online' | 'phone'>('online');
+  const [ivFormat, setIvFormat] = useState<'onsite' | 'online' | 'phone'>('onsite');
   const [ivLocation, setIvLocation] = useState('');
   const [ivLink, setIvLink] = useState('');
+  const [ivStatus, setIvStatus] = useState<'scheduled' | 'completed' | 'cancelled'>('scheduled');
+  const [ivResult, setIvResult] = useState('');
+  const [ivInterviewerIds, setIvInterviewerIds] = useState<string[]>([]);
   const [ivNotes, setIvNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -167,13 +185,17 @@ export function HrRecruitmentPanel({
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const [jobList, pipe, appList, ivList] = await Promise.all([
+        const [jobList, pipe, appList, ivList, departmentList, employeeList] = await Promise.all([
           listRecruitmentJobs(branchId),
           getRecruitmentPipeline(branchId),
           listRecruitmentApplicants(branchId),
           listRecruitmentInterviews(branchId).catch(() => []),
+          companyCode ? listHrDepartments(companyCode).catch(() => []) : Promise.resolve([]),
+          companyCode ? listHrEmployees(companyCode, branchId).catch(() => []) : Promise.resolve([]),
         ]);
         setJobs(jobList);
+        setDepartments(departmentList.filter((department) => department.isActive !== false));
+        setEmployees(employeeList.filter((emp) => (emp as HrEmployee & { isActive?: boolean }).isActive !== false));
         setPipeline(pipe);
         setApplicants(appList);
         setInterviews(ivList);
@@ -184,7 +206,7 @@ export function HrRecruitmentPanel({
         setRefreshing(false);
       }
     },
-    [branchId],
+    [branchId, companyCode],
   );
 
   useEffect(() => {
@@ -192,6 +214,19 @@ export function HrRecruitmentPanel({
   }, [load]);
 
   const jobMap = useMemo(() => new Map(jobs.map((j) => [j.id, j])), [jobs]);
+  const applicantDepartmentOptions = useMemo(() => {
+    return [...new Set([
+      'Chung',
+      ...departments.map((department) => department.name),
+      ...jobs.map((job) => job.department || 'Chung'),
+      aDepartment,
+    ].filter(Boolean))];
+  }, [aDepartment, departments, jobs]);
+  const applicantJobs = useMemo(() => {
+    if (!aDepartment) return jobs;
+    const selectedDepartment = aDepartment.trim().toLowerCase();
+    return jobs.filter((job) => (job.department || 'Chung').trim().toLowerCase() === selectedDepartment);
+  }, [aDepartment, jobs]);
   const appMap = useMemo(() => new Map(applicants.map((a) => [a.id, a])), [applicants]);
   const stages = useMemo(
     () => (pipeline?.stages || []).filter((s) => s.isActive).sort((a, b) => a.position - b.position),
@@ -231,6 +266,7 @@ export function HrRecruitmentPanel({
   }, [interviews, ivStatusFilter]);
 
   const openJobEditor = useCallback((job?: HrRecruitmentJob) => {
+    setJobDepartmentOpen(false);
     setSelectedJob(job || null);
     setJobModalMode(job ? 'edit' : 'new');
     setJTitle(job?.title || '');
@@ -326,8 +362,12 @@ export function HrRecruitmentPanel({
 
   const openApplicantEditor = useCallback(
     (app?: HrRecruitmentApplicant) => {
+      const initialJob = jobs.find((job) => job.id === app?.jobId) || jobs[0];
       setEditingApp(app || null);
-      setAJobId(app?.jobId || jobs[0]?.id || '');
+      setAJobId(app?.jobId || initialJob?.id || '');
+      setADepartment(initialJob?.department || 'Chung');
+      setAppDepartmentOpen(false);
+      setAppJobOpen(false);
       setAName(app?.fullName || '');
       setAEmail(app?.email || '');
       setAPhone(app?.phone || '');
@@ -344,6 +384,16 @@ export function HrRecruitmentPanel({
     },
     [jobs],
   );
+
+  const selectApplicantDepartment = (department: string) => {
+    setADepartment(department);
+    const matchingJob = jobs.find(
+      (job) => (job.department || 'Chung').trim().toLowerCase() === department.trim().toLowerCase(),
+    );
+    setAJobId(matchingJob?.id || '');
+    setAppDepartmentOpen(false);
+    setAppJobOpen(false);
+  };
 
   const onSaveApplicant = useCallback(async () => {
     if ((!editingApp && !aJobId) || !aName.trim() || saving) {
@@ -466,10 +516,44 @@ export function HrRecruitmentPanel({
     [branchId, saving, selectedApp, stageMap, transitionNote],
   );
 
+  const employeeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    employees.forEach((emp) => {
+      const id = emp.uid || emp.id || emp._id || '';
+      if (id) map.set(id, emp.displayName || emp.email || id);
+    });
+    return map;
+  }, [employees]);
+
+  const openCreateInterview = useCallback((applicantId?: string) => {
+    setIvApplicantId(applicantId || applicants[0]?.id || '');
+    setIvDate(getTodayKey());
+    setIvStart('09:00');
+    setIvEnd('10:00');
+    setIvFormat('onsite');
+    setIvLocation('');
+    setIvLink('');
+    setIvStatus('scheduled');
+    setIvResult('');
+    setIvInterviewerIds([]);
+    setIvNotes('');
+    setIvModalOpen(true);
+  }, [applicants]);
+
+  const toggleInterviewer = useCallback((uid: string) => {
+    setIvInterviewerIds((prev) => (prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]));
+  }, []);
+
   const onCreateInterview = useCallback(async () => {
     const app = appMap.get(ivApplicantId);
     if (!app || !app.jobId || !ivDate.trim() || saving) {
       Alert.alert('Thiếu thông tin', 'Hãy chọn ứng viên và ngày phỏng vấn.');
+      return;
+    }
+    const scheduledStart = `${ivDate.trim()}T${ivStart.trim() || '09:00'}:00`;
+    const scheduledEnd = `${ivDate.trim()}T${ivEnd.trim() || '10:00'}:00`;
+    if (new Date(scheduledEnd) <= new Date(scheduledStart)) {
+      Alert.alert('Thời gian chưa hợp lệ', 'Thời gian kết thúc phải sau thời gian bắt đầu.');
       return;
     }
     setSaving(true);
@@ -478,26 +562,30 @@ export function HrRecruitmentPanel({
         {
           applicantId: app.id,
           jobId: app.jobId,
-          scheduledStart: `${ivDate.trim()}T${ivStart.trim() || '09:00'}:00`,
-          scheduledEnd: `${ivDate.trim()}T${ivEnd.trim() || '10:00'}:00`,
+          scheduledStart,
+          scheduledEnd,
           format: ivFormat,
           location: ivLocation.trim(),
           meetingLink: ivLink.trim(),
+          status: ivStatus,
+          result: ivResult.trim(),
           notes: ivNotes.trim(),
-          interviewerIds: [],
+          interviewerIds: ivInterviewerIds,
         },
         branchId,
       );
       setInterviews((prev) => [created, ...prev]);
       setIvModalOpen(false);
       setIvNotes('');
+      setIvResult('');
+      setIvInterviewerIds([]);
       Alert.alert('Thành công', 'Đã tạo lịch phỏng vấn.');
     } catch (err) {
       Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể tạo lịch phỏng vấn.');
     } finally {
       setSaving(false);
     }
-  }, [appMap, branchId, ivApplicantId, ivDate, ivEnd, ivFormat, ivLink, ivLocation, ivNotes, ivStart, saving]);
+  }, [appMap, branchId, ivApplicantId, ivDate, ivEnd, ivFormat, ivInterviewerIds, ivLink, ivLocation, ivNotes, ivResult, ivStart, ivStatus, saving]);
 
   const onUpdateInterviewStatus = useCallback(
     async (iv: HrRecruitmentInterview, status: 'completed' | 'cancelled') => {
@@ -592,6 +680,14 @@ export function HrRecruitmentPanel({
             <View style={styles.infoRow}>
               <Text style={styles.muted}>Địa điểm</Text>
               <Text style={styles.infoVal}>{selectedInterview.location}</Text>
+            </View>
+          ) : null}
+          {selectedInterview.interviewerIds?.length ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.muted}>Người phỏng vấn</Text>
+              <Text style={styles.infoVal}>
+                {selectedInterview.interviewerIds.map((id) => employeeMap.get(id) || id).join(', ')}
+              </Text>
             </View>
           ) : null}
           {selectedInterview.meetingLink ? (
@@ -836,9 +932,10 @@ export function HrRecruitmentPanel({
               <Pressable
                 onPress={() => {
                   setIvApplicantId(selectedApp.id);
+                  const targetAppId = selectedApp.id;
                   setSelectedApp(null);
                   setView('interviews');
-                  setIvModalOpen(true);
+                  openCreateInterview(targetAppId);
                 }}
                 style={styles.smallGreenBtn}
               >
@@ -964,20 +1061,93 @@ export function HrRecruitmentPanel({
               <View style={{ gap: 8, paddingBottom: 14 }}>
                 {!editingApp ? (
                   <>
+                    <Text style={styles.label}>Phòng ban *</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: appDepartmentOpen }}
+                      onPress={() => {
+                        setAppJobOpen(false);
+                        setAppDepartmentOpen((open) => !open);
+                      }}
+                      style={styles.departmentDropdownButton}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.departmentDropdownText, !aDepartment && styles.departmentPlaceholder]}
+                      >
+                        {aDepartment || 'Chọn phòng ban'}
+                      </Text>
+                      <ChevronDown size={15} color={colors.primary} />
+                    </Pressable>
+                    {appDepartmentOpen ? (
+                      <View style={styles.departmentDropdownMenu}>
+                        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                          {applicantDepartmentOptions.map((department) => (
+                            <Pressable
+                              key={department}
+                              onPress={() => selectApplicantDepartment(department)}
+                              style={styles.departmentDropdownOption}
+                            >
+                              <Text numberOfLines={1} style={styles.departmentDropdownText}>
+                                {department}
+                              </Text>
+                            </Pressable>
+                          ))}
+                          {!applicantDepartmentOptions.length ? (
+                            <Text style={styles.departmentEmptyText}>Chưa có phòng ban</Text>
+                          ) : null}
+                        </ScrollView>
+                      </View>
+                    ) : null}
+
                     <Text style={styles.label}>Vị trí ứng tuyển *</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                      {jobs.map((j) => (
-                        <Pressable
-                          key={j.id}
-                          onPress={() => setAJobId(j.id)}
-                          style={[styles.chip, aJobId === j.id && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, aJobId === j.id && styles.chipTextActive]}>
-                            {j.title}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: appJobOpen, disabled: !applicantJobs.length }}
+                      disabled={!applicantJobs.length}
+                      onPress={() => {
+                        setAppDepartmentOpen(false);
+                        setAppJobOpen((open) => !open);
+                      }}
+                      style={[
+                        styles.departmentDropdownButton,
+                        !applicantJobs.length && styles.disabled,
+                      ]}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={[styles.departmentDropdownText, !aJobId && styles.departmentPlaceholder]}
+                      >
+                        {jobMap.get(aJobId)?.title || 'Chọn vị trí tuyển dụng'}
+                      </Text>
+                      <ChevronDown size={15} color={colors.primary} />
+                    </Pressable>
+                    {appJobOpen ? (
+                      <View style={styles.departmentDropdownMenu}>
+                        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                          {applicantJobs.map((job) => (
+                            <Pressable
+                              key={job.id}
+                              onPress={() => {
+                                setAJobId(job.id);
+                                setAppJobOpen(false);
+                              }}
+                              style={styles.departmentDropdownOption}
+                            >
+                              <Text numberOfLines={1} style={styles.departmentDropdownText}>
+                                {job.title}
+                              </Text>
+                            </Pressable>
+                          ))}
+                          {!applicantJobs.length ? (
+                            <Text style={styles.departmentEmptyText}>Chưa có vị trí tuyển dụng</Text>
+                          ) : null}
+                        </ScrollView>
+                      </View>
+                    ) : null}
+                    {!applicantJobs.length ? (
+                      <Text style={styles.muted}>Phòng ban này chưa có vị trí tuyển dụng.</Text>
+                    ) : null}
                   </>
                 ) : null}
                 <Text style={styles.label}>Họ và tên *</Text>
@@ -993,14 +1163,8 @@ export function HrRecruitmentPanel({
                   </View>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Ngày sinh (YYYY-MM-DD)</Text>
-                    <TextInput value={aBirthDate} onChangeText={setABirthDate} placeholder="1998-05-20" style={styles.field} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Ngày nhận việc</Text>
-                    <TextInput value={aAvailableDate} onChangeText={setAAvailableDate} placeholder="YYYY-MM-DD" style={styles.field} />
-                  </View>
+                  <DateTimeField label="Ngày sinh" mode="date" value={aBirthDate} onChange={setABirthDate} allowClear />
+                  <DateTimeField label="Ngày nhận việc" mode="date" value={aAvailableDate} onChange={setAAvailableDate} allowClear />
                 </View>
                 <Text style={styles.label}>Địa chỉ</Text>
                 <TextInput value={aAddress} onChangeText={setAAddress} placeholder="Quận/Huyện, Tỉnh/Thành..." style={styles.field} />
@@ -1094,8 +1258,7 @@ export function HrRecruitmentPanel({
               else if (view === 'applicants') {
                 openApplicantEditor();
               } else {
-                setIvApplicantId(applicants[0]?.id || '');
-                setIvModalOpen(true);
+                openCreateInterview();
               }
             }}
             style={styles.primaryBtn}
@@ -1177,7 +1340,7 @@ export function HrRecruitmentPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -1437,7 +1600,49 @@ export function HrRecruitmentPanel({
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.label}>Phòng ban</Text>
-                    <TextInput value={jDept} onChangeText={setJDept} placeholder="Kinh doanh" style={styles.field} />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: jobDepartmentOpen }}
+                      onPress={() => setJobDepartmentOpen((open) => !open)}
+                      style={styles.departmentDropdownButton}
+                    >
+                      <Text numberOfLines={1} style={[styles.departmentDropdownText, !jDept && styles.departmentPlaceholder]}>
+                        {jDept || 'Chọn phòng ban'}
+                      </Text>
+                      <ChevronDown size={15} color={colors.primary} />
+                    </Pressable>
+                    {jobDepartmentOpen ? (
+                      <View style={styles.departmentDropdownMenu}>
+                        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                          <Pressable
+                            onPress={() => {
+                              setJDept('Chung');
+                              setJobDepartmentOpen(false);
+                            }}
+                            style={styles.departmentDropdownOption}
+                          >
+                            <Text style={styles.departmentDropdownText}>Chung</Text>
+                          </Pressable>
+                          {departments.map((department) => (
+                            <Pressable
+                              key={department.id}
+                              onPress={() => {
+                                setJDept(department.name);
+                                setJobDepartmentOpen(false);
+                              }}
+                              style={styles.departmentDropdownOption}
+                            >
+                              <Text numberOfLines={1} style={styles.departmentDropdownText}>
+                                {department.name}
+                              </Text>
+                            </Pressable>
+                          ))}
+                          {!departments.length ? (
+                            <Text style={styles.departmentEmptyText}>Chưa có phòng ban</Text>
+                          ) : null}
+                        </ScrollView>
+                      </View>
+                    ) : null}
                   </View>
                   <View style={{ width: 90 }}>
                     <Text style={styles.label}>Số lượng</Text>
@@ -1493,21 +1698,20 @@ export function HrRecruitmentPanel({
                     </Pressable>
                   ))}
                 </ScrollView>
-                <Text style={styles.label}>Ngày phỏng vấn (YYYY-MM-DD) *</Text>
-                <TextInput value={ivDate} onChangeText={setIvDate} style={styles.field} />
+                <Text style={styles.label}>Vị trí</Text>
+                <View style={[styles.field, { backgroundColor: '#F1F5F9', justifyContent: 'center' }]}>
+                  <Text style={{ color: colors.ink, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
+                    {jobMap.get(appMap.get(ivApplicantId)?.jobId || '')?.title || 'Tự động theo ứng viên'}
+                  </Text>
+                </View>
+                <DateTimeField label="Ngày phỏng vấn *" mode="date" value={ivDate} onChange={setIvDate} />
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Bắt đầu (HH:mm)</Text>
-                    <TextInput value={ivStart} onChangeText={setIvStart} style={styles.field} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Kết thúc (HH:mm)</Text>
-                    <TextInput value={ivEnd} onChangeText={setIvEnd} style={styles.field} />
-                  </View>
+                  <DateTimeField label="Giờ bắt đầu" mode="time" value={ivStart} onChange={setIvStart} />
+                  <DateTimeField label="Giờ kết thúc" mode="time" value={ivEnd} onChange={setIvEnd} />
                 </View>
                 <Text style={styles.label}>Hình thức</Text>
                 <View style={styles.wrapRow}>
-                  {(['online', 'onsite', 'phone'] as const).map((f) => (
+                  {(['onsite', 'online', 'phone'] as const).map((f) => (
                     <Pressable key={f} onPress={() => setIvFormat(f)} style={[styles.chip, ivFormat === f && styles.chipActive]}>
                       <Text style={[styles.chipText, ivFormat === f && styles.chipTextActive]}>
                         {INTERVIEW_FORMAT_LABELS[f]}
@@ -1517,17 +1721,56 @@ export function HrRecruitmentPanel({
                 </View>
                 {ivFormat === 'online' ? (
                   <>
-                    <Text style={styles.label}>Link phỏng vấn</Text>
-                    <TextInput value={ivLink} onChangeText={setIvLink} autoCapitalize="none" placeholder="https://meet.google.com/..." style={styles.field} />
+                    <Text style={styles.label}>Link họp</Text>
+                    <TextInput value={ivLink} onChangeText={setIvLink} autoCapitalize="none" placeholder="https://meet.google.com/..." placeholderTextColor={colors.muted} style={styles.field} />
                   </>
                 ) : (
                   <>
                     <Text style={styles.label}>Địa điểm</Text>
-                    <TextInput value={ivLocation} onChangeText={setIvLocation} placeholder="Phòng họp tầng 3..." style={styles.field} />
+                    <TextInput value={ivLocation} onChangeText={setIvLocation} placeholder="Phòng họp tầng 3..." placeholderTextColor={colors.muted} style={styles.field} />
                   </>
                 )}
+                <Text style={styles.label}>Trạng thái</Text>
+                <View style={styles.wrapRow}>
+                  {(['scheduled', 'completed', 'cancelled'] as const).map((st) => (
+                    <Pressable key={st} onPress={() => setIvStatus(st)} style={[styles.chip, ivStatus === st && styles.chipActive]}>
+                      <Text style={[styles.chipText, ivStatus === st && styles.chipTextActive]}>
+                        {INTERVIEW_STATUS_LABELS[st]}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.label}>Kết quả</Text>
+                <TextInput
+                  value={ivResult}
+                  onChangeText={setIvResult}
+                  placeholder="VD: Đạt / Cần phỏng vấn vòng 2..."
+                  placeholderTextColor={colors.muted}
+                  style={styles.field}
+                />
+                <Text style={styles.label}>Người phỏng vấn ({ivInterviewerIds.length})</Text>
+                <View style={[styles.wrapRow, { backgroundColor: '#F5F8FC', borderRadius: 10, padding: 8 }]}>
+                  {employees.length ? employees.map((emp) => {
+                    const empId = emp.uid || emp.id || emp._id || '';
+                    if (!empId) return null;
+                    const selected = ivInterviewerIds.includes(empId);
+                    return (
+                      <Pressable
+                        key={empId}
+                        onPress={() => toggleInterviewer(empId)}
+                        style={[styles.chip, selected && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                          {emp.displayName || emp.email || empId}
+                        </Text>
+                      </Pressable>
+                    );
+                  }) : (
+                    <Text style={styles.muted}>Chưa có danh sách người phỏng vấn</Text>
+                  )}
+                </View>
                 <Text style={styles.label}>Ghi chú</Text>
-                <TextInput value={ivNotes} onChangeText={setIvNotes} multiline style={[styles.field, { minHeight: 50, textAlignVertical: 'top' }]} />
+                <TextInput value={ivNotes} onChangeText={setIvNotes} multiline placeholder="Nhập ghi chú..." placeholderTextColor={colors.muted} style={[styles.field, { minHeight: 50, textAlignVertical: 'top' }]} />
                 <Pressable disabled={saving} onPress={() => void onCreateInterview()} style={[styles.submitBtn, saving && styles.disabled]}>
                   <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo lịch phỏng vấn'}</Text>
                 </Pressable>
@@ -1586,6 +1829,12 @@ const styles = StyleSheet.create({
   closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
+  departmentDropdownButton: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  departmentDropdownText: { color: colors.ink, fontSize: 12, flexShrink: 1 },
+  departmentPlaceholder: { color: colors.muted },
+  departmentDropdownMenu: { maxHeight: 150, marginTop: 4, borderColor: colors.border, borderWidth: 1, borderRadius: 10, backgroundColor: colors.white, overflow: 'hidden' },
+  departmentDropdownOption: { paddingHorizontal: 9, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  departmentEmptyText: { color: colors.muted, fontSize: 11, padding: 9 },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },

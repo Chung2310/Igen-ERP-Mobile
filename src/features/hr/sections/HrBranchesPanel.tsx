@@ -1,7 +1,7 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -12,7 +12,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { AlertTriangle, ChevronRight, LocateFixed, MapPin, Phone, Plus, Radio } from 'lucide-react-native';
+import * as Location from 'expo-location';
+import { AlertTriangle, CheckCircle2, ChevronRight, Info, LocateFixed, MapPin, Phone, Plus, Radio } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import {
   createHrBranch,
@@ -97,38 +98,26 @@ function parseLocationConfig(input: {
   };
 }
 
-type GeolocationLike = {
-  getCurrentPosition: (
-    success: (pos: { coords: { latitude: number; longitude: number } }) => void,
-    error: (err: { code?: number; message?: string }) => void,
-    options?: { enableHighAccuracy?: boolean; timeout?: number; maximumAge?: number },
-  ) => void;
-};
+async function requestDevicePosition(): Promise<{ latitude: number; longitude: number }> {
+  const permission = await Location.requestForegroundPermissionsAsync();
+  if (permission.status !== 'granted') {
+    throw new Error('Cần cấp quyền vị trí cho ERP Mobile để lấy tọa độ chi nhánh.');
+  }
 
-function requestDevicePosition(): Promise<{ latitude: number; longitude: number }> {
-  return new Promise((resolve, reject) => {
-    const geo = (globalThis as { navigator?: { geolocation?: GeolocationLike } }).navigator?.geolocation;
-    if (!geo || typeof geo.getCurrentPosition !== 'function') {
-      reject(new Error('UNSUPPORTED'));
-      return;
-    }
-    geo.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      (err) => {
-        if (err?.code === 1) {
-          reject(new Error('Ứng dụng chưa được cấp quyền truy cập vị trí.'));
-        } else if (err?.code === 2) {
-          reject(new Error('Thiết bị chưa xác định được vị trí. Hãy bật GPS rồi thử lại.'));
-        } else if (err?.code === 3) {
-          reject(new Error('Lấy vị trí quá lâu. Hãy thử lại ở nơi có tín hiệu GPS tốt hơn.'));
-        } else {
-          reject(new Error(err?.message || 'Không thể lấy vị trí hiện tại.'));
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    );
+  const position = await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.High,
   });
+  return {
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude,
+  };
 }
+
+type BranchNotice = {
+  title: string;
+  message: string;
+  tone: 'info' | 'success' | 'error';
+};
 
 export function HrBranchesPanel({
   companyCode,
@@ -145,6 +134,8 @@ export function HrBranchesPanel({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [notice, setNotice] = useState<BranchNotice | null>(null);
+  const [locationPermissionPrompt, setLocationPermissionPrompt] = useState(false);
 
   // Detail & Edit modal
   const [selectedBranch, setSelectedBranch] = useState<HrBranch | null>(null);
@@ -164,6 +155,16 @@ export function HrBranchesPanel({
   const [allowedPublicIps, setAllowedPublicIps] = useState('');
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const showNotice = useCallback((title: string, message: string, tone?: BranchNotice['tone']) => {
+    const normalizedTitle = title.toLocaleLowerCase();
+    const inferredTone = tone ?? (/^(đã|thành công)/.test(normalizedTitle)
+      ? 'success'
+      : /^(lỗi|không|thiếu|chưa|cấu hình|mã chi nhánh)/.test(normalizedTitle)
+        ? 'error'
+        : 'info');
+    setNotice({ title, message, tone: inferredTone });
+  }, []);
 
   // Create branch owner modal
   const [ownerModalOpen, setOwnerModalOpen] = useState(false);
@@ -296,28 +297,42 @@ export function HrBranchesPanel({
     setLocating(false);
 
     if (gotPos && gotIp) {
-      Alert.alert('Đã cập nhật', 'Đã lấy thành công vị trí GPS và IP mạng hiện tại.');
+      showNotice('Đã cập nhật', 'Đã lấy thành công vị trí GPS và IP mạng hiện tại.');
     } else if (!gotPos && gotIp) {
       const reason =
-        posRes.status === 'rejected' && posRes.reason instanceof Error && posRes.reason.message !== 'UNSUPPORTED'
-          ? posRes.reason.message
-          : 'Thiết bị chưa hỗ trợ tự động lấy GPS — bạn có thể dán trực tiếp tọa độ "vĩ độ, kinh độ" từ Google Maps vào ô Vĩ độ.';
-      Alert.alert('Đã lấy IP mạng hiện tại', reason);
+        posRes.status === 'rejected' && posRes.reason instanceof Error
+          ? posRes.reason.message + ' Bạn có thể nhập tọa độ vĩ độ, kinh độ thủ công.'
+          : 'Không thể lấy vị trí GPS. Bạn có thể nhập tọa độ vĩ độ, kinh độ thủ công.';
+      showNotice('Đã lấy IP mạng hiện tại', reason);
     } else if (gotPos && !gotIp) {
-      Alert.alert('Đã lấy vị trí GPS', 'Không thể lấy IP mạng hiện tại từ máy chủ.');
+      showNotice('Đã lấy vị trí GPS', 'Không thể lấy IP mạng hiện tại từ máy chủ.');
     } else {
-      Alert.alert('Không thể lấy tự động', 'Không lấy được vị trí GPS và IP mạng hiện tại. Bạn có thể nhập thủ công.');
+      showNotice('Không thể lấy tự động', 'Không lấy được vị trí GPS và IP mạng hiện tại. Bạn có thể nhập thủ công.');
     }
-  }, [locating]);
+  }, [locating, showNotice]);
+
+  const requestLocationCapture = useCallback(async () => {
+    if (locating) return;
+    try {
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status === 'granted') {
+        void captureLocationAndIp();
+      } else {
+        setLocationPermissionPrompt(true);
+      }
+    } catch {
+      showNotice('Không kiểm tra được quyền vị trí', 'Hãy thử lại sau hoặc nhập tọa độ chi nhánh thủ công.', 'error');
+    }
+  }, [captureLocationAndIp, locating, showNotice]);
 
   const onCreate = useCallback(async () => {
     const cleanCode = code.trim().toUpperCase();
     if (!cleanCode || !name.trim()) {
-      Alert.alert('Thiếu thông tin', 'Hãy nhập Mã chi nhánh và Tên chi nhánh.');
+      showNotice('Thiếu thông tin', 'Hãy nhập Mã chi nhánh và Tên chi nhánh.');
       return;
     }
     if (!/^[A-Za-z0-9_-]+$/.test(cleanCode)) {
-      Alert.alert('Mã chi nhánh không hợp lệ', 'Chỉ dùng chữ, số, dấu gạch ngang (-) hoặc gạch dưới (_).');
+      showNotice('Mã chi nhánh không hợp lệ', 'Chỉ dùng chữ, số, dấu gạch ngang (-) hoặc gạch dưới (_).');
       return;
     }
     const { config: locationConfig, error: locErr } = parseLocationConfig({
@@ -327,7 +342,7 @@ export function HrBranchesPanel({
       allowedPublicIps,
     });
     if (locErr) {
-      Alert.alert('Cấu hình chấm công chưa hợp lệ', locErr);
+      showNotice('Cấu hình chấm công chưa hợp lệ', locErr);
       return;
     }
     setSaving(true);
@@ -344,22 +359,22 @@ export function HrBranchesPanel({
       setBranches((prev) => [created, ...prev]);
       setCreateOpen(false);
       onBranchesChanged?.();
-      Alert.alert('Thành công', `Đã tạo chi nhánh "${created.name}".`);
+      showNotice('Thành công', `Đã tạo chi nhánh "${created.name}".`);
     } catch (err) {
-      Alert.alert('Lỗi tạo chi nhánh', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+      showNotice('Lỗi tạo chi nhánh', err instanceof Error ? err.message : 'Vui lòng thử lại.');
     } finally {
       setSaving(false);
     }
-  }, [address, allowedPublicIps, allowedRadius, code, isActive, latitude, longitude, managerId, name, onBranchesChanged, phone]);
+  }, [address, allowedPublicIps, allowedRadius, code, isActive, latitude, longitude, managerId, name, onBranchesChanged, phone, showNotice]);
 
   const onSaveEdit = useCallback(async () => {
     if (!selectedBranch || !name.trim() || saving) {
-      if (!name.trim()) Alert.alert('Thiếu tên chi nhánh', 'Hãy nhập tên chi nhánh.');
+      if (!name.trim()) showNotice('Thiếu tên chi nhánh', 'Hãy nhập tên chi nhánh.');
       return;
     }
     const cleanCode = code.trim().toUpperCase();
     if (cleanCode && !/^[A-Za-z0-9_-]+$/.test(cleanCode)) {
-      Alert.alert('Mã chi nhánh không hợp lệ', 'Chỉ dùng chữ, số, dấu gạch ngang (-) hoặc gạch dưới (_).');
+      showNotice('Mã chi nhánh không hợp lệ', 'Chỉ dùng chữ, số, dấu gạch ngang (-) hoặc gạch dưới (_).');
       return;
     }
     const { config: locationConfig, error: locErr } = parseLocationConfig({
@@ -369,7 +384,7 @@ export function HrBranchesPanel({
       allowedPublicIps,
     });
     if (locErr) {
-      Alert.alert('Cấu hình chấm công chưa hợp lệ', locErr);
+      showNotice('Cấu hình chấm công chưa hợp lệ', locErr);
       return;
     }
     setSaving(true);
@@ -387,18 +402,18 @@ export function HrBranchesPanel({
       setSelectedBranch(updated);
       setIsEditing(false);
       onBranchesChanged?.();
-      Alert.alert('Đã lưu', 'Cập nhật thông tin chi nhánh thành công.');
+      showNotice('Đã lưu', 'Cập nhật thông tin chi nhánh thành công.');
     } catch (err) {
-      Alert.alert('Lỗi cập nhật', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+      showNotice('Lỗi cập nhật', err instanceof Error ? err.message : 'Vui lòng thử lại.');
     } finally {
       setSaving(false);
     }
-  }, [address, allowedPublicIps, allowedRadius, code, isActive, latitude, longitude, managerId, name, onBranchesChanged, phone, saving, selectedBranch]);
+  }, [address, allowedPublicIps, allowedRadius, code, isActive, latitude, longitude, managerId, name, onBranchesChanged, phone, saving, selectedBranch, showNotice]);
 
   const onCreateOwner = useCallback(async () => {
     if (!selectedBranch || savingOwner) return;
     if (!ownerName.trim() || !ownerEmail.trim() || ownerPassword.length < 6) {
-      Alert.alert('Thiếu thông tin', 'Nhập Họ tên, Email và Mật khẩu (tối thiểu 6 ký tự).');
+      showNotice('Thiếu thông tin', 'Nhập Họ tên, Email và Mật khẩu (tối thiểu 6 ký tự).');
       return;
     }
     setSavingOwner(true);
@@ -414,14 +429,14 @@ export function HrBranchesPanel({
       setOwnerEmail('');
       setOwnerPassword('');
       setOwnerPhone('');
-      Alert.alert('Thành công', 'Đã tạo tài khoản Quản lý chi nhánh.');
+      showNotice('Thành công', 'Đã tạo tài khoản Quản lý chi nhánh.');
       void load(true);
     } catch (err) {
-      Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể tạo tài khoản quản lý chi nhánh.');
+      showNotice('Lỗi', err instanceof Error ? err.message : 'Không thể tạo tài khoản quản lý chi nhánh.');
     } finally {
       setSavingOwner(false);
     }
-  }, [load, ownerEmail, ownerName, ownerPassword, ownerPhone, savingOwner, selectedBranch]);
+  }, [load, ownerEmail, ownerName, ownerPassword, ownerPhone, savingOwner, selectedBranch, showNotice]);
 
   const renderLocationConfigEditor = () => (
     <View style={styles.locationBox}>
@@ -432,7 +447,7 @@ export function HrBranchesPanel({
         </View>
         <Pressable
           disabled={locating}
-          onPress={() => void captureLocationAndIp()}
+          onPress={() => void requestLocationCapture()}
           style={[styles.locateBtn, locating && styles.disabled]}
         >
           <View style={styles.iconButtonContent}>
@@ -496,6 +511,10 @@ export function HrBranchesPanel({
     </View>
   );
 
+  const NoticeIcon = notice?.tone === 'success' ? CheckCircle2 : notice?.tone === 'error' ? AlertTriangle : Info;
+  const noticeColor = notice?.tone === 'success' ? '#16885A' : notice?.tone === 'error' ? '#DC2626' : colors.primary;
+  const noticeIconBackground = notice?.tone === 'success' ? '#E9F8F1' : notice?.tone === 'error' ? '#FEF2F2' : '#EAF2FF';
+
   return (
     <ScrollView
       contentContainerStyle={styles.content}
@@ -533,7 +552,7 @@ export function HrBranchesPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -859,6 +878,54 @@ export function HrBranchesPanel({
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={locationPermissionPrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLocationPermissionPrompt(false)}
+      >
+        <Pressable style={styles.dialogBackdrop} onPress={() => setLocationPermissionPrompt(false)}>
+          <Pressable style={styles.dialogCard} onPress={() => {}}>
+            <View style={[styles.dialogIconWrap, { backgroundColor: '#EAF2FF' }]}>
+              <MapPin size={22} color={colors.primary} />
+            </View>
+            <Text style={styles.dialogTitle}>Cho phép truy cập vị trí</Text>
+            <Text style={styles.dialogMessage}>
+              ERP Mobile cần vị trí hiện tại để tự điền vĩ độ và kinh độ cho chi nhánh. Sau khi tiếp tục, hệ thống sẽ hỏi quyền truy cập vị trí. Tọa độ chỉ được dùng để cấu hình chấm công.
+            </Text>
+            <View style={styles.dialogActions}>
+              <Pressable onPress={() => setLocationPermissionPrompt(false)} style={styles.dialogSecondaryBtn}>
+                <Text style={styles.dialogSecondaryText}>Để sau</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setLocationPermissionPrompt(false);
+                  void captureLocationAndIp();
+                }}
+                style={styles.dialogPrimaryBtn}
+              >
+                <Text style={styles.dialogPrimaryText}>Tiếp tục</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={Boolean(notice)} transparent animationType="fade" onRequestClose={() => setNotice(null)}>
+        <Pressable style={styles.dialogBackdrop} onPress={() => setNotice(null)}>
+          <Pressable style={styles.dialogCard} onPress={() => {}}>
+            <View style={[styles.dialogIconWrap, { backgroundColor: noticeIconBackground }]}>
+              <NoticeIcon size={22} color={noticeColor} />
+            </View>
+            <Text style={styles.dialogTitle}>{notice?.title}</Text>
+            <Text style={styles.dialogMessage}>{notice?.message}</Text>
+            <Pressable onPress={() => setNotice(null)} style={styles.dialogPrimaryBtn}>
+              <Text style={styles.dialogPrimaryText}>Đóng</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -887,6 +954,16 @@ const styles = StyleSheet.create({
   configMissing: { color: '#B45309', fontWeight: '600' },
   chevron: { color: colors.muted, fontSize: 20 },
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
+  dialogBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.48)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  dialogCard: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 22, alignItems: 'center', gap: 10 },
+  dialogIconWrap: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  dialogTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  dialogMessage: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  dialogActions: { flexDirection: 'row', gap: 10, width: '100%', marginTop: 8 },
+  dialogSecondaryBtn: { flex: 1, minHeight: 44, borderRadius: 14, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  dialogSecondaryText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  dialogPrimaryBtn: { width: '100%', minHeight: 44, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  dialogPrimaryText: { color: colors.white, fontSize: 12, fontWeight: '700' },
   sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 10, maxHeight: '90%' },
   sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },

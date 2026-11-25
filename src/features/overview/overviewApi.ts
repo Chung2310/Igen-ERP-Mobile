@@ -84,9 +84,10 @@ export type ErpBranch = {
   isActive?: boolean;
 };
 
-export async function fetchCompanyBranches(signal?: AbortSignal): Promise<ErpBranch[]> {
+export async function fetchCompanyBranches(signal?: AbortSignal, companyCode?: string): Promise<ErpBranch[]> {
+  const query = companyCode ? `?companyCode=${encodeURIComponent(companyCode)}` : '';
   const res = await apiRequest<{ data?: ErpBranch[]; branches?: ErpBranch[] } | ErpBranch[]>(
-    '/auth/branches',
+    `/auth/branches${query}`,
     { signal },
   );
   const list = Array.isArray(res) ? res : (res?.data ?? res?.branches ?? []);

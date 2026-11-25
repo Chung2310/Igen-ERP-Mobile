@@ -1,8 +1,10 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import {
   AlertTriangle,
   CalendarDays,
@@ -27,6 +30,7 @@ import {
   RefreshCw,
   Target,
   UserRound,
+  X,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
@@ -64,6 +68,15 @@ function getVietnamLocalDateTime(date = new Date()): string {
   return vn.toISOString().slice(0, 16);
 }
 
+function getVietnamDateKey(date: Date): string {
+  return getVietnamLocalDateTime(date).slice(0, 10);
+}
+
+function parseVietnamDateKey(value?: string): Date | undefined {
+  const key = String(value || '').slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? new Date(`${key}T12:00:00+07:00`) : undefined;
+}
+
 /** Khớp 100% logic parseVietnamTaskInstant & calculateTaskDeadlineKpi từ bản web ERP. */
 function parseVietnamTaskInstant(value?: string): Date | undefined {
   const raw = String(value || '').trim();
@@ -77,6 +90,32 @@ function parseVietnamTaskInstant(value?: string): Date | undefined {
   const d = new Date(normalized);
   return Number.isNaN(d.valueOf()) ? undefined : d;
 }
+
+function formatTaskDateTime(value?: string): string {
+  const date = parseVietnamTaskInstant(value);
+  return date
+    ? date.toLocaleString('vi-VN', {
+        timeZone: 'Asia/Bangkok',
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : '';
+}
+
+function normalizeTaskDateTime(value?: string): string {
+  const date = parseVietnamTaskInstant(value);
+  return date ? getVietnamLocalDateTime(date) : '';
+}
+
+function formatProjectDate(value?: string): string {
+  const date = parseVietnamDateKey(value);
+  return date
+    ? date.toLocaleDateString('vi-VN', { timeZone: 'Asia/Bangkok', dateStyle: 'long' })
+    : '';
+}
+
+type DatePickerTarget = 'taskDue' | 'taskStart' | 'projectDue';
+type ActiveDatePicker = { target: DatePickerTarget; value: Date };
 
 function calculateTaskDeadlineKpi(task: HrKanbanTask) {
   if (task.status !== 'Done' && task.status !== 'done') return null;
@@ -161,11 +200,10 @@ export function KanbanTasksPanel({
   branchId?: string;
 }) {
   const { user } = useAuth();
-  const isManager =
-    user?.role === 'superadmin' ||
-    user?.role === 'admin' ||
-    user?.role === 'manager' ||
-    user?.role === 'branch_owner';
+  const permissions = user?.permissions ?? [];
+  const hasPermission = (permission: string) => permissions.includes('*') || permissions.includes(permission);
+  const canReadWork = hasPermission('work:read');
+  const canManageTasks = hasPermission('work:manage');
 
   const [projects, setProjects] = useState<HrKanbanProject[]>([]);
   const [tasks, setTasks] = useState<HrKanbanTask[]>([]);
@@ -210,6 +248,7 @@ export function KanbanTasksPanel({
   const [projPriority, setProjPriority] = useState('medium');
   const [projDueAt, setProjDueAt] = useState('');
   const [savingProj, setSavingProj] = useState(false);
+  const [activeDatePicker, setActiveDatePicker] = useState<ActiveDatePicker | null>(null);
 
   const loadData = useCallback(
     async (silent = false) => {
@@ -217,7 +256,7 @@ export function KanbanTasksPanel({
       setError(null);
       try {
         const [projList, taskList, empList] = await Promise.all([
-          listKanbanProjects(branchId),
+          listKanbanProjects(branchId).catch(() => []),
           listKanbanTasks(branchId),
           listHrEmployees(companyCode, branchId).catch(() => []),
         ]);
@@ -256,10 +295,14 @@ export function KanbanTasksPanel({
   }, [branchId, kpiPeriod]);
 
   useEffect(() => {
-    if (scopeFilter === 'kpi') {
+    if (scopeFilter === 'kpi' && canReadWork) {
       void loadKpi();
     }
-  }, [loadKpi, scopeFilter]);
+  }, [canReadWork, loadKpi, scopeFilter]);
+
+  useEffect(() => {
+    if (!canReadWork && scopeFilter !== 'all') setScopeFilter('all');
+  }, [canReadWork, scopeFilter]);
 
   const toggleGroup = useCallback((groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -269,6 +312,62 @@ export function KanbanTasksPanel({
       return next;
     });
   }, []);
+
+  const applyPickedDate = useCallback((target: DatePickerTarget, date: Date) => {
+    if (target === 'projectDue') {
+      setProjDueAt(getVietnamDateKey(date));
+      return;
+    }
+    const value = getVietnamLocalDateTime(date);
+    if (target === 'taskDue') setTaskDueDate(value);
+    else setTaskStartTime(value);
+  }, []);
+
+  const openDatePicker = useCallback(
+    (target: DatePickerTarget) => {
+      const currentValue = target === 'taskDue'
+        ? taskDueDate
+        : target === 'taskStart'
+          ? taskStartTime
+          : projDueAt;
+      const initialValue = target === 'projectDue'
+        ? parseVietnamDateKey(currentValue) || new Date()
+        : parseVietnamTaskInstant(currentValue) || new Date();
+
+      if (Platform.OS !== 'android') {
+        setActiveDatePicker({ target, value: initialValue });
+        return;
+      }
+
+      DateTimePickerAndroid.open({
+        value: initialValue,
+        mode: 'date',
+        display: 'calendar',
+        timeZoneName: 'Asia/Bangkok',
+        onChange: (event, selectedDate) => {
+          if (event.type !== 'set' || !selectedDate) return;
+          if (target === 'projectDue') {
+            applyPickedDate(target, selectedDate);
+            return;
+          }
+
+          const selectedDay = getVietnamDateKey(selectedDate);
+          const initialTime = getVietnamLocalDateTime(initialValue).slice(11, 16);
+          const timeValue = parseVietnamTaskInstant(`${selectedDay}T${initialTime}`) || selectedDate;
+          DateTimePickerAndroid.open({
+            value: timeValue,
+            mode: 'time',
+            display: 'clock',
+            is24Hour: true,
+            timeZoneName: 'Asia/Bangkok',
+            onChange: (timeEvent, selectedTime) => {
+              if (timeEvent.type === 'set' && selectedTime) applyPickedDate(target, selectedTime);
+            },
+          });
+        },
+      });
+    }, [applyPickedDate, projDueAt, taskDueDate, taskStartTime],
+  );
 
   const filteredTasks = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -338,8 +437,8 @@ export function KanbanTasksPanel({
     setTaskAssigneeUid(task.assigneeUid || '');
     setTaskStatus(normalizeStatus(task.status));
     setTaskPriority(task.priority || 'Medium');
-    setTaskStartTime(task.startTime ? task.startTime.slice(0, 16) : '');
-    setTaskDueDate(task.dueDate && task.dueDate !== 'Chưa cập nhật' ? task.dueDate.slice(0, 16) : '');
+    setTaskStartTime(task.startTime ? normalizeTaskDateTime(task.startTime) : '');
+    setTaskDueDate(task.dueDate ? normalizeTaskDateTime(task.dueDate) : '');
     setTaskEstTime(task.estTime != null ? String(task.estTime) : '');
     setTaskCategory(task.category || 'Hướng dẫn nhân viên mới');
     setTaskSalesKpiTarget(task.salesKpiTarget ? String(task.salesKpiTarget) : '');
@@ -354,7 +453,7 @@ export function KanbanTasksPanel({
     }
     const cleanDue = taskDueDate.trim();
     if (!cleanDue || !parseVietnamTaskInstant(cleanDue)) {
-      Alert.alert('Thiếu hạn chót', 'Hạn chót là bắt buộc (VD: 2026-11-30T17:00) để tính KPI.');
+      Alert.alert('Thiếu hạn chót', 'Vui lòng chọn ngày và giờ hạn chót để tính KPI.');
       return;
     }
     const estNum = taskEstTime.trim() ? Number(taskEstTime) : undefined;
@@ -585,23 +684,29 @@ export function KanbanTasksPanel({
     return (
       <Pressable
         key={task.id}
-        onPress={() => openEditTask(task)}
+        onPress={canManageTasks ? () => openEditTask(task) : undefined}
         style={styles.taskRow}
       >
         <View style={styles.taskRowTop}>
           <Text numberOfLines={2} style={styles.taskTitle}>
             {task.title}
           </Text>
-          <Pressable
-            hitSlop={6}
-            onPress={() => void onQuickAdvanceStatus(task)}
-            style={[styles.statusBadge, { backgroundColor: st.tone }]}
-          >
-            <View style={styles.iconButtonContent}>
+          {canManageTasks ? (
+            <Pressable
+              hitSlop={6}
+              onPress={() => void onQuickAdvanceStatus(task)}
+              style={[styles.statusBadge, { backgroundColor: st.tone }]}
+            >
+              <View style={styles.iconButtonContent}>
+                <Text style={[styles.statusBadgeText, { color: st.color }]}>{st.label}</Text>
+                <RefreshCw size={11} color={st.color} />
+              </View>
+            </Pressable>
+          ) : (
+            <View style={[styles.statusBadge, { backgroundColor: st.tone }]}>
               <Text style={[styles.statusBadgeText, { color: st.color }]}>{st.label}</Text>
-              <RefreshCw size={11} color={st.color} />
             </View>
-          </Pressable>
+          )}
         </View>
         <View style={styles.taskRowMeta}>
           <View style={styles.taskMetaGroup}>
@@ -669,14 +774,16 @@ export function KanbanTasksPanel({
           placeholderTextColor={colors.muted}
           style={styles.search}
         />
-        {isManager ? (
+        {canManageTasks ? (
           <Pressable onPress={openCreateProject} style={styles.secondaryActionBtn}>
             <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.secondaryActionText}>Dự án</Text></View>
           </Pressable>
         ) : null}
+        {canManageTasks && (
         <Pressable onPress={() => openCreateTask('')} style={styles.primaryBtn}>
           <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Việc</Text></View>
         </Pressable>
+        )}
       </View>
 
       {/* Scope Filter: Tất cả | Theo dự án | Không dự án | KPI tháng */}
@@ -688,7 +795,7 @@ export function KanbanTasksPanel({
             { key: 'no_project', label: `Không DA (${unassignedTasks.length})` },
             { key: 'kpi', label: 'KPI tháng' },
           ] as const
-        ).map((item) => {
+        ).filter((item) => canReadWork || item.key === 'all').map((item) => {
           const active = scopeFilter === item.key;
           return (
             <Pressable
@@ -697,14 +804,14 @@ export function KanbanTasksPanel({
               style={[styles.scopeBtn, active && styles.scopeBtnActive]}
             >
               <Text numberOfLines={1} style={[styles.scopeText, active && styles.scopeTextActive]}>
-                {item.label}
+                {item.key === 'all' && !canReadWork ? 'Việc của tôi' : item.label}
               </Text>
             </Pressable>
           );
         })}
       </View>
 
-      {scopeFilter === 'kpi' ? (
+      {scopeFilter === 'kpi' && canReadWork ? (
         <View style={styles.kpiWrap}>
           {/* Month selector bar */}
           <Card style={styles.kpiBar}>
@@ -744,7 +851,7 @@ export function KanbanTasksPanel({
             </Card>
           ) : kpiError ? (
             <Card style={styles.stateCard}>
-              <Text style={styles.errorText}>{kpiError}</Text>
+              <PopupError error={kpiError} />
               <Pressable onPress={() => void loadKpi()} style={styles.primaryBtn}>
                 <Text style={styles.primaryBtnText}>Thử lại</Text>
               </Pressable>
@@ -873,7 +980,7 @@ export function KanbanTasksPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void loadData()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -906,14 +1013,14 @@ export function KanbanTasksPanel({
                         </View>
                       </View>
                       <View style={styles.groupHeaderRight}>
-                        <Pressable
+                        {canManageTasks ? <Pressable
                           hitSlop={6}
                           onPress={() => openCreateTask(project.id)}
                           style={styles.tinyAddBtn}
                         >
                           <View style={styles.iconButtonContent}><Plus size={11} color={colors.primary} /><Text style={styles.tinyAddText}>Việc</Text></View>
-                        </Pressable>
-                        {isManager ? (
+                        </Pressable> : null}
+                        {canManageTasks ? (
                           <Pressable
                             hitSlop={6}
                             onPress={() => openEditProject(project)}
@@ -953,17 +1060,19 @@ export function KanbanTasksPanel({
                   <FolderOpen size={16} color={colors.muted} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.groupTitle}>Công việc không thuộc dự án</Text>
-                  <Text style={styles.groupSub}>{unassignedTasks.length} công việc độc lập</Text>
+                  <Text style={styles.groupTitle}>{canReadWork ? 'Công việc không thuộc dự án' : 'Việc của tôi'}</Text>
+                  <Text style={styles.groupSub}>
+                    {unassignedTasks.length} {canReadWork ? 'công việc độc lập' : 'công việc'}
+                  </Text>
                 </View>
                 <View style={styles.groupHeaderRight}>
-                  <Pressable
+                  {canManageTasks ? <Pressable
                     hitSlop={6}
                     onPress={() => openCreateTask('')}
                     style={styles.tinyAddBtn}
                   >
                     <View style={styles.iconButtonContent}><Plus size={11} color={colors.primary} /><Text style={styles.tinyAddText}>Việc</Text></View>
-                  </Pressable>
+                  </Pressable> : null}
                   {collapsedGroups.has('__UNASSIGNED__') ? <ChevronDown size={15} color={colors.muted} /> : <ChevronUp size={15} color={colors.muted} />}
                 </View>
               </Pressable>
@@ -1124,38 +1233,40 @@ export function KanbanTasksPanel({
                   </>
                 ) : null}
 
-                <Text style={styles.label}>Hạn chót * (YYYY-MM-DDTHH:mm)</Text>
+                <Text style={styles.label}>Hạn chót *</Text>
+                <Pressable style={styles.dateTimeField} onPress={() => openDatePicker('taskDue')}>
+                  <CalendarDays size={16} color={colors.primary} />
+                  <Text numberOfLines={1} style={taskDueDate ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+                    {taskDueDate ? formatTaskDateTime(taskDueDate) : 'Chọn ngày và giờ'}
+                  </Text>
+                  <ChevronRight size={16} color={colors.muted} />
+                </Pressable>
+
+                <Text style={styles.label}>Thời gian bắt đầu</Text>
+                <View style={styles.dateTimeInputRow}>
+                  <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('taskStart')}>
+                    <Clock3 size={16} color={colors.primary} />
+                    <Text numberOfLines={1} style={taskStartTime ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+                      {taskStartTime ? formatTaskDateTime(taskStartTime) : 'Chọn ngày và giờ'}
+                    </Text>
+                    <ChevronRight size={16} color={colors.muted} />
+                  </Pressable>
+                  {taskStartTime ? (
+                    <Pressable onPress={() => setTaskStartTime('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa thời gian bắt đầu">
+                      <X size={15} color={colors.muted} />
+                    </Pressable>
+                  ) : null}
+                </View>
+
+                <Text style={styles.label}>Giờ dự tính</Text>
                 <TextInput
-                  value={taskDueDate}
-                  onChangeText={setTaskDueDate}
-                  placeholder="2026-11-30T17:00"
+                  value={taskEstTime}
+                  onChangeText={setTaskEstTime}
+                  keyboardType="numeric"
+                  placeholder="VD: 4"
                   placeholderTextColor={colors.muted}
                   style={styles.field}
                 />
-
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>TG bắt đầu</Text>
-                    <TextInput
-                      value={taskStartTime}
-                      onChangeText={setTaskStartTime}
-                      placeholder="2026-11-21T08:30"
-                      placeholderTextColor={colors.muted}
-                      style={styles.field}
-                    />
-                  </View>
-                  <View style={{ width: 95 }}>
-                    <Text style={styles.label}>Giờ dự tính</Text>
-                    <TextInput
-                      value={taskEstTime}
-                      onChangeText={setTaskEstTime}
-                      keyboardType="numeric"
-                      placeholder="VD: 4"
-                      placeholderTextColor={colors.muted}
-                      style={styles.field}
-                    />
-                  </View>
-                </View>
 
                 <Text style={styles.label}>Link / Ghi chú</Text>
                 <TextInput
@@ -1176,7 +1287,7 @@ export function KanbanTasksPanel({
                   </Text>
                 </Pressable>
 
-                {editingTask && isManager ? (
+                {editingTask && canManageTasks ? (
                   <Pressable
                     onPress={() => onDeleteTask(editingTask)}
                     style={styles.deleteBtn}
@@ -1232,14 +1343,21 @@ export function KanbanTasksPanel({
                 ))}
               </View>
 
-              <Text style={styles.label}>Hạn hoàn thành (YYYY-MM-DD)</Text>
-              <TextInput
-                value={projDueAt}
-                onChangeText={setProjDueAt}
-                placeholder="2026-12-31"
-                placeholderTextColor={colors.muted}
-                style={styles.field}
-              />
+              <Text style={styles.label}>Hạn hoàn thành</Text>
+              <View style={styles.dateTimeInputRow}>
+                <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('projectDue')}>
+                  <CalendarDays size={16} color={colors.primary} />
+                  <Text numberOfLines={1} style={projDueAt ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+                    {projDueAt ? formatProjectDate(projDueAt) : 'Chọn ngày'}
+                  </Text>
+                  <ChevronRight size={16} color={colors.muted} />
+                </Pressable>
+                {projDueAt ? (
+                  <Pressable onPress={() => setProjDueAt('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa hạn hoàn thành">
+                    <X size={15} color={colors.muted} />
+                  </Pressable>
+                ) : null}
+              </View>
 
               <Pressable
                 disabled={savingProj}
@@ -1251,7 +1369,7 @@ export function KanbanTasksPanel({
                 </Text>
               </Pressable>
 
-              {editingProject && isManager ? (
+              {editingProject && canManageTasks ? (
                 <Pressable
                   onPress={() => onDeleteProject(editingProject)}
                   style={styles.deleteBtn}
@@ -1263,6 +1381,54 @@ export function KanbanTasksPanel({
           </Pressable>
         </Pressable>
       </Modal>
+
+      {Platform.OS === 'ios' && activeDatePicker ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setActiveDatePicker(null)}
+        >
+          <Pressable style={styles.pickerBackdrop} onPress={() => setActiveDatePicker(null)}>
+            <Pressable style={styles.pickerSheet} onPress={() => {}}>
+              <Text style={styles.pickerTitle}>
+                {activeDatePicker.target === 'taskDue'
+                  ? 'Chọn hạn chót'
+                  : activeDatePicker.target === 'taskStart'
+                    ? 'Chọn thời gian bắt đầu'
+                    : 'Chọn hạn hoàn thành'}
+              </Text>
+              <DateTimePicker
+                value={activeDatePicker.value}
+                mode={activeDatePicker.target === 'projectDue' ? 'date' : 'datetime'}
+                display="spinner"
+                locale="vi-VN"
+                is24Hour
+                timeZoneName="Asia/Bangkok"
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) {
+                    setActiveDatePicker((current) => current ? { ...current, value: selectedDate } : current);
+                  }
+                }}
+              />
+              <View style={styles.pickerActions}>
+                <Pressable onPress={() => setActiveDatePicker(null)} style={styles.pickerCancelBtn}>
+                  <Text style={styles.pickerCancelText}>Hủy</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    applyPickedDate(activeDatePicker.target, activeDatePicker.value);
+                    setActiveDatePicker(null);
+                  }}
+                  style={styles.pickerConfirmBtn}
+                >
+                  <Text style={styles.pickerConfirmText}>Xác nhận</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
     </ScrollView>
   );
 }
@@ -1385,6 +1551,19 @@ const styles = StyleSheet.create({
   form: { gap: 8, paddingBottom: 10 },
   label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
+  dateTimeField: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 11, paddingVertical: 8 },
+  dateTimeInputRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  dateTimeClear: { width: 30, height: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
+  dateTimeValue: { flex: 1, color: colors.ink, fontSize: 12 },
+  dateTimePlaceholder: { flex: 1, color: colors.muted, fontSize: 12 },
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.48)', justifyContent: 'center', padding: 20 },
+  pickerSheet: { backgroundColor: colors.white, borderRadius: 22, overflow: 'hidden', padding: 16 },
+  pickerTitle: { color: colors.ink, fontSize: 15, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  pickerActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
+  pickerCancelBtn: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 11, backgroundColor: '#F1F5F9' },
+  pickerCancelText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  pickerConfirmBtn: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 11, backgroundColor: colors.primary },
+  pickerConfirmText: { color: colors.white, fontSize: 12, fontWeight: '700' },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },

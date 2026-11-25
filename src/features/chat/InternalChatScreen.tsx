@@ -1,3 +1,4 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -430,7 +431,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
           </View>
         ) : messagesError && !messages.length ? (
           <View style={styles.centered}>
-            <Text style={styles.errorText}>{messagesError}</Text>
+            <PopupError error={messagesError} />
             <Pressable
               onPress={() => {
                 void loadMessages(activeRoom._id);
@@ -719,7 +720,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
           </Card>
         ) : roomsError && !rooms.length ? (
           <Card style={styles.stateCard}>
-            <Text style={styles.errorText}>{roomsError}</Text>
+            <PopupError error={roomsError} />
             <Pressable
               onPress={() => {
                 void loadRooms();

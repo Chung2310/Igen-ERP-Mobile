@@ -88,6 +88,7 @@ export type HrAttendanceRecord = {
 export type HrAttendanceRosterEntry = {
   uid: string;
   displayName: string;
+  branchId?: string;
 };
 
 export type HrCalendarEventType = 'event' | 'leave' | 'wfh' | 'exception' | 'reminder';
@@ -447,6 +448,7 @@ export type HrTrainingQuiz = {
 export type HrTrainingCourse = {
   _id?: string;
   id: string;
+  icon?: string;
   title?: string;
   name?: string;
   category?: string;
@@ -493,6 +495,8 @@ export type HrWorkflowAttachment = {
   name: string;
   url: string;
   type?: string;
+  size?: number;
+  uploadToken?: string;
 };
 
 export type HrWorkflowStep = {
@@ -523,11 +527,36 @@ export type HrPayrollRun = {
   periodKey: string;
   status: 'draft' | 'review' | 'closed' | 'paid' | string;
   version: number;
+  activeRevisionId?: string;
+  lines?: HrPayrollLine[];
+  effectiveLines?: HrPayrollLine[];
+  totals?: { grossPay?: number; deductions?: number; netPay?: number };
+  effectiveError?: { code?: string; message?: string };
   employeeCount?: number;
   totalGross?: number;
   totalNet?: number;
   totalDeductions?: number;
   publishedAt?: string;
+  publishedEmployeeIds?: string[];
+};
+
+export type HrPayrollLine = {
+  _id?: string;
+  id?: string;
+  employeeId: string;
+  employeeName?: string;
+  calculation?: Record<string, number | undefined>;
+  effectiveValues?: Record<string, number | undefined>;
+  systemValues?: Record<string, number | undefined>;
+  baseSalary?: number;
+  grossSalary?: number;
+  netSalary?: number;
+  gross?: number;
+  net?: number;
+  totalDeductions?: number;
+  deductionTotal?: number;
+  deductions?: number;
+  [key: string]: unknown;
 };
 
 export type HrPayslip = {
@@ -540,8 +569,13 @@ export type HrPayslip = {
   employeeCode?: string;
   department?: string;
   baseSalary?: number;
+  monthlySalary?: number;
   standardWorkDays?: number;
   actualWorkDays?: number;
+  workedDays?: number;
+  shortageDays?: number;
+  workedMinutes?: number;
+  shortageMinutes?: number;
   overtimeAmount?: number;
   allowances?: number;
   bonus?: number;

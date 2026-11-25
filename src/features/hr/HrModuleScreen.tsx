@@ -36,7 +36,11 @@ const HR_TABS: Array<{ key: HrTabId; label: string; icon: LucideIcon; readPermis
 ];
 
 export function HrModuleScreen() {
-  const { user } = useAuth();
+  const {
+    user,
+    activeBranchId: selectedBranchId,
+    setActiveBranchId: setSelectedBranchId,
+  } = useAuth();
   const [activeTab, setActiveTab] = useState<HrTabId>('employees');
 
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
@@ -47,7 +51,6 @@ export function HrModuleScreen() {
   const canSwitchBranch = isAdmin || !user?.branchId;
   const [branches, setBranches] = useState<ErpBranch[]>([]);
   const [branchReloadTick, setBranchReloadTick] = useState(0);
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(user?.branchId ?? '');
   const [branchModalOpen, setBranchModalOpen] = useState(false);
 
   useEffect(() => {
@@ -79,6 +82,8 @@ export function HrModuleScreen() {
   const canManageDepartments = isAdmin || hasPerm('hr:manage') || hasPerm('access:manage');
   const canViewAllPayroll =
     isAdmin || hasPerm('payroll-period:read') || hasPerm('payroll-period:manage');
+  const canViewPayrollPolicies = isAdmin || hasPerm('payroll-policy:read') || hasPerm('payroll-policy:manage');
+  const canManagePayrollPayments = isAdmin || hasPerm('payroll-payment:manage');
   const visibleTabs = HR_TABS.filter((tab) => !tab.readPermissions || tab.readPermissions.some(hasPerm));
   const activeVisibleTab = visibleTabs.some((tab) => tab.key === activeTab)
     ? activeTab
@@ -164,6 +169,7 @@ export function HrModuleScreen() {
           />
         ) : activeVisibleTab === 'recruitment' ? (
           <HrRecruitmentPanel
+            companyCode={user?.companyCode}
             branchId={activeBranchId}
             canManage={isManager || canManageDepartments || hasPerm('recruitment:manage')}
           />
@@ -173,13 +179,19 @@ export function HrModuleScreen() {
             canManage={isManager || user?.role === 'branch_owner' || canManageDepartments || hasPerm('training:manage')}
           />
         ) : activeVisibleTab === 'workflows' ? (
-          <HrWorkflowsPanel companyCode={user?.companyCode} />
+          <HrWorkflowsPanel
+            companyCode={user?.companyCode}
+            canManage={hasPerm('hr:manage')}
+          />
         ) : (
           <HrPayrollPanel
             companyCode={user?.companyCode}
             branchId={activeBranchId}
             canViewAll={canViewAllPayroll}
             canManage={isAdmin || hasPerm('payroll-period:manage')}
+            canViewPolicies={canViewPayrollPolicies}
+            canPublishPayslips={canManagePayrollPayments}
+            canMarkPaid={canManagePayrollPayments}
           />
         )}
       </View>

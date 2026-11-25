@@ -1,3 +1,4 @@
+import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -76,15 +77,20 @@ function formatDateLabel(iso?: string): string {
 }
 
 export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } = {}) {
-  const { user } = useAuth();
+  const {
+    user,
+    activeBranchId: branchId,
+    setActiveBranchId: setBranchId,
+  } = useAuth();
 
   // Resolve active branchId (important for admin users whose /auth/me has no branchId)
-  const [branchId, setBranchId] = useState<string | undefined>(user?.branchId);
   useEffect(() => {
-    if (user?.branchId) {
-      setBranchId(user.branchId);
+    const canSwitchBranch = user?.role === 'admin' || user?.role === 'superadmin' || !user?.branchId;
+    if (!canSwitchBranch && user?.branchId) {
+      if (branchId !== user.branchId) setBranchId(user.branchId);
       return;
     }
+    if (branchId) return;
     if (!user?.companyCode) return;
     const controller = new AbortController();
     void fetchCompanyBranches(controller.signal)
@@ -95,7 +101,7 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [user?.branchId, user?.companyCode]);
+  }, [branchId, setBranchId, user?.branchId, user?.companyCode, user?.role]);
 
   const [activeTab, setActiveTab] = useState<AssistantModuleTab>('chat');
   const [activeProject, setActiveProject] = useState<AssistantProject | null>(null);
@@ -427,9 +433,7 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
           ) : null}
 
       {errorBanner ? (
-        <View style={styles.errorStrip}>
-          <Text style={styles.errorStripText}>{errorBanner}</Text>
-        </View>
+        <PopupError error={errorBanner} />
       ) : null}
 
       {/* Conversation Area */}

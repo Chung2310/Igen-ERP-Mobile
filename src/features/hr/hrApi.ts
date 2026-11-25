@@ -1,5 +1,5 @@
 import type { DocumentPickerAsset } from 'expo-document-picker';
-import { apiRequest } from '@/core/network/apiClient';
+import { ApiError, apiRequest } from '@/core/network/apiClient';
 import type {
   HrAttendanceRecord,
   HrAttendanceRosterEntry,
@@ -38,6 +38,13 @@ import type {
 
 function branchHeaders(branchId?: string): Record<string, string> | undefined {
   return branchId ? { 'x-branch-id': branchId } : undefined;
+}
+
+function payrollOperationHeaders(runId: string, expectedVersion: number, branchId?: string): Record<string, string> {
+  return {
+    ...(branchHeaders(branchId) ?? {}),
+    'idempotency-key': `payroll-calculate:${runId}:${expectedVersion}`,
+  };
 }
 
 function buildQuery(params: Record<string, string | undefined>): string {
@@ -179,18 +186,78 @@ export async function listAttendanceRoster(branchId?: string): Promise<HrAttenda
   return res?.data ?? [];
 }
 
-export async function submitCheckIn(branchId?: string): Promise<{ message?: string }> {
-  return apiRequest<{ message?: string }>('/timekeeping/check-in', {
+export type TodayTimekeepingData = {
+  log: {
+    _id?: string;
+    date?: string;
+    status?: string;
+    shiftName?: string;
+    checkIn?: { time?: string; latitude?: number; longitude?: number; distance?: number } | null;
+    checkOut?: { time?: string; latitude?: number; longitude?: number; distance?: number } | null;
+  } | null;
+  workCalendar: {
+    date: string;
+    isWorkingDay: boolean;
+    label?: string;
+  } | null;
+};
+
+export async function getTodayTimekeeping(params?: {
+  uid?: string;
+  companyCode?: string;
+  branchId?: string;
+}): Promise<TodayTimekeepingData> {
+  const res = await apiRequest<{ data?: TodayTimekeepingData }>('/timekeeping/today', {
+    headers: branchHeaders(params?.branchId),
+  });
+  const result: TodayTimekeepingData = res?.data ?? { log: null, workCalendar: null };
+
+  // Backend /timekeeping/today chỉ trả về log đang hoạt động (chưa check-out).
+  // Nếu đã check-out trong ngày, tra cứu thêm bản ghi hoàn tất của hôm nay.
+  if (!result.log && params?.uid) {
+    try {
+      const now = new Date();
+      const todayKey =
+        result.workCalendar?.date ||
+        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const qs = new URLSearchParams();
+      if (params.companyCode) qs.set('companyCode', params.companyCode);
+      qs.set('uid', params.uid);
+      qs.set('date', todayKey);
+      qs.set('limit', '1');
+      const fallback = await apiRequest<{ data?: Array<NonNullable<TodayTimekeepingData['log']>> }>(
+        `/crud/timekeeping-logs?${qs.toString()}`,
+        { headers: branchHeaders(params.branchId) },
+      );
+      if (fallback?.data?.[0]) {
+        result.log = fallback.data[0];
+      }
+    } catch {
+      // Bỏ qua nếu tài khoản không có quyền đọc crud/timekeeping-logs
+    }
+  }
+
+  return result;
+}
+
+export async function submitCheckIn(
+  branchId?: string,
+  payload?: { latitude: number; longitude: number; deviceInfo?: string },
+): Promise<{ message?: string; data?: TodayTimekeepingData['log'] }> {
+  return apiRequest<{ message?: string; data?: TodayTimekeepingData['log'] }>('/timekeeping/check-in', {
     method: 'POST',
-    body: {},
+    body: payload ?? {},
     headers: branchHeaders(branchId),
   });
 }
 
-export async function submitCheckOut(branchId?: string): Promise<{ message?: string }> {
-  return apiRequest<{ message?: string }>('/timekeeping/check-out', {
+export async function submitCheckOut(
+  branchId?: string,
+  payload?: { latitude: number; longitude: number; deviceInfo?: string },
+): Promise<{ message?: string; data?: TodayTimekeepingData['log'] }> {
+  return apiRequest<{ message?: string; data?: TodayTimekeepingData['log'] }>('/timekeeping/check-out', {
     method: 'POST',
-    body: {},
+    body: payload ?? {},
     headers: branchHeaders(branchId),
   });
 }
@@ -662,6 +729,97 @@ export async function uploadHrMediaFile(
     mimeType: asset.mimeType || 'application/octet-stream',
     size: asset.size || 0,
   };
+}
+
+export async function uploadHrWorkflowAttachment(asset: DocumentPickerAsset, companyCode?: string): Promise<{
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  type: 'image' | 'video' | 'audio' | 'file';
+}> {
+  const maxSize = 25 * 1024 * 1024;
+  const size = asset.size || 0;
+  if (size > maxSize) throw new Error('Tệp đính kèm không được vượt quá 25 MB.');
+
+  const mimeType = asset.mimeType || 'application/octet-stream';
+  type SignedUpload = {
+    signature: string;
+    timestamp: number;
+    folder: string;
+    publicId: string;
+    apiKey: string;
+    cloudName: string;
+  };
+  let signedData: SignedUpload;
+  try {
+    const signed = await apiRequest<{
+      status?: string;
+      data?: SignedUpload;
+    }>('/media/sign-workflow-attachment-upload', {
+      method: 'POST',
+      body: { fileName: asset.name, mimeType, size },
+    });
+    if (!signed?.data) throw new Error('ERP không trả về thông tin xác thực tải tệp.');
+    signedData = signed.data;
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+    const tenantFolder = String(companyCode || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (!tenantFolder) throw new Error('Không xác định được doanh nghiệp để tải tệp lên.');
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = `igen_erp/managed/${tenantFolder}/workflow/attachments`;
+    const extension = asset.name.match(/\.[a-zA-Z0-9]{1,10}$/)?.[0] || '';
+    const publicId = `workflow_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}${extension}`;
+    const signed = await apiRequest<{
+      signature?: string;
+      apiKey?: string;
+      cloudName?: string;
+    }>('/media/sign-upload', {
+      method: 'POST',
+      body: { paramsToSign: { timestamp, folder, public_id: publicId } },
+    });
+    if (!signed.signature || !signed.apiKey || !signed.cloudName) {
+      throw new Error('ERP không trả về thông tin xác thực tải tệp.');
+    }
+    signedData = { ...signed, timestamp, folder, publicId } as SignedUpload;
+  }
+
+  const localFile = await fetch(asset.uri);
+  if (!localFile.ok) throw new Error('Không đọc được tệp đã chọn trên thiết bị.');
+  const blob = await localFile.blob();
+  const resourceType = mimeType.startsWith('image/')
+    ? 'image'
+    : mimeType.startsWith('video/') || mimeType.startsWith('audio/')
+      ? 'video'
+      : 'raw';
+  const form = new FormData();
+  form.append('file', blob, asset.name);
+  form.append('api_key', signedData.apiKey);
+  form.append('timestamp', String(signedData.timestamp));
+  form.append('folder', signedData.folder);
+  form.append('public_id', signedData.publicId);
+  form.append('signature', signedData.signature);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${encodeURIComponent(signedData.cloudName)}/${resourceType}/upload`,
+    { method: 'POST', body: form },
+  );
+  const payload = await response.json().catch(() => ({})) as {
+    secure_url?: string;
+    error?: { message?: string };
+  };
+  if (!response.ok || !payload.secure_url) {
+    throw new Error(payload.error?.message || `Cloudinary từ chối tải tệp (HTTP ${response.status}).`);
+  }
+
+  const type = mimeType.startsWith('image/')
+    ? 'image'
+    : mimeType.startsWith('video/')
+      ? 'video'
+      : mimeType.startsWith('audio/')
+        ? 'audio'
+        : 'file';
+  return { url: payload.secure_url, name: asset.name, mimeType, size, type };
 }
 
 export async function createLeaveTemplate(payload: {
@@ -1154,7 +1312,7 @@ export async function listTrainingCourses(companyCode?: string): Promise<HrTrain
 }
 
 export async function createTrainingCourse(
-  payload: Partial<HrTrainingCourse> & { title: string; companyCode: string },
+  payload: Partial<HrTrainingCourse> & { title: string; companyCode: string; icon: string },
 ): Promise<HrTrainingCourse> {
   const res = await apiRequest<{ data: HrTrainingCourse & { _id?: string } }>(
     '/crud/training-courses',
@@ -1226,16 +1384,29 @@ export async function createTrainingEnrollment(payload: {
   return { ...res.data, id: res.data._id || res.data.id };
 }
 
+async function retryTrainingUpdateOnGatewayFailure<T>(request: () => Promise<T>): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    if (!(error instanceof ApiError) || ![502, 503, 504].includes(error.status)) throw error;
+    // Enrollment updates are idempotent, so retry once after a transient ERP proxy failure.
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    return request();
+  }
+}
+
 export async function updateTrainingEnrollment(
   enrollmentId: string,
   payload: Partial<HrTrainingEnrollment>,
 ): Promise<HrTrainingEnrollment> {
-  const res = await apiRequest<{ data: HrTrainingEnrollment & { _id?: string } }>(
-    `/crud/training-enrollments/${encodeURIComponent(enrollmentId)}`,
-    {
-      method: 'PATCH',
-      body: payload,
-    },
+  const res = await retryTrainingUpdateOnGatewayFailure(() =>
+    apiRequest<{ data: HrTrainingEnrollment & { _id?: string } }>(
+      `/crud/training-enrollments/${encodeURIComponent(enrollmentId)}`,
+      {
+        method: 'PATCH',
+        body: payload,
+      },
+    ),
   );
   return { ...res.data, id: res.data._id || res.data.id };
 }
@@ -1251,6 +1422,7 @@ export async function listHrWorkflows(companyCode?: string): Promise<HrWorkflow[
 
 export async function createHrWorkflow(payload: {
   companyCode: string;
+  creatorUid: string;
   name: string;
   category?: string;
   description?: string;
@@ -1292,15 +1464,19 @@ export async function deleteHrWorkflow(workflowId: string): Promise<void> {
 }
 
 // --- 10. Bảng lương / Phiếu lương ---
-export async function listMyPayslips(): Promise<HrPayslip[]> {
-  const res = await apiRequest<{ data?: HrPayslip[] } | HrPayslip[]>('/payroll/employee/me/payslips');
+export async function listMyPayslips(branchId?: string): Promise<HrPayslip[]> {
+  const res = await apiRequest<{ data?: HrPayslip[] } | HrPayslip[]>(
+    '/payroll/employee/me/payslips',
+    { headers: branchHeaders(branchId) },
+  );
   return Array.isArray(res) ? res : (res?.data ?? []);
 }
 
-export async function requestMyPayslipReview(runId: string, message: string): Promise<void> {
+export async function requestMyPayslipReview(runId: string, message: string, branchId?: string): Promise<void> {
   await apiRequest(`/payroll/employee/me/payslips/${encodeURIComponent(runId)}/review-requests`, {
     method: 'POST',
     body: { message },
+    headers: branchHeaders(branchId),
   });
 }
 
@@ -1315,8 +1491,14 @@ export async function getPayrollRun(
     );
     const data = res && 'data' in res ? res.data : res;
     return data && '_id' in data ? (data as HrPayrollRun) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    const details = error instanceof ApiError && typeof error.details === 'object' && error.details !== null
+      ? error.details as { code?: unknown }
+      : undefined;
+    if (error instanceof ApiError && error.status === 404 && details?.code === 'PAYROLL_RUN_NOT_FOUND') {
+      return null;
+    }
+    throw error;
   }
 }
 
@@ -1356,7 +1538,52 @@ export async function getPayrollMonthlyKpi(
 }
 
 export async function processPayrollPeriod(periodKey: string, branchId?: string): Promise<void> {
-  await apiRequest(`/payroll/periods/${encodeURIComponent(periodKey)}/process`, {
+  try {
+    await apiRequest(`/payroll/periods/${encodeURIComponent(periodKey)}/process`, {
+      method: 'POST',
+      body: {},
+      headers: branchHeaders(branchId),
+    });
+  } catch (error) {
+    const details = error instanceof ApiError && typeof error.details === 'object' && error.details !== null
+      ? error.details as { code?: unknown; stage?: unknown }
+      : undefined;
+    if (
+      !(error instanceof ApiError)
+      || error.status !== 409
+      || details?.code !== 'PAYROLL_PROCESSING_FAILED'
+      || details.stage !== 'sync_attendance'
+    ) {
+      throw error;
+    }
+
+    // The attendance snapshot is already locked, so calculate from it without syncing it again.
+    await apiRequest(`/payroll/periods/${encodeURIComponent(periodKey)}/run`, {
+      method: 'POST',
+      body: {},
+      headers: branchHeaders(branchId),
+    });
+  }
+}
+
+export async function calculatePayrollRun(runId: string, expectedVersion: number, branchId?: string): Promise<void> {
+  await apiRequest(`/payroll/runs/${encodeURIComponent(runId)}/calculate`, {
+    method: 'POST',
+    body: { expectedVersion },
+    headers: payrollOperationHeaders(runId, expectedVersion, branchId),
+  });
+}
+
+export async function reviewPayrollPeriod(periodKey: string, branchId?: string): Promise<void> {
+  await apiRequest(`/payroll/periods/${encodeURIComponent(periodKey)}/approve`, {
+    method: 'POST',
+    body: {},
+    headers: branchHeaders(branchId),
+  });
+}
+
+export async function closePayrollPeriod(periodKey: string, branchId?: string): Promise<void> {
+  await apiRequest(`/payroll/periods/${encodeURIComponent(periodKey)}/close`, {
     method: 'POST',
     body: {},
     headers: branchHeaders(branchId),

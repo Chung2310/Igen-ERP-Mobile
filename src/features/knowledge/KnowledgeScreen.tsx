@@ -1,3 +1,5 @@
+import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -94,11 +96,11 @@ export function KnowledgeScreen() {
 
   async function addDocuments() {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
+      const result = await withAppLockSuspended(() => DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/plain'],
         multiple: true,
         copyToCacheDirectory: true,
-      });
+      }));
       if (result.canceled) return;
 
       setSaving(true);
@@ -155,7 +157,7 @@ export function KnowledgeScreen() {
         <Text style={styles.eyebrow}>DỮ LIỆU AI</Text>
         <Text style={styles.title}>Kho tri thức</Text>
         <Text style={styles.subtitle}>Tài liệu doanh nghiệp được quản lý trực tiếp trong ERP.</Text>
-        {!!error && <Card style={styles.errorCard}><Text style={styles.errorText}>{error}</Text></Card>}
+        {!!error && <PopupError error={error} />}
 
         <View style={styles.summaryRow}>
           <Card style={styles.summaryCard}><Text style={styles.summaryValue}>{documents.length}</Text><Text style={styles.summaryLabel}>Tài liệu</Text></Card>

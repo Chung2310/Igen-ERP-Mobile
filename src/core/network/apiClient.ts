@@ -1,4 +1,6 @@
 import { clearAccessToken, getAccessToken, saveAccessToken } from '@/core/auth/authSession';
+import { notifySessionInvalidation } from '@/core/auth/sessionInvalidation';
+import { updateAuthSessionSocketToken } from '@/core/auth/sessionSocket';
 
 export class ApiError extends Error {
   constructor(
@@ -46,9 +48,31 @@ async function parseResponse(response: Response): Promise<unknown> {
 }
 
 function messageFrom(result: unknown, fallback: string) {
-  return typeof result === 'object' && result !== null && 'message' in result
-    ? String(result.message)
-    : fallback;
+  if (typeof result === 'object' && result !== null) {
+    if ('message' in result && typeof result.message === 'string' && result.message.trim()) {
+      return result.message;
+    }
+    if ('error' in result && typeof result.error === 'string' && result.error.trim()) {
+      return result.error;
+    }
+  }
+  return fallback;
+}
+
+function sessionInvalidationFrom(result: unknown) {
+  if (typeof result !== 'object' || result === null) return undefined;
+  const value = result as { code?: unknown; message?: unknown };
+  const code = typeof value.code === 'string' ? value.code : undefined;
+  const message = typeof value.message === 'string' ? value.message : undefined;
+  const replacedByAnotherDevice = message?.toLocaleLowerCase().includes('thiết bị khác')
+    || message?.toLocaleLowerCase().includes('phiên đăng nhập đã được sử dụng');
+  if (code === 'SESSION_REPLACED' || code === 'ACCOUNT_ACCESS_CHANGED' || replacedByAnotherDevice) {
+    return {
+      code: code || 'SESSION_REPLACED',
+      message: message || 'Phiên đăng nhập đã được sử dụng trên thiết bị khác. Vui lòng đăng nhập lại.',
+    };
+  }
+  return undefined;
 }
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -63,10 +87,13 @@ async function refreshAccessToken(): Promise<string | null> {
       });
       const result = await parseResponse(response) as { accessToken?: string } | undefined;
       if (!response.ok || !result?.accessToken) {
+        const invalidation = sessionInvalidationFrom(result);
+        if (invalidation) notifySessionInvalidation(invalidation);
         await clearAccessToken();
         return null;
       }
       await saveAccessToken(result.accessToken);
+      updateAuthSessionSocketToken(result.accessToken);
       return result.accessToken;
     } catch {
       return null;
@@ -119,6 +146,8 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
   if (!response.ok) {
     const result = await parseResponse(response);
+    const invalidation = sessionInvalidationFrom(result);
+    if (invalidation) notifySessionInvalidation(invalidation);
     throw new ApiError(messageFrom(result, `ERP API trả về lỗi (${response.status})`), response.status, result);
   }
 

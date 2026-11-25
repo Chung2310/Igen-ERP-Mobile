@@ -28,13 +28,16 @@ const tabs: Array<{ key: InventoryTab; label: string; icon: LucideIcon }> = [
 ];
 
 export function InventoryModuleScreen() {
-  const { user } = useAuth();
+  const {
+    user,
+    activeBranchId: selectedBranchId,
+    setActiveBranchId: setSelectedBranchId,
+  } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const canRead = isAdmin || Boolean(user?.permissions?.some((permission) => ['*', 'inventory:read', 'inventory:manage'].includes(permission)));
   const canManage = isAdmin || Boolean(user?.permissions?.some((permission) => ['*', 'inventory:manage'].includes(permission)));
   const canSwitchBranch = isAdmin || !user?.branchId;
   const [branches, setBranches] = useState<ErpBranch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState(user?.branchId ?? '');
   const [branchModalOpen, setBranchModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<InventoryTab>('products');
 

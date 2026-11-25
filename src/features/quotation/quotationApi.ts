@@ -507,8 +507,11 @@ export async function queueSettlementFile(scope: QuotationScope, id: string) {
 
 export async function loadDocumentTemplates(scope: QuotationScope, category: 'contract' | 'acceptance' | 'settlement') {
   const endpoint = category === 'contract' ? '/quotation/contract-templates' : category === 'acceptance' ? '/quotation/acceptance-templates' : '/quotation/settlement-templates';
-  const result = await apiRequest<{ templates: QuotationTemplate[] }>(scopedPath(endpoint, scope), scopedOptions(scope));
-  return result.templates;
+  const result = await apiRequest<{ templates: Array<QuotationTemplate & { _id?: string }> }>(scopedPath(endpoint, scope), scopedOptions(scope));
+  return (result.templates ?? []).map((template) => ({
+    ...template,
+    id: template.id || template._id || '',
+  })).filter((template) => Boolean(template.id));
 }
 
 export async function loadPriceLists(scope: QuotationScope) {

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PopupError } from '@/components/PopupError';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +26,8 @@ import { Card } from '@/components/Card';
 import {
   approvePayrollAdjustment,
   closePayrollRun,
+  closePayrollPeriod,
+  calculatePayrollRun,
   createPayrollAdjustment,
   getPayrollMonthlyKpi,
   getPayrollPeriodResults,
@@ -39,11 +42,13 @@ import {
   rejectPayrollAdjustment,
   reopenPayrollRun,
   requestMyPayslipReview,
+  reviewPayrollPeriod,
   reviewPayrollRun,
 } from '@/features/hr/hrApi';
 import type {
   HrEmployee,
   HrPayrollAdjustment,
+  HrPayrollLine,
   HrPayrollPolicy,
   HrPayrollRun,
   HrPayslip,
@@ -73,6 +78,15 @@ function formatVnd(val?: number): string {
   return `${Math.round(n).toLocaleString('vi-VN')} ₫`;
 }
 
+function firstNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
 function shiftPeriod(periodKey: string, deltaMonths: number): string {
   const [y, m] = periodKey.split('-').map(Number);
   const d = new Date(y, (m || 1) - 1 + deltaMonths, 1);
@@ -84,13 +98,20 @@ export function HrPayrollPanel({
   branchId,
   canViewAll,
   canManage,
+  canViewPolicies = canViewAll,
+  canPublishPayslips = canManage,
+  canMarkPaid = canManage,
 }: {
   companyCode?: string;
   branchId?: string;
   canViewAll: boolean;
   canManage: boolean;
+  canViewPolicies?: boolean;
+  canPublishPayslips?: boolean;
+  canMarkPaid?: boolean;
 }) {
   const [section, setSection] = useState<PayrollSection>(canViewAll ? 'overview' : 'mine');
+  const previousCanViewAll = useRef(canViewAll);
   const [period, setPeriod] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -134,9 +155,9 @@ export function HrPayrollPanel({
       setError(null);
       try {
         if (section === 'mine' || !canViewAll) {
-          setMyPayslips(await listMyPayslips());
+          setMyPayslips(await listMyPayslips(branchId));
         } else if (section === 'policies') {
-          setPolicies(await listPayrollPolicies(branchId));
+          setPolicies(canViewPolicies ? await listPayrollPolicies(branchId) : []);
         } else if (section === 'adjustments') {
           const [adjList, empList] = await Promise.all([
             listPayrollAdjustments(period, branchId).catch(() => []),
@@ -161,35 +182,84 @@ export function HrPayrollPanel({
         setRefreshing(false);
       }
     },
-    [branchId, canViewAll, companyCode, period, section],
+    [branchId, canViewAll, canViewPolicies, companyCode, period, section],
   );
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!canViewAll) setSection('mine');
+    else if (!previousCanViewAll.current) setSection('overview');
+    previousCanViewAll.current = canViewAll;
+  }, [canViewAll]);
+
+  useEffect(() => {
+    if (!canViewPolicies && section === 'policies') setSection(canViewAll ? 'overview' : 'mine');
+  }, [canViewAll, canViewPolicies, section]);
+
+  const payrollRows = useMemo<HrPayslip[]>(() => {
+    if (!run) return results;
+    if (run.effectiveError) return [];
+    const lines: HrPayrollLine[] = run.effectiveLines?.length ? run.effectiveLines : (run.lines ?? []);
+    if (!lines.length) return [];
+    const attendanceByEmployee = new Map(results.map((row) => [String(row.employeeId || ''), row]));
+    return lines.map((line) => {
+      const attendance = attendanceByEmployee.get(String(line.employeeId));
+      const calculation = line.calculation ?? {};
+      const values = line.effectiveValues ?? line.systemValues ?? {};
+      const netSalary = firstNumber(line.netSalary, line.net, calculation.net);
+      const totalDeductions = firstNumber(line.totalDeductions, line.deductionTotal, line.deductions, calculation.deductions);
+      return {
+        _id: line._id ?? attendance?._id,
+        id: line.id ?? attendance?.id,
+        runId: run._id,
+        periodKey: run.periodKey,
+        employeeId: line.employeeId,
+        employeeName: line.employeeName ?? attendance?.employeeName,
+        department: attendance?.department,
+        baseSalary: firstNumber(line.baseSalary, values.baseSalary, calculation.monthlySalary, attendance?.baseSalary, attendance?.monthlySalary),
+        grossSalary: firstNumber(line.grossSalary, line.gross, calculation.gross)
+          ?? (netSalary !== undefined && totalDeductions !== undefined ? netSalary + totalDeductions : undefined),
+        netSalary,
+        totalDeductions,
+        deductions: totalDeductions,
+        actualWorkDays: attendance?.actualWorkDays ?? attendance?.workedDays,
+        standardWorkDays: attendance?.standardWorkDays,
+        workedDays: attendance?.workedDays,
+        shortageDays: attendance?.shortageDays,
+        workedMinutes: attendance?.workedMinutes,
+        shortageMinutes: attendance?.shortageMinutes,
+        status: run.status,
+      };
+    });
+  }, [results, run]);
+
   const filteredResults = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return results;
-    return results.filter(
+    if (!q) return payrollRows;
+    return payrollRows.filter(
       (r) =>
         (r.employeeName || '').toLowerCase().includes(q) ||
         (r.department || '').toLowerCase().includes(q) ||
         (r.employeeCode || '').toLowerCase().includes(q),
     );
-  }, [results, search]);
+  }, [payrollRows, search]);
 
   const totals = useMemo(() => {
-    let gross = 0;
-    let net = 0;
-    let ded = 0;
-    for (const r of results) {
-      gross += Number(r.grossSalary ?? 0);
-      net += Number(r.netSalary ?? 0);
-      ded += Number(r.totalDeductions ?? r.deductions ?? 0);
-    }
-    return { count: results.length, gross, net, ded };
-  }, [results]);
+    const sum = (getValue: (row: HrPayslip) => unknown) => payrollRows.reduce((total, row) => total + (firstNumber(getValue(row)) ?? 0), 0);
+    const runTotals = run?.totals;
+    return {
+      count: payrollRows.length,
+      gross: firstNumber(runTotals?.grossPay, run?.totalGross) ?? sum((row) => row.grossSalary),
+      net: firstNumber(runTotals?.netPay, run?.totalNet) ?? sum((row) => row.netSalary),
+      ded: firstNumber(runTotals?.deductions, run?.totalDeductions) ?? sum((row) => row.totalDeductions ?? row.deductions),
+      base: sum((row) => row.baseSalary ?? row.monthlySalary),
+      workedDays: sum((row) => row.actualWorkDays ?? row.workedDays),
+      shortageEmployees: payrollRows.filter((row) => (firstNumber(row.shortageDays) ?? 0) > 0 || (firstNumber(row.shortageMinutes) ?? 0) > 0).length,
+    };
+  }, [payrollRows, run]);
 
   const runAction = useCallback(
     async (fn: () => Promise<void>, successMsg: string) => {
@@ -232,7 +302,7 @@ export function HrPayrollPanel({
     }
     setSendingReview(true);
     try {
-      await requestMyPayslipReview(selectedSlip.runId, reviewMsg.trim());
+      await requestMyPayslipReview(selectedSlip.runId, reviewMsg.trim(), branchId);
       setReviewMsg('');
       Alert.alert('Đã gửi', 'Yêu cầu đối soát phiếu lương đã được gửi tới bộ phận Nhân sự.');
     } catch (err) {
@@ -240,9 +310,16 @@ export function HrPayrollPanel({
     } finally {
       setSendingReview(false);
     }
-  }, [reviewMsg, selectedSlip?.runId]);
+  }, [branchId, reviewMsg, selectedSlip?.runId]);
 
-  const stepIndex = run ? STEPS.findIndex((s) => s.key === run.status) : -1;
+  const stepIndex = run ? STEPS.findIndex((s) => s.key === run.status) : results.length ? 0 : -1;
+  const effectiveDataAvailable = !run?.effectiveError;
+  const subSections: Array<{ key: PayrollSection; label: string }> = [
+    { key: 'overview', label: 'Bảng lương' },
+    { key: 'adjustments', label: 'Điều chỉnh' },
+    ...(canViewPolicies ? [{ key: 'policies' as const, label: 'Chính sách' }] : []),
+    { key: 'mine', label: 'Phiếu lương tôi' },
+  ];
 
   return (
     <ScrollView
@@ -267,14 +344,7 @@ export function HrPayrollPanel({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 6, marginBottom: 10 }}
         >
-          {(
-            [
-              { key: 'overview', label: 'Bảng lương' },
-              { key: 'adjustments', label: 'Điều chỉnh' },
-              { key: 'policies', label: 'Chính sách' },
-              { key: 'mine', label: 'Phiếu lương tôi' },
-            ] as const
-          ).map((item) => {
+          {subSections.map((item) => {
             const active = section === item.key;
             return (
               <Pressable
@@ -310,7 +380,7 @@ export function HrPayrollPanel({
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
-          <Text style={styles.errorText}>{error}</Text>
+          <PopupError error={error} />
           <Pressable onPress={() => void load()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
@@ -497,24 +567,41 @@ export function HrPayrollPanel({
           </View>
 
           {/* Summary KPI Grid */}
-          <View style={styles.kpiGrid}>
+          {run?.effectiveError ? (
+            <PopupError error={`Không thể xác thực số liệu bảng lương. Dữ liệu bị ẩn để tránh hiển thị sai. (${run.effectiveError.code || 'PAYROLL_EFFECTIVE_UNAVAILABLE'})`} />
+          ) : <View style={styles.kpiGrid}>
             <View style={styles.kpiCard}>
               <Text style={styles.kpiLabel}>Nhân sự</Text>
               <Text style={styles.kpiVal}>{totals.count}</Text>
             </View>
-            <View style={styles.kpiCard}>
-              <Text style={styles.kpiLabel}>Tổng thu nhập</Text>
-              <Text style={styles.kpiVal}>{formatCompactMoney(totals.gross)}</Text>
-            </View>
-            <View style={styles.kpiCard}>
-              <Text style={styles.kpiLabel}>Khấu trừ</Text>
-              <Text style={[styles.kpiVal, { color: '#B91C1C' }]}>{formatCompactMoney(totals.ded)}</Text>
-            </View>
-            <View style={styles.kpiCard}>
-              <Text style={styles.kpiLabel}>Thực lĩnh (Net)</Text>
-              <Text style={[styles.kpiVal, { color: '#16885A' }]}>{formatCompactMoney(totals.net)}</Text>
-            </View>
-          </View>
+            {run ? <>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>Tổng thu nhập</Text>
+                <Text style={styles.kpiVal}>{formatCompactMoney(totals.gross)}</Text>
+              </View>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>Khấu trừ</Text>
+                <Text style={[styles.kpiVal, { color: '#B91C1C' }]}>{formatCompactMoney(totals.ded)}</Text>
+              </View>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>Thực lĩnh</Text>
+                <Text style={[styles.kpiVal, { color: '#16885A' }]}>{formatCompactMoney(totals.net)}</Text>
+              </View>
+            </> : <>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>Tổng lương cơ bản</Text>
+                <Text style={styles.kpiVal}>{formatCompactMoney(totals.base)}</Text>
+              </View>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>Tổng ngày công</Text>
+                <Text style={styles.kpiVal}>{totals.workedDays.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}</Text>
+              </View>
+              <View style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>Nhân sự thiếu công</Text>
+                <Text style={[styles.kpiVal, { color: '#B91C1C' }]}>{totals.shortageEmployees}</Text>
+              </View>
+            </>}
+          </View>}
 
           {/* Manager workflow actions */}
           {canManage ? (
@@ -524,7 +611,9 @@ export function HrPayrollPanel({
                   disabled={actionLoading}
                   onPress={() =>
                     void runAction(
-                      () => processPayrollPeriod(period, branchId),
+                      () => run?.activeRevisionId
+                        ? calculatePayrollRun(run._id, run.version, branchId)
+                        : processPayrollPeriod(period, branchId),
                       `Đã tính bảng lương kỳ ${period}.`,
                     )
                   }
@@ -540,7 +629,9 @@ export function HrPayrollPanel({
                   disabled={actionLoading}
                   onPress={() =>
                     void runAction(
-                      () => reviewPayrollRun(run._id, run.version, branchId),
+                      () => run.activeRevisionId
+                        ? reviewPayrollRun(run._id, run.version, branchId)
+                        : reviewPayrollPeriod(period, branchId),
                       'Đã chuyển bảng lương sang bước Kiểm tra.',
                     )
                   }
@@ -552,14 +643,16 @@ export function HrPayrollPanel({
 
               {run?.status === 'review' ? (
                 <Pressable
-                  disabled={actionLoading}
+                  disabled={actionLoading || !effectiveDataAvailable}
                   onPress={() =>
                     void runAction(
-                      () => closePayrollRun(run._id, run.version, branchId),
+                      () => run.activeRevisionId
+                        ? closePayrollRun(run._id, run.version, branchId)
+                        : closePayrollPeriod(period, branchId),
                       'Đã chốt bảng lương kỳ này.',
                     )
                   }
-                  style={[styles.primaryBtn, { backgroundColor: '#0F766E' }, actionLoading && styles.disabled]}
+                  style={[styles.primaryBtn, { backgroundColor: '#0F766E' }, (actionLoading || !effectiveDataAvailable) && styles.disabled]}
                 >
                   <Lock size={12} color={colors.white} />
                   <Text style={styles.primaryBtnText}>Chốt bảng lương</Text>
@@ -568,7 +661,7 @@ export function HrPayrollPanel({
 
               {run?.status === 'closed' ? (
                 <>
-                  <Pressable
+                  {canPublishPayslips && effectiveDataAvailable ? <Pressable
                     disabled={actionLoading}
                     onPress={() =>
                       void runAction(
@@ -580,8 +673,8 @@ export function HrPayrollPanel({
                   >
                     <Send size={12} color={colors.primary} />
                     <Text style={styles.outlineBtnText}>Phát hành phiếu</Text>
-                  </Pressable>
-                  <Pressable
+                  </Pressable> : null}
+                  {canMarkPaid ? <Pressable
                     disabled={actionLoading}
                     onPress={() =>
                       void runAction(
@@ -593,7 +686,7 @@ export function HrPayrollPanel({
                   >
                     <Check size={12} color={colors.white} />
                     <Text style={styles.primaryBtnText}>Đánh dấu đã trả</Text>
-                  </Pressable>
+                  </Pressable> : null}
                   <Pressable
                     onPress={() => {
                       setReopenReason('');
@@ -616,11 +709,11 @@ export function HrPayrollPanel({
             style={[styles.field, { marginBottom: 10 }]}
           />
 
-          {!filteredResults.length ? (
+          {run?.effectiveError ? null : !filteredResults.length ? (
             <Card style={styles.stateCard}>
               <Text style={styles.muted}>
                 Chưa có kết quả bảng lương kỳ {period}.
-                {canManage ? ' Bấm "Tính / Xử lý lương" để khởi tạo.' : ''}
+                {!run && canManage ? ' Bấm "Tính / Xử lý lương" để khởi tạo.' : run?.status === 'draft' && canManage ? ' Bấm "Tính / Xử lý lương" để cập nhật kỳ nháp.' : ''}
               </Text>
             </Card>
           ) : (
@@ -644,11 +737,16 @@ export function HrPayrollPanel({
                           {typeof kpi === 'number' ? ` · KPI: ${kpi.toFixed(1)}%` : ''}
                         </Text>
                       </View>
-                      <Text style={styles.moneyVal}>{formatVnd(row.netSalary ?? row.grossSalary)}</Text>
+                      <Text style={styles.moneyVal}>
+                        {run
+                          ? formatVnd(row.netSalary ?? row.grossSalary)
+                          : formatVnd(row.monthlySalary ?? row.baseSalary)}
+                      </Text>
                     </View>
                     <Text style={styles.subMeta}>
-                      Gross: {formatCompactMoney(row.grossSalary)} · Khấu trừ:{' '}
-                      {formatCompactMoney(row.totalDeductions ?? row.deductions ?? 0)}
+                      {run
+                        ? `Tổng thu nhập: ${formatCompactMoney(row.grossSalary)} · Khấu trừ: ${formatCompactMoney(row.totalDeductions ?? row.deductions ?? 0)}`
+                        : `Lương cơ bản: ${formatCompactMoney(row.monthlySalary ?? row.baseSalary)} · Công: ${row.workedDays ?? row.actualWorkDays ?? 0} · Thiếu công: ${row.shortageDays ?? 0}`}
                     </Text>
                   </Card>
                 );

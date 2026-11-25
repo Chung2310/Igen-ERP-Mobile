@@ -1,3 +1,4 @@
+import { PopupError } from '@/components/PopupError';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { colors } from '@/theme/colors';
@@ -246,22 +247,8 @@ export function OverviewLoading({ label }: { label: string }) {
   );
 }
 
-export function OverviewError({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry: () => void;
-}) {
-  return (
-    <Card style={[styles.stateCard, styles.errorCard]}>
-      <Text style={styles.errorTitle}>Không tải được dữ liệu từ ERP</Text>
-      <Text style={styles.errorMessage}>{message}</Text>
-      <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryBtn}>
-        <Text style={styles.retryBtnText}>Thử tải lại</Text>
-      </Pressable>
-    </Card>
-  );
+export function OverviewError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <PopupError error={message} title="Không tải được dữ liệu từ ERP" onRetry={onRetry} />;
 }
 
 export function NoticeStrip({ text }: { text: string }) {

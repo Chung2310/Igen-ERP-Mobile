@@ -1,5 +1,8 @@
+import { PopupError } from '@/components/PopupError';
+import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  AppState,
   ActivityIndicator,
   Alert,
   Image,
@@ -15,12 +18,14 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as ExpoCamera from 'expo-camera';
 import * as SecureStore from 'expo-secure-store';
 import {
   Camera,
-  Check,
   CheckCircle2,
   ExternalLink,
+  Fingerprint,
+  Images,
   Mail,
   Phone,
   RefreshCw,
@@ -38,6 +43,13 @@ import {
   type ErpHealth,
 } from '@/core/auth/authApi';
 import { useAuth } from '@/core/auth/AuthProvider';
+import {
+  authenticateBiometric,
+  biometricErrorMessage,
+  getBiometricAvailability,
+  isBiometricCancellation,
+  type BiometricFeature,
+} from '@/core/auth/biometricAuth';
 import { ERP_PRIVACY_POLICY_URL, ERP_TERMS_OF_SERVICE_URL } from '@/core/network/erpWebLinks';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { colors } from '@/theme/colors';
@@ -46,7 +58,7 @@ const SECTION_TITLES: Record<string, string> = {
   account: 'Thông tin cá nhân',
   notifications: 'Thông báo',
   security: 'Bảo mật đăng nhập',
-  language: 'Ngôn ngữ',
+  permissions: 'Quyền ứng dụng',
   privacy: 'Quyền riêng tư',
   support: 'Trợ giúp và hỗ trợ',
 };
@@ -58,7 +70,6 @@ type LocalPrefs = {
   notifTasks: boolean;
   notifLeaves: boolean;
   notifAttendance: boolean;
-  language: 'vi' | 'en';
 };
 
 const DEFAULT_PREFS: LocalPrefs = {
@@ -66,7 +77,6 @@ const DEFAULT_PREFS: LocalPrefs = {
   notifTasks: true,
   notifLeaves: true,
   notifAttendance: true,
-  language: 'vi',
 };
 
 async function loadPrefs(): Promise<LocalPrefs> {
@@ -110,8 +120,8 @@ export default function ProfileSectionScreen() {
           <NotificationsDetailSection />
         ) : key === 'security' ? (
           <SecurityDetailSection />
-        ) : key === 'language' ? (
-          <LanguageDetailSection />
+        ) : key === 'permissions' ? (
+          <AppPermissionsDetailSection />
         ) : key === 'privacy' ? (
           <PrivacyDetailSection />
         ) : (
@@ -119,6 +129,213 @@ export default function ProfileSectionScreen() {
         )}
       </ScrollView>
     </Screen>
+  );
+}
+
+type AppPermissionState = {
+  granted: boolean;
+  canAskAgain?: boolean;
+};
+
+function AppPermissionsDetailSection() {
+  const [cameraPermission, setCameraPermission] = useState<AppPermissionState | null>(null);
+  const [photoPermission, setPhotoPermission] = useState<AppPermissionState | null>(null);
+  const [biometricStatus, setBiometricStatus] = useState<{ available: boolean; message?: string } | null>(null);
+  const [busy, setBusy] = useState<'camera' | 'photos' | null>(null);
+
+  const refreshPermissions = useCallback(async () => {
+    try {
+      const [camera, photos, biometrics] = await Promise.all([
+        ExpoCamera.Camera.getCameraPermissionsAsync(),
+        ImagePicker.getMediaLibraryPermissionsAsync(),
+        getBiometricAvailability('loginEnabled'),
+      ]);
+      setCameraPermission(camera);
+      setPhotoPermission(photos);
+      setBiometricStatus(biometrics);
+    } catch {
+      setBiometricStatus({ available: false, message: 'Không kiểm tra được quyền trên thiết bị.' });
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshPermissions();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshPermissions();
+    });
+    return () => subscription.remove();
+  }, [refreshPermissions]);
+
+  const requestPermission = useCallback(async (kind: 'camera' | 'photos') => {
+    if (busy) return;
+    const current = kind === 'camera' ? cameraPermission : photoPermission;
+    if (current?.granted || current?.canAskAgain === false) {
+      try {
+        await Linking.openSettings();
+      } catch {
+        Alert.alert('Không mở được Cài đặt', 'Hãy mở Cài đặt của thiết bị và cấp quyền cho ERP Mobile.');
+      }
+      return;
+    }
+
+    setBusy(kind);
+    try {
+      const next = kind === 'camera'
+        ? await ExpoCamera.Camera.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (kind === 'camera') setCameraPermission(next);
+      else setPhotoPermission(next);
+    } catch (error) {
+      Alert.alert('Không xin được quyền', error instanceof Error ? error.message : 'Hãy thử lại trong Cài đặt thiết bị.');
+    } finally {
+      setBusy(null);
+    }
+  }, [busy, cameraPermission, photoPermission]);
+
+  const permissionLabel = (permission: AppPermissionState | null) => {
+    if (!permission) return 'Đang kiểm tra';
+    if (permission.granted) return 'Đã cấp';
+    return permission.canAskAgain === false ? 'Cần bật trong Cài đặt' : 'Chưa cấp';
+  };
+
+  const permissionActionLabel = (permission: AppPermissionState | null) =>
+    permission?.granted || permission?.canAskAgain === false ? 'Cài đặt' : 'Cho phép';
+
+  return (
+    <View style={styles.stack}>
+      <Card style={styles.card}>
+        <Text style={styles.cardTitle}>Quyền thiết bị</Text>
+        <View style={styles.permissionRow}>
+          <View style={styles.iconCircle}><Camera size={17} color={colors.primary} /></View>
+          <View style={styles.permissionCopy}>
+            <Text style={styles.rowTitle}>Camera</Text>
+            <Text style={styles.muted}>Quét mã kiểm kê và chụp ảnh tài liệu khi dùng tính năng tương ứng.</Text>
+            <Text style={[styles.permissionStatus, cameraPermission?.granted && styles.permissionGranted]}>{permissionLabel(cameraPermission)}</Text>
+          </View>
+          <Pressable disabled={busy !== null || Platform.OS === 'web'} onPress={() => void requestPermission('camera')} style={styles.permissionButton}>
+            <Text style={styles.permissionButtonText}>{busy === 'camera' ? 'Đang xử lý…' : permissionActionLabel(cameraPermission)}</Text>
+          </Pressable>
+        </View>
+        <View style={styles.permissionRow}>
+          <View style={styles.iconCircle}><Images size={17} color={colors.primary} /></View>
+          <View style={styles.permissionCopy}>
+            <Text style={styles.rowTitle}>Ảnh và video</Text>
+            <Text style={styles.muted}>Chọn ảnh đại diện hoặc hình ảnh từ thiết bị.</Text>
+            <Text style={[styles.permissionStatus, photoPermission?.granted && styles.permissionGranted]}>{permissionLabel(photoPermission)}</Text>
+          </View>
+          <Pressable disabled={busy !== null || Platform.OS === 'web'} onPress={() => void requestPermission('photos')} style={styles.permissionButton}>
+            <Text style={styles.permissionButtonText}>{busy === 'photos' ? 'Đang xử lý…' : permissionActionLabel(photoPermission)}</Text>
+          </Pressable>
+        </View>
+      </Card>
+
+      <Card style={styles.card}>
+        <Text style={styles.cardTitle}>Sinh trắc học</Text>
+        <View style={styles.permissionRow}>
+          <View style={styles.iconCircle}><Fingerprint size={17} color={colors.primary} /></View>
+          <View style={styles.permissionCopy}>
+            <Text style={styles.rowTitle}>Face ID, khuôn mặt hoặc vân tay</Text>
+            <Text style={styles.muted}>
+              {biometricStatus?.available ? 'Thiết bị đã sẵn sàng.' : biometricStatus?.message || 'Đang kiểm tra thiết bị.'}
+              {' '}Quyền này được xác nhận bằng hộp thoại bảo mật của hệ điều hành, không có quyền Android riêng để cấp.
+            </Text>
+          </View>
+        </View>
+      </Card>
+
+      <BiometricSettingsCard />
+
+      <Text style={styles.muted}>
+        ERP Mobile chỉ xin quyền khi bạn mở tính năng cần dùng. Chọn tệp qua hộp thoại hệ thống không cần quyền lưu trữ riêng.
+      </Text>
+    </View>
+  );
+}
+
+function BiometricSettingsCard() {
+  const { biometricSettings, updateBiometricSettings } = useAuth();
+  const [biometricBusy, setBiometricBusy] = useState<BiometricFeature | null>(null);
+
+  const biometricRows: Array<{ key: BiometricFeature; title: string; description: string }> = [
+    {
+      key: 'loginEnabled',
+      title: 'Đăng nhập bằng Face ID / vân tay',
+      description: 'Dùng sinh trắc học để mở phiên ERP đã lưu.',
+    },
+    {
+      key: 'attendanceEnabled',
+      title: 'Xác thực khi chấm công',
+      description: Platform.OS === 'android'
+        ? 'Dùng nhận diện khuôn mặt Android trước khi check-in hoặc check-out.'
+        : 'Dùng Face ID trước khi check-in hoặc check-out.',
+    },
+    {
+      key: 'appLockEnabled',
+      title: 'Khóa ứng dụng bằng sinh trắc học',
+      description: Platform.OS === 'android'
+        ? 'Yêu cầu vân tay hoặc sinh trắc học Android cấp mạnh khi mở lại ERP Mobile.'
+        : 'Yêu cầu Face ID hoặc Touch ID khi mở lại ERP Mobile.',
+    },
+  ];
+
+  const toggleBiometric = useCallback(async (feature: BiometricFeature) => {
+    if (biometricBusy) return;
+    const enabling = !biometricSettings[feature];
+    if (!enabling) {
+      try {
+        await updateBiometricSettings({ ...biometricSettings, [feature]: false });
+      } catch (error) {
+        Alert.alert('Không lưu được cài đặt', error instanceof Error ? error.message : 'Hãy thử lại.');
+      }
+      return;
+    }
+
+    const availability = await getBiometricAvailability(feature);
+    if (!availability.available) {
+      Alert.alert('Chưa thể bật', availability.message || 'Thiết bị chưa sẵn sàng cho sinh trắc học.');
+      return;
+    }
+
+    setBiometricBusy(feature);
+    try {
+      const prompt = feature === 'loginEnabled'
+        ? 'Xác nhận bật đăng nhập sinh trắc học'
+        : feature === 'attendanceEnabled'
+          ? 'Xác nhận bật xác thực chấm công'
+          : 'Xác nhận bật khóa ứng dụng';
+      const result = await authenticateBiometric(feature, prompt);
+      if (!result.success) {
+        if (!isBiometricCancellation(result)) Alert.alert('Không xác thực được', biometricErrorMessage(result.error));
+        return;
+      }
+      await updateBiometricSettings({ ...biometricSettings, [feature]: true });
+    } catch (error) {
+      Alert.alert('Không bật được sinh trắc học', error instanceof Error ? error.message : 'Hãy thử lại.');
+    } finally {
+      setBiometricBusy(null);
+    }
+  }, [biometricBusy, biometricSettings, updateBiometricSettings]);
+
+  return (
+    <Card style={styles.card}>
+      <Text style={styles.cardTitle}>Bật / tắt sinh trắc học</Text>
+      {biometricRows.map((row, idx) => (
+        <View key={row.key} style={[styles.switchRow, idx === biometricRows.length - 1 && { borderBottomWidth: 0 }]}>
+          <View style={styles.iconCircle}><Fingerprint size={17} color={colors.primary} /></View>
+          <View style={{ flex: 1, paddingHorizontal: 10 }}>
+            <Text style={styles.rowTitle}>{row.title}</Text>
+            <Text style={styles.muted}>{row.description}</Text>
+          </View>
+          <Switch
+            disabled={biometricBusy !== null || Platform.OS === 'web'}
+            value={biometricSettings[row.key]}
+            onValueChange={() => { void toggleBiometric(row.key); }}
+            trackColor={{ true: colors.primary, false: '#CBD5E1' }}
+          />
+        </View>
+      ))}
+      <Text style={styles.muted}>Sinh trắc học được kiểm tra bởi hệ điều hành và không gửi mẫu lên máy chủ ERP.</Text>
+    </Card>
   );
 }
 
@@ -155,13 +372,13 @@ function AccountDetailSection() {
         Alert.alert('Chưa cấp quyền ảnh', 'Vui lòng cho phép ứng dụng truy cập thư viện ảnh để đổi ảnh đại diện.');
         return;
       }
-      const picked = await ImagePicker.launchImageLibraryAsync({
+      const picked = await withAppLockSuspended(() => ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.75,
         base64: true,
-      });
+      }));
       if (picked.canceled || !picked.assets?.[0]) return;
       const asset = picked.assets[0];
       const mimeType = asset.mimeType || 'image/jpeg';
@@ -482,61 +699,7 @@ function SecurityDetailSection() {
 }
 
 // =========================================================================
-// 4. NGÔN NGỮ
-// =========================================================================
-function LanguageDetailSection() {
-  const [prefs, setPrefs] = useState<LocalPrefs>(DEFAULT_PREFS);
-
-  useEffect(() => {
-    void loadPrefs().then(setPrefs);
-  }, []);
-
-  const selectLang = (lang: 'vi' | 'en') => {
-    const next = { ...prefs, language: lang };
-    setPrefs(next);
-    void savePrefs(next);
-    Alert.alert(
-      'Đã cập nhật ngôn ngữ',
-      lang === 'vi'
-        ? 'Ứng dụng đang sử dụng Tiếng Việt.'
-        : 'Đã lưu tùy chọn English (một số mục nghiệp vụ ERP vẫn hiển thị theo ngôn ngữ dữ liệu doanh nghiệp).',
-    );
-  };
-
-  return (
-    <Card style={styles.card}>
-      <Text style={styles.cardTitle}>Chọn ngôn ngữ hiển thị</Text>
-      {(
-        [
-          { code: 'vi', label: 'Tiếng Việt', desc: 'Ngôn ngữ mặc định của hệ thống Igen ERP' },
-          { code: 'en', label: 'English', desc: 'International interface preference' },
-        ] as const
-      ).map((item, idx) => {
-        const active = prefs.language === item.code;
-        return (
-          <Pressable
-            key={item.code}
-            onPress={() => selectLang(item.code)}
-            style={[
-              styles.langRow,
-              active && styles.langRowActive,
-              idx === 0 && { marginBottom: 8 },
-            ]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>{item.label}</Text>
-              <Text style={styles.muted}>{item.desc}</Text>
-            </View>
-            {active ? <Check size={18} color={colors.primary} /> : null}
-          </Pressable>
-        );
-      })}
-    </Card>
-  );
-}
-
-// =========================================================================
-// 5. QUYỀN RIÊNG TƯ
+// 4. QUYỀN RIÊNG TƯ
 // =========================================================================
 function PrivacyDetailSection() {
   const { user } = useAuth();
@@ -613,7 +776,7 @@ function PrivacyDetailSection() {
 }
 
 // =========================================================================
-// 6. TRỢ GIÚP VÀ HỖ TRỢ
+// 5. TRỢ GIÚP VÀ HỖ TRỢ
 // =========================================================================
 function SupportDetailSection() {
   const [health, setHealth] = useState<ErpHealth | null>(null);
@@ -650,7 +813,7 @@ function SupportDetailSection() {
         {checking && !health ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : healthErr ? (
-          <Text style={styles.errorText}>{healthErr}</Text>
+          <PopupError error={healthErr} />
         ) : (
           <View style={styles.healthRow}>
             <CheckCircle2 size={18} color="#16885A" />
@@ -767,6 +930,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
+  permissionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  permissionCopy: { flex: 1, gap: 3 },
+  permissionStatus: { color: '#A86B16', fontSize: 10, fontWeight: '700' },
+  permissionGranted: { color: '#16885A' },
+  permissionButton: {
+    minHeight: 34,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    borderRadius: 9,
+    backgroundColor: '#EAF2FF',
+  },
+  permissionButtonText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
   deviceRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   iconCircle: {
     width: 38,
@@ -776,17 +958,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  langRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  langRowActive: { backgroundColor: '#EAF2FF', borderColor: colors.primary },
   healthRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   contactRow: {
     flexDirection: 'row',
