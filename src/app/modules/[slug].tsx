@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/Card';
+import { ModuleAppIcon } from '@/components/ModuleAppIcons';
 import { Screen } from '@/components/Screen';
 import { getFeatureScreen } from '@/features/modules/featureScreenRegistry';
 import { getModuleBySlug } from '@/features/modules/moduleCatalog';
@@ -25,12 +26,11 @@ export default function ModuleScaffoldScreen() {
     );
   }
 
-  const ModuleIcon = module.icon;
   return (
     <Screen>
       <Stack.Screen options={{ title: module.name }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.icon, { backgroundColor: module.color }]}><ModuleIcon size={28} color={colors.primary} /></View>
+        <View style={styles.icon}><ModuleAppIcon slug={module.slug} size={54} /></View>
         <Text style={styles.category}>{module.category.toLocaleUpperCase('vi')} · ĐỢT 1</Text>
         <Text style={styles.title}>{module.name}</Text>
         <Text style={styles.body}>{module.description}</Text>

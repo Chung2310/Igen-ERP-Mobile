@@ -1,12 +1,10 @@
 import { Link } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Card } from '@/components/Card';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ModuleAppIcon } from '@/components/ModuleAppIcons';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { canAccessModule, moduleCatalog } from '@/features/modules/moduleCatalog';
 import { colors } from '@/theme/colors';
-
-const tileColors = ['#F0E5D9', '#E4DEF5', '#F7EAC5', '#DCE8FA', '#E3E3F5', '#F1E2D7', '#DBE8FB', '#DCEFD7'];
 
 export default function ModulesScreen() {
   const { user } = useAuth();
@@ -15,19 +13,35 @@ export default function ModulesScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Danh mục</Text>
-        <View style={styles.grid}>
-          {visibleModules.map((module, index) => {
-            const ModuleIcon = module.icon;
-            return <Link key={module.slug} href={{ pathname: '/modules/[slug]', params: { slug: module.slug } }} asChild>
-              <Card style={StyleSheet.flatten([styles.tile, { backgroundColor: tileColors[index % tileColors.length] }])}>
-                <View style={styles.artCircle} />
-                <ModuleIcon size={35} color={colors.primary} style={styles.illustration} />
-                <Text numberOfLines={2} style={styles.moduleName}>{module.name}</Text>
-              </Card>
-            </Link>;
-          })}
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Danh mục</Text>
         </View>
+
+        <View style={styles.gridCard}>
+          <View style={styles.grid}>
+            {visibleModules.map((module) => (
+              <Link
+                key={module.slug}
+                href={{ pathname: '/modules/[slug]', params: { slug: module.slug } }}
+                asChild
+              >
+                <Pressable
+                  style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={module.name}
+                >
+                  <View style={styles.iconShadow}>
+                    <ModuleAppIcon slug={module.slug} size={54} />
+                  </View>
+                  <Text numberOfLines={2} style={styles.moduleName}>
+                    {module.name}
+                  </Text>
+                </Pressable>
+              </Link>
+            ))}
+          </View>
+        </View>
+
         <Text style={styles.note}>Module hiển thị theo gói dịch vụ và quyền được cấp.</Text>
       </ScrollView>
     </Screen>
@@ -35,12 +49,72 @@ export default function ModulesScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 26 },
-  title: { color: colors.ink, fontSize: 25, fontWeight: '800', marginBottom: 14 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 11 },
-  tile: { width: '48.5%', height: 151, padding: 14, borderColor: 'transparent', overflow: 'hidden', justifyContent: 'flex-end' },
-  artCircle: { position: 'absolute', width: 105, height: 105, borderRadius: 53, right: -19, top: -13, backgroundColor: 'rgba(255,255,255,0.32)' },
-  illustration: { position: 'absolute', right: 20, top: 22 },
-  moduleName: { color: '#263247', fontSize: 12, fontWeight: '700', lineHeight: 16, maxWidth: '94%' },
-  note: { color: colors.muted, fontSize: 9, textAlign: 'center', marginTop: 16 },
+  content: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 28,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginBottom: 14,
+  },
+  title: {
+    color: colors.ink,
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  gridCard: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingTop: 22,
+    paddingBottom: 20,
+    paddingHorizontal: 8,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 22,
+  },
+  item: {
+    width: '25%',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  itemPressed: {
+    opacity: 0.76,
+    transform: [{ scale: 0.94 }],
+  },
+  iconShadow: {
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+    borderRadius: 16,
+  },
+  moduleName: {
+    marginTop: 9,
+    color: '#1F2937',
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  note: {
+    color: colors.muted,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 16,
+  },
 });
