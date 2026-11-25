@@ -54,8 +54,8 @@ export function VerticalBarChart({
   data,
   primaryLabel,
   secondaryLabel,
-  primaryColor = '#2494F9',
-  secondaryColor = '#F59E0B',
+  primaryColor = '#18C93A',
+  secondaryColor = '#2196F3',
   emptyText = 'Chưa có phát sinh trong kỳ đã chọn.',
 }: {
   data: BarDatum[];
@@ -267,7 +267,9 @@ export function NoticeStrip({ text }: { text: string }) {
   );
 }
 
-export const CHART_COLORS = ['#2463EB', '#16885A', '#C27617', '#7754C8', '#DC2626', '#0E7490'];
+/** Đồng bộ bảng màu biểu đồ từ web iGen ERP (dashboardPalette.ts & hr-analytics.css). */
+export const CHART_COLORS = ['#18C93A', '#2196F3', '#F5D610', '#F44336', '#8B5CF6', '#00B8F4'];
+export const CHART_TRACK_COLOR = '#E8EDF4';
 
 const HAIRLINE_CARD = {
   backgroundColor: colors.white,
@@ -347,10 +349,10 @@ const styles = StyleSheet.create({
   },
   chartGridLine: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#EDF2F8',
+    backgroundColor: '#E8EDF4',
   },
   chartArea: {
-    height: 126,
+    height: 128,
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
@@ -361,15 +363,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   barsRow: {
-    height: 106,
+    height: 108,
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 3,
   },
   bar: {
-    width: 9,
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
+    width: 11,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
   },
   barAxisLabel: {
     color: colors.muted,
@@ -395,14 +397,14 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     ...HAIRLINE_CARD,
-    padding: 14,
+    padding: 15,
     marginBottom: 18,
   },
   breakdownList: {
-    gap: 12,
+    gap: 15,
   },
   breakdownItem: {
-    gap: 6,
+    gap: 8,
   },
   breakdownHeader: {
     flexDirection: 'row',
@@ -414,33 +416,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 6,
+    gap: 7,
   },
   smallDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   breakdownLabel: {
     color: colors.ink,
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: '600',
     flex: 1,
   },
   breakdownValue: {
-    color: colors.muted,
-    fontSize: 10,
+    color: colors.ink,
+    fontSize: 11.5,
     fontWeight: '700',
   },
   progressTrack: {
-    height: 6,
-    borderRadius: 99,
-    backgroundColor: '#EDF2F9',
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#E8EDF4',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 99,
+    borderRadius: 6,
   },
   listRow: {
     flexDirection: 'row',

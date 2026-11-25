@@ -81,9 +81,9 @@ export function HrOverviewView({
   ];
 
   const taskRows = [
-    { label: 'Hoàn thành', value: tasks.done, displayValue: `${formatInt(tasks.done)} việc`, color: '#16885A' },
-    { label: 'Đang thực hiện', value: tasks.doing, displayValue: `${formatInt(tasks.doing)} việc`, color: '#2463EB' },
-    { label: 'Chưa bắt đầu', value: tasks.todo, displayValue: `${formatInt(tasks.todo)} việc`, color: '#C27617' },
+    { label: 'Hoàn thành', value: tasks.done, displayValue: `${formatInt(tasks.done)} việc`, color: '#18C93A' },
+    { label: 'Đang thực hiện', value: tasks.doing, displayValue: `${formatInt(tasks.doing)} việc`, color: '#2196F3' },
+    { label: 'Chưa bắt đầu', value: tasks.todo, displayValue: `${formatInt(tasks.todo)} việc`, color: '#F5D610' },
   ];
 
   const deptRows = (personnel?.departmentHeadcounts ?? [])

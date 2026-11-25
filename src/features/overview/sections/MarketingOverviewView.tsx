@@ -21,11 +21,11 @@ import type {
 } from '@/features/overview/types';
 
 const STAGE_META: Array<{ key: CrmLeadStage; label: string; color: string }> = [
-  { key: 'cold', label: 'Mới', color: '#2463EB' },
-  { key: 'warm', label: 'Đang quan tâm', color: '#0E7490' },
-  { key: 'hot', label: 'Tiềm năng cao', color: '#C27617' },
-  { key: 'won', label: 'Đã chốt', color: '#16885A' },
-  { key: 'upsell', label: 'Bán thêm', color: '#7754C8' },
+  { key: 'cold', label: 'Mới', color: '#2196F3' },
+  { key: 'warm', label: 'Đang quan tâm', color: '#00B8F4' },
+  { key: 'hot', label: 'Tiềm năng cao', color: '#F5D610' },
+  { key: 'won', label: 'Đã chốt', color: '#18C93A' },
+  { key: 'upsell', label: 'Bán thêm', color: '#8B5CF6' },
 ];
 
 function toDateKey(input?: string): string | null {

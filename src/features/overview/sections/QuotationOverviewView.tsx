@@ -111,11 +111,11 @@ export function QuotationOverviewView({
   }
 
   const statusRows = [
-    { label: 'Đã duyệt', value: q.byStatus.approved, displayValue: formatInt(q.byStatus.approved), color: '#16885A' },
-    { label: 'Chờ duyệt', value: q.byStatus.pending_review, displayValue: formatInt(q.byStatus.pending_review), color: '#C27617' },
-    { label: 'Bản nháp', value: q.byStatus.draft, displayValue: formatInt(q.byStatus.draft), color: '#2463EB' },
-    { label: 'Thiếu thông tin', value: q.byStatus.needs_info, displayValue: formatInt(q.byStatus.needs_info), color: '#7754C8' },
-    { label: 'Cần chỉnh sửa', value: q.byStatus.rejected, displayValue: formatInt(q.byStatus.rejected), color: '#DC2626' },
+    { label: 'Đã duyệt', value: q.byStatus.approved, displayValue: formatInt(q.byStatus.approved), color: '#18C93A' },
+    { label: 'Chờ duyệt', value: q.byStatus.pending_review, displayValue: formatInt(q.byStatus.pending_review), color: '#F5D610' },
+    { label: 'Bản nháp', value: q.byStatus.draft, displayValue: formatInt(q.byStatus.draft), color: '#2196F3' },
+    { label: 'Thiếu thông tin', value: q.byStatus.needs_info, displayValue: formatInt(q.byStatus.needs_info), color: '#8B5CF6' },
+    { label: 'Cần chỉnh sửa', value: q.byStatus.rejected, displayValue: formatInt(q.byStatus.rejected), color: '#F44336' },
   ];
 
   const customerItems: ListRowItem[] = q.customers.slice(0, 5).map((c, idx) => ({
@@ -138,8 +138,8 @@ export function QuotationOverviewView({
         data={aggregateTrend(q.trend)}
         primaryLabel="Tổng tạo"
         secondaryLabel="Đã duyệt"
-        primaryColor="#2463EB"
-        secondaryColor="#16885A"
+        primaryColor="#2196F3"
+        secondaryColor="#18C93A"
       />
 
       <SectionHeading title="Phân bổ theo trạng thái" />

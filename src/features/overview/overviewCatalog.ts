@@ -13,16 +13,6 @@ import {
 
 export const ALL_OVERVIEW_PAGES: OverviewPageDefinition[] = [
   {
-    id: 'finance',
-    label: 'Tài chính',
-    shortLabel: 'Tài chính',
-    subtitle: 'Thu chi, lãi lỗ, dòng tiền & công nợ',
-    icon: CircleDollarSign,
-    accent: '#16885A',
-    tone: '#E9F8F1',
-    moduleSlug: 'analytics',
-  },
-  {
     id: 'hr',
     label: 'Nhân sự',
     shortLabel: 'Nhân sự',
@@ -31,6 +21,16 @@ export const ALL_OVERVIEW_PAGES: OverviewPageDefinition[] = [
     accent: '#0E7490',
     tone: '#E8F7FA',
     moduleSlug: 'hr',
+  },
+  {
+    id: 'finance',
+    label: 'Tài chính',
+    shortLabel: 'Tài chính',
+    subtitle: 'Thu chi, lãi lỗ, dòng tiền & công nợ',
+    icon: CircleDollarSign,
+    accent: '#16885A',
+    tone: '#E9F8F1',
+    moduleSlug: 'analytics',
   },
   {
     id: 'quotation',
