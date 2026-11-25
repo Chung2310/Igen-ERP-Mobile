@@ -6,22 +6,12 @@ import {
   FileText,
   GraduationCap,
   HeartPulse,
-  LayoutDashboard,
   MessageSquare,
   Package,
   Users,
 } from 'lucide-react-native';
 
 export const ALL_OVERVIEW_PAGES: OverviewPageDefinition[] = [
-  {
-    id: 'executive',
-    label: 'Tổng hợp chung',
-    shortLabel: 'Tổng hợp',
-    subtitle: 'Toàn cảnh doanh nghiệp & việc cần xử lý hôm nay',
-    icon: LayoutDashboard,
-    accent: '#2463EB',
-    tone: '#EAF2FF',
-  },
   {
     id: 'finance',
     label: 'Tài chính',
@@ -110,7 +100,7 @@ function hasPerm(user: ErpUser | null, code: string): boolean {
 }
 
 export function canAccessOverview(user: ErpUser | null): boolean {
-  return hasPerm(user, 'dashboard:read');
+  return hasPerm(user, 'dashboard:read') && resolveAllowedOverviewPages(user).length > 0;
 }
 
 /**
@@ -125,10 +115,10 @@ export function resolveAllowedOverviewPages(user: ErpUser | null): OverviewPageD
   const isTeacher = user.role === 'teacher';
   const enabledModules = user.enabledModules ?? [];
 
-  // Nếu API /auth/me chưa trả về enabledModules, vẫn giữ Tổng hợp + các phân hệ cốt lõi.
+  // Nếu API /auth/me chưa trả về enabledModules, giữ các phân hệ cốt lõi.
   if (enabledModules.length === 0) {
     return ALL_OVERVIEW_PAGES.filter((page) =>
-      ['executive', 'finance', 'hr', 'quotation', 'retail', 'marketing'].includes(page.id),
+      ['finance', 'hr', 'quotation', 'retail', 'marketing'].includes(page.id),
     );
   }
 
@@ -136,8 +126,6 @@ export function resolveAllowedOverviewPages(user: ErpUser | null): OverviewPageD
 
   return ALL_OVERVIEW_PAGES.filter((page) => {
     switch (page.id) {
-      case 'executive':
-        return true;
       case 'finance':
         return (
           hasModule('finance') &&

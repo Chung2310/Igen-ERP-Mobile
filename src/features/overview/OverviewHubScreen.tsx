@@ -14,9 +14,7 @@ import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
-  fetchBusinessOverview,
   fetchCompanyBranches,
-  fetchDashboardActionItems,
   fetchDashboardSummary,
   fetchFinanceOverview,
   fetchHealthcareOverview,
@@ -41,15 +39,12 @@ import {
   StudentOverviewView,
   WorkerOverviewView,
 } from '@/features/overview/sections/DomainOverviewViews';
-import { ExecutiveOverviewView } from '@/features/overview/sections/ExecutiveOverviewView';
 import { FinanceOverviewView } from '@/features/overview/sections/FinanceOverviewView';
 import { HrOverviewView } from '@/features/overview/sections/HrOverviewView';
 import { MarketingOverviewView } from '@/features/overview/sections/MarketingOverviewView';
 import { QuotationOverviewView } from '@/features/overview/sections/QuotationOverviewView';
 import { RetailOverviewView } from '@/features/overview/sections/RetailOverviewView';
 import type {
-  BusinessOverviewData,
-  DashboardActionItemsData,
   DashboardSummaryData,
   FinanceOverviewReport,
   HealthcareOverviewData,
@@ -63,7 +58,6 @@ import type {
 import { colors } from '@/theme/colors';
 
 type PagePayload =
-  | { kind: 'executive'; business: BusinessOverviewData; actions: DashboardActionItemsData | null }
   | { kind: 'finance'; report: FinanceOverviewReport; previous: FinanceOverviewReport | null }
   | { kind: 'hr'; summary: DashboardSummaryData; previous: DashboardSummaryData | null }
   | { kind: 'quotation'; data: QuotationOverviewData; previous: QuotationOverviewData | null }
@@ -99,7 +93,9 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   } = useAuth();
   const allowedPages = useMemo(() => resolveAllowedOverviewPages(user), [user]);
 
-  const [selectedPageId, setSelectedPageId] = useState<OverviewPageId>('executive');
+  const [selectedPageId, setSelectedPageId] = useState<OverviewPageId | null>(
+    () => allowedPages[0]?.id ?? null,
+  );
   const [periodKey, setPeriodKey] = useState<OverviewPeriodKey>('month');
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [branchPickerOpen, setBranchPickerOpen] = useState(false);
@@ -149,7 +145,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     () => allowedPages.find((p) => p.id === selectedPageId) ?? allowedPages[0],
     [allowedPages, selectedPageId],
   );
-  const activePageId: OverviewPageId = activePage?.id ?? 'executive';
+  const activePageId: OverviewPageId | null = activePage?.id ?? null;
 
   const range = useMemo(() => getOverviewDateRange(periodKey), [periodKey]);
 
@@ -166,6 +162,13 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
 
   const loadActivePage = useCallback(
     async (force: boolean, signal: AbortSignal) => {
+      if (!activePageId) {
+        setPayload(null);
+        setError(null);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
       if (branchesLoading && !activeBranchId) {
         setLoading(true);
         return;
@@ -195,19 +198,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         let next: PagePayload;
 
         switch (activePageId) {
-          case 'executive': {
-            const [bizRes, actRes] = await Promise.allSettled([
-              fetchBusinessOverview(range.from, range.to, scope),
-              fetchDashboardActionItems(scope),
-            ]);
-            if (bizRes.status === 'rejected') throw bizRes.reason;
-            next = {
-              kind: 'executive',
-              business: bizRes.value,
-              actions: actRes.status === 'fulfilled' ? actRes.value : null,
-            };
-            break;
-          }
           case 'finance': {
             const [currRes, prevRes] = await Promise.allSettled([
               fetchFinanceOverview(range.from, range.to, scope),
@@ -326,6 +316,15 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   }, []);
 
   const renderSection = () => {
+    if (!activePageId) {
+      return (
+        <Card>
+          <Text style={styles.subtitle}>
+            Tài khoản hiện chưa có trang tổng quan phân hệ nào được kích hoạt.
+          </Text>
+        </Card>
+      );
+    }
     if (loading && (!payload || payload.kind !== activePageId)) {
       return <OverviewLoading label={`Đang tải ${activePage?.label ?? 'tổng quan'} từ ERP...`} />;
     }
@@ -337,14 +336,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     }
 
     switch (payload.kind) {
-      case 'executive':
-        return (
-          <ExecutiveOverviewView
-            business={payload.business}
-            actions={payload.actions}
-            range={range}
-          />
-        );
       case 'finance':
         return (
           <FinanceOverviewView

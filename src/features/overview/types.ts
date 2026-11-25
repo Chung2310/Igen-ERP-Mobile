@@ -1,7 +1,6 @@
 export type OverviewPeriodKey = 'day' | 'week' | 'month' | 'quarter' | 'year';
 
 export type OverviewPageId =
-  | 'executive'
   | 'finance'
   | 'hr'
   | 'quotation'
