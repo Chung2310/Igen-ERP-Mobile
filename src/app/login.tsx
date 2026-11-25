@@ -412,8 +412,8 @@ const styles = StyleSheet.create({
   },
   label: {
     color: '#1E293B',
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 14.5,
+    fontWeight: '400',
   },
   inputWrap: {
     flexDirection: 'row',
