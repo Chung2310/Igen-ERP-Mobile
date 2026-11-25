@@ -19,7 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Eye, EyeOff, Fingerprint, Lock, Mail } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   ERP_PRIVACY_POLICY_URL,
@@ -27,8 +27,7 @@ import {
 } from '@/core/network/erpWebLinks';
 import { colors } from '@/theme/colors';
 
-const IGEN_ROBOT_ILLUSTRATION = require('../../assets/images/login-igen-operator.png');
-const IGEN_LOGO = require('../../assets/images/logo-igen.png');
+const IGEN_FULL_LOGO = require('../../assets/images/logo-igenerp.png');
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -60,9 +59,6 @@ export default function LoginScreen() {
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (event) => {
       setKeyboardHeight(event.endCoordinates.height);
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 60);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setKeyboardHeight(0);
@@ -72,13 +68,6 @@ export default function LoginScreen() {
       hideSub.remove();
     };
   }, []);
-
-  function handleFieldFocus(field: 'email' | 'password') {
-    setFocusedField(field);
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 120);
-  }
 
   async function openExternalLink(url: string | null, label: string) {
     if (!url) {
@@ -137,7 +126,35 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.root}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
+
+      {/* Soft luminous icy-blue / lavender pastel canvas matching the reference */}
+      <Svg pointerEvents="none" width="100%" height="100%" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id="loginCanvasBg" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#EBF3FD" />
+            <Stop offset="45%" stopColor="#F3F6FD" />
+            <Stop offset="100%" stopColor="#EDF5F9" />
+          </LinearGradient>
+          <RadialGradient id="loginGlowTopLeft" cx="12%" cy="12%" rx="55%" ry="35%">
+            <Stop offset="0%" stopColor="#DCEBFF" stopOpacity="0.8" />
+            <Stop offset="100%" stopColor="#DCEBFF" stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id="loginGlowMidRight" cx="92%" cy="46%" rx="50%" ry="35%">
+            <Stop offset="0%" stopColor="#E4E7FF" stopOpacity="0.65" />
+            <Stop offset="100%" stopColor="#E4E7FF" stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id="loginGlowBottom" cx="50%" cy="94%" rx="65%" ry="28%">
+            <Stop offset="0%" stopColor="#E2F4FA" stopOpacity="0.6" />
+            <Stop offset="100%" stopColor="#E2F4FA" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#loginCanvasBg)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#loginGlowTopLeft)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#loginGlowMidRight)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#loginGlowBottom)" />
+      </Svg>
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -147,6 +164,7 @@ export default function LoginScreen() {
           contentContainerStyle={[
             styles.scrollContent,
             {
+              paddingTop: topInset + 14,
               paddingBottom: bottomInset + (Platform.OS === 'android' ? keyboardHeight : 0),
             },
           ]}
@@ -154,110 +172,101 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          {/* Phần trên: Nền xanh + Robot iGen */}
-          <View style={[styles.banner, { paddingTop: topInset + 18 }]}>
-            <View pointerEvents="none" style={styles.bannerGlowTop} />
-            <View pointerEvents="none" style={styles.bannerGlowBottom} />
-
-            <Text style={styles.bannerTitle}>
-              ĐIỀU HÀNH DOANH NGHIỆP{'\n'}TRONG MỘT HỆ THỐNG
-            </Text>
-
-            <View style={styles.illustrationWrap}>
-              <Image
-                source={IGEN_ROBOT_ILLUSTRATION}
-                style={styles.illustrationImage}
-                resizeMode="contain"
-              />
-            </View>
+          {/* Top-left brand logo */}
+          <View style={styles.topBar}>
+            <Image source={IGEN_FULL_LOGO} style={styles.topLogo} resizeMode="contain" />
           </View>
 
-          {/* Phần dưới: Nền trắng phẳng, form đăng nhập trực tiếp (không card bọc) */}
-          <View style={styles.whiteSection}>
-            <View style={styles.brandHeader}>
-              <Image source={IGEN_LOGO} style={styles.logoImage} resizeMode="contain" />
-              <Text style={styles.title}>Đăng nhập iGen ERP</Text>
-            </View>
+          {/* Centered white login card */}
+          <View style={styles.cardStage}>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Đăng nhập</Text>
 
-            <View style={styles.form}>
-              <View
-                style={[
-                  styles.inputWrap,
-                  focusedField === 'email' && styles.inputWrapFocused,
-                ]}
-              >
-                <Mail
-                  size={18}
-                  strokeWidth={1.8}
-                  color={focusedField === 'email' ? '#0A74F5' : '#94A3B8'}
-                />
-                <TextInput
-                  value={email}
-                  onChangeText={(value) => {
-                    setEmail(value);
-                    if (error) setError('');
-                  }}
-                  onFocus={() => handleFieldFocus('email')}
-                  onBlur={() => setFocusedField((prev) => (prev === 'email' ? null : prev))}
-                  placeholder="Email"
-                  placeholderTextColor="#94A3B8"
-                  style={styles.input}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  textContentType="emailAddress"
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordInputRef.current?.focus()}
-                />
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Email</Text>
+                <View
+                  style={[
+                    styles.inputWrap,
+                    focusedField === 'email' && styles.inputWrapFocused,
+                  ]}
+                >
+                  <Mail
+                    size={17}
+                    strokeWidth={1.8}
+                    color={focusedField === 'email' ? '#0A74F5' : '#94A3B8'}
+                  />
+                  <TextInput
+                    value={email}
+                    onChangeText={(value) => {
+                      setEmail(value);
+                      if (error) setError('');
+                    }}
+                    onFocus={() => setFocusedField('email')}
+                    onBlur={() => setFocusedField((prev) => (prev === 'email' ? null : prev))}
+                    placeholder="Nhập địa chỉ email"
+                    placeholderTextColor="#94A3B8"
+                    style={styles.input}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    textContentType="emailAddress"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  />
+                </View>
               </View>
 
-              <View
-                style={[
-                  styles.inputWrap,
-                  focusedField === 'password' && styles.inputWrapFocused,
-                ]}
-              >
-                <Lock
-                  size={18}
-                  strokeWidth={1.8}
-                  color={focusedField === 'password' ? '#0A74F5' : '#94A3B8'}
-                />
-                <TextInput
-                  ref={passwordInputRef}
-                  value={password}
-                  onChangeText={(value) => {
-                    setPassword(value);
-                    if (error) setError('');
-                  }}
-                  onFocus={() => handleFieldFocus('password')}
-                  onBlur={() => setFocusedField((prev) => (prev === 'password' ? null : prev))}
-                  placeholder="Mật khẩu"
-                  placeholderTextColor="#94A3B8"
-                  style={styles.input}
-                  secureTextEntry={!showPassword}
-                  textContentType="password"
-                  returnKeyType="done"
-                  onSubmitEditing={() => {
-                    void submit();
-                  }}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                  hitSlop={8}
-                  onPress={() => setShowPassword((prev) => !prev)}
-                  style={styles.eyeButton}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Mật khẩu</Text>
+                <View
+                  style={[
+                    styles.inputWrap,
+                    focusedField === 'password' && styles.inputWrapFocused,
+                  ]}
                 >
-                  {showPassword ? (
-                    <Eye size={19} color="#94A3B8" />
-                  ) : (
-                    <EyeOff size={19} color="#94A3B8" />
-                  )}
-                </Pressable>
+                  <Lock
+                    size={17}
+                    strokeWidth={1.8}
+                    color={focusedField === 'password' ? '#0A74F5' : '#94A3B8'}
+                  />
+                  <TextInput
+                    ref={passwordInputRef}
+                    value={password}
+                    onChangeText={(value) => {
+                      setPassword(value);
+                      if (error) setError('');
+                    }}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField((prev) => (prev === 'password' ? null : prev))}
+                    placeholder="Nhập mật khẩu"
+                    placeholderTextColor="#94A3B8"
+                    style={styles.input}
+                    secureTextEntry={!showPassword}
+                    textContentType="password"
+                    returnKeyType="done"
+                    onSubmitEditing={() => {
+                      void submit();
+                    }}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    hitSlop={8}
+                    onPress={() => setShowPassword((prev) => !prev)}
+                    style={styles.eyeButton}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={18} color="#64748B" />
+                    ) : (
+                      <Eye size={18} color="#64748B" />
+                    )}
+                  </Pressable>
+                </View>
               </View>
 
               {!!error && <PopupError error={error} title="Không thể đăng nhập" />}
 
+              {/* Pill gradient primary submit button */}
               <Pressable
                 accessibilityRole="button"
                 disabled={busy}
@@ -288,51 +297,59 @@ export default function LoginScreen() {
               </Pressable>
 
               {biometricSettings.loginEnabled && Platform.OS !== 'web' ? (
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={busy}
-                  onPress={() => {
-                    void submitBiometric();
-                  }}
-                  style={({ pressed }) => [
-                    styles.biometricSubmit,
-                    busy && styles.submitDisabled,
-                    pressed && !busy && styles.biometricPressed,
-                  ]}
-                >
-                  {busy ? (
-                    <ActivityIndicator size="small" color="#0A74F5" />
-                  ) : (
-                    <Fingerprint size={18} color="#0A74F5" />
-                  )}
-                  <Text style={styles.biometricSubmitText}>
-                    {Platform.OS === 'ios'
-                      ? 'Đăng nhập bằng Face ID / Touch ID'
-                      : 'Đăng nhập bằng khuôn mặt / vân tay'}
-                  </Text>
-                </Pressable>
+                <>
+                  <View style={styles.orRow}>
+                    <View style={styles.orLine} />
+                    <Text style={styles.orText}>Hoặc</Text>
+                    <View style={styles.orLine} />
+                  </View>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy}
+                    onPress={() => {
+                      void submitBiometric();
+                    }}
+                    style={({ pressed }) => [
+                      styles.biometricSubmit,
+                      busy && styles.submitDisabled,
+                      pressed && !busy && styles.biometricPressed,
+                    ]}
+                  >
+                    {busy ? (
+                      <ActivityIndicator size="small" color="#0A66E8" />
+                    ) : (
+                      <Fingerprint size={17} color="#0A66E8" />
+                    )}
+                    <Text style={styles.biometricSubmitText}>
+                      {Platform.OS === 'ios'
+                        ? 'Đăng nhập bằng Face ID / Touch ID'
+                        : 'Đăng nhập bằng khuôn mặt / vân tay'}
+                    </Text>
+                  </Pressable>
+                </>
               ) : null}
             </View>
+          </View>
 
-            {/* Footer: Chính sách, Điều khoản & Copyright chữ nét mảnh */}
-            <View style={styles.footer}>
-              <View style={styles.legalWrap}>
-                <Pressable
-                  hitSlop={6}
-                  onPress={() => void openExternalLink(ERP_PRIVACY_POLICY_URL, 'Chính sách & Bảo mật')}
-                >
-                  <Text style={styles.footerLightText}>Chính sách &amp; Bảo mật</Text>
-                </Pressable>
-                <Text style={styles.footerLightText}>·</Text>
-                <Pressable
-                  hitSlop={6}
-                  onPress={() => void openExternalLink(ERP_TERMS_OF_SERVICE_URL, 'Điều khoản sử dụng')}
-                >
-                  <Text style={styles.footerLightText}>Điều khoản sử dụng</Text>
-                </Pressable>
-              </View>
-              <Text style={styles.copyright}>Copyright © 2026 iGen Technology</Text>
+          {/* Footer: Chính sách, Điều khoản & Copyright chữ nét mảnh */}
+          <View style={styles.footer}>
+            <View style={styles.legalWrap}>
+              <Pressable
+                hitSlop={6}
+                onPress={() => void openExternalLink(ERP_PRIVACY_POLICY_URL, 'Chính sách & Bảo mật')}
+              >
+                <Text style={styles.footerLightText}>Chính sách &amp; Bảo mật</Text>
+              </Pressable>
+              <Text style={styles.footerLightText}>·</Text>
+              <Pressable
+                hitSlop={6}
+                onPress={() => void openExternalLink(ERP_TERMS_OF_SERVICE_URL, 'Điều khoản sử dụng')}
+              >
+                <Text style={styles.footerLightText}>Điều khoản sử dụng</Text>
+              </Pressable>
             </View>
+            <Text style={styles.copyright}>Copyright © 2026 iGen Technology</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -344,91 +361,61 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#EEF3FC',
   },
   scrollContent: {
     flexGrow: 1,
+    paddingHorizontal: 18,
   },
-  banner: {
-    width: '100%',
-    backgroundColor: '#0577E7',
-    paddingHorizontal: 22,
-    paddingBottom: 22,
-    overflow: 'hidden',
-  },
-  bannerGlowTop: {
-    position: 'absolute',
-    top: -90,
-    right: -80,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: 'rgba(103, 232, 249, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
-  },
-  bannerGlowBottom: {
-    position: 'absolute',
-    bottom: -110,
-    left: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(6, 79, 196, 0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  bannerTitle: {
-    color: colors.white,
-    fontSize: 17.5,
-    lineHeight: 24,
-    fontWeight: '800',
-    textAlign: 'center',
-    letterSpacing: 0.3,
-  },
-  illustrationWrap: {
+  topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 4,
+    marginBottom: 18,
   },
-  illustrationImage: {
-    width: '100%',
-    maxWidth: 240,
-    height: 140,
+  topLogo: {
+    width: 118,
+    height: 36,
   },
-  whiteSection: {
+  cardStage: {
     flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  card: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 26,
-    paddingTop: 26,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5ECF6',
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
+    gap: 16,
   },
-  brandHeader: {
-    alignItems: 'center',
-    marginBottom: 22,
-  },
-  logoImage: {
-    width: 112,
-    height: 46,
-    marginBottom: 10,
-  },
-  title: {
+  cardTitle: {
     color: colors.ink,
-    fontSize: 19,
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '600',
     textAlign: 'center',
-    letterSpacing: -0.2,
+    marginBottom: 2,
   },
-  form: {
-    gap: 13,
+  fieldGroup: {
+    gap: 7,
+  },
+  label: {
+    color: '#1E293B',
+    fontSize: 13,
+    fontWeight: '500',
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
-    paddingHorizontal: 15,
+    height: 46,
+    paddingHorizontal: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
     gap: 10,
   },
@@ -438,7 +425,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: colors.ink,
-    fontSize: 14.5,
+    fontSize: 14,
     paddingVertical: 0,
   },
   eyeButton: {
@@ -448,38 +435,56 @@ const styles = StyleSheet.create({
   },
   submit: {
     height: 48,
-    borderRadius: 10,
+    borderRadius: 999,
     backgroundColor: '#067AF0',
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   submitDisabled: { opacity: 0.7 },
   submitPressed: { opacity: 0.88 },
   submitText: {
     color: colors.white,
-    fontSize: 15.5,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  orRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 2,
+  },
+  orLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E2E8F0',
+  },
+  orText: {
+    color: '#64748B',
+    fontSize: 12.5,
+    fontWeight: '400',
   },
   biometricSubmit: {
-    minHeight: 42,
+    height: 46,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#0A66E8',
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 4,
   },
   biometricPressed: {
-    opacity: 0.7,
+    backgroundColor: '#F0F6FF',
   },
   biometricSubmitText: {
-    color: '#0A74F5',
+    color: '#0A66E8',
     fontSize: 13.5,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   footer: {
-    marginTop: 'auto',
     paddingTop: 28,
     alignItems: 'center',
     gap: 6,
@@ -494,7 +499,7 @@ const styles = StyleSheet.create({
   footerLightText: {
     fontSize: 11.5,
     fontWeight: '300',
-    color: '#94A3B8',
+    color: '#64748B',
     letterSpacing: 0.2,
   },
   copyright: {
