@@ -1,5 +1,5 @@
 import { AppState, Platform } from 'react-native';
-import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { getCurrentErpUser, signInToErp, signOutFromErp, type ErpUser } from '@/core/auth/authApi';
 import {
   clearAccessToken,
@@ -41,6 +41,7 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const APP_LOCK_BACKGROUND_DELAY_MS = 5 * 60 * 1000;
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<ErpUser | null>(null);
@@ -48,9 +49,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [activeBranchId, setActiveBranchId] = useState<string | undefined>(undefined);
   const [isAppLocked, setIsAppLocked] = useState(false);
-  const [hasPendingBiometricSession, setHasPendingBiometricSession] = useState(false);
   const [canSignInWithBiometrics, setCanSignInWithBiometrics] = useState(false);
   const [biometricSettings, setBiometricSettings] = useState(DEFAULT_BIOMETRIC_SETTINGS);
+  const appBackgroundedAtRef = useRef<number | null>(null);
 
   const clearSessionNotice = useCallback(() => setSessionNotice(null), []);
 
@@ -60,7 +61,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setActiveBranchId(undefined);
     setUser(null);
     setIsAppLocked(false);
-    setHasPendingBiometricSession(false);
     setCanSignInWithBiometrics(false);
     setSessionNotice(reason.message || 'Phiên đăng nhập đã được sử dụng trên thiết bị khác. Vui lòng đăng nhập lại.');
   }), []);
@@ -80,9 +80,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (Platform.OS === 'web' || !user || !biometricSettings.appLockEnabled) return;
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'background' && !isAppLockSuspended()) setIsAppLocked(true);
+      if (state === 'background') {
+        appBackgroundedAtRef.current = isAppLockSuspended() ? null : Date.now();
+      } else if (state === 'active') {
+        const backgroundedAt = appBackgroundedAtRef.current;
+        appBackgroundedAtRef.current = null;
+        if (backgroundedAt && Date.now() - backgroundedAt >= APP_LOCK_BACKGROUND_DELAY_MS && !isAppLockSuspended()) {
+          setIsAppLocked(true);
+        }
+      }
     });
-    return () => subscription.remove();
+    return () => {
+      appBackgroundedAtRef.current = null;
+      subscription.remove();
+    };
   }, [biometricSettings.appLockEnabled, user?._id, user?.id]);
 
   useEffect(() => {
@@ -94,24 +105,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
         const token = await restoreAccessToken();
         if (token) {
-          if (settings.appLockEnabled) {
-            if (active) {
-              setHasPendingBiometricSession(true);
-              setCanSignInWithBiometrics(true);
-              setIsAppLocked(true);
-            }
-            return;
-          }
-          if (settings.loginEnabled) {
-            if (active) setCanSignInWithBiometrics(true);
-            return;
-          }
-
           const currentUser = await getCurrentErpUser();
           const savedBranchId = await restoreActiveBranchId();
           if (active) {
             setUser(currentUser);
             setActiveBranchId(currentUser.branchId || savedBranchId || undefined);
+            setCanSignInWithBiometrics(Boolean(settings.loginEnabled));
+            setIsAppLocked(false);
           }
         }
       } catch {
@@ -132,7 +132,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setActiveBranchId(currentUser.branchId || savedBranchId || undefined);
     setUser(currentUser);
     setIsAppLocked(false);
-    setHasPendingBiometricSession(false);
     setCanSignInWithBiometrics(Boolean(biometricSettings.loginEnabled));
   }, [biometricSettings.loginEnabled]);
 
@@ -156,7 +155,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setActiveBranchId(currentUser.branchId || savedBranchId || undefined);
       setUser(currentUser);
       setIsAppLocked(false);
-      setHasPendingBiometricSession(false);
       setCanSignInWithBiometrics(false);
     } catch (error) {
       await clearAccessToken();
@@ -175,36 +173,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       throw new Error(biometricErrorMessage(result.error));
     }
 
-    if (hasPendingBiometricSession) {
-      const token = await restoreAccessToken();
-      if (!token) {
-        setHasPendingBiometricSession(false);
-        setCanSignInWithBiometrics(false);
-        setIsAppLocked(false);
-        throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại bằng mật khẩu.');
-      }
-
-      try {
-        const currentUser = await getCurrentErpUser();
-        const savedBranchId = await restoreActiveBranchId();
-        setSessionNotice(null);
-        setActiveBranchId(currentUser.branchId || savedBranchId || undefined);
-        setUser(currentUser);
-        setHasPendingBiometricSession(false);
-        setCanSignInWithBiometrics(false);
-      } catch (error) {
-        await clearAccessToken();
-        await clearActiveBranchId();
-        setActiveBranchId(undefined);
-        setHasPendingBiometricSession(false);
-        setCanSignInWithBiometrics(false);
-        setIsAppLocked(false);
-        throw error;
-      }
-    }
-
     setIsAppLocked(false);
-  }, [hasPendingBiometricSession]);
+  }, []);
 
   const signOut = useCallback(async () => {
     try {
@@ -215,7 +185,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setActiveBranchId(undefined);
       setUser(null);
       setIsAppLocked(false);
-      setHasPendingBiometricSession(false);
       setCanSignInWithBiometrics(false);
     }
   }, []);
