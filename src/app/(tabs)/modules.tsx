@@ -70,8 +70,6 @@ export default function ModulesScreen() {
             </View>
           ))}
         </View>
-
-        <Text style={styles.note}>Module hiển thị theo gói dịch vụ và quyền được cấp.</Text>
       </ScrollView>
     </Screen>
   );
@@ -134,11 +132,5 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 16,
     textAlign: 'center',
-  },
-  note: {
-    color: colors.muted,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 16,
   },
 });
