@@ -20,7 +20,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Eye, EyeOff, Fingerprint, Lock, Mail } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
-import Svg, { Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   ERP_PRIVACY_POLICY_URL,
@@ -29,7 +29,6 @@ import {
 import { colors } from '@/theme/colors';
 
 const IGEN_FULL_LOGO = require('../../assets/images/logo-igenerp-transparent.png');
-const IGEN_PEEKING_ROBOT = require('../../assets/images/login-robot-peeking.png');
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -179,24 +178,8 @@ export default function LoginScreen() {
             <Image source={IGEN_FULL_LOGO} style={styles.topLogo} resizeMode="contain" />
           </View>
 
-          {/* Centered white login card with peeking iGen robot + cyan speech bubble */}
+          {/* Centered white login card */}
           <View style={styles.cardStage}>
-            <View pointerEvents="none" style={styles.peekingRow}>
-              <View style={styles.speechBubbleWrap}>
-                <View style={styles.speechBubble}>
-                  <Text style={styles.speechBubbleText}>Hi, mình là trợ lý ERP</Text>
-                </View>
-                <Svg width={14} height={12} viewBox="0 0 14 12" style={styles.speechTail}>
-                  <Path d="M0 2C4.5 2 9.5 4.2 14 10C9.5 9.8 4.2 9.5 0 9.5V2Z" fill="#00AEF0" />
-                </Svg>
-              </View>
-
-              <Image
-                source={IGEN_PEEKING_ROBOT}
-                style={styles.peekingRobot}
-                resizeMode="contain"
-              />
-            </View>
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Đăng nhập vào iGen ERP</Text>
 
@@ -409,55 +392,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
   },
-  peekingRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'flex-end',
-    paddingRight: 8,
-    zIndex: 2,
-    marginBottom: -19,
-  },
-  speechBubbleWrap: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 46,
-    marginRight: -10,
-    zIndex: 3,
-  },
-  speechBubble: {
-    backgroundColor: '#00AEF0',
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 15,
-    borderBottomRightRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  speechBubbleText: {
-    color: '#FFFFFF',
-    fontSize: 12.5,
-    fontWeight: '600',
-    lineHeight: 17,
-  },
-  speechTail: {
-    marginLeft: -2,
-    marginBottom: 2,
-  },
-  peekingRobot: {
-    width: 176,
-    height: 136,
-    transform: [{ rotate: '4deg' }],
-  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5ECF6',
     paddingHorizontal: 20,
-    paddingTop: 28,
+    paddingTop: 24,
     paddingBottom: 24,
     gap: 16,
-    zIndex: 1,
   },
   cardTitle: {
     color: colors.ink,
