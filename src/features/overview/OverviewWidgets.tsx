@@ -1,6 +1,5 @@
 import { PopupError } from '@/components/PopupError';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Card } from '@/components/Card';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/theme/colors';
 
 export type KpiItem = {
@@ -17,7 +16,7 @@ export function KpiGrid({ items }: { items: KpiItem[] }) {
   return (
     <View style={styles.kpiGrid}>
       {items.map((item) => (
-        <Card key={item.id} style={styles.kpiCard}>
+        <View key={item.id} style={styles.kpiCard}>
           <View style={styles.kpiHeader}>
             <View style={[styles.kpiDotWrap, { backgroundColor: item.tone }]}>
               <View style={[styles.kpiDot, { backgroundColor: item.accent }]} />
@@ -39,7 +38,7 @@ export function KpiGrid({ items }: { items: KpiItem[] }) {
               {item.helper}
             </Text>
           ) : null}
-        </Card>
+        </View>
       ))}
     </View>
   );
@@ -69,9 +68,9 @@ export function VerticalBarChart({
   const hasAny = data.some((d) => d.primary > 0 || (d.secondary ?? 0) > 0);
   if (!data.length || !hasAny) {
     return (
-      <Card style={styles.chartCard}>
+      <View style={styles.chartCard}>
         <Text style={styles.emptyInline}>{emptyText}</Text>
-      </Card>
+      </View>
     );
   }
 
@@ -81,7 +80,7 @@ export function VerticalBarChart({
   );
 
   return (
-    <Card style={styles.chartCard}>
+    <View style={styles.chartCard}>
       <View style={styles.chartAreaWrap}>
         {/* Subtle horizontal hairline gridlines */}
         <View pointerEvents="none" style={styles.chartGridLines}>
@@ -125,7 +124,7 @@ export function VerticalBarChart({
           </>
         ) : null}
       </View>
-    </Card>
+    </View>
   );
 }
 
@@ -146,14 +145,14 @@ export function BreakdownBars({
   const total = rows.reduce((sum, r) => sum + Math.max(0, r.value), 0);
   if (!rows.length || total <= 0) {
     return (
-      <Card style={styles.sectionCard}>
+      <View style={styles.sectionCard}>
         <Text style={styles.emptyInline}>{emptyText}</Text>
-      </Card>
+      </View>
     );
   }
 
   return (
-    <Card style={styles.sectionCard}>
+    <View style={styles.sectionCard}>
       <View style={styles.breakdownList}>
         {rows.map((row) => {
           const pct = Math.min(100, Math.round((Math.max(0, row.value) / total) * 100));
@@ -182,7 +181,7 @@ export function BreakdownBars({
           );
         })}
       </View>
-    </Card>
+    </View>
   );
 }
 
@@ -205,14 +204,14 @@ export function ListPanel({
 }) {
   if (!items.length) {
     return (
-      <Card style={styles.sectionCard}>
+      <View style={styles.sectionCard}>
         <Text style={styles.emptyInline}>{emptyText}</Text>
-      </Card>
+      </View>
     );
   }
 
   return (
-    <Card style={styles.sectionCard}>
+    <View style={styles.sectionCard}>
       {items.map((item, idx) => (
         <View key={item.id} style={[styles.listRow, idx > 0 && styles.listRowBorder]}>
           <View style={[styles.rowBullet, { backgroundColor: item.dotColor ?? colors.primary }]} />
@@ -243,16 +242,16 @@ export function ListPanel({
           ) : null}
         </View>
       ))}
-    </Card>
+    </View>
   );
 }
 
 export function OverviewLoading({ label }: { label: string }) {
   return (
-    <Card style={styles.stateCard}>
+    <View style={styles.stateCard}>
       <ActivityIndicator size="small" color={colors.primary} />
       <Text style={styles.stateText}>{label}</Text>
-    </Card>
+    </View>
   );
 }
 
@@ -272,14 +271,9 @@ export const CHART_COLORS = ['#2463EB', '#16885A', '#C27617', '#7754C8', '#DC262
 
 const HAIRLINE_CARD = {
   backgroundColor: colors.white,
-  borderRadius: 12,
+  borderRadius: 10,
   borderWidth: StyleSheet.hairlineWidth,
-  borderColor: '#E2EAF4',
-  shadowColor: '#132442',
-  shadowOpacity: 0.02,
-  shadowRadius: 6,
-  shadowOffset: { width: 0, height: 2 },
-  elevation: 1,
+  borderColor: '#E5EAF2',
 } as const;
 
 const styles = StyleSheet.create({

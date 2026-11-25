@@ -1,5 +1,4 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Card } from '@/components/Card';
 import { SectionHeading } from '@/components/SectionHeading';
 import {
   BreakdownBars,
@@ -130,14 +129,14 @@ export function HrOverviewView({
       <SectionHeading title="Chấm công hôm nay" />
       <View style={styles.attGrid}>
         {attendanceTiles.map((tile) => (
-          <Card key={tile.label} style={styles.attCard}>
+          <View key={tile.label} style={styles.attCard}>
             <View style={[styles.attBadge, { backgroundColor: tile.tone }]}>
               <Text style={[styles.attValue, { color: tile.color }]}>{formatInt(tile.value)}</Text>
             </View>
             <Text numberOfLines={1} style={styles.attLabel}>
               {tile.label}
             </Text>
-          </Card>
+          </View>
         ))}
       </View>
 
@@ -174,12 +173,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    borderRadius: 12,
+    backgroundColor: colors.white,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E2EAF4',
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-    elevation: 1,
+    borderColor: '#E5EAF2',
   },
   attBadge: {
     minWidth: 36,

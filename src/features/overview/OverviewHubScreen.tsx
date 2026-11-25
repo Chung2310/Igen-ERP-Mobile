@@ -519,7 +519,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         ) : null}
 
         {/* Period filter bar */}
-        <Card style={styles.periodCard}>
+        <View style={styles.periodCard}>
           <View style={styles.periodHeader}>
             <Text style={styles.periodLabel}>Kỳ thống kê</Text>
             <Text style={styles.periodRange}>
@@ -549,7 +549,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
             })}
           </ScrollView>
           <Text style={styles.comparisonText}>{range.comparisonLabel}</Text>
-        </Card>
+        </View>
 
         {/* Active overview page body */}
         {renderSection()}
@@ -718,17 +718,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#DCE6F4',
+    borderColor: '#E5EAF2',
     paddingHorizontal: 6,
     paddingVertical: 8,
     marginBottom: 12,
-    shadowColor: '#132442',
-    shadowOpacity: 0.025,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   switcherNavBtn: {
     width: 34,
@@ -780,14 +775,9 @@ const styles = StyleSheet.create({
   },
   periodCard: {
     backgroundColor: colors.white,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E2EAF4',
-    shadowColor: '#132442',
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    borderColor: '#E5EAF2',
     paddingHorizontal: 14,
     paddingTop: 11,
     paddingBottom: 10,
