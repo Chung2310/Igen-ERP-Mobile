@@ -38,8 +38,9 @@ export default function TabLayout() {
 
   const tabOptions = {
     headerShown: false,
-    animation: 'shift' as const,
-    sceneStyle: { backgroundColor: colors.background },
+    lazy: false,
+    animation: 'fade' as const,
+    sceneStyle: { backgroundColor: colors.white },
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
     tabBarButton: (props: Record<string, unknown>) => <NoRippleTabButton {...props} />,
@@ -54,7 +55,7 @@ export default function TabLayout() {
   };
 
   return (
-    <Tabs screenOptions={tabOptions}>
+    <Tabs detachInactiveScreens={false} screenOptions={tabOptions}>
       <Tabs.Screen
         name="inbox"
         options={{
