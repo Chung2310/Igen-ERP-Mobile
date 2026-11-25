@@ -3,13 +3,11 @@ import {
   Animated,
   Easing,
   StyleSheet,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import Svg, { Circle, Defs, G, LinearGradient, Path, Stop } from 'react-native-svg';
-import { colors } from '@/theme/colors';
 
 type BrandLoaderProps = {
   size?: number;
@@ -29,7 +27,7 @@ type BrandLoadingOverlayProps = {
 const PETAL_PATH =
   'M 32 9.5 C 44.4 9.5 54.5 19.6 54.5 32 C 54.5 36.1 53.4 39.9 51.5 43.2 C 50.9 35.1 45.1 28.4 37.3 26.5 C 40.7 23.1 42.3 18.2 41.3 13.3 C 38.4 10.9 35.3 9.5 32 9.5 Z';
 
-export function BrandLoader({ size = 46, label, style }: BrandLoaderProps) {
+export function BrandLoader({ size = 46, style }: BrandLoaderProps) {
   const rawId = useId();
   const uid = rawId.replace(/[^a-zA-Z0-9_-]/g, '_');
 
@@ -156,18 +154,16 @@ export function BrandLoader({ size = 46, label, style }: BrandLoaderProps) {
           </Svg>
         </Animated.View>
       </View>
-
-      {label ? <Text style={styles.label}>{label}</Text> : null}
     </View>
   );
 }
 
-export function BrandLoadingOverlay({ visible, label }: BrandLoadingOverlayProps) {
+export function BrandLoadingOverlay({ visible }: BrandLoadingOverlayProps) {
   if (!visible) return null;
 
   return (
     <View style={styles.overlay} pointerEvents="auto">
-      <BrandLoader size={54} label={label} />
+      <BrandLoader size={54} />
     </View>
   );
 }
@@ -176,7 +172,6 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
   },
   stage: {
     alignItems: 'center',
@@ -186,12 +181,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  label: {
-    color: colors.muted,
-    fontSize: 12,
-    fontWeight: '400',
-    textAlign: 'center',
   },
   overlay: {
     ...StyleSheet.absoluteFill,
