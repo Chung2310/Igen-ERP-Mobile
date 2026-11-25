@@ -679,15 +679,13 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
           <Text style={styles.title}>Trò chuyện</Text>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Cuộc trò chuyện mới"
             onPress={() => {
               void openNewChatModal();
             }}
             style={({ pressed }) => [styles.newChatBtn, pressed && styles.newChatBtnPressed]}
           >
-            <View style={styles.newChatBtnContent}>
-              <Plus size={15} color={colors.white} />
-              <Text style={styles.newChatBtnText}>Mới</Text>
-            </View>
+            <Plus size={19} color={colors.white} strokeWidth={2.2} />
           </Pressable>
         </View>
 
@@ -943,24 +941,24 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   title: { color: colors.ink, fontSize: 21, fontWeight: '700', letterSpacing: -0.2 },
   newChatBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.primary,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  newChatBtnPressed: { opacity: 0.85 },
-  newChatBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  newChatBtnText: { color: colors.white, fontSize: 12, fontWeight: '600' },
+  newChatBtnPressed: { opacity: 0.82 },
   filters: { flexDirection: 'row', gap: 8, marginTop: 12 },
   filterPill: {
     backgroundColor: colors.white,
-    paddingHorizontal: 15,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 6.5,
     borderRadius: 999,
   },
   filterPillActive: { backgroundColor: colors.primary },
-  filterText: { color: '#334155', fontSize: 13, fontWeight: '500' },
-  filterTextActive: { color: colors.white, fontWeight: '600' },
+  filterText: { color: '#334155', fontSize: 12.5, fontWeight: '400' },
+  filterTextActive: { color: colors.white, fontWeight: '500' },
   whiteSheet: {
     flex: 1,
     backgroundColor: colors.white,
@@ -1007,15 +1005,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  initials: { color: colors.ink, fontSize: 14, fontWeight: '700' },
+  initials: { color: colors.ink, fontSize: 14, fontWeight: '600' },
   copy: { flex: 1, marginLeft: 13 },
   nameLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   roomNameWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  name: { color: colors.ink, fontSize: 15, fontWeight: '600', flex: 1 },
+  name: { color: colors.ink, fontSize: 15, fontWeight: '500', flex: 1 },
   time: { color: '#8A96A8', fontSize: 12, fontWeight: '400' },
   previewLine: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  message: { flex: 1, color: '#64748B', fontSize: 13.5 },
-  messageUnread: { color: colors.ink, fontWeight: '600' },
+  message: { flex: 1, color: '#64748B', fontSize: 13.5, fontWeight: '400' },
+  messageUnread: { color: colors.ink, fontWeight: '500' },
   unreadBadge: {
     minWidth: 20,
     height: 20,
@@ -1025,7 +1023,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
-  unreadBadgeText: { color: colors.white, fontSize: 10.5, fontWeight: '700' },
+  unreadBadgeText: { color: colors.white, fontSize: 10.5, fontWeight: '600' },
   stateBox: { padding: 28, alignItems: 'center', justifyContent: 'center', gap: 10 },
   stateText: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center', lineHeight: 18 },
