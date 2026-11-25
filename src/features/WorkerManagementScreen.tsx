@@ -1,4 +1,5 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { BrandLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
@@ -647,7 +648,7 @@ function StatusPill({ label }: { label: string }) { return <Text style={styles.s
 function Metric({ label, value }: { label: string; value: string }) { return <View style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.muted}>{label}</Text></View>; }
 function Detail({ label, value }: { label: string; value?: string | null }) { return <View style={styles.detailRow}><Text style={styles.muted}>{label}</Text><Text style={styles.detailText}>{value || '—'}</Text></View>; }
 function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) { return <View style={styles.modalHeader}><Text style={styles.heading}>{title}</Text><Pressable onPress={onClose} style={styles.close}><X size={18} color={colors.ink} /></Pressable></View>; }
-function Loading() { return <View style={styles.center}><ActivityIndicator color={colors.primary} /><Text style={styles.muted}>Đang tải dữ liệu…</Text></View>; }
+function Loading() { return <View style={styles.center}><BrandLoader size={42} label="Đang tải dữ liệu…" /></View>; }
 function Empty({ text }: { text: string }) { return <View style={styles.center}><Text style={styles.muted}>{text}</Text></View>; }
 
 const styles = StyleSheet.create({

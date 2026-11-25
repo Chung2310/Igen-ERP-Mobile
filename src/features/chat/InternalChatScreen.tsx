@@ -1,3 +1,4 @@
+import { BrandLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -426,8 +427,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
 
         {messagesLoading && !messages.length ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.stateText}>Đang tải tin nhắn...</Text>
+            <BrandLoader size={42} label="Đang tải tin nhắn..." />
           </View>
         ) : messagesError && !messages.length ? (
           <View style={styles.centered}>
@@ -715,8 +715,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
 
         {roomsLoading && !rooms.length ? (
           <Card style={styles.stateCard}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.stateText}>Đang tải danh sách hội thoại từ ERP...</Text>
+            <BrandLoader size={42} label="Đang tải danh sách hội thoại từ ERP..." />
           </Card>
         ) : roomsError && !rooms.length ? (
           <Card style={styles.stateCard}>

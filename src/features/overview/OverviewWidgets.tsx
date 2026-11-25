@@ -1,5 +1,6 @@
+import { BrandLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/theme/colors';
 
 export type KpiItem = {
@@ -249,8 +250,7 @@ export function ListPanel({
 export function OverviewLoading({ label }: { label: string }) {
   return (
     <View style={styles.stateCard}>
-      <ActivityIndicator size="small" color={colors.primary} />
-      <Text style={styles.stateText}>{label}</Text>
+      <BrandLoader size={42} label={label} />
     </View>
   );
 }
