@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.ink,
     fontSize: 19,
-    fontWeight: '700',
+    fontWeight: '500',
     textAlign: 'center',
     letterSpacing: -0.2,
   },
