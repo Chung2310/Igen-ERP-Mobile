@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import * as ExpoCamera from 'expo-camera';
 import * as SecureStore from 'expo-secure-store';
@@ -471,7 +471,7 @@ function AccountDetailSection() {
 
   return (
     <View style={[styles.accountContainer, { paddingBottom: bottomInset }]}>
-      {/* Soft mountain cover header */}
+      {/* Abstract fluid & geometric iGen brand cover header */}
       <View style={[styles.coverWrap, { height: coverHeight }]}>
         <Svg
           width="100%"
@@ -480,10 +480,58 @@ function AccountDetailSection() {
           preserveAspectRatio="xMidYMid slice"
           style={StyleSheet.absoluteFill}
         >
-          <Rect x="0" y="0" width="400" height="180" fill="#E5E9F0" />
-          <Path d="M0 120 L110 56 L195 16 L285 95 L345 62 L400 108 L400 180 L0 180 Z" fill="#C9D0DC" />
-          <Path d="M0 128 L125 68 L225 118 L325 78 L400 124 L400 180 L0 180 Z" fill="#B1B9C7" />
-          <Path d="M0 144 L95 128 L210 146 L330 132 L400 145 L400 180 L0 180 Z" fill="#9AA3B2" />
+          <Defs>
+            <LinearGradient id="profileCoverBase" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#D7ECFF" />
+              <Stop offset="52%" stopColor="#E6EEFF" />
+              <Stop offset="100%" stopColor="#D4F2FA" />
+            </LinearGradient>
+            <LinearGradient id="profileWaveA" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#38BDF8" />
+              <Stop offset="100%" stopColor="#3B82F6" />
+            </LinearGradient>
+            <LinearGradient id="profileWaveB" x1="1" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor="#6366F1" />
+              <Stop offset="100%" stopColor="#06B6D4" />
+            </LinearGradient>
+          </Defs>
+
+          <Rect x="0" y="0" width="400" height="180" fill="url(#profileCoverBase)" />
+
+          {/* Abstract sweeping silk ribbons */}
+          <Path
+            d="M-20 155 C 70 85, 165 160, 265 95 C 325 56, 375 68, 420 42 L 420 190 L -20 190 Z"
+            fill="url(#profileWaveA)"
+            fillOpacity={0.24}
+          />
+          <Path
+            d="M-20 105 C 65 148, 175 45, 290 108 C 342 136, 385 112, 420 96 L 420 190 L -20 190 Z"
+            fill="url(#profileWaveB)"
+            fillOpacity={0.2}
+          />
+
+          {/* Soft translucent geometric orbs & minimal arc */}
+          <Circle cx="336" cy="40" r="68" fill="#38BDF8" fillOpacity={0.18} />
+          <Circle cx="312" cy="52" r="38" fill="#FFFFFF" fillOpacity={0.34} />
+          <Circle cx="76" cy="36" r="46" fill="#6366F1" fillOpacity={0.1} />
+          <Circle
+            cx="200"
+            cy="152"
+            r="96"
+            stroke="#FFFFFF"
+            strokeOpacity={0.45}
+            strokeWidth="1.4"
+            fill="none"
+          />
+          <Circle
+            cx="336"
+            cy="40"
+            r="84"
+            stroke="#3B82F6"
+            strokeOpacity={0.16}
+            strokeWidth="1.2"
+            fill="none"
+          />
         </Svg>
 
         <Pressable
