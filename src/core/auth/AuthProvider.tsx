@@ -67,7 +67,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!user) return;
-    return connectAuthSessionSocket(notifySessionInvalidation);
+    return connectAuthSessionSocket(notifySessionInvalidation, (event) => {
+      const currentCompany = user.companyCode?.trim().toUpperCase();
+      if (!currentCompany || event.companyCode.trim().toUpperCase() !== currentCompany) return;
+      setUser((current) => {
+        if (!current || current.companyCode?.trim().toUpperCase() !== currentCompany) return current;
+        return { ...current, enabledModules: event.enabledModules };
+      });
+    });
   }, [user]);
 
   useEffect(() => {
