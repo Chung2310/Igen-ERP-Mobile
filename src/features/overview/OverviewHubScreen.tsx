@@ -12,6 +12,7 @@ import {
 import { Building2, Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Card } from '@/components/Card';
+import { OverviewTabIcon } from '@/components/OverviewTabIcons';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -483,11 +484,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
               ]}
             >
               <View style={styles.switcherTitleRow}>
-                {activePage ? (
-                  <View style={[styles.switcherIconBadge, { backgroundColor: activePage.tone }]}>
-                    <activePage.icon size={14} color={activePage.accent} />
-                  </View>
-                ) : null}
+                {activePage ? <OverviewTabIcon id={activePage.id} size={24} /> : null}
                 <Text numberOfLines={1} style={styles.switcherTitle}>
                   {activePage?.label ?? 'Tổng quan'}
                 </Text>
@@ -580,16 +577,13 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {allowedPages.map((page) => {
                 const active = page.id === activePageId;
-                const PageIcon = page.icon;
                 return (
                   <Pressable
                     key={page.id}
                     onPress={() => onSelectPage(page.id)}
                     style={[styles.modalRow, active && styles.modalRowActive]}
                   >
-                    <View style={[styles.modalIcon, { backgroundColor: page.tone }]}>
-                      <PageIcon size={18} color={page.accent} />
-                    </View>
+                    <OverviewTabIcon id={page.id} size={38} />
                     <View style={styles.modalRowCopy}>
                       <Text style={styles.modalRowTitle}>{page.label}</Text>
                       <Text numberOfLines={1} style={styles.modalRowSub}>
