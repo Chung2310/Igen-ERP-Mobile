@@ -27,7 +27,7 @@ import {
 } from '@/core/network/erpWebLinks';
 import { colors } from '@/theme/colors';
 
-const IGEN_FULL_LOGO = require('../../assets/images/logo-igenerp.png');
+const IGEN_FULL_LOGO = require('../../assets/images/logo-igenerp-transparent.png');
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -371,12 +371,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingHorizontal: 4,
-    marginBottom: 18,
+    paddingHorizontal: 0,
+    marginBottom: 20,
   },
   topLogo: {
-    width: 118,
-    height: 36,
+    width: 176,
+    height: 38,
   },
   cardStage: {
     flex: 1,
