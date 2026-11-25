@@ -330,6 +330,11 @@ export default function LoginScreen() {
                 </>
               ) : null}
             </View>
+
+            <Text style={styles.signupPrompt}>
+              Bạn chưa có tài khoản?{' '}
+              <Text style={styles.signupLink}>Tạo tài khoản</Text>
+            </Text>
           </View>
 
           {/* Footer: Chính sách, Điều khoản & Copyright chữ nét mảnh */}
@@ -483,6 +488,17 @@ const styles = StyleSheet.create({
     color: '#0A66E8',
     fontSize: 13.5,
     fontWeight: '500',
+  },
+  signupPrompt: {
+    marginTop: 20,
+    textAlign: 'center',
+    color: '#475569',
+    fontSize: 13.5,
+    fontWeight: '400',
+  },
+  signupLink: {
+    color: '#0A66E8',
+    fontWeight: '600',
   },
   footer: {
     paddingTop: 28,
