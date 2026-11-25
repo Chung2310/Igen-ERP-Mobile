@@ -98,11 +98,11 @@ const styles = StyleSheet.create({
   },
   gridCard: {
     backgroundColor: colors.white,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingTop: 24,
-    paddingBottom: 22,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5EAF2',
+    paddingTop: 22,
+    paddingBottom: 20,
     paddingHorizontal: 8,
   },
   row: {
