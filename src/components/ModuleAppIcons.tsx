@@ -32,7 +32,6 @@ const DEFAULT_PALETTE: IconPalette = {
 function renderGlyph(slug: string, accent: string) {
   switch (slug) {
     case 'ai-plans':
-      // 4-point AI sparkle star + companion sparkles
       return (
         <>
           <Path
@@ -41,20 +40,21 @@ function renderGlyph(slug: string, accent: string) {
           />
           <Path
             d="M38.5 13.5C39.05 16.55 40.85 18.35 43.9 18.9C40.85 19.45 39.05 21.25 38.5 24.3C37.95 21.25 36.15 19.45 33.1 18.9C36.15 18.35 37.95 16.55 38.5 13.5Z"
-            fill="rgba(255,255,255,0.82)"
+            fill="#FFFFFF"
+            fillOpacity={0.82}
           />
-          <Circle cx="38.5" cy="36.5" r="2.3" fill="rgba(255,255,255,0.68)" />
+          <Circle cx="38.5" cy="36.5" r="2.3" fill="#FFFFFF" fillOpacity={0.68} />
         </>
       );
 
     case 'users':
-      // Two-person account & permissions silhouette
       return (
         <>
-          <Circle cx="36.2" cy="22.8" r="4.1" fill="rgba(255,255,255,0.72)" />
+          <Circle cx="36.2" cy="22.8" r="4.1" fill="#FFFFFF" fillOpacity={0.72} />
           <Path
             d="M32.4 37.8C32.7 33.2 35.5 30.2 39.2 30.2C42.1 30.2 44.3 32.1 45 35.2C45.3 36.6 44.3 37.8 42.9 37.8H32.4Z"
-            fill="rgba(255,255,255,0.72)"
+            fill="#FFFFFF"
+            fillOpacity={0.72}
           />
           <Circle cx="23.5" cy="21.2" r="5.5" fill="#FFFFFF" />
           <Path
@@ -65,10 +65,9 @@ function renderGlyph(slug: string, accent: string) {
       );
 
     case 'hr':
-      // Employee ID badge with avatar & profile lines
       return (
         <>
-          <Rect x="23" y="12.5" width="10" height="5" rx="2.5" fill="rgba(255,255,255,0.72)" />
+          <Rect x="23" y="12.5" width="10" height="5" rx="2.5" fill="#FFFFFF" fillOpacity={0.72} />
           <Rect x="13" y="16.5" width="30" height="26" rx="6" fill="#FFFFFF" />
           <Circle cx="22.5" cy="26.2" r="3.4" fill={accent} />
           <Path
@@ -76,12 +75,11 @@ function renderGlyph(slug: string, accent: string) {
             fill={accent}
           />
           <Rect x="30.5" y="24.2" width="8.5" height="2.7" rx="1.35" fill={accent} />
-          <Rect x="30.5" y="29.5" width="6.5" height="2.7" rx="1.35" fill={accent} opacity={0.65} />
+          <Rect x="30.5" y="29.5" width="6.5" height="2.7" rx="1.35" fill={accent} fillOpacity={0.65} />
         </>
       );
 
     case 'worker-management':
-      // Safety hard-hat + worker shoulders silhouette
       return (
         <>
           <Path
@@ -92,7 +90,8 @@ function renderGlyph(slug: string, accent: string) {
           <Rect x="13.2" y="27.2" width="29.6" height="4.1" rx="2.05" fill="#FFFFFF" />
           <Path
             d="M18.2 34.8C20.5 38.4 24 40.3 28 40.3C32 40.3 35.5 38.4 37.8 34.8"
-            stroke="rgba(255,255,255,0.88)"
+            stroke="#FFFFFF"
+            strokeOpacity={0.88}
             strokeWidth="3.6"
             strokeLinecap="round"
             fill="none"
@@ -101,7 +100,6 @@ function renderGlyph(slug: string, accent: string) {
       );
 
     case 'student-management':
-      // Graduation cap (mortarboard + tassel)
       return (
         <>
           <Path
@@ -110,7 +108,8 @@ function renderGlyph(slug: string, accent: string) {
           />
           <Path
             d="M18.5 28.3V34.6C18.5 37.4 22.8 39.8 28 39.8C33.2 39.8 37.5 37.4 37.5 34.6V28.3L28 32.8L18.5 28.3Z"
-            fill="rgba(255,255,255,0.84)"
+            fill="#FFFFFF"
+            fillOpacity={0.84}
           />
           <Path
             d="M41.5 24.8V34.2"
@@ -123,20 +122,19 @@ function renderGlyph(slug: string, accent: string) {
       );
 
     case 'resources':
-      // Clean layered folder icon
       return (
         <>
           <Path
             d="M14 19.2C14 16.9 15.9 15 18.2 15H24.6C25.9 15 27.1 15.6 27.9 16.6L29.6 18.8H37.8C40.1 18.8 42 20.7 42 23V25.5H14V19.2Z"
-            fill="rgba(255,255,255,0.72)"
+            fill="#FFFFFF"
+            fillOpacity={0.72}
           />
           <Rect x="13.5" y="21.2" width="29" height="19.8" rx="5.2" fill="#FFFFFF" />
-          <Rect x="22" y="29.4" width="12" height="3" rx="1.5" fill={accent} opacity={0.78} />
+          <Rect x="22" y="29.4" width="12" height="3" rx="1.5" fill={accent} fillOpacity={0.78} />
         </>
       );
 
     case 'quotes':
-      // Quotation document with check badge
       return (
         <>
           <Path
@@ -145,23 +143,23 @@ function renderGlyph(slug: string, accent: string) {
           />
           <Path
             d="M31.2 12.5V18.3C31.2 19.7 32.3 20.8 33.7 20.8H39.5L31.2 12.5Z"
-            fill="rgba(13,163,97,0.32)"
+            fill={accent}
+            fillOpacity={0.35}
           />
           <Rect x="20.8" y="24" width="13.4" height="2.7" rx="1.35" fill={accent} />
-          <Rect x="20.8" y="29.5" width="9.5" height="2.7" rx="1.35" fill={accent} opacity={0.72} />
-          <Rect x="20.8" y="35" width="6.5" height="2.7" rx="1.35" fill={accent} opacity={0.5} />
+          <Rect x="20.8" y="29.5" width="9.5" height="2.7" rx="1.35" fill={accent} fillOpacity={0.72} />
+          <Rect x="20.8" y="35" width="6.5" height="2.7" rx="1.35" fill={accent} fillOpacity={0.5} />
         </>
       );
 
     case 'inventory':
-      // Warehouse arch + inner package cube (MISA Kho hàng style)
       return (
         <>
           <Path
             d="M25.8 14.8C27.1 13.7 28.9 13.7 30.2 14.8L41.8 24.4C42.6 25.1 43 26 43 27V37.6C43 39.5 41.5 41 39.6 41H35.2V31.4C35.2 29.8 33.9 28.5 32.3 28.5H23.7C22.1 28.5 20.8 29.8 20.8 31.4V41H16.4C14.5 41 13 39.5 13 37.6V27C13 26 13.4 25.1 14.2 24.4L25.8 14.8Z"
             fill="#FFFFFF"
           />
-          <Rect x="23.6" y="31.4" width="8.8" height="9.6" rx="2.2" fill="rgba(255,255,255,0.62)" />
+          <Rect x="23.6" y="31.4" width="8.8" height="9.6" rx="2.2" fill="#FFFFFF" fillOpacity={0.62} />
         </>
       );
 
@@ -169,19 +167,18 @@ function renderGlyph(slug: string, accent: string) {
       return (
         <>
           <Rect x="15.5" y="15.5" width="10.5" height="10.5" rx="3.2" fill="#FFFFFF" />
-          <Rect x="30" y="15.5" width="10.5" height="10.5" rx="3.2" fill="rgba(255,255,255,0.78)" />
-          <Rect x="15.5" y="30" width="10.5" height="10.5" rx="3.2" fill="rgba(255,255,255,0.78)" />
+          <Rect x="30" y="15.5" width="10.5" height="10.5" rx="3.2" fill="#FFFFFF" fillOpacity={0.78} />
+          <Rect x="15.5" y="30" width="10.5" height="10.5" rx="3.2" fill="#FFFFFF" fillOpacity={0.78} />
           <Rect x="30" y="30" width="10.5" height="10.5" rx="3.2" fill="#FFFFFF" />
         </>
       );
   }
 }
 
-export function ModuleAppIcon({ slug, size = 54 }: ModuleAppIconProps) {
+export function ModuleAppIcon({ slug, size = 46 }: ModuleAppIconProps) {
   const palette = MODULE_PALETTES[slug] ?? DEFAULT_PALETTE;
   const safeId = slug.replace(/[^a-zA-Z0-9_-]/g, '_');
   const bgGradientId = `mod_bg_${safeId}`;
-  const sheenGradientId = `mod_sheen_${safeId}`;
 
   return (
     <Svg width={size} height={size} viewBox="0 0 56 56" fill="none">
@@ -190,24 +187,9 @@ export function ModuleAppIcon({ slug, size = 54 }: ModuleAppIconProps) {
           <Stop offset="0%" stopColor={palette.from} />
           <Stop offset="100%" stopColor={palette.to} />
         </LinearGradient>
-        <LinearGradient id={sheenGradientId} x1="0.2" y1="0" x2="0.8" y2="0.85">
-          <Stop offset="0%" stopColor="#FFFFFF" stopOpacity={0.22} />
-          <Stop offset="55%" stopColor="#FFFFFF" stopOpacity={0.04} />
-          <Stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
-        </LinearGradient>
       </Defs>
 
-      <Rect x="0" y="0" width="56" height="56" rx="16" fill={`url(#${bgGradientId})`} />
-      <Rect x="0" y="0" width="56" height="56" rx="16" fill={`url(#${sheenGradientId})`} />
-      <Rect
-        x="0.75"
-        y="0.75"
-        width="54.5"
-        height="54.5"
-        rx="15.25"
-        stroke="rgba(255,255,255,0.22)"
-        strokeWidth="1.2"
-      />
+      <Rect x="0" y="0" width="56" height="56" rx="15.5" fill={`url(#${bgGradientId})`} />
 
       {renderGlyph(slug, palette.accent)}
     </Svg>

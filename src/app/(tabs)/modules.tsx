@@ -30,9 +30,7 @@ export default function ModulesScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={module.name}
                 >
-                  <View style={styles.iconShadow}>
-                    <ModuleAppIcon slug={module.slug} size={54} />
-                  </View>
+                  <ModuleAppIcon slug={module.slug} size={46} />
                   <Text numberOfLines={2} style={styles.moduleName}>
                     {module.name}
                   </Text>
@@ -63,9 +61,9 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.ink,
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   },
   gridCard: {
     backgroundColor: colors.white,
@@ -74,41 +72,28 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingTop: 22,
     paddingBottom: 20,
-    paddingHorizontal: 8,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    paddingHorizontal: 10,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    rowGap: 22,
+    rowGap: 20,
   },
   item: {
     width: '25%',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
   itemPressed: {
-    opacity: 0.76,
+    opacity: 0.72,
     transform: [{ scale: 0.94 }],
   },
-  iconShadow: {
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
-    borderRadius: 16,
-  },
   moduleName: {
-    marginTop: 9,
-    color: '#1F2937',
-    fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 16,
+    marginTop: 7,
+    color: '#2B3445',
+    fontSize: 11.5,
+    fontWeight: '400',
+    lineHeight: 15,
     textAlign: 'center',
   },
   note: {
