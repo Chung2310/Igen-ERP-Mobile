@@ -10,21 +10,28 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StatusBar as RnStatusBar,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Rect } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import * as ExpoCamera from 'expo-camera';
 import * as SecureStore from 'expo-secure-store';
 import {
+  Briefcase,
+  Building2,
   Camera,
   CheckCircle2,
+  ChevronLeft,
   ExternalLink,
   Fingerprint,
+  Globe,
   Images,
   Mail,
   Phone,
@@ -109,13 +116,22 @@ export default function ProfileSectionScreen() {
   const key = Array.isArray(section) ? section[0] : section || 'account';
   const title = SECTION_TITLES[key] || 'Cài đặt cá nhân';
 
+  if (key === 'account') {
+    return (
+      <View style={styles.accountRoot}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScrollView contentContainerStyle={styles.accountScroll} showsVerticalScrollIndicator={false}>
+          <AccountDetailSection />
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <Screen edges={['left', 'right', 'bottom']}>
       <Stack.Screen options={{ title }} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {key === 'account' ? (
-          <AccountDetailSection />
-        ) : key === 'notifications' ? (
+        {key === 'notifications' ? (
           <NotificationsDetailSection />
         ) : key === 'security' ? (
           <SecurityDetailSection />
@@ -353,11 +369,18 @@ function getInitials(name?: string) {
 // 1. THÔNG TIN CÁ NHÂN
 // =========================================================================
 function AccountDetailSection() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, refreshUser } = useAuth();
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [photoURL, setPhotoURL] = useState(user?.photoURL || '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (RnStatusBar.currentHeight ?? 24) : 0,
+  );
 
   useEffect(() => {
     setDisplayName(user?.displayName || '');
@@ -435,72 +458,131 @@ function AccountDetailSection() {
   }, [displayName, photoURL, refreshUser]);
 
   const accountInfoRows = [
-    { label: 'Email đăng nhập', value: user?.email || '—' },
-    { label: 'Doanh nghiệp', value: user?.companyName || user?.companyCode || '—' },
-    { label: 'Chi nhánh', value: user?.branchName || 'Toàn công ty' },
-    { label: 'Vai trò', value: user?.role || '—' },
-    ...(user?.department ? [{ label: 'Phòng ban', value: user.department }] : []),
-    ...(user?.phone ? [{ label: 'Số điện thoại', value: user.phone }] : []),
+    { icon: Globe, label: 'Doanh nghiệp', value: user?.companyName || user?.companyCode || '—', accent: true },
+    { icon: Building2, label: 'Chi nhánh', value: user?.branchName || 'Toàn công ty', accent: false },
+    ...(user?.department ? [{ icon: Briefcase, label: 'Phòng ban', value: user.department, accent: false }] : []),
+    { icon: ShieldCheck, label: 'Vai trò', value: user?.role || '—', accent: false },
+    ...(user?.phone ? [{ icon: Smartphone, label: 'Số điện thoại', value: user.phone, accent: true }] : []),
+    { icon: Mail, label: 'Email đăng nhập', value: user?.email || '—', accent: true },
   ];
 
+  const coverHeight = topInset + 132;
+
   return (
-    <View style={styles.stack}>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Ảnh đại diện</Text>
-        <View style={styles.avatarRow}>
-          <View style={styles.avatarPreview}>
-            {photoURL ? (
-              <Image source={{ uri: photoURL }} style={styles.avatarImage} />
-            ) : (
-              <Text style={styles.avatarInitials}>{getInitials(displayName || user?.displayName)}</Text>
-            )}
-          </View>
-          <View style={{ flex: 1, gap: 8 }}>
-            <Pressable
-              disabled={uploadingAvatar}
-              onPress={() => void onPickAvatar()}
-              style={[styles.changePhotoBtn, uploadingAvatar && styles.disabled]}
-            >
-              {uploadingAvatar ? (
-                <ActivityIndicator size="small" color={colors.white} />
+    <View style={styles.accountContainer}>
+      {/* Soft mountain cover header */}
+      <View style={[styles.coverWrap, { height: coverHeight }]}>
+        <Svg
+          width="100%"
+          height="100%"
+          viewBox="0 0 400 180"
+          preserveAspectRatio="xMidYMid slice"
+          style={StyleSheet.absoluteFill}
+        >
+          <Rect x="0" y="0" width="400" height="180" fill="#E5E9F0" />
+          <Path d="M0 120 L110 56 L195 16 L285 95 L345 62 L400 108 L400 180 L0 180 Z" fill="#C9D0DC" />
+          <Path d="M0 128 L125 68 L225 118 L325 78 L400 124 L400 180 L0 180 Z" fill="#B1B9C7" />
+          <Path d="M0 144 L95 128 L210 146 L330 132 L400 145 L400 180 L0 180 Z" fill="#9AA3B2" />
+        </Svg>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Trở lại"
+          onPress={() => router.back()}
+          hitSlop={10}
+          style={[styles.coverBackBtn, { top: topInset + 8 }]}
+        >
+          <ChevronLeft size={24} color="#334155" strokeWidth={2.2} />
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Thay đổi ảnh đại diện"
+          disabled={uploadingAvatar}
+          onPress={() => void onPickAvatar()}
+          style={[styles.coverCameraBtn, uploadingAvatar && styles.disabled]}
+        >
+          {uploadingAvatar ? (
+            <ActivityIndicator size="small" color="#1F2937" />
+          ) : (
+            <Camera size={17} color="#1F2937" strokeWidth={2} />
+          )}
+        </Pressable>
+      </View>
+
+      {/* Main white profile sheet overlapping cover */}
+      <View style={styles.profileSheet}>
+        <View style={styles.avatarCenterWrap}>
+          <Pressable
+            disabled={uploadingAvatar}
+            onPress={() => void onPickAvatar()}
+            style={styles.heroAvatarRing}
+          >
+            <View style={styles.heroAvatarInner}>
+              {photoURL ? (
+                <Image source={{ uri: photoURL }} style={styles.heroAvatarImage} />
               ) : (
-                <>
-                  <Camera size={14} color={colors.white} />
-                  <Text style={styles.primaryBtnText}>Thay đổi ảnh</Text>
-                </>
+                <Text style={styles.heroAvatarInitials}>
+                  {getInitials(displayName || user?.displayName)}
+                </Text>
               )}
+            </View>
+          </Pressable>
+
+          <Text style={styles.heroName} numberOfLines={2}>
+            {displayName.trim() || user?.displayName || 'Người dùng ERP'}
+          </Text>
+
+          {photoURL ? (
+            <Pressable
+              disabled={uploadingAvatar || saving}
+              onPress={() => setPhotoURL('')}
+              style={styles.heroRemovePhotoPill}
+            >
+              <Trash2 size={13} color="#C74848" />
+              <Text style={styles.heroRemovePhotoText}>Gỡ ảnh đại diện</Text>
             </Pressable>
-            {photoURL ? (
-              <Pressable
-                disabled={uploadingAvatar || saving}
-                onPress={() => setPhotoURL('')}
-                style={styles.removePhotoBtn}
+          ) : null}
+        </View>
+
+        {/* Clean stacked icon + label/value rows */}
+        <View style={styles.profileInfoList}>
+          {accountInfoRows.map((row, idx) => {
+            const Icon = row.icon;
+            return (
+              <View
+                key={row.label}
+                style={[
+                  styles.profileInfoItem,
+                  idx === accountInfoRows.length - 1 && styles.lastRow,
+                ]}
               >
-                <Trash2 size={13} color="#C74848" />
-                <Text style={styles.removePhotoText}>Gỡ ảnh đại diện</Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.muted}>Chọn ảnh vuông từ thư viện ảnh trên thiết bị.</Text>
-            )}
-          </View>
+                <View style={styles.profileInfoIcon}>
+                  <Icon size={19} color="#64748B" strokeWidth={1.7} />
+                </View>
+                <View style={styles.profileInfoCopy}>
+                  <Text style={styles.profileInfoLabel}>{row.label}</Text>
+                  <Text
+                    style={[
+                      styles.profileInfoValue,
+                      row.accent && styles.profileInfoValueAccent,
+                    ]}
+                  >
+                    {row.value}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
         </View>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Thông tin tài khoản ERP</Text>
-        {accountInfoRows.map((row, idx) => (
-          <View
-            key={row.label}
-            style={[styles.infoRow, idx === accountInfoRows.length - 1 && styles.lastRow]}
-          >
-            <Text style={styles.muted}>{row.label}</Text>
-            <Text style={styles.infoVal}>{row.value}</Text>
-          </View>
-        ))}
-      </View>
+      {/* Subtle band separator */}
+      <View style={styles.sectionBand} />
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Chỉnh sửa hồ sơ</Text>
+      {/* Existing edit display name section */}
+      <View style={styles.editSection}>
+        <Text style={styles.editSectionTitle}>Chỉnh sửa hồ sơ</Text>
         <Text style={styles.label}>Họ và tên hiển thị *</Text>
         <TextInput
           value={displayName}
@@ -851,6 +933,140 @@ function SupportDetailSection() {
 }
 
 const styles = StyleSheet.create({
+  accountRoot: { flex: 1, backgroundColor: colors.white },
+  accountScroll: { flexGrow: 1, backgroundColor: colors.white, paddingBottom: 32 },
+  accountContainer: { flex: 1, backgroundColor: colors.white },
+  coverWrap: {
+    width: '100%',
+    backgroundColor: '#DCE2EC',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  coverBackBtn: {
+    position: 'absolute',
+    left: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coverCameraBtn: {
+    position: 'absolute',
+    right: 16,
+    bottom: 24,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E2E8F0',
+  },
+  profileSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    marginTop: -14,
+    paddingBottom: 6,
+  },
+  avatarCenterWrap: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+  },
+  heroAvatarRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    marginTop: -46,
+    backgroundColor: colors.white,
+    padding: 3.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroAvatarInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 43,
+    backgroundColor: '#E5ECF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroAvatarImage: { width: '100%', height: '100%' },
+  heroAvatarInitials: { color: colors.primary, fontSize: 26, fontWeight: '700' },
+  heroName: {
+    marginTop: 10,
+    color: '#111827',
+    fontSize: 19,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  heroRemovePhotoPill: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#FCEBEC',
+  },
+  heroRemovePhotoText: { color: '#C74848', fontSize: 12, fontWeight: '500' },
+  profileInfoList: {
+    paddingHorizontal: 18,
+    paddingTop: 4,
+  },
+  profileInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  profileInfoIcon: {
+    width: 30,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  profileInfoCopy: {
+    flex: 1,
+    marginLeft: 6,
+    gap: 3,
+  },
+  profileInfoLabel: {
+    color: '#475569',
+    fontSize: 12.5,
+    fontWeight: '400',
+  },
+  profileInfoValue: {
+    color: '#1F2937',
+    fontSize: 14.5,
+    fontWeight: '400',
+  },
+  profileInfoValueAccent: {
+    color: '#1E6CEB',
+  },
+  sectionBand: {
+    height: 8,
+    backgroundColor: '#F3F6FA',
+    marginTop: 8,
+  },
+  editSection: {
+    backgroundColor: colors.white,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  editSectionTitle: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   content: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 32 },
   stack: { gap: 12 },
   card: {
