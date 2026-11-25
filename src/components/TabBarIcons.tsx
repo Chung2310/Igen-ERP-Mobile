@@ -8,9 +8,11 @@ export type TabIconProps = {
   size?: number;
 };
 
+const INACTIVE_STROKE = 1.6;
+
 /**
  * Tổng quan — Rounded geometric home icon.
- * Inactive: crisp slate outline. Active: solid blue fill with white inner cutout.
+ * Inactive: crisp thin slate outline. Active: solid blue fill with white inner cutout.
  */
 export function OverviewTabIcon({ color, focused = false, size = 24 }: TabIconProps) {
   if (focused) {
@@ -30,14 +32,14 @@ export function OverviewTabIcon({ color, focused = false, size = 24 }: TabIconPr
       <Path
         d="M10.85 3.95C11.52 3.4 12.48 3.4 13.15 3.95L19.45 9.1C19.96 9.52 20.25 10.14 20.25 10.8V18C20.25 19.24 19.24 20.25 18 20.25H6C4.76 20.25 3.75 19.24 3.75 18V10.8C3.75 10.14 4.04 9.52 4.55 9.1L10.85 3.95Z"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={INACTIVE_STROKE}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <Path
         d="M9.75 16H14.25"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={INACTIVE_STROKE}
         strokeLinecap="round"
       />
     </Svg>
@@ -68,7 +70,7 @@ export function ModulesTabIcon({ color, focused = false, size = 24 }: TabIconPro
         height="6.75"
         rx="2.1"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={INACTIVE_STROKE}
       />
       <Rect
         x="13.5"
@@ -77,7 +79,7 @@ export function ModulesTabIcon({ color, focused = false, size = 24 }: TabIconPro
         height="6.75"
         rx="2.1"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={INACTIVE_STROKE}
       />
       <Rect
         x="3.75"
@@ -86,7 +88,7 @@ export function ModulesTabIcon({ color, focused = false, size = 24 }: TabIconPro
         height="6.75"
         rx="2.1"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={INACTIVE_STROKE}
       />
       <Rect
         x="13.5"
@@ -95,7 +97,7 @@ export function ModulesTabIcon({ color, focused = false, size = 24 }: TabIconPro
         height="6.75"
         rx="2.1"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={INACTIVE_STROKE}
       />
     </Svg>
   );
@@ -112,9 +114,9 @@ export function InboxTabIcon({ color, focused = false, size = 24 }: TabIconProps
           d="M12 3C6.89 3 2.75 6.82 2.75 11.55C2.75 13.45 3.43 15.2 4.58 16.62L3.54 19.86C3.37 20.38 3.86 20.86 4.38 20.68L7.93 19.45C9.17 19.87 10.55 20.1 12 20.1C17.11 20.1 21.25 16.28 21.25 11.55C21.25 6.82 17.11 3 12 3Z"
           fill={color}
         />
-        <Circle cx="8.5" cy="11.6" r="1.2" fill="#FFFFFF" />
-        <Circle cx="12" cy="11.6" r="1.2" fill="#FFFFFF" />
-        <Circle cx="15.5" cy="11.6" r="1.2" fill="#FFFFFF" />
+        <Circle cx="8.5" cy="11.6" r="1.15" fill="#FFFFFF" />
+        <Circle cx="12" cy="11.6" r="1.15" fill="#FFFFFF" />
+        <Circle cx="15.5" cy="11.6" r="1.15" fill="#FFFFFF" />
       </Svg>
     );
   }
@@ -124,13 +126,13 @@ export function InboxTabIcon({ color, focused = false, size = 24 }: TabIconProps
       <Path
         d="M12 3.75C7.3 3.75 3.5 7.25 3.5 11.55C3.5 13.3 4.13 14.91 5.19 16.2L4.26 19.12C4.12 19.55 4.53 19.95 4.96 19.8L8.15 18.69C9.32 19.12 10.63 19.35 12 19.35C16.7 19.35 20.5 15.85 20.5 11.55C20.5 7.25 16.7 3.75 12 3.75Z"
         stroke={color}
-        strokeWidth={2}
+        strokeWidth={INACTIVE_STROKE}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <Circle cx="8.6" cy="11.55" r="1.15" fill={color} />
-      <Circle cx="12" cy="11.55" r="1.15" fill={color} />
-      <Circle cx="15.4" cy="11.55" r="1.15" fill={color} />
+      <Circle cx="8.65" cy="11.55" r="1" fill={color} />
+      <Circle cx="12" cy="11.55" r="1" fill={color} />
+      <Circle cx="15.35" cy="11.55" r="1" fill={color} />
     </Svg>
   );
 }
@@ -144,7 +146,7 @@ export function AiChatTabIcon({ color, focused = false, size = 24 }: TabIconProp
       <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <Circle cx="12" cy="12" r="9.5" fill={color} />
         <Path
-          d="M12 6.5C12.38 9.48 14.52 11.62 17.5 12C14.52 12.38 12.38 14.52 12 17.5C11.62 14.52 9.48 12.38 6.5 12C9.48 11.62 11.62 9.48 12 6.5Z"
+          d="M12 6.8C12.35 9.65 14.35 11.65 17.2 12C14.35 12.35 12.35 14.35 12 17.2C11.65 14.35 9.65 12.35 6.8 12C9.65 11.65 11.65 9.65 12 6.8Z"
           fill="#FFFFFF"
         />
       </Svg>
@@ -153,9 +155,9 @@ export function AiChatTabIcon({ color, focused = false, size = 24 }: TabIconProp
 
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="12" r="8.75" stroke={color} strokeWidth={2} />
+      <Circle cx="12" cy="12" r="8.75" stroke={color} strokeWidth={INACTIVE_STROKE} />
       <Path
-        d="M12 7C12.35 9.7 14.3 11.65 17 12C14.3 12.35 12.35 14.3 12 17C11.65 14.3 9.7 12.35 7 12C9.7 11.65 11.65 9.7 12 7Z"
+        d="M12 7.25C12.32 9.8 14.2 11.68 16.75 12C14.2 12.32 12.32 14.2 12 16.75C11.68 14.2 9.8 12.32 7.25 12C9.8 11.68 11.68 9.8 12 7.25Z"
         fill={color}
       />
     </Svg>
@@ -164,7 +166,7 @@ export function AiChatTabIcon({ color, focused = false, size = 24 }: TabIconProp
 
 /**
  * Cài đặt cá nhân — Rounded geometric gear icon.
- * Inactive: crisp slate outline. Active: solid blue fill with white center cutout.
+ * Inactive: crisp thin slate outline. Active: solid blue fill with white center cutout.
  */
 export function ProfileTabIcon({ color, focused = false, size = 24 }: TabIconProps) {
   const gearPath =
@@ -184,11 +186,11 @@ export function ProfileTabIcon({ color, focused = false, size = 24 }: TabIconPro
       <Path
         d={gearPath}
         stroke={color}
-        strokeWidth={1.9}
+        strokeWidth={INACTIVE_STROKE}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <Circle cx="12" cy="12" r="3" stroke={color} strokeWidth={1.9} />
+      <Circle cx="12" cy="12" r="3" stroke={color} strokeWidth={INACTIVE_STROKE} />
     </Svg>
   );
 }
