@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Platform, Pressable, Text, type PressableProps } from 'react-native';
+import { Platform, Pressable, type PressableProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AiChatTabIcon,
@@ -38,6 +38,7 @@ export default function TabLayout() {
 
   const tabOptions = {
     headerShown: false,
+    animation: 'shift' as const,
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
     tabBarButton: (props: Record<string, unknown>) => <NoRippleTabButton {...props} />,
@@ -54,6 +55,26 @@ export default function TabLayout() {
   return (
     <Tabs screenOptions={tabOptions}>
       <Tabs.Screen
+        name="inbox"
+        options={{
+          title: 'Trò chuyện',
+          tabBarLabel: 'Trò chuyện',
+          tabBarIcon: ({ color, focused }) => (
+            <InboxTabIcon color={color} focused={focused} size={23} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="ai-chat"
+        options={{
+          title: 'iGenAI',
+          tabBarLabel: 'iGenAI',
+          tabBarIcon: ({ color, focused }) => (
+            <AiChatTabIcon color={color} focused={focused} size={23} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           href: showOverview ? undefined : null,
@@ -67,51 +88,18 @@ export default function TabLayout() {
       <Tabs.Screen
         name="modules"
         options={{
-          title: 'Danh mục',
-          tabBarLabel: 'Danh mục',
+          title: 'Tính năng',
+          tabBarLabel: 'Tính năng',
           tabBarIcon: ({ color, focused }) => (
             <ModulesTabIcon color={color} focused={focused} size={23} />
           ),
         }}
       />
       <Tabs.Screen
-        name="inbox"
-        options={{
-          title: 'Trò chuyện',
-          tabBarLabel: 'Trò chuyện',
-          tabBarIcon: ({ color, focused }) => (
-            <InboxTabIcon color={color} focused={focused} size={23} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="ai-chat"
-        options={{
-          title: 'Trò chuyện AI',
-          tabBarLabel: 'Trò chuyện AI',
-          tabBarIcon: ({ color, focused }) => (
-            <AiChatTabIcon color={color} focused={focused} size={23} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
-          title: 'Cài đặt cá nhân',
-          tabBarLabel: ({ color }) => (
-            <Text
-              style={{
-                color,
-                fontSize: 9.5,
-                lineHeight: 11,
-                fontWeight: '600',
-                textAlign: 'center',
-                marginTop: 2,
-              }}
-            >
-              Cài đặt{'\n'}cá nhân
-            </Text>
-          ),
+          title: 'Cài đặt',
+          tabBarLabel: 'Cài đặt',
           tabBarIcon: ({ color, focused }) => (
             <ProfileTabIcon color={color} focused={focused} size={23} />
           ),

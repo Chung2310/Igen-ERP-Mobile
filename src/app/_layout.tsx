@@ -59,11 +59,44 @@ function AuthenticatedRouter() {
         <BiometricLockScreen />
       ) : (
         <>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="modules/[slug]" options={{ headerShown: true, title: 'Phân hệ', headerBackTitle: 'Trở lại', headerTintColor: colors.ink }} />
-            <Stack.Screen name="profile/[section]" options={{ headerShown: true, title: 'Cài đặt cá nhân', headerBackTitle: 'Trở lại', headerTintColor: colors.ink }} />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+              animation: 'ios_from_right',
+              animationDuration: 260,
+              gestureEnabled: true,
+              fullScreenGestureEnabled: true,
+            }}
+          >
+            <Stack.Screen
+              name="login"
+              options={{ headerShown: false, animation: 'fade', animationDuration: 220 }}
+            />
+            <Stack.Screen
+              name="(tabs)"
+              options={{ animation: 'fade', animationDuration: 220 }}
+            />
+            <Stack.Screen
+              name="modules/[slug]"
+              options={{
+                headerShown: true,
+                title: 'Phân hệ',
+                headerBackTitle: 'Trở lại',
+                headerTintColor: colors.ink,
+                animation: 'ios_from_right',
+              }}
+            />
+            <Stack.Screen
+              name="profile/[section]"
+              options={{
+                headerShown: true,
+                title: 'Cài đặt cá nhân',
+                headerBackTitle: 'Trở lại',
+                headerTintColor: colors.ink,
+                animation: 'ios_from_right',
+              }}
+            />
           </Stack>
           <HrConfirmHost />
         </>

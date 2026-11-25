@@ -1,6 +1,7 @@
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Modal,
   Pressable,
   RefreshControl,
@@ -301,7 +302,12 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     setReloadTick((t) => t + 1);
   }, []);
 
+  const sectionOpacity = useRef(new Animated.Value(1)).current;
+  const sectionTranslateX = useRef(new Animated.Value(0)).current;
+  const transitionDirRef = useRef<number>(0);
+
   const onSelectPage = useCallback((id: OverviewPageId) => {
+    transitionDirRef.current = 0;
     setSelectedPageId(id);
     setSwitcherOpen(false);
   }, []);
@@ -314,12 +320,31 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   const onStepPage = useCallback(
     (delta: -1 | 1) => {
       if (allowedPages.length <= 1) return;
+      transitionDirRef.current = delta;
       const nextIndex = (currentPageIndex + delta + allowedPages.length) % allowedPages.length;
       const target = allowedPages[nextIndex];
       if (target) setSelectedPageId(target.id);
     },
     [allowedPages, currentPageIndex],
   );
+
+  useEffect(() => {
+    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 18;
+    sectionOpacity.setValue(0.35);
+    sectionTranslateX.setValue(startX);
+    Animated.parallel([
+      Animated.timing(sectionOpacity, {
+        toValue: 1,
+        duration: 210,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sectionTranslateX, {
+        toValue: 0,
+        duration: 210,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [activePageId, sectionOpacity, sectionTranslateX]);
 
   const renderSection = () => {
     if (!activePageId) {
@@ -542,7 +567,14 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         </View>
 
         {/* Active overview page body */}
-        {renderSection()}
+        <Animated.View
+          style={{
+            opacity: sectionOpacity,
+            transform: [{ translateX: sectionTranslateX }],
+          }}
+        >
+          {renderSection()}
+        </Animated.View>
 
         {/* Footer */}
         <Text style={styles.footerNote}>
