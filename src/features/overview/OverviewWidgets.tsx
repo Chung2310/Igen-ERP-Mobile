@@ -55,8 +55,8 @@ export function VerticalBarChart({
   data,
   primaryLabel,
   secondaryLabel,
-  primaryColor = colors.primary,
-  secondaryColor = '#F2B86D',
+  primaryColor = '#2494F9',
+  secondaryColor = '#F59E0B',
   emptyText = 'Chưa có phát sinh trong kỳ đã chọn.',
 }: {
   data: BarDatum[];
@@ -82,36 +82,45 @@ export function VerticalBarChart({
 
   return (
     <Card style={styles.chartCard}>
-      <View style={styles.chartArea}>
-        {data.map((item, idx) => {
-          const h1 = item.primary > 0 ? Math.max(6, Math.round((item.primary / maxValue) * 88)) : 2;
-          const h2 =
-            secondaryLabel !== undefined
-              ? (item.secondary ?? 0) > 0
-                ? Math.max(6, Math.round(((item.secondary ?? 0) / maxValue) * 88))
-                : 2
-              : 0;
-          return (
-            <View key={`${item.label}-${idx}`} style={styles.barGroup}>
-              <View style={styles.barsRow}>
-                <View style={[styles.bar, { height: h1, backgroundColor: primaryColor }]} />
-                {secondaryLabel !== undefined ? (
-                  <View style={[styles.bar, { height: h2, backgroundColor: secondaryColor }]} />
-                ) : null}
+      <View style={styles.chartAreaWrap}>
+        {/* Subtle horizontal hairline gridlines */}
+        <View pointerEvents="none" style={styles.chartGridLines}>
+          <View style={styles.chartGridLine} />
+          <View style={styles.chartGridLine} />
+          <View style={styles.chartGridLine} />
+          <View style={styles.chartGridLine} />
+        </View>
+        <View style={styles.chartArea}>
+          {data.map((item, idx) => {
+            const h1 = item.primary > 0 ? Math.max(6, Math.round((item.primary / maxValue) * 102)) : 2;
+            const h2 =
+              secondaryLabel !== undefined
+                ? (item.secondary ?? 0) > 0
+                  ? Math.max(6, Math.round(((item.secondary ?? 0) / maxValue) * 102))
+                  : 2
+                : 0;
+            return (
+              <View key={`${item.label}-${idx}`} style={styles.barGroup}>
+                <View style={styles.barsRow}>
+                  <View style={[styles.bar, { height: h1, backgroundColor: primaryColor }]} />
+                  {secondaryLabel !== undefined ? (
+                    <View style={[styles.bar, { height: h2, backgroundColor: secondaryColor }]} />
+                  ) : null}
+                </View>
+                <Text numberOfLines={1} style={styles.barAxisLabel}>
+                  {item.label}
+                </Text>
               </View>
-              <Text numberOfLines={1} style={styles.barAxisLabel}>
-                {item.label}
-              </Text>
-            </View>
-          );
-        })}
+            );
+          })}
+        </View>
       </View>
       <View style={styles.legendRow}>
         <View style={[styles.legendDot, { backgroundColor: primaryColor }]} />
         <Text style={styles.legendText}>{primaryLabel}</Text>
         {secondaryLabel ? (
           <>
-            <View style={[styles.legendDot, { backgroundColor: secondaryColor, marginLeft: 14 }]} />
+            <View style={[styles.legendDot, { backgroundColor: secondaryColor, marginLeft: 16 }]} />
             <Text style={styles.legendText}>{secondaryLabel}</Text>
           </>
         ) : null}
@@ -261,6 +270,18 @@ export function NoticeStrip({ text }: { text: string }) {
 
 export const CHART_COLORS = ['#2463EB', '#16885A', '#C27617', '#7754C8', '#DC2626', '#0E7490'];
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 12,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E2EAF4',
+  shadowColor: '#132442',
+  shadowOpacity: 0.02,
+  shadowRadius: 6,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 1,
+} as const;
+
 const styles = StyleSheet.create({
   kpiGrid: {
     flexDirection: 'row',
@@ -270,8 +291,9 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   kpiCard: {
+    ...HAIRLINE_CARD,
     width: '48.5%',
-    minHeight: 96,
+    minHeight: 94,
     padding: 12,
   },
   kpiHeader: {
@@ -283,7 +305,7 @@ const styles = StyleSheet.create({
   kpiDotWrap: {
     width: 22,
     height: 22,
-    borderRadius: 8,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -299,7 +321,7 @@ const styles = StyleSheet.create({
   },
   kpiLabel: {
     color: colors.muted,
-    fontSize: 10,
+    fontSize: 10.5,
     marginTop: 8,
   },
   kpiValue: {
@@ -310,15 +332,31 @@ const styles = StyleSheet.create({
   },
   kpiHelper: {
     color: colors.muted,
-    fontSize: 9,
+    fontSize: 9.5,
     marginTop: 3,
   },
   chartCard: {
+    ...HAIRLINE_CARD,
     padding: 14,
     marginBottom: 18,
   },
+  chartAreaWrap: {
+    position: 'relative',
+  },
+  chartGridLines: {
+    position: 'absolute',
+    top: 4,
+    left: 0,
+    right: 0,
+    height: 104,
+    justifyContent: 'space-between',
+  },
+  chartGridLine: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#EDF2F8',
+  },
   chartArea: {
-    height: 112,
+    height: 126,
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
@@ -329,38 +367,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   barsRow: {
-    height: 92,
+    height: 106,
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 3,
   },
   bar: {
     width: 9,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
   },
   barAxisLabel: {
     color: colors.muted,
-    fontSize: 8,
-    marginTop: 5,
+    fontSize: 8.5,
+    marginTop: 6,
   },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 12,
   },
   legendDot: {
-    width: 7,
-    height: 7,
+    width: 8,
+    height: 8,
     borderRadius: 4,
-    marginRight: 5,
+    marginRight: 6,
   },
   legendText: {
-    color: colors.muted,
-    fontSize: 9,
+    color: '#5B677B',
+    fontSize: 10,
+    fontWeight: '500',
   },
   sectionCard: {
+    ...HAIRLINE_CARD,
     padding: 14,
     marginBottom: 18,
   },
@@ -389,7 +429,7 @@ const styles = StyleSheet.create({
   },
   breakdownLabel: {
     color: colors.ink,
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '600',
     flex: 1,
   },
@@ -399,7 +439,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   progressTrack: {
-    height: 7,
+    height: 6,
     borderRadius: 99,
     backgroundColor: '#EDF2F9',
     overflow: 'hidden',
@@ -416,7 +456,7 @@ const styles = StyleSheet.create({
   },
   listRowBorder: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: '#EDF2F8',
   },
   rowBullet: {
     width: 7,
@@ -439,7 +479,7 @@ const styles = StyleSheet.create({
   rowBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 99,
+    borderRadius: 8,
     maxWidth: 110,
   },
   rowBadgeText: {
@@ -453,6 +493,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   stateCard: {
+    ...HAIRLINE_CARD,
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',

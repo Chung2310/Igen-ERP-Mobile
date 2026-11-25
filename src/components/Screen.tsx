@@ -6,7 +6,8 @@ import { colors } from '@/theme/colors';
 export function Screen({
   children,
   edges = ['top', 'left', 'right'],
-}: PropsWithChildren<{ edges?: Edge[] }>) {
+  backgroundColor = colors.background,
+}: PropsWithChildren<{ edges?: Edge[]; backgroundColor?: string }>) {
   const insets = useSafeAreaInsets();
   const androidStatusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
 
@@ -22,6 +23,7 @@ export function Screen({
       style={[
         styles.safe,
         {
+          backgroundColor,
           paddingTop,
           paddingBottom,
           paddingLeft,

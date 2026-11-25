@@ -9,7 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Building2, Check, ChevronDown } from 'lucide-react-native';
+import { Building2, Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -315,6 +316,21 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     setSwitcherOpen(false);
   }, []);
 
+  const currentPageIndex = useMemo(
+    () => Math.max(0, allowedPages.findIndex((p) => p.id === activePageId)),
+    [allowedPages, activePageId],
+  );
+
+  const onStepPage = useCallback(
+    (delta: -1 | 1) => {
+      if (allowedPages.length <= 1) return;
+      const nextIndex = (currentPageIndex + delta + allowedPages.length) % allowedPages.length;
+      const target = allowedPages[nextIndex];
+      if (target) setSelectedPageId(target.id);
+    },
+    [allowedPages, currentPageIndex],
+  );
+
   const renderSection = () => {
     if (!activePageId) {
       return (
@@ -380,7 +396,30 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   };
 
   const content = (
-    <>
+    <View style={styles.backdropWrap}>
+      {/* Soft luminous icy-sky pastel gradient background matching the reference style */}
+      <Svg pointerEvents="none" width="100%" height="100%" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id="overviewBg" x1="0" y1="0" x2="0.15" y2="1">
+            <Stop offset="0" stopColor="#DFF3FC" stopOpacity="1" />
+            <Stop offset="0.32" stopColor="#EAF2FB" stopOpacity="1" />
+            <Stop offset="0.7" stopColor="#F1F5FB" stopOpacity="1" />
+            <Stop offset="1" stopColor="#F5F7FC" stopOpacity="1" />
+          </LinearGradient>
+          <RadialGradient id="overviewGlowTopRight" cx="85%" cy="8%" rx="55%" ry="28%">
+            <Stop offset="0" stopColor="#BCEAFB" stopOpacity="0.6" />
+            <Stop offset="1" stopColor="#BCEAFB" stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id="overviewGlowMidLeft" cx="10%" cy="42%" rx="48%" ry="26%">
+            <Stop offset="0" stopColor="#E4DCFF" stopOpacity="0.35" />
+            <Stop offset="1" stopColor="#E4DCFF" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#overviewBg)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#overviewGlowTopRight)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#overviewGlowMidLeft)" />
+      </Svg>
+
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -393,7 +432,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
           />
         }
       >
-        {/* Top bar */}
+        {/* Top bar: Company / Branch + Profile Avatar */}
         <View style={styles.topLine}>
           <Pressable
             disabled={branches.length <= 1}
@@ -416,51 +455,68 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
           </Link>
         </View>
 
-        {/* Title & Switcher button */}
-        <View style={styles.titleRow}>
-          <View style={styles.titleCopy}>
-            <Text style={styles.greeting}>Tổng quan</Text>
-            <Text numberOfLines={1} style={styles.subtitle}>
-              {activePage?.subtitle ?? 'Theo dõi số liệu điều hành từ ERP'}
-            </Text>
-          </View>
-          {allowedPages.length > 1 ? (
+        {/* Top Overview Tab Switcher Bar: Left / Center Dropdown / Right */}
+        {allowedPages.length > 0 ? (
+          <View style={styles.switcherBar}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => setSwitcherOpen(true)}
-              style={styles.allPagesBtn}
+              accessibilityLabel="Trang tổng quan trước"
+              disabled={allowedPages.length <= 1}
+              onPress={() => onStepPage(-1)}
+              style={({ pressed }) => [
+                styles.switcherNavBtn,
+                allowedPages.length <= 1 && styles.switcherNavBtnDisabled,
+                pressed && styles.switcherNavBtnPressed,
+              ]}
             >
-              <View style={styles.allPagesContent}><Text style={styles.allPagesText}>Trang ({allowedPages.length})</Text><ChevronDown size={14} color={colors.primary} /></View>
+              <ChevronLeft size={18} color={colors.ink} />
             </Pressable>
-          ) : null}
-        </View>
 
-        {/* Horizontal multi-overview switcher */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.pageTabsRow}
-          style={styles.pageTabsScroll}
-        >
-          {allowedPages.map((page) => {
-            const active = page.id === activePageId;
-            const PageIcon = page.icon;
-            return (
-              <Pressable
-                key={page.id}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                onPress={() => onSelectPage(page.id)}
-                style={[styles.pagePill, active && styles.pagePillActive]}
-              >
-                <PageIcon size={14} color={active ? colors.white : page.accent} />
-                <Text style={[styles.pagePillText, active && styles.pagePillTextActive]}>
-                  {page.shortLabel}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mở danh sách trang tổng quan"
+              disabled={allowedPages.length <= 1}
+              onPress={() => setSwitcherOpen(true)}
+              style={({ pressed }) => [
+                styles.switcherCenter,
+                pressed && allowedPages.length > 1 && styles.switcherCenterPressed,
+              ]}
+            >
+              <View style={styles.switcherTitleRow}>
+                {activePage ? (
+                  <View style={[styles.switcherIconBadge, { backgroundColor: activePage.tone }]}>
+                    <activePage.icon size={14} color={activePage.accent} />
+                  </View>
+                ) : null}
+                <Text numberOfLines={1} style={styles.switcherTitle}>
+                  {activePage?.label ?? 'Tổng quan'}
                 </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                {allowedPages.length > 1 ? (
+                  <ChevronDown size={15} color={colors.muted} />
+                ) : null}
+              </View>
+              {activePage?.subtitle ? (
+                <Text numberOfLines={1} style={styles.switcherSubtitle}>
+                  {activePage.subtitle}
+                </Text>
+              ) : null}
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Trang tổng quan tiếp theo"
+              disabled={allowedPages.length <= 1}
+              onPress={() => onStepPage(1)}
+              style={({ pressed }) => [
+                styles.switcherNavBtn,
+                allowedPages.length <= 1 && styles.switcherNavBtnDisabled,
+                pressed && styles.switcherNavBtnPressed,
+              ]}
+            >
+              <ChevronRight size={18} color={colors.ink} />
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Period filter bar */}
         <Card style={styles.periodCard}>
@@ -487,6 +543,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
                   <Text style={[styles.periodChipText, active && styles.periodChipTextActive]}>
                     {opt.label}
                   </Text>
+                  {active ? <View style={styles.periodChipUnderline} /> : null}
                 </Pressable>
               );
             })}
@@ -594,10 +651,10 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
           </Pressable>
         </Pressable>
       </Modal>
-    </>
+    </View>
   );
 
-  return embedded ? content : <Screen>{content}</Screen>;
+  return embedded ? content : <Screen backgroundColor="#DFF3FC">{content}</Screen>;
 }
 
 export function EmbeddedOverviewScreen() {
@@ -605,16 +662,20 @@ export function EmbeddedOverviewScreen() {
 }
 
 const styles = StyleSheet.create({
+  backdropWrap: {
+    flex: 1,
+  },
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 12,
+    paddingHorizontal: 14,
+    paddingTop: 10,
     paddingBottom: 28,
   },
   topLine: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
+    paddingHorizontal: 2,
     gap: 12,
   },
   companyWrap: {
@@ -628,92 +689,109 @@ const styles = StyleSheet.create({
   },
   company: {
     color: colors.ink,
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: 3,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
-    backgroundColor: '#DCE8FF',
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D5E4F7',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     color: colors.primary,
     fontWeight: '800',
-    fontSize: 13,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 12,
-  },
-  titleCopy: {
-    flex: 1,
-  },
-  greeting: {
-    color: colors.ink,
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 12.5,
   },
   subtitle: {
     color: colors.muted,
     fontSize: 11,
     marginTop: 3,
   },
-  allPagesBtn: {
-    backgroundColor: '#EAF2FF',
-    borderColor: '#D6E5FF',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  allPagesText: {
-    color: colors.primary,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  allPagesContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   companyValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  pageTabsScroll: {
-    marginHorizontal: -18,
-    marginBottom: 14,
-  },
-  pageTabsRow: {
-    paddingHorizontal: 18,
-    gap: 8,
-  },
-  pagePill: {
+  switcherBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     backgroundColor: colors.white,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 99,
-    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#DCE6F4',
+    paddingHorizontal: 6,
     paddingVertical: 8,
+    marginBottom: 12,
+    shadowColor: '#132442',
+    shadowOpacity: 0.025,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  pagePillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  switcherNavBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F8FD',
   },
-  pagePillText: {
+  switcherNavBtnDisabled: {
+    opacity: 0.35,
+  },
+  switcherNavBtnPressed: {
+    backgroundColor: '#E8F0FC',
+  },
+  switcherCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  switcherCenterPressed: {
+    opacity: 0.72,
+  },
+  switcherTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  switcherIconBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switcherTitle: {
     color: colors.ink,
-    fontSize: 11,
+    fontSize: 14.5,
     fontWeight: '700',
+    flexShrink: 1,
   },
-  pagePillTextActive: {
-    color: colors.white,
+  switcherSubtitle: {
+    color: colors.muted,
+    fontSize: 10,
+    marginTop: 2,
+    textAlign: 'center',
   },
   periodCard: {
-    padding: 12,
-    marginBottom: 18,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E2EAF4',
+    shadowColor: '#132442',
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+    paddingHorizontal: 14,
+    paddingTop: 11,
+    paddingBottom: 10,
+    marginBottom: 16,
     gap: 8,
   },
   periodHeader: {
@@ -723,35 +801,43 @@ const styles = StyleSheet.create({
   },
   periodLabel: {
     color: colors.ink,
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
   },
   periodRange: {
     color: colors.primary,
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 10.5,
+    fontWeight: '600',
   },
   periodChipsRow: {
-    gap: 6,
+    gap: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E9EFF7',
   },
   periodChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 9,
-    backgroundColor: '#F3F6FB',
+    paddingHorizontal: 2,
+    paddingTop: 4,
+    paddingBottom: 8,
+    position: 'relative',
   },
-  periodChipActive: {
-    backgroundColor: '#EAF2FF',
-    borderWidth: 1,
-    borderColor: '#BFD7FF',
-  },
+  periodChipActive: {},
   periodChipText: {
-    color: colors.muted,
-    fontSize: 10,
-    fontWeight: '700',
+    color: '#6C788C',
+    fontSize: 11.5,
+    fontWeight: '500',
   },
   periodChipTextActive: {
     color: colors.primary,
+    fontWeight: '700',
+  },
+  periodChipUnderline: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
   },
   comparisonText: {
     color: colors.muted,
