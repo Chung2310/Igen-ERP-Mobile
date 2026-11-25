@@ -17,7 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Building2, Eye, EyeOff, Fingerprint } from 'lucide-react-native';
+import { Building2, Eye, EyeOff, Fingerprint, Lock, Mail } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -192,6 +192,11 @@ export default function LoginScreen() {
                   focusedField === 'email' && styles.inputWrapFocused,
                 ]}
               >
+                <Mail
+                  size={18}
+                  strokeWidth={1.8}
+                  color={focusedField === 'email' ? '#0A74F5' : '#94A3B8'}
+                />
                 <TextInput
                   value={email}
                   onChangeText={(value) => {
@@ -218,6 +223,11 @@ export default function LoginScreen() {
                   focusedField === 'password' && styles.inputWrapFocused,
                 ]}
               >
+                <Lock
+                  size={18}
+                  strokeWidth={1.8}
+                  color={focusedField === 'password' ? '#0A74F5' : '#94A3B8'}
+                />
                 <TextInput
                   ref={passwordInputRef}
                   value={password}
