@@ -39,7 +39,7 @@ export default function TabLayout() {
   const tabOptions = {
     headerShown: false,
     lazy: false,
-    animation: 'fade' as const,
+    animation: 'none' as const,
     sceneStyle: { backgroundColor: colors.white },
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
