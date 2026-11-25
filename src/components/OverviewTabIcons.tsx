@@ -241,3 +241,93 @@ export function BranchAppIcon({ size = 34 }: { size?: number }) {
     </Svg>
   );
 }
+
+/**
+ * Đầu trợ lý iGen AI — Circular glowing badge with the iGen login robot head.
+ */
+export function IgenAssistantAvatarIcon({ size = 38 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      <Defs>
+        <LinearGradient id="igen_ai_ring" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0%" stopColor="#32D2FF" />
+          <Stop offset="55%" stopColor="#1B75F8" />
+          <Stop offset="100%" stopColor="#1E4CE6" />
+        </LinearGradient>
+        <LinearGradient id="igen_ai_head" x1="0.2" y1="0" x2="0.8" y2="1">
+          <Stop offset="0%" stopColor="#FFFFFF" />
+          <Stop offset="75%" stopColor="#F2F8FF" />
+          <Stop offset="100%" stopColor="#D6EAFF" />
+        </LinearGradient>
+        <LinearGradient id="igen_ai_visor" x1="0.5" y1="0" x2="0.5" y2="1">
+          <Stop offset="0%" stopColor="#1C3159" />
+          <Stop offset="100%" stopColor="#071226" />
+        </LinearGradient>
+        <LinearGradient id="igen_ai_ant" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0%" stopColor="#72F5FF" />
+          <Stop offset="100%" stopColor="#0891F2" />
+        </LinearGradient>
+      </Defs>
+
+      {/* Soft outer halo */}
+      <Circle cx="28" cy="28" r="27.5" fill="#BFE7FF" fillOpacity={0.5} />
+      {/* Main vibrant circular badge */}
+      <Circle cx="28" cy="28" r="24.5" fill="url(#igen_ai_ring)" />
+
+      {/* Tilted antenna stem & glowing ball */}
+      <Path
+        d="M27.2 19.6L25.1 13.5"
+        stroke="#273B63"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+      <Circle cx="24.6" cy="11.6" r="3.4" fill="url(#igen_ai_ant)" />
+      <Circle cx="23.6" cy="10.6" r="1.1" fill="#FFFFFF" fillOpacity={0.85} />
+      {/* Antenna base cap */}
+      <Path
+        d="M23.5 19.8C24.4 17.9 29.8 17.9 31.2 19.8Z"
+        fill="#13B5FF"
+      />
+
+      {/* Left & right glowing cyan ear-cups */}
+      <Rect x="9.6" y="25.2" width="5.2" height="11.6" rx="2.6" fill="#0B7CF2" />
+      <Rect x="10.4" y="27.1" width="2.6" height="7.8" rx="1.3" fill="#7BF6FF" />
+      <Rect x="41.2" y="25.2" width="5.2" height="11.6" rx="2.6" fill="#0B7CF2" />
+      <Rect x="43" y="27.1" width="2.6" height="7.8" rx="1.3" fill="#7BF6FF" />
+
+      {/* Glossy white rounded robot head */}
+      <Rect x="12.5" y="19" width="31" height="24.5" rx="12.2" fill="url(#igen_ai_head)" />
+
+      {/* Dark glossy visor screen */}
+      <Rect x="16" y="23.8" width="24" height="15.8" rx="7.6" fill="url(#igen_ai_visor)" />
+      {/* Subtle visor top sheen */}
+      <Path
+        d="M20.5 25.4H35.5C34.2 27 31.4 27.6 28 27.6C24.6 27.6 21.8 27 20.5 25.4Z"
+        fill="#FFFFFF"
+        fillOpacity={0.14}
+      />
+
+      {/* Happy glowing cyan arched smiling eyes (^ ^) */}
+      <Path
+        d="M20.4 31.5C21.1 29.4 23.9 29.4 24.6 31.5"
+        stroke="#6FF7FF"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <Path
+        d="M31.4 31.5C32.1 29.4 34.9 29.4 35.6 31.5"
+        stroke="#6FF7FF"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        fill="none"
+      />
+
+      {/* Cheerful glowing cyan smile */}
+      <Path
+        d="M24.6 33.8H31.4C31 36.4 29.6 37.5 28 37.5C26.4 37.5 25 36.4 24.6 33.8Z"
+        fill="#6FF7FF"
+      />
+    </Svg>
+  );
+}

@@ -12,7 +12,7 @@ import {
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Card } from '@/components/Card';
-import { BranchAppIcon, OverviewTabIcon } from '@/components/OverviewTabIcons';
+import { BranchAppIcon, IgenAssistantAvatarIcon, OverviewTabIcon } from '@/components/OverviewTabIcons';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -70,17 +70,6 @@ type PagePayload =
   | { kind: 'healthcare'; data: HealthcareOverviewData };
 
 type CacheEntry = { payload: PagePayload; fetchedAt: number };
-
-function getInitials(name?: string) {
-  return (
-    name
-      ?.trim()
-      .split(/\s+/)
-      .slice(-2)
-      .map((part) => part[0]?.toLocaleUpperCase('vi'))
-      .join('') || 'ERP'
-  );
-}
 
 function formatClock(timestamp: number) {
   const d = new Date(timestamp);
@@ -449,9 +438,13 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
               {branches.length > 1 ? <ChevronDown size={14} color={colors.ink} /> : null}
             </View>
           </Pressable>
-          <Link href="/(tabs)/profile" asChild>
-            <Pressable accessibilityRole="button" style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials(user?.displayName)}</Text>
+          <Link href="/(tabs)/ai-chat" asChild>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mở trợ lý iGen AI"
+              style={({ pressed }) => [styles.assistantBtn, pressed && styles.assistantBtnPressed]}
+            >
+              <IgenAssistantAvatarIcon size={38} />
             </Pressable>
           </Link>
         </View>
@@ -566,7 +559,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         onRequestClose={() => setSwitcherOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setSwitcherOpen(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
+          <Pressable style={styles.modalSheet} onPress={() => { }}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn trang tổng quan</Text>
@@ -606,7 +599,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         onRequestClose={() => setBranchPickerOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setBranchPickerOpen(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
+          <Pressable style={styles.modalSheet} onPress={() => { }}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn chi nhánh</Text>
@@ -679,20 +672,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     flexShrink: 1,
   },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#D5E4F7',
+  assistantBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {
-    color: colors.primary,
-    fontWeight: '800',
-    fontSize: 12.5,
+  assistantBtnPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.94 }],
   },
   subtitle: {
     color: colors.muted,
