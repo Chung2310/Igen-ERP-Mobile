@@ -17,7 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Building2, Eye, EyeOff, Fingerprint, Lock, Mail } from 'lucide-react-native';
+import { Eye, EyeOff, Fingerprint, Lock, Mail } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -154,16 +154,9 @@ export default function LoginScreen() {
           bounces={false}
         >
           {/* Phần trên: Nền xanh + Robot iGen */}
-          <View style={[styles.banner, { paddingTop: topInset + 14 }]}>
+          <View style={[styles.banner, { paddingTop: topInset + 18 }]}>
             <View pointerEvents="none" style={styles.bannerGlowTop} />
             <View pointerEvents="none" style={styles.bannerGlowBottom} />
-
-            <View style={styles.bannerBadgeRow}>
-              <View style={styles.bannerBadgeIcon}>
-                <Building2 size={15} color="#9CF3FF" />
-              </View>
-              <Text style={styles.bannerBadgeText}>Nền tảng quản trị doanh nghiệp</Text>
-            </View>
 
             <Text style={styles.bannerTitle}>
               ĐIỀU HÀNH DOANH NGHIỆP{'\n'}TRONG MỘT HỆ THỐNG
@@ -374,34 +367,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  bannerBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  bannerBadgeIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: 'rgba(7, 88, 184, 0.78)',
-    borderWidth: 1,
-    borderColor: 'rgba(165, 243, 252, 0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bannerBadgeText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
   bannerTitle: {
     color: colors.white,
     fontSize: 17.5,
     lineHeight: 24,
     fontWeight: '800',
     textAlign: 'center',
-    marginTop: 16,
     letterSpacing: 0.3,
   },
   illustrationWrap: {
