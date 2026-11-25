@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Platform, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AiChatTabIcon,
   InboxTabIcon,
@@ -13,23 +14,28 @@ import { colors } from '@/theme/colors';
 
 const TAB_INACTIVE_COLOR = '#4B5565';
 
-const tabOptions = {
-  headerShown: false,
-  tabBarActiveTintColor: colors.primary,
-  tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
-  tabBarStyle: {
-    height: 78,
-    paddingTop: 7,
-    paddingBottom: 6,
-    borderTopColor: colors.border,
-    backgroundColor: colors.white,
-  },
-  tabBarLabelStyle: { fontSize: 9.5, lineHeight: 12, fontWeight: '600' as const, marginTop: 2 },
-};
-
 export default function TabLayout() {
   const { user } = useAuth();
   const showOverview = canAccessOverview(user);
+  const insets = useSafeAreaInsets();
+  const bottomInset =
+    Platform.OS === 'android'
+      ? Math.max(insets.bottom + 8, 24)
+      : Math.max(insets.bottom, 12);
+
+  const tabOptions = {
+    headerShown: false,
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
+    tabBarStyle: {
+      height: 60 + bottomInset,
+      paddingTop: 8,
+      paddingBottom: bottomInset,
+      borderTopColor: colors.border,
+      backgroundColor: colors.white,
+    },
+    tabBarLabelStyle: { fontSize: 9.5, lineHeight: 12, fontWeight: '600' as const, marginTop: 2 },
+  };
 
   return (
     <Tabs screenOptions={tabOptions}>

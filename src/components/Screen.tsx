@@ -1,10 +1,40 @@
 import { PropsWithChildren } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
+import { Platform, StatusBar, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 import { colors } from '@/theme/colors';
 
-export function Screen({ children, edges = ['top', 'left', 'right'] }: PropsWithChildren<{ edges?: Edge[] }>) {
-  return <SafeAreaView edges={edges} style={styles.safe}><View style={styles.content}>{children}</View></SafeAreaView>;
+export function Screen({
+  children,
+  edges = ['top', 'left', 'right'],
+}: PropsWithChildren<{ edges?: Edge[] }>) {
+  const insets = useSafeAreaInsets();
+  const androidStatusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+
+  const paddingTop = edges.includes('top')
+    ? Math.max(insets.top, androidStatusBarHeight) + 4
+    : 0;
+  const paddingBottom = edges.includes('bottom') ? insets.bottom : 0;
+  const paddingLeft = edges.includes('left') ? insets.left : 0;
+  const paddingRight = edges.includes('right') ? insets.right : 0;
+
+  return (
+    <View
+      style={[
+        styles.safe,
+        {
+          paddingTop,
+          paddingBottom,
+          paddingLeft,
+          paddingRight,
+        },
+      ]}
+    >
+      <View style={styles.content}>{children}</View>
+    </View>
+  );
 }
 
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.background }, content: { flex: 1 } });
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.background },
+  content: { flex: 1 },
+});

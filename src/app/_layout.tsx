@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { Stack } from 'expo-router';
 import { useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/core/auth/AuthProvider';
 import { HrConfirmHost } from '@/features/hr/components/HrConfirmModal';
 import { canAccessOverview } from '@/features/overview/overviewCatalog';
@@ -11,9 +12,11 @@ import { Fingerprint, LogOut, ShieldCheck } from 'lucide-react-native';
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <AuthenticatedRouter />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AuthenticatedRouter />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
