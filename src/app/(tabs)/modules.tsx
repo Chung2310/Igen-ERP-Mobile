@@ -1,14 +1,34 @@
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ModuleAppIcon } from '@/components/ModuleAppIcons';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
-import { canAccessModule, moduleCatalog } from '@/features/modules/moduleCatalog';
+import {
+  canAccessModule,
+  moduleCatalog,
+  type ModuleDefinition,
+} from '@/features/modules/moduleCatalog';
 import { colors } from '@/theme/colors';
 
+const COLUMNS = 4;
+
+function chunkRows(items: ModuleDefinition[]): Array<Array<ModuleDefinition | null>> {
+  const rows: Array<Array<ModuleDefinition | null>> = [];
+  for (let index = 0; index < items.length; index += COLUMNS) {
+    const slice: Array<ModuleDefinition | null> = items.slice(index, index + COLUMNS);
+    while (slice.length < COLUMNS) {
+      slice.push(null);
+    }
+    rows.push(slice);
+  }
+  return rows;
+}
+
 export default function ModulesScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const visibleModules = moduleCatalog.filter((module) => canAccessModule(user, module.slug));
+  const rows = chunkRows(visibleModules);
 
   return (
     <Screen>
@@ -18,26 +38,37 @@ export default function ModulesScreen() {
         </View>
 
         <View style={styles.gridCard}>
-          <View style={styles.grid}>
-            {visibleModules.map((module) => (
-              <Link
-                key={module.slug}
-                href={{ pathname: '/modules/[slug]', params: { slug: module.slug } }}
-                asChild
-              >
-                <Pressable
-                  style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel={module.name}
-                >
-                  <ModuleAppIcon slug={module.slug} size={46} />
-                  <Text numberOfLines={2} style={styles.moduleName}>
-                    {module.name}
-                  </Text>
-                </Pressable>
-              </Link>
-            ))}
-          </View>
+          {rows.map((row, rowIndex) => (
+            <View
+              key={`row-${rowIndex}`}
+              style={[styles.row, rowIndex < rows.length - 1 && styles.rowSpacing]}
+            >
+              {row.map((module, colIndex) => {
+                if (!module) {
+                  return <View key={`empty-${rowIndex}-${colIndex}`} style={styles.cell} />;
+                }
+
+                const label = module.shortName ?? module.name;
+                return (
+                  <View key={module.slug} style={styles.cell}>
+                    <Pressable
+                      onPress={() =>
+                        router.push({ pathname: '/modules/[slug]', params: { slug: module.slug } })
+                      }
+                      style={({ pressed }) => [styles.itemButton, pressed && styles.itemPressed]}
+                      accessibilityRole="button"
+                      accessibilityLabel={module.name}
+                    >
+                      <ModuleAppIcon slug={module.slug} size={48} />
+                      <Text numberOfLines={2} style={styles.moduleName}>
+                        {label}
+                      </Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+          ))}
         </View>
 
         <Text style={styles.note}>Module hiển thị theo gói dịch vụ và quyền được cấp.</Text>
@@ -70,30 +101,38 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingTop: 22,
-    paddingBottom: 20,
-    paddingHorizontal: 10,
+    paddingTop: 24,
+    paddingBottom: 22,
+    paddingHorizontal: 8,
   },
-  grid: {
+  row: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 20,
+    alignItems: 'flex-start',
+    width: '100%',
   },
-  item: {
-    width: '25%',
+  rowSpacing: {
+    marginBottom: 24,
+  },
+  cell: {
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
+  },
+  itemButton: {
+    width: '100%',
+    alignItems: 'center',
   },
   itemPressed: {
     opacity: 0.72,
     transform: [{ scale: 0.94 }],
   },
   moduleName: {
-    marginTop: 7,
+    marginTop: 8,
+    width: '100%',
     color: '#2B3445',
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '400',
-    lineHeight: 15,
+    lineHeight: 16,
     textAlign: 'center',
   },
   note: {
