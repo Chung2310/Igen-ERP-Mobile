@@ -1,5 +1,5 @@
 import { PopupError } from '@/components/PopupError';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -324,6 +324,7 @@ function AttendanceAndCalendarSection({
   const [calMonthDate, setCalMonthDate] = useState(() => new Date());
   const calYear = calMonthDate.getFullYear();
   const calMonth = calMonthDate.getMonth(); // 0-11
+  const holidaySyncAttempts = useRef(new Set<string>());
   const [pickedDayKey, setPickedDayKey] = useState(today);
   const [calFilterType, setCalFilterType] = useState<'all' | HrCalendarEventType>('all');
   const [calListScope, setCalListScope] = useState<'day' | 'month'>('month');
@@ -359,11 +360,42 @@ function AttendanceAndCalendarSection({
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const [evList, holList, leaveApps] = await Promise.all([
+        const [evList, holResult, leaveApps] = await Promise.all([
           listHrCalendarEvents(companyCode, branchId).catch(() => [] as HrCalendarEvent[]),
-          listHrWorkCalendar(calYear, false, branchId).catch(() => [] as HrWorkCalendarDay[]),
+          listHrWorkCalendar(calYear, false, branchId).catch(() => null),
           listLeaveApplications(companyCode, branchId).catch(() => [] as HrLeaveApplication[]),
         ]);
+
+        let holList = holResult ?? [];
+        const isCalendarAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+        const syncKey = `system-holidays-v2:${companyCode || ''}:${calYear}`;
+        if (
+          holResult !== null &&
+          !holResult.some((day) => day.source === 'system') &&
+          companyCode &&
+          isCalendarAdmin &&
+          !holidaySyncAttempts.current.has(syncKey)
+        ) {
+          holidaySyncAttempts.current.add(syncKey);
+          try {
+            const synced = await syncHrWorkCalendar(calYear, branchId);
+            const refreshed = await listHrWorkCalendar(calYear, false, branchId).catch(() => []);
+            const merged = new Map<string, HrWorkCalendarDay>();
+            for (const day of [...refreshed, ...synced]) {
+              merged.set(day._id || `${day.date}:${day.source}:${day.name}`, day);
+            }
+            holList = [...merged.values()];
+            if (!holList.some((day) => day.source === 'system')) {
+              throw new Error(`API đồng bộ không trả về ngày nghỉ lễ hệ thống cho năm ${calYear}.`);
+            }
+          } catch (syncError) {
+            holidaySyncAttempts.current.delete(syncKey);
+            Alert.alert(
+              'Không đồng bộ được lịch nghỉ lễ',
+              syncError instanceof Error ? syncError.message : 'Vui lòng thử lại sau.',
+            );
+          }
+        }
 
         // Exclude unapproved / rejected / cancelled calendar items (matching Web ERP)
         const activeEvents = evList.filter((ev) => {
@@ -400,7 +432,7 @@ function AttendanceAndCalendarSection({
         setRefreshing(false);
       }
     },
-    [branchId, calYear, companyCode],
+    [branchId, calYear, companyCode, user?.role],
   );
 
   const loadMonthly = useCallback(
@@ -960,7 +992,7 @@ function AttendanceAndCalendarSection({
         </>
       ) : (
         <>
-          {/* Month Navigator + Add Event */}
+          {/* Month Navigator */}
           <View style={styles.headRow}>
             <Card style={[styles.dateBar, { flex: 1, marginBottom: 0 }]}>
               <Pressable
@@ -979,17 +1011,6 @@ function AttendanceAndCalendarSection({
                 <ChevronRight size={16} color={colors.primary} />
               </Pressable>
             </Card>
-            <Pressable
-              onPress={() => {
-                setEvStart(pickedDayKey);
-                setEvEnd(pickedDayKey);
-                setEventModalOpen(true);
-              }}
-              style={styles.primaryBtn}
-            >
-              <Plus size={14} color={colors.white} />
-              <Text style={styles.primaryBtnText}>Thêm lịch</Text>
-            </Pressable>
           </View>
 
           {/* Monthly Type Filter & Count Pills */}
