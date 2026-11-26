@@ -52,8 +52,12 @@ function messageFrom(result: unknown, fallback: string) {
     if ('message' in result && typeof result.message === 'string' && result.message.trim()) {
       return result.message;
     }
-    if ('error' in result && typeof result.error === 'string' && result.error.trim()) {
-      return result.error;
+    if ('error' in result) {
+      if (typeof result.error === 'string' && result.error.trim()) return result.error;
+      if (typeof result.error === 'object' && result.error !== null && 'message' in result.error
+        && typeof result.error.message === 'string' && result.error.message.trim()) {
+        return result.error.message;
+      }
     }
   }
   return fallback;
