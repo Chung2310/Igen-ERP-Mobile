@@ -104,7 +104,7 @@ export async function saveLaborContract(scope: WorkerScope, input: LaborContract
   return response.data;
 }
 export async function renewLaborContract(scope: WorkerScope, id: string, input: LaborContractInput) {
-  const response = await workerApiRequest<{ data?: { previous: LaborContract; current: LaborContract } }>(`/worker-management/labor-contracts/${encodeURIComponent(id)}/renew${query(scope)}`, scope, { method: 'POST', body: input });
+  const response = await workerApiRequest<{ data?: { previous: LaborContract; current: LaborContract } }>(`/worker-management/labor-contracts/${encodeURIComponent(id)}/renew${query(scope)}`, scope, { method: 'POST', body: { code: input.code, clientName: input.clientName, startDate: input.startDate, endDate: input.endDate, note: input.note } });
   if (!response.data) throw new Error('IGen-ERP không trả về kỳ gia hạn.');
   return response.data;
 }

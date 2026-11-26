@@ -13,9 +13,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Search, ShieldCheck, UserRound, UserRoundPlus, X } from 'lucide-react-native';
+import { ChevronDown, Search, ShieldCheck, UserRound, UserRoundPlus, X } from 'lucide-react-native';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { listHrDepartments } from '@/features/hr/hrApi';
 import {
   createManagedAccount,
   deleteManagedAccount,
@@ -79,6 +80,7 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
   const { user, activeBranchId } = useAuth();
   const canManage = user?.role === 'admin' || user?.role === 'superadmin';
   const [accounts, setAccounts] = useState<ManagedAccount[]>([]);
+  const [departmentNames, setDepartmentNames] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,7 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
   const [editing, setEditing] = useState<ManagedAccount | null>(null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [departmentOpen, setDepartmentOpen] = useState(false);
   const [form, setForm] = useState<AccountForm>(blankForm);
 
   const loadAccounts = useCallback(async (showSpinner = true) => {
@@ -96,8 +99,12 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
     }
     if (showSpinner) setLoading(true);
     try {
-      const rows = await listManagedAccounts(user?.companyCode, activeBranchId || user?.branchId);
+      const [rows, departments] = await Promise.all([
+        listManagedAccounts(user?.companyCode, activeBranchId || user?.branchId),
+        listHrDepartments(user?.companyCode || 'SYSTEM').catch(() => []),
+      ]);
       setAccounts(rows);
+      setDepartmentNames(departments.filter((item) => item.isActive !== false).map((item) => item.name.trim()).filter(Boolean));
       setError('');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Không tải được danh sách tài khoản từ IGen-ERP.');
@@ -114,6 +121,13 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
     return ['all', ...[...values].sort()];
   }, [accounts]);
 
+  const departmentOptions = useMemo(() => [...new Set([
+    ...departmentNames,
+    ...accounts.map((account) => account.department || ''),
+    form.department,
+  ].map((name) => name.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi')),
+  [accounts, departmentNames, form.department]);
+
   const visibleAccounts = useMemo(() => {
     const normalized = search.trim().toLocaleLowerCase('vi');
     return accounts.filter((account) => {
@@ -126,6 +140,7 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
   function openCreate() {
     setEditing(null);
     setForm(blankForm());
+    setDepartmentOpen(false);
     setCreating(true);
   }
 
@@ -136,6 +151,7 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
     }
     setEditing(account);
     setForm(toForm(account));
+    setDepartmentOpen(false);
     setCreating(false);
   }
 
@@ -143,6 +159,7 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
     if (saving) return;
     setEditing(null);
     setCreating(false);
+    setDepartmentOpen(false);
   }
 
   function setField<K extends keyof AccountForm>(key: K, value: AccountForm[K]) {
@@ -309,7 +326,20 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
             <Field label="Email *" value={form.email} onChangeText={(value) => setField('email', value)} placeholder="ten@congty.vn" keyboardType="email-address" autoCapitalize="none" editable={creating} />
             {creating && <Field label="Mật khẩu ban đầu *" value={form.password} onChangeText={(value) => setField('password', value)} placeholder="Ít nhất 6 ký tự" secureTextEntry autoCapitalize="none" />}
             <Field label="Số điện thoại" value={form.phone} onChangeText={(value) => setField('phone', value)} placeholder="090…" keyboardType="phone-pad" />
-            <Field label="Phòng ban" value={form.department} onChangeText={(value) => setField('department', value)} placeholder="Kinh doanh" />
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Phòng ban</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Chọn phòng ban" accessibilityState={{ expanded: departmentOpen }} disabled={saving} onPress={() => setDepartmentOpen((open) => !open)} style={styles.departmentPicker}>
+                <Text style={[styles.departmentPickerText, !form.department && styles.departmentPlaceholder]}>{form.department || 'Chọn phòng ban'}</Text>
+                <ChevronDown size={15} color={colors.muted} />
+              </Pressable>
+              {departmentOpen ? <View style={styles.departmentMenu}>
+                <ScrollView nestedScrollEnabled style={styles.departmentOptions} keyboardShouldPersistTaps="handled">
+                  {departmentOptions.length ? departmentOptions.map((department) => <Pressable key={department} accessibilityRole="button" onPress={() => { setField('department', department); setDepartmentOpen(false); }} style={styles.departmentOption}>
+                    <Text style={[styles.departmentOptionText, form.department === department && styles.departmentOptionSelected]}>{department}</Text>
+                  </Pressable>) : <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>}
+                </ScrollView>
+              </View> : null}
+            </View>
 
             <Text style={styles.fieldLabel}>Vai trò</Text>
             <View style={styles.roleOptions}>
@@ -403,6 +433,15 @@ const styles = StyleSheet.create({
   input: { minHeight: 43, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 11, backgroundColor: colors.white, color: colors.ink, fontSize: 12 },
   multilineInput: { minHeight: 65, paddingTop: 10 },
   fieldHint: { color: colors.muted, fontSize: 9, lineHeight: 14, marginTop: 5 },
+  departmentPicker: { minHeight: 43, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 11, backgroundColor: colors.white },
+  departmentPickerText: { color: colors.ink, fontSize: 12 },
+  departmentPlaceholder: { color: colors.muted },
+  departmentMenu: { maxHeight: 180, marginTop: 5, borderWidth: 1, borderColor: colors.border, borderRadius: 11, backgroundColor: colors.white, overflow: 'hidden' },
+  departmentOptions: { maxHeight: 178 },
+  departmentOption: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  departmentOptionText: { color: colors.ink, fontSize: 11 },
+  departmentOptionSelected: { color: colors.primary, fontWeight: '700' },
+  departmentEmpty: { color: colors.muted, fontSize: 10, padding: 12 },
   roleOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 15 },
   roleOption: { borderRadius: 18, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: '#EDF1F7', borderWidth: 1, borderColor: 'transparent' },
   roleOptionSelected: { backgroundColor: '#E6EEFF', borderColor: '#C6D7FF' },
