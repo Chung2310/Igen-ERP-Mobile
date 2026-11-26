@@ -255,17 +255,23 @@ function renderGlyph(slug: string, accent: string) {
     case 'retail-partners':
       return (
         <>
-          {/* Smartphone paired with partner badge, balanced around (28, 28) */}
-          <Rect x="14.5" y="12.5" width="19.5" height="31" rx="4.4" fill="#FFFFFF" />
-          <Rect x="21.5" y="15" width="5.5" height="1.5" rx="0.75" fill={accent} fillOpacity={0.6} />
-          <Rect x="17" y="18" width="14.5" height="19.5" rx="2" fill={accent} fillOpacity={0.2} />
-          <Rect x="21.8" y="39.8" width="5" height="1.5" rx="0.75" fill={accent} fillOpacity={0.6} />
-          {/* Partner silhouette badge on right */}
-          <Circle cx="37.2" cy="25.2" r="4.3" fill="#FFFFFF" fillOpacity={0.92} />
+          {/* Centered smartphone matching retail-sales with partner duo inside the screen */}
+          <Rect x="17" y="11.5" width="22" height="33" rx="4.8" fill="#FFFFFF" />
+          <Rect x="25" y="14" width="6" height="1.6" rx="0.8" fill={accent} fillOpacity={0.6} />
+          <Rect x="25.2" y="40.5" width="5.6" height="1.6" rx="0.8" fill={accent} fillOpacity={0.6} />
+          <Rect x="19.5" y="17.2" width="17" height="21.4" rx="2.2" fill={accent} fillOpacity={0.16} />
+          {/* Secondary partner figure (right, softer opacity) */}
+          <Circle cx="31.6" cy="25.2" r="2.1" fill={accent} fillOpacity={0.58} />
           <Path
-            d="M30.5 41.2C30.8 36.1 33.6 32.6 37.4 32.6C40.7 32.6 43.1 34.9 43.7 38.6C43.9 40 42.9 41.2 41.5 41.2H30.5Z"
-            fill="#FFFFFF"
-            fillOpacity={0.92}
+            d="M29.4 33.4C29.7 30.9 30.9 29.4 32.5 29.4C33.8 29.4 34.7 30.4 35 32.1C35.1 32.8 34.6 33.4 33.9 33.4H29.4Z"
+            fill={accent}
+            fillOpacity={0.58}
+          />
+          {/* Primary partner figure (left-center) */}
+          <Circle cx="25.8" cy="24.2" r="2.75" fill={accent} />
+          <Path
+            d="M21.2 33.8C21.2 30.8 23.2 28.8 25.8 28.8C28.4 28.8 30.4 30.8 30.4 33.8C30.4 34.4 29.9 34.9 29.3 34.9H22.3C21.7 34.9 21.2 34.4 21.2 33.8Z"
+            fill={accent}
           />
         </>
       );
