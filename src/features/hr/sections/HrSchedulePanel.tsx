@@ -128,12 +128,14 @@ export function HrSchedulePanel({
   branchId,
   canManageTimekeeping,
   canManageCalendar,
+  canViewAllAttendance,
   canEditAttendance,
 }: {
   companyCode?: string;
   branchId?: string;
   canManageTimekeeping: boolean;
   canManageCalendar: boolean;
+  canViewAllAttendance: boolean;
   canEditAttendance: boolean;
 }) {
   const [subTab, setSubTab] = useState<ScheduleSubTab>('attendance');
@@ -177,6 +179,7 @@ export function HrSchedulePanel({
         <AttendanceAndCalendarSection
           companyCode={companyCode}
           branchId={branchId}
+          canViewAllAttendance={canViewAllAttendance}
           canEditAttendance={canEditAttendance}
           canManageCalendar={canManageCalendar}
         />
@@ -233,11 +236,13 @@ const DOW_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'] as const;
 function AttendanceAndCalendarSection({
   companyCode,
   branchId,
+  canViewAllAttendance,
   canEditAttendance,
   canManageCalendar,
 }: {
   companyCode?: string;
   branchId?: string;
+  canViewAllAttendance: boolean;
   canEditAttendance: boolean;
   canManageCalendar: boolean;
 }) {
@@ -320,10 +325,10 @@ function AttendanceAndCalendarSection({
             companyCode,
             startDate,
             endDate,
-            uid: canEditAttendance ? undefined : (user?._id || user?.id),
+            uid: canViewAllAttendance ? undefined : (user?._id || user?.id),
             branchId,
           }),
-          canEditAttendance ? listAttendanceRoster(branchId).catch(() => []) : Promise.resolve([]),
+          canViewAllAttendance ? listAttendanceRoster(branchId).catch(() => []) : Promise.resolve([]),
           listHrWorkCalendar(histYear, true).catch(() => []),
         ]);
         setMonthlyLogs(list);
@@ -336,7 +341,7 @@ function AttendanceAndCalendarSection({
         setRefreshing(false);
       }
     },
-    [branchId, canEditAttendance, companyCode, histMonth, histYear, user?._id, user?.id],
+    [branchId, canViewAllAttendance, companyCode, histMonth, histYear, user?._id, user?.id],
   );
 
   useEffect(() => {
@@ -464,7 +469,7 @@ function AttendanceAndCalendarSection({
 
     for (const log of monthlyLogs) {
       const key = log.uid || log.employeeId || log.employeeName || 'unknown';
-      if (!canEditAttendance && key !== (user?._id || user?.id)) continue;
+      if (!canViewAllAttendance && key !== (user?._id || user?.id)) continue;
       const row = addOrGet(
         key,
         log.employeeName || log.displayName || 'Nhân viên',
@@ -474,7 +479,7 @@ function AttendanceAndCalendarSection({
     }
 
     // Nếu nhân viên thường chưa có log nào, vẫn hiện chính họ
-    if (!canEditAttendance && map.size === 0 && user) {
+    if (!canViewAllAttendance && map.size === 0 && user) {
       const uid = user._id || user.id || 'self';
       addOrGet(uid, user.displayName || 'Tôi');
     }
@@ -501,7 +506,7 @@ function AttendanceAndCalendarSection({
       list.push(row);
     }
     return list.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-  }, [canEditAttendance, monthlyEmployees, monthlyLogs, monthlySearch, user]);
+  }, [canViewAllAttendance, canEditAttendance, monthlyEmployees, monthlyLogs, monthlySearch, user]);
 
   return (
     <ScrollView
@@ -581,7 +586,7 @@ function AttendanceAndCalendarSection({
             </View>
           </View>
 
-          {canEditAttendance ? (
+          {canViewAllAttendance ? (
             <TextInput
               value={monthlySearch}
               onChangeText={setMonthlySearch}
@@ -736,7 +741,7 @@ function AttendanceAndCalendarSection({
                           return (
                             <Pressable
                               key={day}
-                              disabled={!canEditAttendance && row.key !== (user?._id || user?.id)}
+                              disabled={!canViewAllAttendance && row.key !== (user?._id || user?.id)}
                               onPress={() => {
                                 if (!log) return;
                                 const ci = formatTime(log.checkIn || log.checkInTime);
@@ -746,7 +751,7 @@ function AttendanceAndCalendarSection({
                                   setEditIn(ci === '--:--' ? '' : ci);
                                   setEditOut(co === '--:--' ? '' : co);
                                   setEditNote(log.note || '');
-                                } else if (canEditAttendance || row.key === (user?._id || user?.id)) {
+                                } else if (canViewAllAttendance || row.key === (user?._id || user?.id)) {
                                   Alert.alert(
                                     `${row.name} · ${formatViDate(dateStr)}`,
                                     `Giờ vào: ${ci}\nGiờ ra: ${co}\nTrạng thái: ${log.attendanceStatus || log.status || '—'}\nHệ số công: ${coeff}`,
@@ -785,8 +790,10 @@ function AttendanceAndCalendarSection({
 
           <Text style={[styles.subMeta, { marginTop: 8, textAlign: 'center' }]}>
             Vuốt ngang bảng để xem các ngày 1–{daysInHistMonth}
-            {canEditAttendance
-              ? ' · Chạm ô có dữ liệu để xem / chỉnh sửa'
+            {canViewAllAttendance
+              ? canEditAttendance
+                ? ' · Chạm ô có dữ liệu để xem / chỉnh sửa'
+                : ' · Chạm ô có dữ liệu để xem chi tiết'
               : ' · Chi tiết chấm công của nhân sự khác được ẩn'}
           </Text>
         </>

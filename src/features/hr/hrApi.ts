@@ -189,7 +189,7 @@ export async function listAttendanceRoster(branchId?: string): Promise<HrAttenda
   const query = buildQuery({ branchId });
   type ApiRosterUser = Partial<HrAttendanceRosterEntry> & { _id?: string; id?: string };
   const res = await apiRequest<{ data?: ApiRosterUser[] }>(
-    `/auth/users${query}`,
+    `/auth/users/attendance-roster${query}`,
     { headers: branchHeaders(branchId) },
   );
   return (res?.data ?? [])

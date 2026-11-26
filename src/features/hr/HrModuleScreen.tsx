@@ -80,6 +80,12 @@ export function HrModuleScreen() {
 
   const canApproveLeaves = isManager || hasPerm('hr:manage') || hasPerm('timekeeping:manage');
   const canManageDepartments = isAdmin || hasPerm('hr:manage') || hasPerm('access:manage');
+  const canViewAllAttendance =
+    isManager ||
+    hasPerm('hr:manage') ||
+    hasPerm('timekeeping:manage') ||
+    hasPerm('timekeeping:edit') ||
+    hasPerm('payroll-period:manage');
   const canViewAllPayroll =
     isAdmin || hasPerm('payroll-period:read') || hasPerm('payroll-period:manage');
   const canViewPayrollPolicies = isAdmin || hasPerm('payroll-policy:read') || hasPerm('payroll-policy:manage');
@@ -143,6 +149,7 @@ export function HrModuleScreen() {
             branchId={activeBranchId}
             canManageTimekeeping={isManager || hasPerm('timekeeping:manage') || hasPerm('hr:manage')}
             canManageCalendar={isManager || hasPerm('hr:manage') || hasPerm('timekeeping:manage')}
+            canViewAllAttendance={canViewAllAttendance}
             canEditAttendance={isManager || hasPerm('timekeeping:manage') || hasPerm('timekeeping:edit')}
           />
         ) : activeVisibleTab === 'tasks' ? (
