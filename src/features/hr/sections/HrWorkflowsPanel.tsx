@@ -21,12 +21,16 @@ import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   createHrWorkflow,
+  createHrWorkflowCategory,
+  deleteHrWorkflowCategory,
   deleteHrWorkflow,
+  listHrWorkflowCategories,
   listHrWorkflows,
+  updateHrWorkflowCategory,
   uploadHrWorkflowAttachment,
   updateHrWorkflow,
 } from '@/features/hr/hrApi';
-import type { HrWorkflow, HrWorkflowAttachment, HrWorkflowStep } from '@/features/hr/types';
+import type { HrWorkflow, HrWorkflowAttachment, HrWorkflowCategory, HrWorkflowStep, HrWorkflowSubTask } from '@/features/hr/types';
 import { colors } from '@/theme/colors';
 
 function makeId(prefix: string) {
@@ -43,6 +47,7 @@ export function HrWorkflowsPanel({
   const { user } = useAuth();
   const creatorUid = user?._id || user?.id || '';
   const [workflows, setWorkflows] = useState<HrWorkflow[]>([]);
+  const [workflowCategories, setWorkflowCategories] = useState<HrWorkflowCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,25 +67,36 @@ export function HrWorkflowsPanel({
   const [stepDesc, setStepDesc] = useState('');
   const [stepNote, setStepNote] = useState('');
   const [stepDeliverable, setStepDeliverable] = useState('');
-  const [stepSubTasksText, setStepSubTasksText] = useState('');
+  const [stepSubTasks, setStepSubTasks] = useState<HrWorkflowSubTask[]>([]);
+  const [stepSubTaskDraft, setStepSubTaskDraft] = useState('');
   const [stepAttachments, setStepAttachments] = useState<HrWorkflowAttachment[]>([]);
   const [uploadingStepAttachments, setUploadingStepAttachments] = useState(false);
   const [savingStep, setSavingStep] = useState(false);
 
   // Create workflow modal
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingWorkflow, setEditingWorkflow] = useState<HrWorkflow | null>(null);
   const [wfName, setWfName] = useState('');
   const [wfCategory, setWfCategory] = useState('');
   const [wfDesc, setWfDesc] = useState('');
   const [savingWf, setSavingWf] = useState(false);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [categoryManagerMode, setCategoryManagerMode] = useState<'list' | 'create' | 'rename'>('list');
+  const [categoryEditFrom, setCategoryEditFrom] = useState<string | null>(null);
+  const [categoryNameDraft, setCategoryNameDraft] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
 
   const load = useCallback(
     async (silent = false) => {
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const list = await listHrWorkflows(companyCode);
+        const [list, categoryList] = await Promise.all([
+          listHrWorkflows(companyCode),
+          listHrWorkflowCategories(companyCode).catch(() => [] as HrWorkflowCategory[]),
+        ]);
         setWorkflows(list);
+        setWorkflowCategories(categoryList);
         setSelectedWorkflow((curr) => (curr ? list.find((w) => w.id === curr.id) ?? curr : null));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Không tải được quy trình nội bộ.');
@@ -98,16 +114,19 @@ export function HrWorkflowsPanel({
 
   const categories = useMemo(() => {
     const set = new Set<string>();
+    for (const category of workflowCategories) {
+      if (category.name?.trim()) set.add(category.name.trim());
+    }
     for (const w of workflows) {
       if (w.category?.trim()) set.add(w.category.trim());
     }
-    return ['Tất cả', ...Array.from(set).sort((a, b) => a.localeCompare(b, 'vi'))];
-  }, [workflows]);
+    return ['Tất cả', ...Array.from(set).filter((category) => category !== 'Tất cả').sort((a, b) => a.localeCompare(b, 'vi'))];
+  }, [workflowCategories, workflows]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return workflows.filter((w) => {
-      if (selectedCategory !== 'Tất cả' && (w.category || '') !== selectedCategory) return false;
+      if (selectedCategory !== 'Tất cả' && (w.category || '').trim() !== selectedCategory) return false;
       if (!q) return true;
       const title = (w.name || w.title || '').toLowerCase();
       return (
@@ -125,7 +144,8 @@ export function HrWorkflowsPanel({
     setStepDesc('');
     setStepNote('');
     setStepDeliverable('');
-    setStepSubTasksText('');
+    setStepSubTasks([]);
+    setStepSubTaskDraft('');
     setStepAttachments([]);
     setStepModalOpen(true);
   }, [selectedWorkflow?.steps?.length]);
@@ -137,9 +157,24 @@ export function HrWorkflowsPanel({
     setStepDesc(step.description || '');
     setStepNote(step.note || '');
     setStepDeliverable(step.deliverable || '');
-    setStepSubTasksText((step.subTasks ?? []).map((t) => t.title).join('\n'));
+    setStepSubTasks((step.subTasks ?? []).map((task, index) => ({
+      ...task,
+      id: task.id || makeId(`sub${index}`),
+    })));
+    setStepSubTaskDraft('');
     setStepAttachments(step.attachments ?? []);
     setStepModalOpen(true);
+  }, []);
+
+  const addStepSubTask = useCallback(() => {
+    const title = stepSubTaskDraft.trim();
+    if (!title) return;
+    setStepSubTasks((current) => [...current, { id: makeId('sub'), title }]);
+    setStepSubTaskDraft('');
+  }, [stepSubTaskDraft]);
+
+  const removeStepSubTask = useCallback((id: string) => {
+    setStepSubTasks((current) => current.filter((task) => task.id !== id));
   }, []);
 
   const pickStepAttachments = useCallback(async () => {
@@ -191,12 +226,6 @@ export function HrWorkflowsPanel({
       Alert.alert('Thiếu tên bước', 'Vui lòng nhập tên bước thực hiện.');
       return;
     }
-    const subTasks = stepSubTasksText
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((title) => ({ id: makeId('sub'), title }));
-
     const currentSteps = selectedWorkflow.steps ?? [];
     const nextStep: HrWorkflowStep = {
       id: editingStepId || makeId('step'),
@@ -204,7 +233,7 @@ export function HrWorkflowsPanel({
       description: stepDesc.trim(),
       note: stepNote.trim(),
       deliverable: stepDeliverable.trim(),
-      subTasks,
+      subTasks: stepSubTasks,
       attachments: stepAttachments,
     };
     const nextSteps = editingStepId
@@ -230,7 +259,7 @@ export function HrWorkflowsPanel({
     stepDesc,
     stepNote,
     stepAttachments,
-    stepSubTasksText,
+    stepSubTasks,
     stepTitle,
     uploadingStepAttachments,
   ]);
@@ -257,6 +286,22 @@ export function HrWorkflowsPanel({
     },
     [selectedWorkflow],
   );
+
+  const openCreateWorkflow = useCallback(() => {
+    setEditingWorkflow(null);
+    setWfName('');
+    setWfCategory('');
+    setWfDesc('');
+    setCreateOpen(true);
+  }, []);
+
+  const openEditWorkflow = useCallback((workflow: HrWorkflow) => {
+    setEditingWorkflow(workflow);
+    setWfName(workflow.name || workflow.title || '');
+    setWfCategory(workflow.category || '');
+    setWfDesc(workflow.description || '');
+    setCreateOpen(true);
+  }, []);
 
   const onCreateWorkflow = useCallback(async () => {
     if (!wfName.trim() || savingWf) {
@@ -290,6 +335,127 @@ export function HrWorkflowsPanel({
     }
   }, [companyCode, creatorUid, savingWf, wfCategory, wfDesc, wfName]);
 
+  const onUpdateWorkflow = useCallback(async () => {
+    if (!editingWorkflow || savingWf) return;
+    const name = wfName.trim();
+    if (!name) {
+      Alert.alert('Thiếu tên quy trình', 'Hãy nhập tên quy trình.');
+      return;
+    }
+    const payload = {
+      name,
+      category: wfCategory.trim() || 'Chung',
+      description: wfDesc.trim(),
+    };
+    setSavingWf(true);
+    try {
+      await updateHrWorkflow(editingWorkflow.id, payload);
+      const localUpdate = { ...payload, title: name };
+      setWorkflows((prev) => prev.map((workflow) =>
+        workflow.id === editingWorkflow.id ? { ...workflow, ...localUpdate } : workflow,
+      ));
+      setSelectedWorkflow((prev) => prev?.id === editingWorkflow.id ? { ...prev, ...localUpdate } : prev);
+      setCreateOpen(false);
+      setEditingWorkflow(null);
+      Alert.alert('Đã lưu', 'Cập nhật quy trình thành công.');
+    } catch (err) {
+      Alert.alert('Lỗi cập nhật quy trình', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+    } finally {
+      setSavingWf(false);
+    }
+  }, [editingWorkflow, savingWf, wfCategory, wfDesc, wfName]);
+
+  const openCreateCategory = useCallback(() => {
+    setCategoryEditFrom(null);
+    setCategoryNameDraft('');
+    setCategoryManagerMode('create');
+  }, []);
+
+  const openRenameCategory = useCallback((category: string) => {
+    setCategoryEditFrom(category);
+    setCategoryNameDraft(category);
+    setCategoryManagerMode('rename');
+  }, []);
+
+  const onSaveCategory = useCallback(async () => {
+    const nextName = categoryNameDraft.trim();
+    if (!nextName || savingCategory) {
+      if (!nextName) Alert.alert('Thiếu tên phân loại', 'Hãy nhập tên phân loại.');
+      return;
+    }
+    if (nextName.toLocaleLowerCase('vi') === 'tất cả') {
+      Alert.alert('Tên phân loại không hợp lệ', 'Tên "Tất cả" được dùng để xem mọi quy trình.');
+      return;
+    }
+    const duplicate = categories.some(
+      (category) => category !== 'Tất cả' && category !== categoryEditFrom && category.toLocaleLowerCase('vi') === nextName.toLocaleLowerCase('vi'),
+    );
+    if (duplicate) {
+      Alert.alert('Phân loại đã tồn tại', 'Tên này đang được sử dụng. Hãy chọn tên khác.');
+      return;
+    }
+    const comp = companyCode || user?.companyCode || 'SYSTEM';
+    setSavingCategory(true);
+    try {
+      if (categoryManagerMode === 'create') {
+        const created = await createHrWorkflowCategory({ companyCode: comp, name: nextName });
+        setWorkflowCategories((prev) => [created, ...prev.filter((category) => category.id !== created.id)]);
+      } else {
+        const targets = workflows.filter((workflow) => workflow.category?.trim() === categoryEditFrom);
+        await Promise.all(targets.map((workflow) => updateHrWorkflow(workflow.id, { category: nextName })));
+        const currentCategory = workflowCategories.find((category) => category.name.trim() === categoryEditFrom);
+        const updatedCategory = currentCategory
+          ? await updateHrWorkflowCategory(currentCategory.id, { name: nextName })
+          : await createHrWorkflowCategory({ companyCode: comp, name: nextName });
+        const targetIds = new Set(targets.map((workflow) => workflow.id));
+        setWorkflows((prev) => prev.map((workflow) => targetIds.has(workflow.id) ? { ...workflow, category: nextName } : workflow));
+        setSelectedWorkflow((prev) => prev && targetIds.has(prev.id) ? { ...prev, category: nextName } : prev);
+        setWorkflowCategories((prev) => [
+          updatedCategory,
+          ...prev.filter((category) => category.id !== updatedCategory.id && category.name.trim() !== categoryEditFrom),
+        ]);
+        if (categoryEditFrom && selectedCategory === categoryEditFrom) setSelectedCategory(nextName);
+      }
+      setCategoryManagerMode('list');
+      setCategoryEditFrom(null);
+    } catch (err) {
+      Alert.alert('Không lưu được phân loại', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+      void load(true);
+    } finally {
+      setSavingCategory(false);
+    }
+  }, [categories, categoryEditFrom, categoryManagerMode, categoryNameDraft, companyCode, load, savingCategory, selectedCategory, user?.companyCode, workflowCategories, workflows]);
+
+  const onDeleteCategory = useCallback((category: string) => {
+    if (category === 'Chung') return;
+    const targets = workflows.filter((workflow) => workflow.category?.trim() === category);
+    showHrConfirm({
+      title: 'Xóa phân loại?',
+      message: targets.length
+        ? `Các quy trình thuộc "${category}" sẽ được chuyển về phân loại "Chung".`
+        : `Bạn có chắc muốn xóa phân loại "${category}"?`,
+      confirmLabel: 'Xóa phân loại',
+      onConfirm: async () => {
+        setSavingCategory(true);
+        try {
+          const categoryRecord = workflowCategories.find((entry) => entry.name.trim() === category);
+          await Promise.all(targets.map((workflow) => updateHrWorkflow(workflow.id, { category: 'Chung' })));
+          if (categoryRecord) await deleteHrWorkflowCategory(categoryRecord.id);
+          const targetIds = new Set(targets.map((workflow) => workflow.id));
+          setWorkflows((prev) => prev.map((workflow) => targetIds.has(workflow.id) ? { ...workflow, category: 'Chung' } : workflow));
+          setSelectedWorkflow((prev) => prev && targetIds.has(prev.id) ? { ...prev, category: 'Chung' } : prev);
+          setWorkflowCategories((prev) => prev.filter((entry) => entry.name.trim() !== category));
+          if (selectedCategory === category) setSelectedCategory('Tất cả');
+        } catch (err) {
+          Alert.alert('Không xóa được phân loại', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+          void load(true);
+        } finally {
+          setSavingCategory(false);
+        }
+      },
+    });
+  }, [load, selectedCategory, workflowCategories, workflows]);
+
   const onDeleteWorkflow = useCallback((wf: HrWorkflow) => {
     showHrConfirm({
       title: 'Xóa quy trình?',
@@ -307,6 +473,86 @@ export function HrWorkflowsPanel({
     });
   }, []);
 
+  function renderWorkflowFormModal() {
+    const close = () => {
+      if (savingWf) return;
+      setCreateOpen(false);
+      setEditingWorkflow(null);
+    };
+    return (
+      <Modal
+        visible={createOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={close}
+      >
+        <Pressable style={styles.backdrop} onPress={close}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.sheetTitle}>
+                {editingWorkflow ? 'Sửa quy trình' : 'Tạo quy trình mới'}
+              </Text>
+              <Pressable onPress={close} hitSlop={8} disabled={savingWf}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <View style={{ gap: 8 }}>
+              <Text style={styles.label}>Tên quy trình *</Text>
+              <TextInput
+                value={wfName}
+                onChangeText={setWfName}
+                placeholder="VD: Quy trình tiếp nhận nhân sự mới"
+                placeholderTextColor={colors.muted}
+                style={styles.field}
+              />
+              <Text style={styles.label}>Danh mục</Text>
+              <TextInput
+                value={wfCategory}
+                onChangeText={setWfCategory}
+                placeholder="VD: Nhân sự / Vận hành"
+                placeholderTextColor={colors.muted}
+                style={styles.field}
+              />
+              {categories.length > 1 ? (
+                <View style={styles.categorySuggestions}>
+                  {categories.slice(1).map((category) => (
+                    <Pressable
+                      key={category}
+                      onPress={() => setWfCategory(category)}
+                      style={[styles.catChip, wfCategory.trim() === category && styles.catChipActive]}
+                    >
+                      <Text style={[styles.catText, wfCategory.trim() === category && styles.catTextActive]}>{category}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              <Text style={styles.label}>Mô tả</Text>
+              <TextInput
+                value={wfDesc}
+                onChangeText={setWfDesc}
+                multiline
+                placeholder="Mục đích và phạm vi áp dụng..."
+                placeholderTextColor={colors.muted}
+                style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+              />
+              <Pressable
+                disabled={savingWf}
+                onPress={() => void (editingWorkflow ? onUpdateWorkflow() : onCreateWorkflow())}
+                style={[styles.submitBtn, savingWf && styles.disabled]}
+              >
+                <Text style={styles.submitBtnText}>
+                  {savingWf
+                    ? 'Đang lưu...'
+                    : editingWorkflow ? 'Lưu quy trình' : 'Tạo quy trình'}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    );
+  }
+
   // --- Workflow Detail Screen ---
   if (selectedWorkflow) {
     const steps = selectedWorkflow.steps ?? [];
@@ -318,6 +564,9 @@ export function HrWorkflowsPanel({
           </Pressable>
           {canManage ? (
             <View style={{ flexDirection: 'row', gap: 6 }}>
+              <Pressable onPress={() => openEditWorkflow(selectedWorkflow)} style={styles.editSmallBtn}>
+                <Text style={styles.editSmallText}>Sửa</Text>
+              </Pressable>
               <Pressable onPress={openAddStep} style={styles.primaryBtn}>
                 <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Bước</Text></View>
               </Pressable>
@@ -390,7 +639,7 @@ export function HrWorkflowsPanel({
                       ) : null}
                       {step.note ? <Text style={styles.stepTagAmber}>! Có lưu ý</Text> : null}
                       {step.subTasks?.length ? (
-                        <Text style={styles.stepTagBlue}>{step.subTasks.length} giai đoạn con</Text>
+                        <Text style={styles.stepTagBlue}>{step.subTasks.length} công việc con</Text>
                       ) : null}
                       {step.attachments?.length ? (
                         <View style={styles.stepTagRow}><Paperclip size={12} color={colors.primary} /><Text style={styles.stepTagBlue}>{step.attachments.length} tệp</Text></View>
@@ -453,7 +702,7 @@ export function HrWorkflowsPanel({
                       {selectedStep.step.subTasks?.length ? (
                         <View style={{ gap: 6 }}>
                           <Text style={styles.subSectionLabel}>
-                            Giai đoạn con ({selectedStep.step.subTasks.length})
+                            Công việc con ({selectedStep.step.subTasks.length})
                           </Text>
                           {selectedStep.step.subTasks.map((sub, i) => (
                             <View key={sub.id || i} style={styles.subTaskRow}>
@@ -551,15 +800,39 @@ export function HrWorkflowsPanel({
                     style={styles.field}
                   />
 
-                  <Text style={styles.label}>Giai đoạn con (mỗi dòng 1 mục)</Text>
-                  <TextInput
-                    value={stepSubTasksText}
-                    onChangeText={setStepSubTasksText}
-                    multiline
-                    placeholder={'Kiểm tra hồ sơ\nTrình quản lý duyệt'}
-                    placeholderTextColor={colors.muted}
-                    style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
-                  />
+                  <Text style={styles.label}>Công việc con ({stepSubTasks.length})</Text>
+                  {stepSubTasks.map((task) => (
+                    <View key={task.id} style={styles.subTaskEditRow}>
+                      <View style={styles.subDot} />
+                      <Text style={styles.subTaskText}>{task.title}</Text>
+                      <Pressable
+                        onPress={() => removeStepSubTask(task.id)}
+                        hitSlop={8}
+                        accessibilityLabel={`Xóa công việc con ${task.title}`}
+                      >
+                        <X size={15} color={colors.muted} />
+                      </Pressable>
+                    </View>
+                  ))}
+                  <View style={styles.subTaskAddRow}>
+                    <TextInput
+                      value={stepSubTaskDraft}
+                      onChangeText={setStepSubTaskDraft}
+                      onSubmitEditing={addStepSubTask}
+                      returnKeyType="done"
+                      placeholder="Nhập tên công việc con..."
+                      placeholderTextColor={colors.muted}
+                      style={[styles.field, { flex: 1 }]}
+                    />
+                    <Pressable
+                      onPress={addStepSubTask}
+                      disabled={!stepSubTaskDraft.trim()}
+                      style={[styles.subTaskAddBtn, !stepSubTaskDraft.trim() && styles.disabled]}
+                    >
+                      <Plus size={14} color={colors.primary} />
+                      <Text style={styles.categoryAddText}>Thêm</Text>
+                    </Pressable>
+                  </View>
 
                   <View style={styles.attachmentSection}>
                     <View style={styles.attachmentHeading}>
@@ -630,6 +903,7 @@ export function HrWorkflowsPanel({
             </Pressable>
           </Pressable>
         </Modal>
+        {renderWorkflowFormModal()}
       </ScrollView>
     );
   }
@@ -660,32 +934,50 @@ export function HrWorkflowsPanel({
           style={[styles.search, { flex: 1 }]}
         />
         {canManage ? (
-          <Pressable onPress={() => setCreateOpen(true)} style={styles.primaryBtn}>
+          <Pressable onPress={openCreateWorkflow} style={styles.primaryBtn}>
             <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Quy trình</Text></View>
           </Pressable>
         ) : null}
       </View>
 
-      {categories.length > 1 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.catRow}
-          style={styles.catScroll}
-        >
-          {categories.map((cat) => {
-            const active = selectedCategory === cat;
-            return (
+      {categories.length > 1 || canManage ? (
+        <>
+          {canManage ? (
+            <View style={styles.categoryHeading}>
+              <Text style={styles.categoryHeadingText}>Phân loại quy trình</Text>
               <Pressable
-                key={cat}
-                onPress={() => setSelectedCategory(cat)}
-                style={[styles.catChip, active && styles.catChipActive]}
+                accessibilityRole="button"
+                accessibilityLabel="Quản lý phân loại quy trình"
+                onPress={() => {
+                  setCategoryManagerMode('list');
+                  setCategoryManagerOpen(true);
+                }}
+                style={styles.categoryManageBtn}
               >
-                <Text style={[styles.catText, active && styles.catTextActive]}>{cat}</Text>
+                <Text style={styles.categoryManageText}>Quản lý phân loại</Text>
               </Pressable>
-            );
-          })}
-        </ScrollView>
+            </View>
+          ) : null}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.catRow}
+            style={styles.catScroll}
+          >
+            {categories.map((cat) => {
+              const active = selectedCategory === cat;
+              return (
+                <Pressable
+                  key={cat}
+                  onPress={() => setSelectedCategory(cat)}
+                  style={[styles.catChip, active && styles.catChipActive]}
+                >
+                  <Text style={[styles.catText, active && styles.catTextActive]}>{cat}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </>
       ) : null}
 
       {loading ? (
@@ -706,77 +998,147 @@ export function HrWorkflowsPanel({
       ) : (
         <View style={styles.list}>
           {filtered.map((wf) => (
-            <Card key={wf.id} onPress={() => setSelectedWorkflow(wf)} style={styles.wfCard}>
-              <View style={styles.wfCardTop}>
-                <View style={{ flex: 1 }}>
-                  {wf.category ? <Text style={styles.badge}>{wf.category}</Text> : null}
-                  <Text numberOfLines={2} style={styles.rowTitle}>
-                    {wf.name || wf.title || 'Quy trình'}
-                  </Text>
+            <Card key={wf.id} style={styles.wfCard}>
+              <View style={styles.wfCardContentRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setSelectedWorkflow(wf)}
+                  style={styles.wfCardMain}
+                >
+                  <View style={styles.wfCardTop}>
+                    <View style={{ flex: 1 }}>
+                      {wf.category ? <Text style={styles.badge}>{wf.category}</Text> : null}
+                      <Text numberOfLines={2} style={styles.rowTitle}>
+                        {wf.name || wf.title || 'Quy trình'}
+                      </Text>
+                    </View>
+                  </View>
+                  {wf.description ? (
+                    <Text numberOfLines={2} style={styles.muted}>
+                      {wf.description}
+                    </Text>
+                  ) : null}
+                </Pressable>
+                <View style={styles.workflowCardActions}>
+                  <View style={styles.stepCountRow}>
+                    <Text style={styles.stepCountBadge}>{wf.steps?.length ?? 0} bước</Text>
+                    <ChevronRight size={13} color={colors.muted} />
+                  </View>
+                  {canManage ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Sửa quy trình ${wf.name || wf.title || ''}`}
+                      onPress={() => openEditWorkflow(wf)}
+                      style={styles.workflowListEditBtn}
+                    >
+                      <Text style={styles.editSmallText}>Sửa</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
-                <View style={styles.stepCountRow}><Text style={styles.stepCountBadge}>{wf.steps?.length ?? 0} bước</Text><ChevronRight size={13} color={colors.muted} /></View>
               </View>
-              {wf.description ? (
-                <Text numberOfLines={2} style={styles.muted}>
-                  {wf.description}
-                </Text>
-              ) : null}
             </Card>
           ))}
         </View>
       )}
 
-      {/* Create Workflow Modal */}
+      {renderWorkflowFormModal()}
       <Modal
-        visible={createOpen}
+        visible={categoryManagerOpen}
         transparent
-        animationType="slide"
-        onRequestClose={() => setCreateOpen(false)}
+        animationType="fade"
+        onRequestClose={() => setCategoryManagerOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setCategoryManagerOpen(false)}>
           <Pressable style={styles.sheet} onPress={() => {}}>
             <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>Tạo quy trình mới</Text>
-              <Pressable onPress={() => setCreateOpen(false)} hitSlop={8}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetTitle}>
+                  {categoryManagerMode === 'list'
+                    ? 'Quản lý phân loại'
+                    : categoryManagerMode === 'rename' ? 'Đổi tên phân loại' : 'Tạo phân loại'}
+                </Text>
+                {categoryManagerMode === 'list' ? (
+                  <Text style={styles.muted}>Tạo phân loại riêng và gán cho quy trình bất cứ lúc nào.</Text>
+                ) : null}
+              </View>
+              <Pressable onPress={() => setCategoryManagerOpen(false)} hitSlop={8}>
                 <Text style={styles.closeText}>Đóng</Text>
               </Pressable>
             </View>
-            <View style={{ gap: 8 }}>
-              <Text style={styles.label}>Tên quy trình *</Text>
-              <TextInput
-                value={wfName}
-                onChangeText={setWfName}
-                placeholder="VD: Quy trình tiếp nhận nhân sự mới"
-                placeholderTextColor={colors.muted}
-                style={styles.field}
-              />
-              <Text style={styles.label}>Danh mục</Text>
-              <TextInput
-                value={wfCategory}
-                onChangeText={setWfCategory}
-                placeholder="VD: Nhân sự / Vận hành"
-                placeholderTextColor={colors.muted}
-                style={styles.field}
-              />
-              <Text style={styles.label}>Mô tả</Text>
-              <TextInput
-                value={wfDesc}
-                onChangeText={setWfDesc}
-                multiline
-                placeholder="Mục đích và phạm vi áp dụng..."
-                placeholderTextColor={colors.muted}
-                style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
-              />
-              <Pressable
-                disabled={savingWf}
-                onPress={() => void onCreateWorkflow()}
-                style={[styles.submitBtn, savingWf && styles.disabled]}
-              >
-                <Text style={styles.submitBtnText}>
-                  {savingWf ? 'Đang tạo...' : 'Tạo quy trình'}
-                </Text>
-              </Pressable>
-            </View>
+
+            {categoryManagerMode === 'list' ? (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+                <Pressable onPress={openCreateCategory} style={styles.categoryAddBtn}>
+                  <View style={styles.iconButtonContent}>
+                    <Plus size={14} color={colors.primary} />
+                    <Text style={styles.categoryAddText}>Tạo phân loại</Text>
+                  </View>
+                </Pressable>
+                {categories.slice(1).length ? categories.slice(1).map((category) => {
+                  const count = workflows.filter((workflow) => workflow.category?.trim() === category).length;
+                  return (
+                    <View key={category} style={styles.categoryRow}>
+                      <View style={styles.categoryRowCopy}>
+                        <Text style={styles.rowTitle}>{category}</Text>
+                        <Text style={styles.muted}>{count} quy trình</Text>
+                      </View>
+                      <Pressable onPress={() => openRenameCategory(category)} style={styles.categoryActionBtn}>
+                        <Text style={styles.categoryActionText}>Đổi tên</Text>
+                      </Pressable>
+                      {category !== 'Chung' ? (
+                        <Pressable
+                          disabled={savingCategory}
+                          onPress={() => onDeleteCategory(category)}
+                          style={styles.categoryDeleteBtn}
+                        >
+                          <Text style={styles.categoryDeleteText}>Xóa</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  );
+                }) : (
+                  <Text style={styles.categoryEmpty}>Chưa có phân loại. Bạn có thể tạo danh mục trước khi có quy trình.</Text>
+                )}
+              </ScrollView>
+            ) : (
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+                <View style={{ gap: 8, paddingBottom: 12 }}>
+                  <Text style={styles.label}>Tên phân loại *</Text>
+                  <TextInput
+                    value={categoryNameDraft}
+                    onChangeText={setCategoryNameDraft}
+                    placeholder="Ví dụ: Nhân sự / Vận hành"
+                    placeholderTextColor={colors.muted}
+                    style={styles.field}
+                  />
+                  {categoryManagerMode === 'rename' ? (
+                    <Text style={styles.muted}>
+                      Tên phân loại sẽ được cập nhật cho tất cả {workflows.filter((workflow) => workflow.category?.trim() === categoryEditFrom).length} quy trình đang sử dụng.
+                    </Text>
+                  ) : (
+                    <Text style={styles.muted}>Phân loại sẽ được lưu riêng. Bạn có thể gán vào quy trình khi tạo hoặc cập nhật quy trình.</Text>
+                  )}
+                  <View style={styles.categoryFormActions}>
+                    <Pressable
+                      disabled={savingCategory}
+                      onPress={() => setCategoryManagerMode('list')}
+                      style={[styles.categoryCancelBtn, savingCategory && styles.disabled]}
+                    >
+                      <Text style={styles.categoryActionText}>Hủy</Text>
+                    </Pressable>
+                    <Pressable
+                      disabled={savingCategory}
+                      onPress={() => void onSaveCategory()}
+                      style={[styles.submitBtn, styles.categorySaveBtn, savingCategory && styles.disabled]}
+                    >
+                      <Text style={styles.submitBtnText}>
+                        {savingCategory ? 'Đang lưu...' : categoryManagerMode === 'rename' ? 'Lưu thay đổi' : 'Tạo phân loại'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </ScrollView>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -805,13 +1167,24 @@ const styles = StyleSheet.create({
   stepCountRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   dangerSmallBtn: { backgroundColor: '#FCEBEC', paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
   dangerSmallText: { color: '#C74848', fontSize: 11, fontWeight: '700' },
+  editSmallBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
+  editSmallText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  categoryHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
+  categoryHeadingText: { color: colors.ink, fontSize: 11, fontWeight: '800' },
+  categoryManageBtn: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9 },
+  categoryManageText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
   catScroll: { marginHorizontal: -18, marginBottom: 12 },
   catRow: { paddingHorizontal: 18, gap: 6 },
   catChip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
   catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   catText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
   catTextActive: { color: colors.white },
+  categorySuggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   list: { gap: 10 },
+  wfCardContentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  wfCardMain: { flex: 1, gap: 6 },
+  workflowCardActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  workflowListEditBtn: { minHeight: 34, minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, borderRadius: 9, backgroundColor: '#EAF2FF' },
   wfCard: { padding: 13, gap: 6 },
   wfCardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', marginTop: 3 },
@@ -849,6 +1222,18 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
   sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, maxHeight: '86%' },
   modalHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 10 },
+  categoryAddBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, marginBottom: 8, alignSelf: 'flex-start' },
+  categoryAddText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  categoryRowCopy: { flex: 1, gap: 2 },
+  categoryActionBtn: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 8, backgroundColor: '#EAF2FF' },
+  categoryActionText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  categoryDeleteBtn: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FCEBEC' },
+  categoryDeleteText: { color: '#C74848', fontSize: 10, fontWeight: '700' },
+  categoryEmpty: { color: colors.muted, fontSize: 11, lineHeight: 16, paddingVertical: 12 },
+  categoryFormActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  categoryCancelBtn: { minHeight: 42, paddingHorizontal: 18, borderRadius: 11, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  categorySaveBtn: { flex: 1 },
   stepEyebrow: { color: colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', marginTop: 2 },
   closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
@@ -861,6 +1246,9 @@ const styles = StyleSheet.create({
   deliverableText: { color: '#14532D', fontSize: 12, lineHeight: 18 },
   subSectionLabel: { color: colors.ink, fontSize: 11, fontWeight: '800' },
   subTaskRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
+  subTaskEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.background },
+  subTaskAddRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  subTaskAddBtn: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, borderRadius: 10, backgroundColor: '#EAF2FF' },
   subDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
   subTaskText: { color: colors.ink, fontSize: 12, flex: 1 },
   attachBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },

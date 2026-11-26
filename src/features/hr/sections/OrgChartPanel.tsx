@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ChevronRight, Crown, FileText, Minus, Plus } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Crown, FileText, Minus, Plus } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -26,7 +26,6 @@ import {
   updateHrEmployee,
 } from '@/features/hr/hrApi';
 import type { HrDepartment, HrEmployee, HrLeaveBalance } from '@/features/hr/types';
-import { formatCompactMoney } from '@/features/overview/overviewPeriod';
 import { colors } from '@/theme/colors';
 
 type OrgNode = HrEmployee & {
@@ -88,6 +87,18 @@ function getInitials(name?: string) {
       .map((p) => p[0]?.toLocaleUpperCase('vi'))
       .join('') || 'NV'
   );
+}
+
+function parseVndAmount(value: string): number | undefined {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return undefined;
+  const amount = Number(digits);
+  return Number.isSafeInteger(amount) ? amount : undefined;
+}
+
+function formatVndAmount(value?: number | null): string {
+  if (value == null || !Number.isFinite(value)) return '—';
+  return `${Math.round(value).toLocaleString('vi-VN')} ₫`;
 }
 
 function getCategoryColor(division?: string, department?: string): { accent: string; tone: string } {
@@ -211,6 +222,7 @@ export function OrgChartPanel({
   const [addPhone, setAddPhone] = useState('');
   const [addRole, setAddRole] = useState<AddRole>('user');
   const [addDepartment, setAddDepartment] = useState('');
+  const [addDepartmentOpen, setAddDepartmentOpen] = useState(false);
   const [addParentId, setAddParentId] = useState('');
   const [addQualification, setAddQualification] = useState('');
   const [addSalary, setAddSalary] = useState('');
@@ -455,6 +467,11 @@ export function OrgChartPanel({
       Alert.alert('Cấp trên không hợp lệ', 'Không thể chọn chính nhân sự này hoặc cấp dưới làm quản lý trực tiếp.');
       return;
     }
+    const monthlySalary = parseVndAmount(editSalary);
+    if (editSalary.trim() && monthlySalary == null) {
+      Alert.alert('Lương không hợp lệ', 'Vui lòng nhập số tiền lương bằng VNĐ.');
+      return;
+    }
 
     setSavingEdit(true);
     try {
@@ -465,7 +482,7 @@ export function OrgChartPanel({
         department: editDepartment.trim(),
         phone: editPhone.trim(),
         qualification: editQualification.trim(),
-        monthlySalary: editSalary.trim() === '' ? undefined : Number(editSalary),
+        monthlySalary,
         jobDescriptionLink: editJdLink.trim(),
         parentId: editParentId || null,
       };
@@ -549,6 +566,7 @@ export function OrgChartPanel({
     setAddQualification('');
     setAddSalary('');
     setAddJdLink('');
+    setAddDepartmentOpen(false);
     const defaultMgr =
       orgNodes.find((n) => n.role === 'manager') ||
       orgNodes.find((n) => n.role === 'branch_owner') ||
@@ -571,8 +589,18 @@ export function OrgChartPanel({
       Alert.alert('Email không hợp lệ', 'Vui lòng kiểm tra lại định dạng email.');
       return;
     }
+    const normalizedPhone = addPhone.trim().replace(/[\s().-]/g, '');
+    if (normalizedPhone && !/^(0|\+84|84)(3|5|7|8|9)[0-9]{8}$/.test(normalizedPhone)) {
+      Alert.alert('Số điện thoại chưa hợp lệ', 'Ví dụ đúng: 0987654321.');
+      return;
+    }
     if ((addRole === 'user' || addRole === 'manager') && !addDepartment.trim()) {
       Alert.alert('Thiếu phòng ban', 'Vui lòng nhập hoặc chọn phòng ban.');
+      return;
+    }
+    const monthlySalary = parseVndAmount(addSalary);
+    if (addSalary.trim() && monthlySalary == null) {
+      Alert.alert('Lương không hợp lệ', 'Vui lòng nhập số tiền lương bằng VNĐ.');
       return;
     }
 
@@ -590,9 +618,9 @@ export function OrgChartPanel({
         level: parentNode ? parentNode.resolvedLevel + 1 : undefined,
         department: addDepartment.trim() || undefined,
         division: addDepartment.trim() || undefined,
-        phone: addPhone.trim() || undefined,
+        phone: normalizedPhone || undefined,
         qualification: addQualification.trim() || undefined,
-        monthlySalary: addSalary.trim() ? Number(addSalary) : undefined,
+        monthlySalary,
         jobDescriptionLink: addJdLink.trim() || undefined,
         branchId,
       });
@@ -992,7 +1020,7 @@ export function OrgChartPanel({
                           {selectedNode.isLeader ? <Crown size={14} color="#D97706" /> : null}
                           <Text style={styles.detailRole}>
                             {selectedNode.isLeader ? 'Trưởng nhóm · ' : ''}
-                            {selectedNode.jobTitle || ROLE_LABELS[selectedNode.role || 'user']}
+                            {selectedNode.jobTitle || selectedNode.position || 'Chưa cập nhật chức vụ'}
                           </Text>
                         </View>
                         <Text style={styles.muted}>
@@ -1004,15 +1032,14 @@ export function OrgChartPanel({
                       <View style={styles.infoGrid}>
                         <InfoLine label="Email" value={selectedNode.email || '—'} />
                         <InfoLine label="Điện thoại" value={selectedNode.phone || 'Chưa cập nhật'} />
-                        <InfoLine label="Vai trò" value={ROLE_LABELS[selectedNode.role || 'user'] || selectedNode.role || '—'} />
                         <InfoLine label="Chuyên môn" value={selectedNode.qualification || '—'} />
                         {selectedNode.monthlySalary != null ? (
-                          <InfoLine label="Lương tháng" value={formatCompactMoney(selectedNode.monthlySalary)} />
+                          <InfoLine label="Lương tháng" value={formatVndAmount(selectedNode.monthlySalary)} />
                         ) : null}
                         {leaveBalance ? (
                           <InfoLine
                             label={`Phép năm ${leaveBalance.year ?? new Date().getFullYear()}`}
-                            value={`Còn ${leaveBalance.remainingDays ?? 0} / ${leaveBalance.totalDays ?? 0} ngày`}
+                            value={`Còn ${leaveBalance.remaining ?? 0} / ${leaveBalance.entitlement ?? 0} ngày`}
                           />
                         ) : null}
                       </View>
@@ -1127,7 +1154,39 @@ export function OrgChartPanel({
                 </View>
 
                 <Text style={styles.label}>Phòng ban</Text>
-                <TextInput value={addDepartment} onChangeText={setAddDepartment} placeholder="VD: Phòng Kinh Doanh" placeholderTextColor={colors.muted} style={styles.field} />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: addDepartmentOpen }}
+                  onPress={() => setAddDepartmentOpen((open) => !open)}
+                  style={styles.departmentSelector}
+                >
+                  <Text style={[styles.departmentSelectorText, !addDepartment && styles.departmentPlaceholder]}>
+                    {addDepartment || 'Chọn phòng ban'}
+                  </Text>
+                  <ChevronDown size={16} color={colors.muted} />
+                </Pressable>
+                {addDepartmentOpen ? (
+                  <View style={styles.departmentDropdown}>
+                    {departmentOptions.length > 1 ? (
+                      <ScrollView nestedScrollEnabled style={styles.departmentOptions}>
+                        {departmentOptions.slice(1).map((department) => (
+                          <Pressable
+                            key={department}
+                            onPress={() => {
+                              setAddDepartment(department);
+                              setAddDepartmentOpen(false);
+                            }}
+                            style={styles.departmentOption}
+                          >
+                            <Text style={styles.departmentOptionText}>{department}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    ) : (
+                      <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>
+                    )}
+                  </View>
+                ) : null}
 
                 <Text style={styles.label}>Quản lý trực tiếp</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
@@ -1151,7 +1210,7 @@ export function OrgChartPanel({
                 <TextInput value={addQualification} onChangeText={setAddQualification} placeholder="Đại học / Thạc sĩ..." placeholderTextColor={colors.muted} style={styles.field} />
 
                 <Text style={styles.label}>Lương tháng (VNĐ)</Text>
-                <TextInput value={addSalary} onChangeText={setAddSalary} keyboardType="numeric" placeholder="15000000" placeholderTextColor={colors.muted} style={styles.field} />
+                <TextInput value={addSalary} onChangeText={setAddSalary} keyboardType="numeric" placeholder="15.000.000" placeholderTextColor={colors.muted} style={styles.field} />
 
                 <Text style={styles.label}>Link mô tả công việc (JD)</Text>
                 <TextInput value={addJdLink} onChangeText={setAddJdLink} autoCapitalize="none" placeholder="https://..." placeholderTextColor={colors.muted} style={styles.field} />
@@ -1327,6 +1386,14 @@ const styles = StyleSheet.create({
   relList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   relChip: { backgroundColor: '#F1F5FB', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9, alignSelf: 'flex-start' },
   relChipText: { color: colors.ink, fontSize: 11, fontWeight: '700' },
+  departmentSelector: { minHeight: 40, backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  departmentSelectorText: { color: colors.ink, fontSize: 12 },
+  departmentPlaceholder: { color: colors.muted },
+  departmentDropdown: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 11, overflow: 'hidden' },
+  departmentOptions: { maxHeight: 150 },
+  departmentOption: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  departmentOptionText: { color: colors.ink, fontSize: 12 },
+  departmentEmpty: { color: colors.muted, fontSize: 11, paddingHorizontal: 12, paddingVertical: 10 },
   detailActions: { gap: 8, marginTop: 4 },
   leaderBtn: { backgroundColor: '#FFF3E5', borderColor: '#F6D1A2', borderWidth: 1, minHeight: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   leaderBtnText: { color: '#B45309', fontSize: 12, fontWeight: '800' },
