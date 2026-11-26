@@ -171,24 +171,27 @@ function renderGlyph(slug: string, accent: string) {
     case 'retail-sales':
       return (
         <>
-          {/* Sleek smartphone with sale/retail tag centered at (28, 28) */}
-          <Rect x="17.5" y="11.5" width="21" height="33" rx="4.8" fill="#FFFFFF" />
-          {/* Top speaker notch & bottom home indicator */}
-          <Rect x="25" y="14" width="6" height="1.6" rx="0.8" fill={accent} fillOpacity={0.6} />
-          <Rect x="25.2" y="40.5" width="5.6" height="1.6" rx="0.8" fill={accent} fillOpacity={0.6} />
-          {/* Phone screen area */}
-          <Rect x="20.2" y="17.2" width="15.6" height="21.4" rx="2.2" fill={accent} fillOpacity={0.18} />
-          {/* Crisp shopping/sale symbol on screen */}
           <Path
-            d="M25 25V23.8C25 22.1 26.3 20.8 28 20.8C29.7 20.8 31 22.1 31 23.8V25"
-            stroke={accent}
-            strokeWidth="2"
+            d="M21 21.5V19C21 15.1 24.1 12 28 12C31.9 12 35 15.1 35 19V21.5"
+            stroke="#FFFFFF"
+            strokeOpacity={0.82}
+            strokeWidth="3.2"
             strokeLinecap="round"
             fill="none"
           />
-          <Rect x="23.2" y="24.8" width="9.6" height="9.4" rx="2.4" fill={accent} />
-          <Circle cx="26.2" cy="27.8" r="0.9" fill="#FFFFFF" />
-          <Circle cx="29.8" cy="27.8" r="0.9" fill="#FFFFFF" />
+          <Path
+            d="M14.5 21.5C14.5 20.1 15.6 19 17 19H39C40.4 19 41.5 20.1 41.5 21.5L40.1 38.2C39.9 40.9 37.6 43 34.9 43H21.1C18.4 43 16.1 40.9 15.9 38.2L14.5 21.5Z"
+            fill="#FFFFFF"
+          />
+          <Circle cx="22.8" cy="25.8" r="2.2" fill={accent} />
+          <Circle cx="33.2" cy="25.8" r="2.2" fill={accent} />
+          <Path
+            d="M23 32.5C24.3 34.8 26 35.8 28 35.8C30 35.8 31.7 34.8 33 32.5"
+            stroke={accent}
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            fill="none"
+          />
         </>
       );
 
