@@ -171,23 +171,24 @@ function renderGlyph(slug: string, accent: string) {
     case 'retail-sales':
       return (
         <>
-          {/* Clean modern shopping cart centered at (28, 28) */}
+          {/* Sleek smartphone with sale/retail tag centered at (28, 28) */}
+          <Rect x="17.5" y="11.5" width="21" height="33" rx="4.8" fill="#FFFFFF" />
+          {/* Top speaker notch & bottom home indicator */}
+          <Rect x="25" y="14" width="6" height="1.6" rx="0.8" fill={accent} fillOpacity={0.6} />
+          <Rect x="25.2" y="40.5" width="5.6" height="1.6" rx="0.8" fill={accent} fillOpacity={0.6} />
+          {/* Phone screen area */}
+          <Rect x="20.2" y="17.2" width="15.6" height="21.4" rx="2.2" fill={accent} fillOpacity={0.18} />
+          {/* Crisp shopping/sale symbol on screen */}
           <Path
-            d="M12.5 16.5H16.8C17.9 16.5 18.8 17.2 19.1 18.3L22.3 31.2C22.6 32.4 23.6 33.2 24.8 33.2H37.2C38.4 33.2 39.4 32.4 39.7 31.3L42.3 21.8C42.6 20.6 41.7 19.5 40.5 19.5H20"
-            stroke="#FFFFFF"
-            strokeWidth="3.2"
+            d="M25 25V23.8C25 22.1 26.3 20.8 28 20.8C29.7 20.8 31 22.1 31 23.8V25"
+            stroke={accent}
+            strokeWidth="2"
             strokeLinecap="round"
-            strokeLinejoin="round"
             fill="none"
           />
-          <Path
-            d="M20.6 20.5H40.6L38.4 30.8C38.2 31.6 37.5 32.2 36.6 32.2H24.6C23.7 32.2 23 31.6 22.8 30.8L20.6 20.5Z"
-            fill="#FFFFFF"
-            fillOpacity={0.9}
-          />
-          <Rect x="25" y="24.2" width="11.5" height="2.4" rx="1.2" fill={accent} fillOpacity={0.8} />
-          <Circle cx="24.5" cy="39.2" r="2.9" fill="#FFFFFF" />
-          <Circle cx="36.5" cy="39.2" r="2.9" fill="#FFFFFF" />
+          <Rect x="23.2" y="24.8" width="9.6" height="9.4" rx="2.4" fill={accent} />
+          <Circle cx="26.2" cy="27.8" r="0.9" fill="#FFFFFF" />
+          <Circle cx="29.8" cy="27.8" r="0.9" fill="#FFFFFF" />
         </>
       );
 
@@ -254,18 +255,18 @@ function renderGlyph(slug: string, accent: string) {
     case 'retail-partners':
       return (
         <>
-          {/* Symmetrical retail shop with awning canopy & double glass doors */}
+          {/* Smartphone paired with partner badge, balanced around (28, 28) */}
+          <Rect x="14.5" y="12.5" width="19.5" height="31" rx="4.4" fill="#FFFFFF" />
+          <Rect x="21.5" y="15" width="5.5" height="1.5" rx="0.75" fill={accent} fillOpacity={0.6} />
+          <Rect x="17" y="18" width="14.5" height="19.5" rx="2" fill={accent} fillOpacity={0.2} />
+          <Rect x="21.8" y="39.8" width="5" height="1.5" rx="0.75" fill={accent} fillOpacity={0.6} />
+          {/* Partner silhouette badge on right */}
+          <Circle cx="37.2" cy="25.2" r="4.3" fill="#FFFFFF" fillOpacity={0.92} />
           <Path
-            d="M16.2 14.5H39.8C40.8 14.5 41.7 15.2 42 16.2L43.5 21.8C43.9 23.4 42.7 25 41 25H15C13.3 25 12.1 23.4 12.5 21.8L14 16.2C14.3 15.2 15.2 14.5 16.2 14.5Z"
+            d="M30.5 41.2C30.8 36.1 33.6 32.6 37.4 32.6C40.7 32.6 43.1 34.9 43.7 38.6C43.9 40 42.9 41.2 41.5 41.2H30.5Z"
             fill="#FFFFFF"
+            fillOpacity={0.92}
           />
-          <Rect x="16.5" y="25" width="23" height="16.5" rx="3.2" fill="#FFFFFF" fillOpacity={0.86} />
-          {/* Centered double glass storefront door */}
-          <Rect x="22.2" y="29.5" width="11.6" height="12" rx="2.4" fill={accent} />
-          <Rect x="27.3" y="29.5" width="1.4" height="12" fill="#FFFFFF" fillOpacity={0.88} />
-          {/* Subtle awning divider stripes */}
-          <Rect x="21.5" y="14.5" width="2" height="10.5" fill={accent} fillOpacity={0.22} />
-          <Rect x="32.5" y="14.5" width="2" height="10.5" fill={accent} fillOpacity={0.22} />
         </>
       );
 
