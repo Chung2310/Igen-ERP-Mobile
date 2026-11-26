@@ -552,11 +552,11 @@ export function HrLeavesPanel({
         <Card style={styles.balanceCard}>
           <Text style={styles.balanceTitle}>
             Phép năm {myBalance.year || new Date().getFullYear()}: Còn{' '}
-            <Text style={{ color: colors.primary }}>{myBalance.remainingDays ?? 0}</Text> /{' '}
-            {myBalance.totalDays ?? 12} ngày
+            <Text style={{ color: colors.primary }}>{myBalance.remaining ?? 0}</Text> /{' '}
+            {myBalance.entitlement ?? 0} ngày
           </Text>
           <Text style={styles.subMeta}>
-            Đã dùng: {myBalance.usedDays ?? 0} ngày · Chờ duyệt: {myBalance.pendingDays ?? 0} ngày
+            Đã dùng: {myBalance.used ?? 0} ngày · Chờ duyệt: {myBalance.pending ?? 0} ngày
           </Text>
         </Card>
       ) : null}
@@ -770,7 +770,7 @@ export function HrLeavesPanel({
                 {formBalance ? (
                   <View style={styles.inlineBalance}>
                     <Text style={styles.subMeta}>
-                      Số dư phép năm: <Text style={{ color: colors.primary, fontWeight: '800' }}>{formBalance.remainingDays ?? 0}</Text> / {formBalance.totalDays ?? 12} ngày
+                      Số dư phép năm: <Text style={{ color: colors.primary, fontWeight: '800' }}>{formBalance.remaining ?? 0}</Text> / {formBalance.entitlement ?? 0} ngày
                     </Text>
                   </View>
                 ) : null}

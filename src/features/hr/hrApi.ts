@@ -1,4 +1,6 @@
 import type { DocumentPickerAsset } from 'expo-document-picker';
+import { File as ExpoFile } from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 import { ApiError, apiRequest } from '@/core/network/apiClient';
 import type {
   HrAttendanceRecord,
@@ -12,6 +14,7 @@ import type {
   HrEmployee,
   HrEmployeeWorkHoursRow,
   HrKanbanKpiReport,
+  HrKanbanAttachment,
   HrKanbanProject,
   HrKanbanTask,
   HrLeaveApplication,
@@ -34,6 +37,7 @@ import type {
   HrWorkHoursConfig,
   HrWorkShift,
   HrWorkflow,
+  HrWorkflowCategory,
 } from '@/features/hr/types';
 
 function branchHeaders(branchId?: string): Record<string, string> | undefined {
@@ -170,20 +174,35 @@ export async function listMonthlyAttendanceLogs(params: {
   qs.set('date[$gte]', params.startDate);
   qs.set('date[$lte]', params.endDate);
   if (params.uid) qs.set('uid', params.uid);
-  const res = await apiRequest<{ data?: HrAttendanceRecord[] }>(
+  type ApiAttendanceRecord = Omit<HrAttendanceRecord, 'checkIn' | 'checkOut'> & {
+    checkIn?: string | { time?: string | null } | null;
+    checkOut?: string | { time?: string | null } | null;
+  };
+  const res = await apiRequest<{ data?: ApiAttendanceRecord[] }>(
     `/crud/timekeeping-logs?${qs.toString()}`,
     { headers: branchHeaders(params.branchId) },
   );
-  return res?.data ?? [];
+  return (res?.data ?? []).map((log) => ({
+    ...log,
+    checkIn: typeof log.checkIn === 'object' && log.checkIn ? log.checkIn.time ?? null : log.checkIn,
+    checkOut: typeof log.checkOut === 'object' && log.checkOut ? log.checkOut.time ?? null : log.checkOut,
+  }));
 }
 
 export async function listAttendanceRoster(branchId?: string): Promise<HrAttendanceRosterEntry[]> {
   const query = buildQuery({ branchId });
-  const res = await apiRequest<{ data?: HrAttendanceRosterEntry[] }>(
-    `/auth/users/attendance-roster${query}`,
+  type ApiRosterUser = Partial<HrAttendanceRosterEntry> & { _id?: string; id?: string };
+  const res = await apiRequest<{ data?: ApiRosterUser[] }>(
+    `/auth/users${query}`,
     { headers: branchHeaders(branchId) },
   );
-  return res?.data ?? [];
+  return (res?.data ?? [])
+    .map((user) => ({
+      uid: user.uid || user._id || user.id || '',
+      displayName: user.displayName || 'Nhân viên',
+      branchId: user.branchId,
+    }))
+    .filter((user) => Boolean(user.uid));
 }
 
 export type TodayTimekeepingData = {
@@ -281,29 +300,37 @@ export async function updateAttendanceLog(
 }
 
 // --- 2b. Lịch làm việc (Sự kiện lịch) ---
-export async function listHrCalendarEvents(companyCode?: string): Promise<HrCalendarEvent[]> {
-  const query = buildQuery({ companyCode });
+export async function listHrCalendarEvents(
+  companyCode?: string,
+  branchId?: string,
+): Promise<HrCalendarEvent[]> {
+  const query = buildQuery({ companyCode, limit: '1000' });
   const res = await apiRequest<{ data?: Array<HrCalendarEvent & { _id?: string }> }>(
     `/crud/hr-calendar-events${query}`,
+    { headers: branchHeaders(branchId) },
   );
   return (res?.data ?? []).map((e) => ({ ...e, id: e._id || e.id }));
 }
 
-export async function createHrCalendarEvent(payload: {
-  companyCode: string;
-  type: HrCalendarEvent['type'];
-  title: string;
-  description?: string;
-  startDate: string;
-  endDate: string;
-  employeeId?: string;
-  employeeName?: string;
-  creatorId?: string;
-}): Promise<HrCalendarEvent> {
+export async function createHrCalendarEvent(
+  payload: {
+    companyCode: string;
+    type: HrCalendarEvent['type'];
+    title: string;
+    description?: string;
+    startDate: string;
+    endDate: string;
+    employeeId?: string;
+    employeeName?: string;
+    creatorId?: string;
+  },
+  branchId?: string,
+): Promise<HrCalendarEvent> {
   const res = await apiRequest<{ data: HrCalendarEvent & { _id?: string } }>(
     '/crud/hr-calendar-events',
     {
       method: 'POST',
+      headers: branchHeaders(branchId),
       body: {
         ...payload,
         status: 'active',
@@ -367,22 +394,39 @@ export async function assignHrWorkShift(
 }
 
 // --- 2d. Lịch nghỉ lễ & Ngày làm bù ---
+function extractWorkCalendarDays(data: unknown): HrWorkCalendarDay[] {
+  if (Array.isArray(data)) return data as HrWorkCalendarDay[];
+  if (data && typeof data === 'object') {
+    const obj = data as { items?: unknown; days?: unknown; data?: unknown };
+    if (Array.isArray(obj.items)) return obj.items as HrWorkCalendarDay[];
+    if (Array.isArray(obj.days)) return obj.days as HrWorkCalendarDay[];
+    if (Array.isArray(obj.data)) return obj.data as HrWorkCalendarDay[];
+  }
+  return [];
+}
+
 export async function listHrWorkCalendar(
   year: number,
   appliedOnly = false,
+  branchId?: string,
 ): Promise<HrWorkCalendarDay[]> {
-  const res = await apiRequest<{ data?: HrWorkCalendarDay[] }>(
+  const res = await apiRequest<{ data?: unknown }>(
     `/timekeeping/work-calendar?year=${year}&appliedOnly=${appliedOnly}`,
+    { headers: branchHeaders(branchId) },
   );
-  return res?.data ?? [];
+  return extractWorkCalendarDays(res?.data ?? res);
 }
 
-export async function syncHrWorkCalendar(year: number): Promise<HrWorkCalendarDay[]> {
-  const res = await apiRequest<{ data?: HrWorkCalendarDay[] }>('/timekeeping/work-calendar/sync', {
+export async function syncHrWorkCalendar(
+  year: number,
+  branchId?: string,
+): Promise<HrWorkCalendarDay[]> {
+  const res = await apiRequest<{ data?: unknown }>('/timekeeping/work-calendar/sync', {
     method: 'POST',
+    headers: branchHeaders(branchId),
     body: { year },
   });
-  return res?.data ?? [];
+  return extractWorkCalendarDays(res?.data ?? res);
 }
 
 export async function createHrWorkCalendarDay(payload: {
@@ -519,6 +563,7 @@ export async function createKanbanTask(
     category?: string;
     salesKpiTarget?: number;
     linkNote?: string;
+    attachments?: HrKanbanAttachment[];
   },
   branchId?: string,
 ): Promise<HrKanbanTask> {
@@ -541,6 +586,7 @@ export async function createKanbanTask(
       category: payload.category || 'Hướng dẫn nhân viên mới',
       salesKpiTarget: payload.salesKpiTarget ?? 0,
       linkNote: payload.linkNote || '',
+      attachments: payload.attachments || [],
       createdAt: new Date().toISOString(),
       ...(branchId ? { branchId } : {}),
     },
@@ -571,6 +617,28 @@ export async function updateKanbanTaskStatus(
   branchId?: string,
 ): Promise<HrKanbanTask> {
   return updateKanbanTask(taskId, { status }, branchId);
+}
+
+export async function updateKanbanTaskActivity(
+  taskId: string,
+  payload: {
+    action: 'progress' | 'help' | 'join' | 'resolve';
+    revision: number;
+    progress?: number;
+    note?: string;
+    helper?: { uid: string; name: string };
+  },
+  branchId?: string,
+): Promise<HrKanbanTask> {
+  const res = await apiRequest<{ data: HrKanbanTask & { _id?: string } }>(
+    `/kanban/tasks/${encodeURIComponent(taskId)}/activity`,
+    {
+      method: 'PATCH',
+      body: payload,
+      headers: branchHeaders(branchId),
+    },
+  );
+  return { ...res.data, id: res.data._id || res.data.id };
 }
 
 export async function deleteKanbanTask(taskId: string, branchId?: string): Promise<void> {
@@ -728,6 +796,75 @@ export async function uploadHrMediaFile(
     name: asset.name,
     mimeType: asset.mimeType || 'application/octet-stream',
     size: asset.size || 0,
+  };
+}
+
+async function localFileAsDataUrl(uri: string, mimeType: string): Promise<string> {
+  const base64 = await LegacyFileSystem.readAsStringAsync(uri, {
+    encoding: LegacyFileSystem.EncodingType.Base64,
+  });
+  if (!base64) throw new Error('Tệp ghi âm hoặc video không có dữ liệu.');
+  return `data:${mimeType};base64,${base64}`;
+}
+
+export async function uploadKanbanTaskAttachment(asset: {
+  uri: string;
+  name: string;
+  mimeType?: string;
+  size?: number;
+}): Promise<HrKanbanAttachment> {
+  const maxSize = 25 * 1024 * 1024;
+  let fileSize = asset.size || 0;
+  if (!fileSize) {
+    try {
+      const localFile = new ExpoFile(asset.uri);
+      if (localFile.exists) fileSize = localFile.size || 0;
+    } catch {
+      // The base64 length is checked after reading a provider-backed URI.
+    }
+  }
+  if (fileSize > maxSize) {
+    throw new Error('Tệp đính kèm không được vượt quá 25 MB.');
+  }
+  const mimeType = (asset.mimeType || 'application/octet-stream').toLowerCase();
+  const dataUrl = await localFileAsDataUrl(asset.uri, mimeType);
+  const encodedBytes = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  const actualSize = Math.ceil(encodedBytes.length * 0.75);
+  if (actualSize > maxSize) {
+    throw new Error('Tệp đính kèm không được vượt quá 25 MB.');
+  }
+  const res = await apiRequest<{ url?: string; uploadToken?: string; data?: { url?: string; uploadToken?: string } }>(
+    '/media/upload',
+    {
+      method: 'POST',
+      body: {
+        file: dataUrl,
+        sourceType: 'hr.kanban',
+        fileName: asset.name,
+        mimeType,
+        size: fileSize || actualSize,
+      },
+    },
+  );
+  const url = res?.url || res?.data?.url;
+  const uploadToken = res?.uploadToken || res?.data?.uploadToken;
+  if (!url || !uploadToken) {
+    throw new Error('Máy chủ không xác nhận được tệp vừa tải lên.');
+  }
+  const type: HrKanbanAttachment['type'] = mimeType.startsWith('image/')
+    ? 'image'
+    : mimeType.startsWith('video/')
+      ? 'video'
+      : mimeType.startsWith('audio/')
+        ? 'audio'
+        : 'file';
+  return {
+    id: `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    name: asset.name,
+    url,
+    type,
+    size: fileSize || actualSize,
+    uploadToken,
   };
 }
 
@@ -1412,6 +1549,51 @@ export async function updateTrainingEnrollment(
 }
 
 // --- 9. Quy trình ---
+export async function listHrWorkflowCategories(companyCode?: string): Promise<HrWorkflowCategory[]> {
+  const query = buildQuery({ companyCode });
+  const res = await apiRequest<{ data?: Array<HrWorkflowCategory & { _id?: string }> }>(
+    `/crud/workflow-categories${query}`,
+  );
+  return (res?.data ?? []).map((category) => ({
+    ...category,
+    id: category._id || category.id || category.name,
+  }));
+}
+
+export async function createHrWorkflowCategory(payload: {
+  companyCode: string;
+  name: string;
+}): Promise<HrWorkflowCategory> {
+  const res = await apiRequest<{ data: HrWorkflowCategory & { _id?: string } }>(
+    '/crud/workflow-categories',
+    {
+      method: 'POST',
+      body: payload,
+    },
+  );
+  return { ...res.data, id: res.data._id || res.data.id || res.data.name };
+}
+
+export async function updateHrWorkflowCategory(
+  categoryId: string,
+  payload: { name: string },
+): Promise<HrWorkflowCategory> {
+  const res = await apiRequest<{ data: HrWorkflowCategory & { _id?: string } }>(
+    `/crud/workflow-categories/${encodeURIComponent(categoryId)}`,
+    {
+      method: 'PATCH',
+      body: payload,
+    },
+  );
+  return { ...res.data, id: res.data._id || res.data.id || categoryId };
+}
+
+export async function deleteHrWorkflowCategory(categoryId: string): Promise<void> {
+  await apiRequest(`/crud/workflow-categories/${encodeURIComponent(categoryId)}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function listHrWorkflows(companyCode?: string): Promise<HrWorkflow[]> {
   const query = buildQuery({ companyCode });
   const res = await apiRequest<{ data?: Array<HrWorkflow & { _id?: string }> }>(

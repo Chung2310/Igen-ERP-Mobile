@@ -15,15 +15,12 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import * as Location from 'expo-location';
 import {
   CalendarCheck,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock3,
-  LogIn,
-  LogOut,
   Pencil,
   Plus,
   RefreshCw,
@@ -34,30 +31,21 @@ import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
-  authenticateBiometric,
-  biometricErrorMessage,
-  getBiometricAvailability,
-  isBiometricCancellation,
-} from '@/core/auth/biometricAuth';
-import {
   assignHrWorkShift,
   createHrCalendarEvent,
   createHrWorkCalendarDay,
   deleteHrCalendarEvent,
   deleteHrWorkCalendarDay,
-  getTodayTimekeeping,
   listHrCalendarEvents,
   listAttendanceRoster,
   listHrEmployeeWorkHours,
   listHrShiftAssignments,
   listHrWorkCalendar,
   listHrWorkShifts,
+  listLeaveApplications,
   listMonthlyAttendanceLogs,
   saveHrWorkShift,
   syncHrWorkCalendar,
-  submitCheckIn,
-  submitCheckOut,
-  type TodayTimekeepingData,
   updateAttendanceLog,
   updateHrEmployeeWorkHours,
   updateHrWorkCalendarDay,
@@ -68,6 +56,7 @@ import type {
   HrCalendarEvent,
   HrCalendarEventType,
   HrEmployeeWorkHoursRow,
+  HrLeaveApplication,
   HrShiftAssignmentEmployee,
   HrWorkCalendarDay,
   HrWorkCalendarDayType,
@@ -96,6 +85,61 @@ const EVENT_TYPE_LABELS: Record<HrCalendarEventType, string> = {
   exception: 'Ngoại lệ',
   reminder: 'Nhắc nhở',
 };
+
+const EVENT_TYPE_COLORS: Record<HrCalendarEventType, { dot: string; bg: string; fg: string }> = {
+  event: { dot: '#2563EB', bg: '#EFF6FF', fg: '#1D4ED8' },
+  leave: { dot: '#E11D48', bg: '#FFF1F2', fg: '#BE123C' },
+  wfh: { dot: '#0D9488', bg: '#F0FDFA', fg: '#0F766E' },
+  exception: { dot: '#7C3AED', bg: '#F5F3FF', fg: '#6D28D9' },
+  reminder: { dot: '#D97706', bg: '#FFFBEB', fg: '#B45309' },
+};
+
+function normalizeDateKey(val?: string | null): string {
+  if (!val) return '';
+  const raw = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+  }
+  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(raw);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  return raw.slice(0, 10);
+}
+
+function formatEventClock(val?: string | null): string {
+  if (!val) return '';
+  const raw = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const hh = parsed.getHours();
+  const mm = parsed.getMinutes();
+  if (hh === 0 && mm === 0) return '';
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+function mapLeaveAppToCalendarEvent(app: HrLeaveApplication): HrCalendarEvent {
+  const rawKind = String(app.requestKind || app.type || app.leaveType || 'leave').toLowerCase();
+  const type: HrCalendarEventType = rawKind.includes('wfh')
+    ? 'wfh'
+    : rawKind.includes('exception') || rawKind.includes('ngoại lệ')
+      ? 'exception'
+      : 'leave';
+  const empName = app.employeeName || 'Nhân sự';
+  const defaultTitle = type === 'wfh' ? `WFH · ${empName}` : type === 'exception' ? `Ngoại lệ · ${empName}` : `Nghỉ phép · ${empName}`;
+  return {
+    id: `leave_app_${app.id}`,
+    type,
+    title: app.reason ? `${defaultTitle} (${app.reason})` : defaultTitle,
+    description: app.reason,
+    startDate: app.startDate || app.createdAt || '',
+    endDate: app.endDate || app.startDate || app.createdAt || '',
+    employeeId: app.employeeId,
+    employeeName: app.employeeName,
+    status: app.status,
+  };
+}
 
 const HOLIDAY_TYPE_LABELS: Record<HrWorkCalendarDayType, string> = {
   holiday: 'Ngày nghỉ lễ',
@@ -196,7 +240,7 @@ export function HrSchedulePanel({
       ) : subTab === 'shifts' ? (
         <WorkShiftsSection branchId={branchId} />
       ) : subTab === 'holidays' ? (
-        <WorkHolidaysSection />
+        <WorkHolidaysSection branchId={branchId} />
       ) : (
         <EmployeeWorkHoursSection branchId={branchId} />
       )}
@@ -254,7 +298,7 @@ function AttendanceAndCalendarSection({
   canEditAttendance: boolean;
   canManageCalendar: boolean;
 }) {
-  const { user, biometricSettings } = useAuth();
+  const { user } = useAuth();
   const [mode, setMode] = useState<'monthly' | 'calendar'>('monthly');
   const today = useMemo(() => getTodayKey(), []);
   const [monthlyLogs, setMonthlyLogs] = useState<HrAttendanceRecord[]>([]);
@@ -267,8 +311,6 @@ function AttendanceAndCalendarSection({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [todayAttendance, setTodayAttendance] = useState<TodayTimekeepingData | null>(null);
-  const [actionChecking, setActionChecking] = useState<'in' | 'out' | null>(null);
 
   const histYear = monthlyDate.getFullYear();
   const histMonth = monthlyDate.getMonth() + 1; // 1-12
@@ -283,6 +325,18 @@ function AttendanceAndCalendarSection({
   const calYear = calMonthDate.getFullYear();
   const calMonth = calMonthDate.getMonth(); // 0-11
   const [pickedDayKey, setPickedDayKey] = useState(today);
+  const [calFilterType, setCalFilterType] = useState<'all' | HrCalendarEventType>('all');
+  const [calListScope, setCalListScope] = useState<'day' | 'month'>('month');
+
+  const navigateCalMonth = useCallback(
+    (delta: number) => {
+      const next = new Date(calYear, calMonth + delta, 1);
+      setCalMonthDate(next);
+      const nextYm = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+      setPickedDayKey(today.startsWith(nextYm) ? today : `${nextYm}-01`);
+    },
+    [calMonth, calYear, today],
+  );
 
   // Create calendar event modal
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -305,11 +359,39 @@ function AttendanceAndCalendarSection({
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const [evList, holList] = await Promise.all([
-          listHrCalendarEvents(companyCode).catch(() => []),
-          listHrWorkCalendar(calYear, true).catch(() => []),
+        const [evList, holList, leaveApps] = await Promise.all([
+          listHrCalendarEvents(companyCode, branchId).catch(() => [] as HrCalendarEvent[]),
+          listHrWorkCalendar(calYear, false, branchId).catch(() => [] as HrWorkCalendarDay[]),
+          listLeaveApplications(companyCode, branchId).catch(() => [] as HrLeaveApplication[]),
         ]);
-        setEvents(evList);
+
+        // Exclude unapproved / rejected / cancelled calendar items (matching Web ERP)
+        const activeEvents = evList.filter((ev) => {
+          const st = String(ev.status || '').toLowerCase();
+          return st !== 'pending' && st !== 'rejected' && st !== 'cancelled';
+        });
+
+        // Merge approved leave/WFH applications that are not already in hr-calendar-events
+        const seenKeys = new Set(
+          activeEvents.map((ev) =>
+            `${ev.employeeId || ''}|${ev.type}|${normalizeDateKey(ev.startDate)}|${normalizeDateKey(ev.endDate || ev.startDate)}`,
+          ),
+        );
+        const mergedEvents: HrCalendarEvent[] = [...activeEvents];
+        for (const app of leaveApps) {
+          if (String(app.status || '').toLowerCase() !== 'approved') continue;
+          const mapped = mapLeaveAppToCalendarEvent(app);
+          const sKey = normalizeDateKey(mapped.startDate);
+          const eKey = normalizeDateKey(mapped.endDate || mapped.startDate);
+          if (!sKey) continue;
+          const dedupeKey = `${mapped.employeeId || ''}|${mapped.type}|${sKey}|${eKey}`;
+          if (!seenKeys.has(dedupeKey)) {
+            seenKeys.add(dedupeKey);
+            mergedEvents.push(mapped);
+          }
+        }
+
+        setEvents(mergedEvents);
         setHolidays(holList);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Không tải được lịch làm việc.');
@@ -318,7 +400,7 @@ function AttendanceAndCalendarSection({
         setRefreshing(false);
       }
     },
-    [calYear, companyCode],
+    [branchId, calYear, companyCode],
   );
 
   const loadMonthly = useCallback(
@@ -335,9 +417,10 @@ function AttendanceAndCalendarSection({
             companyCode,
             startDate,
             endDate,
+            uid: canEditAttendance ? undefined : user?._id || user?.id,
             branchId,
           }),
-          listAttendanceRoster(branchId).catch(() => []),
+          canEditAttendance ? listAttendanceRoster(branchId).catch(() => []) : Promise.resolve([]),
           listHrWorkCalendar(histYear, true).catch(() => []),
         ]);
         setMonthlyLogs(list);
@@ -350,79 +433,8 @@ function AttendanceAndCalendarSection({
         setRefreshing(false);
       }
     },
-    [branchId, companyCode, histMonth, histYear],
+    [branchId, canEditAttendance, companyCode, histMonth, histYear, user?._id, user?.id],
   );
-
-  const loadTodayAttendance = useCallback(async () => {
-    if (!branchId) {
-      setTodayAttendance(null);
-      return;
-    }
-    try {
-      const result = await getTodayTimekeeping({
-        uid: user?._id || user?.id,
-        companyCode,
-        branchId,
-      });
-      setTodayAttendance(result);
-    } catch {
-      // Keep the check-in buttons available if today's status cannot be loaded.
-    }
-  }, [branchId, companyCode, user?._id, user?.id]);
-
-  useEffect(() => {
-    void loadTodayAttendance();
-  }, [loadTodayAttendance]);
-
-  const onCheck = useCallback(async (type: 'in' | 'out') => {
-    if (actionChecking) return;
-    if (!branchId) {
-      Alert.alert('Chưa có chi nhánh', 'Chọn chi nhánh trước khi chấm công.');
-      return;
-    }
-
-    setActionChecking(type);
-    try {
-      if (biometricSettings.attendanceEnabled) {
-        const availability = await getBiometricAvailability('attendanceEnabled');
-        if (!availability.available) throw new Error(availability.message || 'Thiết bị chưa sẵn sàng cho xác thực chấm công.');
-        const result = await authenticateBiometric(
-          'attendanceEnabled',
-          type === 'in' ? 'Xác thực khuôn mặt để check-in' : 'Xác thực khuôn mặt để check-out',
-        );
-        if (!result.success) {
-          if (isBiometricCancellation(result)) return;
-          throw new Error(biometricErrorMessage(result.error));
-        }
-      }
-
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        Alert.alert('Chưa có quyền vị trí', 'Cấp quyền vị trí để ghi nhận địa điểm chấm công.');
-        return;
-      }
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }).catch(() => null);
-      if (!position) {
-        Alert.alert('Không xác định được vị trí', 'Bật định vị và thử chấm công lại.');
-        return;
-      }
-
-      const payload = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        deviceInfo: `ERP-Mobile (${Platform.OS} ${String(Platform.Version)})`,
-      };
-      const response = type === 'in'
-        ? await submitCheckIn(branchId, payload)
-        : await submitCheckOut(branchId, payload);
-      Alert.alert(type === 'in' ? 'Check-in thành công' : 'Check-out thành công', response.message || 'Đã ghi nhận chấm công.');
-      await Promise.all([loadTodayAttendance(), loadMonthly(true)]);
-    } catch (error) {
-      Alert.alert('Chấm công thất bại', error instanceof Error ? error.message : 'Vui lòng thử lại.');
-    } finally {
-      setActionChecking(null);
-    }
-  }, [actionChecking, biometricSettings.attendanceEnabled, branchId, loadMonthly, loadTodayAttendance]);
 
   useEffect(() => {
     if (mode === 'monthly') void loadMonthly();
@@ -467,7 +479,7 @@ function AttendanceAndCalendarSection({
         startDate: evStart || today,
         endDate: evEnd || evStart || today,
         creatorId: user?._id || user?.id,
-      });
+      }, branchId);
       setEvents((prev) => [created, ...prev]);
       setEventModalOpen(false);
       setEvTitle('');
@@ -509,23 +521,91 @@ function AttendanceAndCalendarSection({
     return cells;
   }, [calMonth, calYear]);
 
-  const holidayMap = useMemo(() => new Map(holidays.map((h) => [h.date, h])), [holidays]);
+  const holidayMap = useMemo(() => {
+    const map = new Map<string, HrWorkCalendarDay>();
+    for (const h of holidays) {
+      const k = normalizeDateKey(h.date);
+      if (!k) continue;
+      // Prefer applied holiday if multiple exist on the same date (used by monthly attendance table)
+      if (!map.has(k) || h.isApplied) map.set(k, h);
+    }
+    return map;
+  }, [holidays]);
+
+  const holidaysByDate = useMemo(() => {
+    const map = new Map<string, HrWorkCalendarDay[]>();
+    for (const h of holidays) {
+      const k = normalizeDateKey(h.date);
+      if (!k) continue;
+      const list = map.get(k);
+      if (list) list.push(h);
+      else map.set(k, [h]);
+    }
+    return map;
+  }, [holidays]);
+
+  const filteredCalendarEvents = useMemo(
+    () => (calFilterType === 'all' ? events : events.filter((ev) => ev.type === calFilterType)),
+    [calFilterType, events],
+  );
 
   const eventsForDay = useCallback(
     (dateKey: string) =>
-      events.filter((ev) => {
-        const s = (ev.startDate || '').slice(0, 10);
-        const e = (ev.endDate || s).slice(0, 10);
+      filteredCalendarEvents.filter((ev) => {
+        const s = normalizeDateKey(ev.startDate);
+        const e = normalizeDateKey(ev.endDate) || s;
+        if (!s) return false;
         return dateKey >= s && dateKey <= e;
       }),
-    [events],
+    [filteredCalendarEvents],
   );
 
-  const pickedEvents = useMemo(() => eventsForDay(pickedDayKey), [eventsForDay, pickedDayKey]);
-  const pickedHoliday = holidayMap.get(pickedDayKey);
-  const hasTodayCheckIn = Boolean(todayAttendance?.log?.checkIn?.time);
-  const hasTodayCheckOut = Boolean(todayAttendance?.log?.checkOut?.time);
+  const calMonthStartKey = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-01`;
+  const calMonthEndKey = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(new Date(calYear, calMonth + 1, 0).getDate()).padStart(2, '0')}`;
 
+  const monthAllEvents = useMemo(() => {
+    return events
+      .filter((ev) => {
+        const s = normalizeDateKey(ev.startDate);
+        const e = normalizeDateKey(ev.endDate) || s;
+        if (!s) return false;
+        return s <= calMonthEndKey && e >= calMonthStartKey;
+      })
+      .sort((a, b) => normalizeDateKey(a.startDate).localeCompare(normalizeDateKey(b.startDate)));
+  }, [calMonthEndKey, calMonthStartKey, events]);
+
+  const monthFilteredEvents = useMemo(
+    () => (calFilterType === 'all' ? monthAllEvents : monthAllEvents.filter((ev) => ev.type === calFilterType)),
+    [calFilterType, monthAllEvents],
+  );
+
+  const monthHolidays = useMemo(
+    () =>
+      holidays
+        .filter((h) => {
+          const d = normalizeDateKey(h.date);
+          return d >= calMonthStartKey && d <= calMonthEndKey;
+        })
+        .sort((a, b) => normalizeDateKey(a.date).localeCompare(normalizeDateKey(b.date))),
+    [calMonthEndKey, calMonthStartKey, holidays],
+  );
+
+  const monthTypeCounts = useMemo(() => {
+    const counts: Record<HrCalendarEventType, number> = {
+      event: 0,
+      leave: 0,
+      wfh: 0,
+      exception: 0,
+      reminder: 0,
+    };
+    for (const ev of monthAllEvents) {
+      if (counts[ev.type] !== undefined) counts[ev.type] += 1;
+    }
+    return counts;
+  }, [monthAllEvents]);
+
+  const pickedEvents = useMemo(() => eventsForDay(pickedDayKey), [eventsForDay, pickedDayKey]);
+  const pickedHolidays = useMemo(() => holidaysByDate.get(pickedDayKey) ?? [], [holidaysByDate, pickedDayKey]);
   const monthlyRows = useMemo(() => {
     type Row = {
       key: string;
@@ -552,6 +632,7 @@ function AttendanceAndCalendarSection({
 
     for (const log of monthlyLogs) {
       const key = log.uid || log.employeeId || log.employeeName || 'unknown';
+      if (!canEditAttendance && key !== (user?._id || user?.id)) continue;
       const row = addOrGet(
         key,
         log.employeeName || log.displayName || 'Nhân viên',
@@ -627,41 +708,6 @@ function AttendanceAndCalendarSection({
         </Pressable>
       </View>
 
-      <Card style={styles.quickCheckCard}>
-        <View style={styles.quickCheckHeading}>
-          <Text style={styles.sectionTitle}>Chấm công hôm nay</Text>
-          <Text style={styles.subMeta}>
-            {biometricSettings.attendanceEnabled
-              ? Platform.OS === 'ios' ? 'Xác thực bằng Face ID' : 'Xác thực bằng khuôn mặt'
-              : 'Check-in / check-out bằng tài khoản hiện tại'}
-          </Text>
-        </View>
-        <View style={styles.quickCheckButtons}>
-          <Pressable
-            accessibilityRole="button"
-            disabled={actionChecking !== null || hasTodayCheckIn || !branchId}
-            onPress={() => { void onCheck('in'); }}
-            style={[styles.quickCheckButton, styles.quickCheckInButton, (actionChecking !== null || hasTodayCheckIn || !branchId) && styles.quickCheckDisabled]}
-          >
-            {actionChecking === 'in' ? <ActivityIndicator size="small" color={colors.white} /> : <LogIn size={15} color={colors.white} />}
-            <Text numberOfLines={1} style={styles.quickCheckInText}>
-              {actionChecking === 'in' ? 'Đang xử lý…' : hasTodayCheckIn ? 'Đã check-in' : biometricSettings.attendanceEnabled ? Platform.OS === 'ios' ? 'Face ID · Check-in' : 'Khuôn mặt · Check-in' : 'Check-in'}
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={actionChecking !== null || !hasTodayCheckIn || hasTodayCheckOut || !branchId}
-            onPress={() => { void onCheck('out'); }}
-            style={[styles.quickCheckButton, styles.quickCheckOutButton, (actionChecking !== null || !hasTodayCheckIn || hasTodayCheckOut || !branchId) && styles.quickCheckDisabled]}
-          >
-            {actionChecking === 'out' ? <ActivityIndicator size="small" color={colors.primary} /> : <LogOut size={15} color={colors.primary} />}
-            <Text numberOfLines={1} style={styles.quickCheckOutText}>
-              {actionChecking === 'out' ? 'Đang xử lý…' : hasTodayCheckOut ? 'Đã check-out' : biometricSettings.attendanceEnabled ? Platform.OS === 'ios' ? 'Face ID · Check-out' : 'Khuôn mặt · Check-out' : 'Check-out'}
-            </Text>
-          </Pressable>
-        </View>
-      </Card>
-
       {mode === 'monthly' ? (
         <>
           {/* Month Navigator + Coeff/Hours toggle */}
@@ -731,7 +777,7 @@ function AttendanceAndCalendarSection({
               </Text>
             </Card>
           ) : (
-            <View style={styles.tableWrap}>
+            <View style={[styles.tableWrap, styles.tableContentRow]}>
               {/* Frozen Left Columns: # | Họ và Tên | Số công */}
               <View style={styles.tableLeft}>
                 <View style={[styles.tableHeaderRow, styles.tableHeaderLeft]}>
@@ -918,7 +964,7 @@ function AttendanceAndCalendarSection({
           <View style={styles.headRow}>
             <Card style={[styles.dateBar, { flex: 1, marginBottom: 0 }]}>
               <Pressable
-                onPress={() => setCalMonthDate(new Date(calYear, calMonth - 1, 1))}
+                onPress={() => navigateCalMonth(-1)}
                 style={styles.iconBtn}
               >
                 <ChevronLeft size={16} color={colors.primary} />
@@ -927,7 +973,7 @@ function AttendanceAndCalendarSection({
                 Tháng {calMonth + 1}/{calYear}
               </Text>
               <Pressable
-                onPress={() => setCalMonthDate(new Date(calYear, calMonth + 1, 1))}
+                onPress={() => navigateCalMonth(1)}
                 style={styles.iconBtn}
               >
                 <ChevronRight size={16} color={colors.primary} />
@@ -946,6 +992,43 @@ function AttendanceAndCalendarSection({
             </Pressable>
           </View>
 
+          {/* Monthly Type Filter & Count Pills */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0, marginTop: 10 }}
+            contentContainerStyle={{ gap: 6, paddingRight: 4 }}
+          >
+            <Pressable
+              onPress={() => setCalFilterType('all')}
+              style={[styles.chip, calFilterType === 'all' && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, calFilterType === 'all' && styles.chipTextActive]}>
+                Tất cả ({monthAllEvents.length})
+              </Text>
+            </Pressable>
+            {(['event', 'leave', 'wfh', 'exception', 'reminder'] as const).map((t) => {
+              const active = calFilterType === t;
+              const palette = EVENT_TYPE_COLORS[t];
+              return (
+                <Pressable
+                  key={t}
+                  onPress={() => setCalFilterType(t)}
+                  style={[
+                    styles.chip,
+                    { flexDirection: 'row', alignItems: 'center', gap: 5 },
+                    active && styles.chipActive,
+                  ]}
+                >
+                  <View style={[styles.dot, { backgroundColor: active ? colors.white : palette.dot, width: 6, height: 6, borderRadius: 3 }]} />
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {EVENT_TYPE_LABELS[t]} ({monthTypeCounts[t]})
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
           {/* 7-column Calendar Grid */}
           <Card style={styles.calCard}>
             <View style={styles.calHeaderRow}>
@@ -962,10 +1045,14 @@ function AttendanceAndCalendarSection({
                 const isToday = cell.key === today;
                 const hasHoliday = holidayMap.has(cell.key);
                 const dayEvs = eventsForDay(cell.key);
+                const uniqueTypes = Array.from(new Set(dayEvs.map((ev) => ev.type))).slice(0, 3);
                 return (
                   <Pressable
                     key={cell.key}
-                    onPress={() => setPickedDayKey(cell.key)}
+                    onPress={() => {
+                      setPickedDayKey(cell.key);
+                      setCalListScope('day');
+                    }}
                     style={[
                       styles.calCell,
                       isToday && styles.calCellToday,
@@ -982,9 +1069,18 @@ function AttendanceAndCalendarSection({
                       {cell.day}
                     </Text>
                     <View style={styles.dotRow}>
-                      {hasHoliday ? <View style={[styles.dot, { backgroundColor: '#EF4444' }]} /> : null}
-                      {dayEvs.length > 0 ? (
-                        <View style={[styles.dot, { backgroundColor: isSelected ? colors.white : colors.primary }]} />
+                      {hasHoliday ? <View style={[styles.dot, { backgroundColor: isSelected ? '#FECACA' : '#EF4444' }]} /> : null}
+                      {uniqueTypes.map((type) => (
+                        <View
+                          key={type}
+                          style={[
+                            styles.dot,
+                            { backgroundColor: isSelected ? colors.white : (EVENT_TYPE_COLORS[type]?.dot || colors.primary) },
+                          ]}
+                        />
+                      ))}
+                      {dayEvs.length > 3 ? (
+                        <Text style={[styles.calMoreText, isSelected && { color: colors.white }]}>+</Text>
                       ) : null}
                     </View>
                   </Pressable>
@@ -993,41 +1089,102 @@ function AttendanceAndCalendarSection({
             </View>
           </Card>
 
-          {/* Picked day details */}
-          <Text style={styles.sectionTitle}>Chi tiết ngày {formatViDate(pickedDayKey)}</Text>
-          {pickedHoliday ? (
-            <Card style={[styles.card, { backgroundColor: '#FEF2F2', borderColor: '#FECACA', marginBottom: 8 }]}>
-              <Text style={[styles.rowTitle, { color: '#B91C1C' }]}>🎉 {pickedHoliday.name}</Text>
-              <Text style={styles.subMeta}>{HOLIDAY_TYPE_LABELS[pickedHoliday.dayType]}</Text>
-            </Card>
-          ) : null}
+          {/* Scope switcher: Picked Day vs Full Month */}
+          <View style={styles.segmentRow}>
+            <Pressable
+              onPress={() => setCalListScope('month')}
+              style={[styles.segmentBtn, calListScope === 'month' && styles.segmentBtnActive]}
+            >
+              <Text style={[styles.segmentText, calListScope === 'month' && styles.segmentTextActive]}>
+                Cả tháng {calMonth + 1}/{calYear} ({monthFilteredEvents.length + monthHolidays.length})
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setCalListScope('day')}
+              style={[styles.segmentBtn, calListScope === 'day' && styles.segmentBtnActive]}
+            >
+              <Text style={[styles.segmentText, calListScope === 'day' && styles.segmentTextActive]}>
+                Ngày {formatViDate(pickedDayKey)} ({pickedEvents.length + pickedHolidays.length})
+              </Text>
+            </Pressable>
+          </View>
 
-          {!pickedEvents.length ? (
-            <Card style={styles.stateCard}>
-              <Text style={styles.muted}>Không có sự kiện hoặc lịch trình nào trong ngày này.</Text>
-            </Card>
-          ) : (
-            <View style={styles.list}>
-              {pickedEvents.map((ev) => (
-                <Card key={ev.id} style={styles.card}>
-                  <View style={styles.headRow}>
-                    <Text style={styles.badgeInfo}>{EVENT_TYPE_LABELS[ev.type] || ev.type}</Text>
-                    {canManageCalendar || ev.creatorId === (user?._id || user?.id) ? (
-                      <Pressable onPress={() => onDeleteEvent(ev)} hitSlop={8}>
-                        <Trash2 size={14} color="#B91C1C" />
-                      </Pressable>
-                    ) : null}
-                  </View>
-                  <Text style={styles.rowTitle}>{ev.title}</Text>
-                  <Text style={styles.subMeta}>
-                    {formatViDate(ev.startDate)}
-                    {ev.endDate && ev.endDate !== ev.startDate ? ` → ${formatViDate(ev.endDate)}` : ''}
+          {(() => {
+            const visibleHolidays = calListScope === 'month' ? monthHolidays : pickedHolidays;
+            const visibleEvents = calListScope === 'month' ? monthFilteredEvents : pickedEvents;
+            if (!visibleHolidays.length && !visibleEvents.length) {
+              return (
+                <Card style={styles.stateCard}>
+                  <Text style={styles.muted}>
+                    {calListScope === 'month'
+                      ? `Không có lịch trình hoặc sự kiện nào trong tháng ${calMonth + 1}/${calYear}.`
+                      : `Không có sự kiện hoặc lịch trình nào trong ngày ${formatViDate(pickedDayKey)}.`}
                   </Text>
-                  {ev.description ? <Text style={styles.muted}>{ev.description}</Text> : null}
                 </Card>
-              ))}
-            </View>
-          )}
+              );
+            }
+            return (
+              <View style={styles.list}>
+                {visibleHolidays.map((hol) => (
+                  <Card
+                    key={hol._id || `${hol.date}-${hol.name}`}
+                    style={[
+                      styles.card,
+                      { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+                      !hol.isApplied && { opacity: 0.65 },
+                    ]}
+                  >
+                    <View style={styles.headRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.badgeInfo, { backgroundColor: '#FEE2E2', color: '#B91C1C' }]}>
+                          {HOLIDAY_TYPE_LABELS[hol.dayType]}
+                        </Text>
+                        <Text style={styles.badgeNeutral}>
+                          {hol.source === 'system' ? 'Hệ thống' : 'Admin'}
+                        </Text>
+                        {!hol.isApplied ? (
+                          <Text style={styles.badgeNeutral}>Đã tắt</Text>
+                        ) : null}
+                      </View>
+                      <Text style={[styles.subMeta, { color: '#B91C1C', fontWeight: '700' }]}>{formatViDate(hol.date)}</Text>
+                    </View>
+                    <Text style={[styles.rowTitle, { color: '#991B1B' }]}>{hol.name}</Text>
+                  </Card>
+                ))}
+                {visibleEvents.map((ev) => {
+                  const palette = EVENT_TYPE_COLORS[ev.type] || EVENT_TYPE_COLORS.event;
+                  const sKey = normalizeDateKey(ev.startDate);
+                  const eKey = normalizeDateKey(ev.endDate) || sKey;
+                  const sClock = formatEventClock(ev.startDate);
+                  const eClock = formatEventClock(ev.endDate);
+                  const clockText = sClock ? (eClock && eClock !== sClock ? `${sClock} – ${eClock}` : sClock) : '';
+                  const isMergedLeave = ev.id.startsWith('leave_app_');
+                  return (
+                    <Card key={ev.id} style={styles.card}>
+                      <View style={styles.headRow}>
+                        <Text style={[styles.badgeInfo, { backgroundColor: palette.bg, color: palette.fg }]}>
+                          {EVENT_TYPE_LABELS[ev.type] || ev.type}
+                        </Text>
+                        {!isMergedLeave && (canManageCalendar || ev.creatorId === (user?._id || user?.id)) ? (
+                          <Pressable onPress={() => onDeleteEvent(ev)} hitSlop={8}>
+                            <Trash2 size={14} color="#B91C1C" />
+                          </Pressable>
+                        ) : null}
+                      </View>
+                      <Text style={styles.rowTitle}>{ev.title}</Text>
+                      <Text style={styles.subMeta}>
+                        {formatViDate(sKey)}
+                        {eKey && eKey !== sKey ? ` → ${formatViDate(eKey)}` : ''}
+                        {clockText ? ` · ${clockText}` : ''}
+                        {ev.employeeName ? ` · ${ev.employeeName}` : ''}
+                      </Text>
+                      {ev.description ? <Text style={styles.muted}>{ev.description}</Text> : null}
+                    </Card>
+                  );
+                })}
+              </View>
+            );
+          })()}
         </>
       )}
 
@@ -1641,7 +1798,7 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
 // =========================================================================
 // 3. LỊCH NGHỈ LỄ & NGÀY LÀM BÙ
 // =========================================================================
-function WorkHolidaysSection() {
+function WorkHolidaysSection({ branchId }: { branchId?: string }) {
   const [year, setYear] = useState(new Date().getFullYear());
   const [days, setDays] = useState<HrWorkCalendarDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1660,13 +1817,13 @@ function WorkHolidaysSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setDays(await listHrWorkCalendar(year));
+      setDays(await listHrWorkCalendar(year, false, branchId));
     } catch (err) {
       Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không tải được lịch nghỉ lễ.');
     } finally {
       setLoading(false);
     }
-  }, [year]);
+  }, [branchId, year]);
 
   useEffect(() => {
     void load();
@@ -1675,8 +1832,10 @@ function WorkHolidaysSection() {
   const onSync = async () => {
     setSyncing(true);
     try {
-      setDays(await syncHrWorkCalendar(year));
-      Alert.alert('Thành công', `Đã đồng bộ lịch nghỉ lễ năm ${year}.`);
+      const synced = await syncHrWorkCalendar(year, branchId);
+      const fresh = await listHrWorkCalendar(year, false, branchId).catch(() => synced);
+      setDays(fresh.length ? fresh : synced);
+      Alert.alert('Thành công', `Đã đồng bộ ${fresh.length || synced.length} ngày nghỉ lễ năm ${year}.`);
     } catch (err) {
       Alert.alert('Lỗi', err instanceof Error ? err.message : 'Không thể đồng bộ.');
     } finally {
@@ -2362,15 +2521,6 @@ const styles = StyleSheet.create({
 
   content: { paddingHorizontal: 18, paddingBottom: 28 },
   segmentRow: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 11, padding: 3, marginBottom: 12 },
-  quickCheckCard: { padding: 12, gap: 9, marginBottom: 12 },
-  quickCheckHeading: { gap: 3 },
-  quickCheckButtons: { flexDirection: 'row', gap: 8 },
-  quickCheckButton: { flex: 1, minHeight: 40, borderRadius: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 6 },
-  quickCheckInButton: { backgroundColor: colors.primary },
-  quickCheckOutButton: { backgroundColor: '#EAF2FF', borderWidth: 1, borderColor: '#C9DDFD' },
-  quickCheckInText: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  quickCheckOutText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
-  quickCheckDisabled: { opacity: 0.45 },
   segmentBtn: { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   segmentBtnActive: { backgroundColor: colors.white },
   segmentText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
@@ -2394,8 +2544,9 @@ const styles = StyleSheet.create({
   calCellToday: { backgroundColor: '#EAF2FF' },
   calCellSelected: { backgroundColor: colors.primary },
   calDayNum: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  dotRow: { flexDirection: 'row', gap: 3, marginTop: 2, height: 5 },
+  dotRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2, height: 8 },
   dot: { width: 4, height: 4, borderRadius: 2 },
+  calMoreText: { fontSize: 8, fontWeight: '800', color: colors.primary, lineHeight: 8 },
 
   list: { gap: 9 },
   card: { padding: 12, gap: 5 },

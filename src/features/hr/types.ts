@@ -59,10 +59,11 @@ export type HrEmployee = {
 
 export type HrLeaveBalance = {
   year?: number;
-  totalDays?: number;
-  usedDays?: number;
-  remainingDays?: number;
-  pendingDays?: number;
+  entitlement?: number;
+  used?: number;
+  pending?: number;
+  unexcused?: number;
+  remaining?: number;
 };
 
 export type HrAttendanceRecord = {
@@ -190,6 +191,15 @@ export type HrKanbanProject = {
   createdAt?: string;
 };
 
+export type HrKanbanAttachment = {
+  id: string;
+  name: string;
+  url: string;
+  type: 'image' | 'video' | 'audio' | 'file' | 'link';
+  size?: number;
+  uploadToken?: string;
+};
+
 export type HrKanbanTask = {
   _id?: string;
   id: string;
@@ -208,8 +218,17 @@ export type HrKanbanTask = {
   category?: string;
   salesKpiTarget?: number;
   linkNote?: string;
+  attachments?: HrKanbanAttachment[];
   estTime?: number;
   actualTime?: number;
+  actualStartTime?: string;
+  progress?: number;
+  progressNote?: string;
+  helpRequested?: boolean;
+  helpReason?: string;
+  requestedHelperUid?: string;
+  helpers?: Array<{ uid: string; name: string }>;
+  revision?: number;
   tags?: string[];
   createdAt?: string;
 };
@@ -520,6 +539,15 @@ export type HrWorkflow = {
   steps?: HrWorkflowStep[];
   updatedAt?: string;
   createdAt?: string;
+};
+
+export type HrWorkflowCategory = {
+  _id?: string;
+  id: string;
+  companyCode?: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type HrPayrollRun = {

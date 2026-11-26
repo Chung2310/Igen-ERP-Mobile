@@ -38,7 +38,13 @@
         }
       ],
       "expo-sharing",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Cho phép ERP Mobile ghi âm cho công việc."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

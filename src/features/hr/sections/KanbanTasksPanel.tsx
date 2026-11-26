@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -14,6 +15,9 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import {
   AlertTriangle,
   CalendarDays,
@@ -25,11 +29,22 @@ import {
   Clock3,
   Folder,
   FolderOpen,
+  LifeBuoy,
+  FileText,
+  Link2,
+  Mic,
+  Paperclip,
   Pencil,
   Plus,
   RefreshCw,
+  Sliders,
+  Square,
   Target,
   UserRound,
+  UserPlus,
+  UserCheck,
+  Video,
+  CheckCircle2,
   X,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
@@ -45,10 +60,12 @@ import {
   listKanbanProjects,
   listKanbanTasks,
   updateKanbanProject,
+  updateKanbanTaskActivity,
   updateKanbanTask,
   updateKanbanTaskStatus,
+  uploadKanbanTaskAttachment,
 } from '@/features/hr/hrApi';
-import type { HrEmployee, HrKanbanKpiReport, HrKanbanProject, HrKanbanTask } from '@/features/hr/types';
+import type { HrEmployee, HrKanbanAttachment, HrKanbanKpiReport, HrKanbanProject, HrKanbanTask } from '@/features/hr/types';
 import { formatCompactMoney, getTodayKey } from '@/features/overview/overviewPeriod';
 import { colors } from '@/theme/colors';
 
@@ -142,6 +159,13 @@ function calculateEstimatedTimeProgress(task: HrKanbanTask) {
   return { status: 'over' as const, text: `Vượt dự tính ${diff}h` };
 }
 
+function taskProgress(task: HrKanbanTask) {
+  if (task.status === 'Done' || task.status === 'done') return 100;
+  const explicit = Number(task.progress);
+  if (Number.isFinite(explicit)) return Math.min(100, Math.max(0, explicit));
+  return ['In Progress', 'doing', 'Review/Testing'].includes(task.status) ? 1 : 0;
+}
+
 function shiftMonth(period: string, delta: number): string {
   const [y, m] = period.split('-').map(Number);
   const d = new Date(y, (m || 1) - 1 + delta, 1);
@@ -200,10 +224,12 @@ export function KanbanTasksPanel({
   branchId?: string;
 }) {
   const { user } = useAuth();
+  const taskAudioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const permissions = user?.permissions ?? [];
   const hasPermission = (permission: string) => permissions.includes('*') || permissions.includes(permission);
   const canReadWork = hasPermission('work:read');
   const canManageTasks = hasPermission('work:manage');
+  const currentUid = user?._id || user?.id || '';
 
   const [projects, setProjects] = useState<HrKanbanProject[]>([]);
   const [tasks, setTasks] = useState<HrKanbanTask[]>([]);
@@ -239,7 +265,17 @@ export function KanbanTasksPanel({
   const [taskCategory, setTaskCategory] = useState<string>('Hướng dẫn nhân viên mới');
   const [taskSalesKpiTarget, setTaskSalesKpiTarget] = useState('');
   const [taskLinkNote, setTaskLinkNote] = useState('');
+  const [taskAttachments, setTaskAttachments] = useState<HrKanbanAttachment[]>([]);
+  const [taskAttachmentLinkDraft, setTaskAttachmentLinkDraft] = useState('');
+  const [uploadingTaskAttachment, setUploadingTaskAttachment] = useState(false);
+  const [recordingTaskAudio, setRecordingTaskAudio] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
+  const [activityTask, setActivityTask] = useState<HrKanbanTask | null>(null);
+  const [activityMode, setActivityMode] = useState<'progress' | 'help' | null>(null);
+  const [activityProgress, setActivityProgress] = useState(0);
+  const [activityNote, setActivityNote] = useState('');
+  const [activityHelperUid, setActivityHelperUid] = useState('');
+  const [savingActivity, setSavingActivity] = useState(false);
 
   // Project Modal (Create / Edit)
   const [projectModalOpen, setProjectModalOpen] = useState(false);
@@ -408,6 +444,143 @@ export function KanbanTasksPanel({
       });
   }, [filteredTasks, projects, search, statusFilter, tasks]);
 
+  const uploadTaskAssets = useCallback(async (assets: Array<{
+    uri: string;
+    name: string;
+    mimeType?: string;
+    size?: number;
+  }>) => {
+    if (taskAttachments.length + assets.length > 30) {
+      Alert.alert('Đã đủ tệp đính kèm', 'Mỗi công việc có thể đính kèm tối đa 30 tệp.');
+      return;
+    }
+    if (!assets.length) return;
+    setUploadingTaskAttachment(true);
+    try {
+      const results = await Promise.allSettled(assets.map((asset) => uploadKanbanTaskAttachment(asset)));
+      const uploaded = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+      if (uploaded.length) setTaskAttachments((current) => [...current, ...uploaded].slice(0, 30));
+      const failures = results.filter((result) => result.status === 'rejected');
+      if (failures.length) {
+        const firstError = failures[0].status === 'rejected' ? failures[0].reason : undefined;
+        Alert.alert(
+          'Không tải được một số tệp',
+          firstError instanceof Error ? firstError.message : `Đã tải ${uploaded.length}/${assets.length} tệp.`,
+        );
+      }
+    } finally {
+      setUploadingTaskAttachment(false);
+    }
+  }, [taskAttachments.length]);
+
+  const pickTaskAttachments = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      await uploadTaskAssets(result.assets.map((asset) => ({
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType,
+        size: asset.size,
+      })));
+    } catch (err) {
+      Alert.alert('Không mở được tệp', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+    }
+  }, [uploadTaskAssets]);
+
+  const recordTaskAudio = useCallback(async () => {
+    if (taskAttachments.length >= 30) {
+      Alert.alert('Đã đủ tệp đính kèm', 'Mỗi công việc có thể đính kèm tối đa 30 tệp.');
+      return;
+    }
+    try {
+      const permission = await AudioModule.requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Chưa có quyền micro', 'Hãy cho phép ERP Mobile dùng micro để ghi âm.');
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await taskAudioRecorder.prepareToRecordAsync();
+      taskAudioRecorder.record();
+      setRecordingTaskAudio(true);
+    } catch (err) {
+      Alert.alert('Không thể ghi âm', err instanceof Error ? err.message : 'Vui lòng kiểm tra quyền micro.');
+    }
+  }, [taskAttachments.length, taskAudioRecorder]);
+
+  const stopTaskAudioRecording = useCallback(async () => {
+    try {
+      await taskAudioRecorder.stop();
+      setRecordingTaskAudio(false);
+      const uri = taskAudioRecorder.uri;
+      if (!uri) throw new Error('Không tìm thấy tệp ghi âm vừa tạo.');
+      const extension = uri.split('?')[0].split('.').pop()?.toLowerCase();
+      const mimeType = extension === 'm4a' ? 'audio/mp4' : extension === 'caf' ? 'audio/x-caf' : 'audio/mpeg';
+      await uploadTaskAssets([{
+        uri,
+        name: `Ghi âm ${new Date().toLocaleString('vi-VN')}.${extension || 'm4a'}`,
+        mimeType,
+      }]);
+    } catch (err) {
+      Alert.alert('Không lưu được bản ghi âm', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+    } finally {
+      setRecordingTaskAudio(false);
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => undefined);
+    }
+  }, [taskAudioRecorder, uploadTaskAssets]);
+
+  const recordTaskVideo = useCallback(async () => {
+    if (taskAttachments.length >= 30) {
+      Alert.alert('Đã đủ tệp đính kèm', 'Mỗi công việc có thể đính kèm tối đa 30 tệp.');
+      return;
+    }
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['videos'],
+        videoMaxDuration: 60,
+        videoQuality: ImagePicker.UIImagePickerControllerQualityType.VGA640x480,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (!asset) return;
+      await uploadTaskAssets([{
+        uri: asset.uri,
+        name: asset.fileName || `Ghi hình ${new Date().toLocaleString('vi-VN')}.mp4`,
+        mimeType: asset.mimeType || 'video/mp4',
+        size: asset.fileSize,
+      }]);
+    } catch (err) {
+      Alert.alert('Không thể ghi hình', err instanceof Error ? err.message : 'Vui lòng kiểm tra quyền camera và micro.');
+    }
+  }, [taskAttachments.length, uploadTaskAssets]);
+
+  const addTaskAttachmentLink = useCallback(() => {
+    const raw = taskAttachmentLinkDraft.trim();
+    if (!raw) return;
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    try {
+      const parsed = new URL(normalized);
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('invalid protocol');
+      if (taskAttachments.length >= 30) {
+        Alert.alert('Đã đủ tệp đính kèm', 'Mỗi công việc có thể đính kèm tối đa 30 tệp.');
+        return;
+      }
+      setTaskAttachments((current) => [...current, {
+        id: `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+        name: `${parsed.host}${parsed.pathname}`,
+        url: parsed.toString(),
+        type: 'link',
+      }]);
+      setTaskAttachmentLinkDraft('');
+    } catch {
+      Alert.alert('Link không hợp lệ', 'Hãy nhập địa chỉ bắt đầu bằng http:// hoặc https://.');
+    }
+  }, [taskAttachmentLinkDraft, taskAttachments.length]);
+
   // --- Task Handlers ---
   const openCreateTask = useCallback(
     (presetProjectId = '') => {
@@ -425,6 +598,8 @@ export function KanbanTasksPanel({
       setTaskCategory('Hướng dẫn nhân viên mới');
       setTaskSalesKpiTarget('');
       setTaskLinkNote('');
+      setTaskAttachments([]);
+      setTaskAttachmentLinkDraft('');
       setTaskModalOpen(true);
     },
     [user?._id, user?.id],
@@ -443,6 +618,8 @@ export function KanbanTasksPanel({
     setTaskCategory(task.category || 'Hướng dẫn nhân viên mới');
     setTaskSalesKpiTarget(task.salesKpiTarget ? String(task.salesKpiTarget) : '');
     setTaskLinkNote(task.linkNote || '');
+    setTaskAttachments(task.attachments || []);
+    setTaskAttachmentLinkDraft('');
     setTaskModalOpen(true);
   }, []);
 
@@ -495,6 +672,7 @@ export function KanbanTasksPanel({
             category: taskCategory,
             salesKpiTarget: salesTarget,
             linkNote: taskLinkNote.trim(),
+            attachments: taskAttachments,
           },
           branchId,
         );
@@ -517,6 +695,7 @@ export function KanbanTasksPanel({
             category: taskCategory,
             salesKpiTarget: salesTarget,
             linkNote: taskLinkNote.trim(),
+            attachments: taskAttachments,
           },
           branchId,
         );
@@ -535,6 +714,7 @@ export function KanbanTasksPanel({
     employees,
     savingTask,
     taskAssigneeUid,
+    taskAttachments,
     taskCategory,
     taskDueDate,
     taskEstTime,
@@ -598,6 +778,69 @@ export function KanbanTasksPanel({
     },
     [branchId],
   );
+
+  const openTaskActivity = useCallback((task: HrKanbanTask, mode: 'progress' | 'help') => {
+    setActivityTask(task);
+    setActivityMode(mode);
+    setActivityProgress(taskProgress(task));
+    setActivityNote('');
+    setActivityHelperUid('');
+  }, []);
+
+  const saveTaskActivity = useCallback(async () => {
+    if (!activityTask || !activityMode || savingActivity) return;
+    const note = activityNote.trim();
+    if (!note) {
+      Alert.alert(activityMode === 'progress' ? 'Thiếu nội dung báo cáo' : 'Thiếu lý do trợ giúp', 'Vui lòng nhập nội dung trước khi lưu.');
+      return;
+    }
+    if (note.length > 2000) {
+      Alert.alert('Nội dung quá dài', 'Nội dung tối đa 2.000 ký tự.');
+      return;
+    }
+    const helper = activityMode === 'help' && activityHelperUid
+      ? employees.find((employee) => (employee.id || employee._id || employee.uid) === activityHelperUid)
+      : undefined;
+    setSavingActivity(true);
+    try {
+      const updated = await updateKanbanTaskActivity(
+        activityTask.id,
+        {
+          action: activityMode,
+          revision: activityTask.revision || 0,
+          ...(activityMode === 'progress' ? { progress: activityProgress } : {}),
+          note: activityMode === 'help' && helper ? `Nhờ ${helper.displayName} hỗ trợ: ${note}` : note,
+          ...(activityMode === 'help' && helper
+            ? { helper: { uid: helper.id || helper._id || helper.uid || '', name: helper.displayName } }
+            : {}),
+        },
+        branchId,
+      );
+      setTasks((current) => current.map((task) => task.id === updated.id ? updated : task));
+      setActivityTask(null);
+      setActivityMode(null);
+      setActivityNote('');
+    } catch (err) {
+      Alert.alert('Không cập nhật được công việc', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+      if ((err as { status?: number })?.status === 409) void loadData(true);
+    } finally {
+      setSavingActivity(false);
+    }
+  }, [activityHelperUid, activityMode, activityNote, activityProgress, activityTask, branchId, employees, loadData, savingActivity]);
+
+  const runTaskActivity = useCallback(async (task: HrKanbanTask, action: 'join' | 'resolve') => {
+    if (savingActivity) return;
+    setSavingActivity(true);
+    try {
+      const updated = await updateKanbanTaskActivity(task.id, { action, revision: task.revision || 0 }, branchId);
+      setTasks((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (err) {
+      Alert.alert('Không cập nhật được công việc', err instanceof Error ? err.message : 'Vui lòng thử lại.');
+      if ((err as { status?: number })?.status === 409) void loadData(true);
+    } finally {
+      setSavingActivity(false);
+    }
+  }, [branchId, loadData, savingActivity]);
 
   // --- Project Handlers ---
   const openCreateProject = useCallback(() => {
@@ -681,6 +924,14 @@ export function KanbanTasksPanel({
     const pr = getPriorityMeta(task.priority);
     const deadlineKpi = calculateTaskDeadlineKpi(task);
     const estProgress = calculateEstimatedTimeProgress(task);
+    const progress = taskProgress(task);
+    const closed = task.status === 'Archived';
+    const isActivityOwner = canManageTasks || task.assigneeUid === currentUid;
+    const canJoinHelp = task.helpRequested
+      && !closed
+      && (!task.requestedHelperUid || task.requestedHelperUid === currentUid)
+      && task.assigneeUid !== currentUid
+      && !task.helpers?.some((helper) => helper.uid === currentUid);
     return (
       <Pressable
         key={task.id}
@@ -723,6 +974,75 @@ export function KanbanTasksPanel({
             {pr.label}
           </Text>
         </View>
+        <View style={styles.taskProgressSummary}>
+          <View style={styles.progressLabelRow}>
+            <Text style={styles.taskProgressLabel}>Tiến độ</Text>
+            <Text style={styles.taskProgressPercent}>{progress}%</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+          </View>
+          {task.progressNote ? <Text numberOfLines={2} style={styles.progressNote}>💬 {task.progressNote}</Text> : null}
+        </View>
+        {task.helpRequested ? (
+          <View style={styles.helpNotice}>
+            <LifeBuoy size={13} color="#B42318" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.helpNoticeTitle}>Đang cần trợ giúp</Text>
+              {task.helpReason ? <Text style={styles.helpNoticeText}>{task.helpReason}</Text> : null}
+            </View>
+          </View>
+        ) : null}
+        {task.helpers?.length ? (
+          <View style={styles.helpersLine}>
+            <UserCheck size={12} color={colors.primary} />
+            <Text style={styles.taskMetaText}>Người hỗ trợ: {task.helpers.map((helper) => helper.name).join(', ')}</Text>
+          </View>
+        ) : null}
+        {((isActivityOwner && !closed) || canJoinHelp) ? (
+          <View style={styles.taskActivityActions}>
+            {isActivityOwner && !closed ? (
+              <>
+                <Pressable
+                  onPress={(event) => { event.stopPropagation(); openTaskActivity(task, 'progress'); }}
+                  style={styles.taskActivityBtn}
+                >
+                  <Sliders size={13} color={colors.primary} />
+                  <Text style={styles.taskActivityBtnText}>Báo cáo tiến độ</Text>
+                </Pressable>
+                {!task.helpRequested && progress < 100 ? (
+                  <Pressable
+                    onPress={(event) => { event.stopPropagation(); openTaskActivity(task, 'help'); }}
+                    style={styles.taskHelpBtn}
+                  >
+                    <LifeBuoy size={13} color="#B42318" />
+                    <Text style={styles.taskHelpBtnText}>Yêu cầu trợ giúp</Text>
+                  </Pressable>
+                ) : null}
+                {task.helpRequested ? (
+                  <Pressable
+                    onPress={(event) => { event.stopPropagation(); void runTaskActivity(task, 'resolve'); }}
+                    disabled={savingActivity}
+                    style={styles.taskResolveBtn}
+                  >
+                    <CheckCircle2 size={13} color="#16885A" />
+                    <Text style={styles.taskResolveBtnText}>Đã giải quyết</Text>
+                  </Pressable>
+                ) : null}
+              </>
+            ) : null}
+            {canJoinHelp ? (
+              <Pressable
+                onPress={(event) => { event.stopPropagation(); void runTaskActivity(task, 'join'); }}
+                disabled={savingActivity}
+                style={styles.taskJoinBtn}
+              >
+                <UserPlus size={13} color={colors.white} />
+                <Text style={styles.taskJoinBtnText}>Tham gia hỗ trợ</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         {deadlineKpi || estProgress || (task.salesKpiTarget && task.salesKpiTarget > 0) ? (
           <View style={styles.kpiTagRow}>
             {deadlineKpi ? (
@@ -1100,15 +1420,27 @@ export function KanbanTasksPanel({
         visible={taskModalOpen}
         transparent
         animationType="slide"
-        onRequestClose={() => setTaskModalOpen(false)}
+        onRequestClose={() => {
+          if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
+        }}
       >
-        <Pressable style={styles.backdrop} onPress={() => setTaskModalOpen(false)}>
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => {
+            if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
+          }}
+        >
           <Pressable style={styles.sheet} onPress={() => {}}>
             <View style={styles.modalHeader}>
               <Text style={styles.sheetTitle}>
                 {editingTask ? 'Chi tiết & sửa công việc' : 'Giao việc mới'}
               </Text>
-              <Pressable onPress={() => setTaskModalOpen(false)} hitSlop={8}>
+              <Pressable
+                onPress={() => {
+                  if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
+                }}
+                hitSlop={8}
+              >
                 <Text style={styles.closeText}>Đóng</Text>
               </Pressable>
             </View>
@@ -1277,10 +1609,90 @@ export function KanbanTasksPanel({
                   style={styles.field}
                 />
 
+                <Text style={styles.label}>Tệp đính kèm</Text>
+                {taskAttachments.map((attachment) => (
+                  <View key={attachment.id} style={styles.attachmentRow}>
+                    {attachment.type === 'audio' ? <Mic size={15} color="#7754C8" /> : null}
+                    {attachment.type === 'video' ? <Video size={15} color="#B42318" /> : null}
+                    {attachment.type === 'link' ? <Link2 size={15} color={colors.primary} /> : null}
+                    {attachment.type === 'file' || attachment.type === 'image' ? <FileText size={15} color={colors.primary} /> : null}
+                    <Pressable
+                      style={styles.attachmentNameButton}
+                      onPress={() => void Linking.openURL(attachment.url).catch(() => Alert.alert('Không mở được tệp', 'Hãy thử lại sau.'))}
+                    >
+                      <Text numberOfLines={1} style={styles.attachmentName}>{attachment.name}</Text>
+                      <Text style={styles.attachmentMeta}>
+                        {attachment.type.toUpperCase()}{attachment.size ? ` · ${(attachment.size / (1024 * 1024)).toFixed(1)} MB` : ''}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel={`Gỡ ${attachment.name}`}
+                      hitSlop={8}
+                      onPress={() => setTaskAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                      style={styles.attachmentRemove}
+                    >
+                      <X size={15} color="#B42318" />
+                    </Pressable>
+                  </View>
+                ))}
+                <View style={styles.attachmentActions}>
+                  <Pressable
+                    onPress={() => void pickTaskAttachments()}
+                    disabled={uploadingTaskAttachment || recordingTaskAudio}
+                    style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+                  >
+                    <Paperclip size={14} color={colors.primary} />
+                    <Text style={styles.attachmentActionText}>Chọn tệp</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => void (recordingTaskAudio ? stopTaskAudioRecording() : recordTaskAudio())}
+                    disabled={uploadingTaskAttachment}
+                    style={[styles.attachmentAction, recordingTaskAudio && styles.recordingAction, uploadingTaskAttachment && styles.disabled]}
+                  >
+                    {recordingTaskAudio ? <Square size={13} color="#B42318" /> : <Mic size={14} color={colors.primary} />}
+                    <Text style={[styles.attachmentActionText, recordingTaskAudio && styles.recordingActionText]}>
+                      {recordingTaskAudio ? 'Dừng ghi âm' : 'Ghi âm'}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => void recordTaskVideo()}
+                    disabled={uploadingTaskAttachment || recordingTaskAudio}
+                    style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+                  >
+                    <Video size={14} color={colors.primary} />
+                    <Text style={styles.attachmentActionText}>Ghi hình</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.attachmentLinkRow}>
+                  <TextInput
+                    value={taskAttachmentLinkDraft}
+                    onChangeText={setTaskAttachmentLinkDraft}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                    placeholder="Link tài liệu (https://...)"
+                    placeholderTextColor={colors.muted}
+                    style={[styles.field, styles.attachmentLinkInput]}
+                  />
+                  <Pressable
+                    onPress={addTaskAttachmentLink}
+                    disabled={uploadingTaskAttachment || recordingTaskAudio}
+                    style={[styles.addAttachmentLink, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+                  >
+                    <Link2 size={14} color={colors.white} />
+                    <Text style={styles.addAttachmentLinkText}>Thêm</Text>
+                  </Pressable>
+                </View>
+                {uploadingTaskAttachment ? (
+                  <View style={styles.attachmentUploading}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.attachmentMeta}>Đang tải tệp lên...</Text>
+                  </View>
+                ) : null}
+
                 <Pressable
-                  disabled={savingTask}
+                  disabled={savingTask || uploadingTaskAttachment || recordingTaskAudio}
                   onPress={() => void onSaveTask()}
-                  style={[styles.submitBtn, savingTask && styles.disabled]}
+                  style={[styles.submitBtn, (savingTask || uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
                 >
                   <Text style={styles.submitBtnText}>
                     {savingTask ? 'Đang lưu...' : editingTask ? 'Lưu thay đổi' : 'Tạo công việc'}
@@ -1295,6 +1707,134 @@ export function KanbanTasksPanel({
                     <Text style={styles.deleteBtnText}>Xóa công việc</Text>
                   </Pressable>
                 ) : null}
+              </View>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Báo cáo tiến độ / yêu cầu trợ giúp */}
+      <Modal
+        visible={activityMode !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
+      >
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
+        >
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.modalHeader}>
+              <View style={styles.activityModalHeading}>
+                {activityMode === 'progress' ? <Sliders size={18} color={colors.primary} /> : <LifeBuoy size={18} color="#B42318" />}
+                <Text style={styles.sheetTitle}>
+                  {activityMode === 'progress' ? 'Báo cáo tiến độ công việc' : 'Yêu cầu trợ giúp công việc'}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
+                hitSlop={8}
+              >
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            {activityTask ? <Text numberOfLines={2} style={styles.activityTaskTitle}>{activityTask.title}</Text> : null}
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
+              <View style={styles.form}>
+                {activityMode === 'progress' ? (
+                  <>
+                    <View style={styles.progressEditorSummary}>
+                      <Text style={styles.label}>Tiến độ hoàn thành</Text>
+                      <Text style={styles.progressEditorPercent}>{activityProgress}%</Text>
+                    </View>
+                    <TextInput
+                      value={String(activityProgress)}
+                      onChangeText={(value) => {
+                        const digits = value.replace(/[^0-9]/g, '').slice(0, 3);
+                        if (!digits) { setActivityProgress(0); return; }
+                        setActivityProgress(Math.min(100, Number(digits)));
+                      }}
+                      keyboardType="number-pad"
+                      maxLength={3}
+                      selectTextOnFocus
+                      accessibilityLabel="Tiến độ phần trăm"
+                      style={styles.progressPercentInput}
+                    />
+                    <View style={styles.wrapRow}>
+                      {[0, 25, 50, 75, 100].map((value) => (
+                        <Pressable
+                          key={value}
+                          onPress={() => setActivityProgress(value)}
+                          style={[styles.chip, activityProgress === value && styles.chipActive]}
+                        >
+                          <Text style={[styles.chipText, activityProgress === value && styles.chipTextActive]}>{value}%</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Text style={styles.label}>Nội dung báo cáo *</Text>
+                    <TextInput
+                      value={activityNote}
+                      onChangeText={setActivityNote}
+                      multiline
+                      maxLength={2000}
+                      placeholder="Mô tả kết quả đã hoàn thành hoặc vướng mắc..."
+                      placeholderTextColor={colors.muted}
+                      style={[styles.field, styles.activityNoteField]}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.label}>Chọn người hỗ trợ</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+                      <Pressable
+                        onPress={() => setActivityHelperUid('')}
+                        style={[styles.chip, !activityHelperUid && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, !activityHelperUid && styles.chipTextActive]}>Cả nhóm</Text>
+                      </Pressable>
+                      {employees
+                        .filter((employee) => {
+                          const uid = employee.id || employee._id || employee.uid || '';
+                          return uid && uid !== currentUid && uid !== activityTask?.assigneeUid;
+                        })
+                        .map((employee) => {
+                          const uid = employee.id || employee._id || employee.uid || '';
+                          const selected = activityHelperUid === uid;
+                          return (
+                            <Pressable
+                              key={uid}
+                              onPress={() => setActivityHelperUid(uid)}
+                              style={[styles.chip, selected && styles.chipActive]}
+                            >
+                              <Text style={[styles.chipText, selected && styles.chipTextActive]}>{employee.displayName}</Text>
+                            </Pressable>
+                          );
+                        })}
+                    </ScrollView>
+                    <Text style={styles.helpHint}>Để cả nhóm nhận thông báo hoặc chọn một người hỗ trợ cụ thể.</Text>
+                    <Text style={styles.label}>Nguyên nhân cần trợ giúp *</Text>
+                    <TextInput
+                      value={activityNote}
+                      onChangeText={setActivityNote}
+                      multiline
+                      maxLength={2000}
+                      placeholder="Mô tả vướng mắc hoặc hỗ trợ bạn cần..."
+                      placeholderTextColor={colors.muted}
+                      style={[styles.field, styles.activityNoteField]}
+                    />
+                  </>
+                )}
+                <Text style={styles.activityCharCount}>{activityNote.length}/2000 ký tự</Text>
+                <Pressable
+                  onPress={() => void saveTaskActivity()}
+                  disabled={savingActivity || !activityNote.trim()}
+                  style={[styles.submitBtn, (savingActivity || !activityNote.trim()) && styles.disabled]}
+                >
+                  <Text style={styles.submitBtnText}>
+                    {savingActivity ? 'Đang lưu...' : activityMode === 'progress' ? 'Lưu báo cáo tiến độ' : 'Gửi yêu cầu trợ giúp'}
+                  </Text>
+                </Pressable>
               </View>
             </ScrollView>
           </Pressable>
@@ -1516,6 +2056,24 @@ const styles = StyleSheet.create({
   taskMetaGroup: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
   taskMetaText: { color: colors.muted, fontSize: 10, flex: 1 },
   priorityTag: { fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, overflow: 'hidden' },
+  taskProgressSummary: { gap: 2, marginTop: 1 },
+  progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  taskProgressLabel: { color: colors.muted, fontSize: 9, fontWeight: '700' },
+  taskProgressPercent: { color: colors.primary, fontSize: 10, fontWeight: '800' },
+  progressNote: { color: colors.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
+  helpNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, padding: 9, borderRadius: 10, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FFF1F0' },
+  helpNoticeTitle: { color: '#B42318', fontSize: 10, fontWeight: '800' },
+  helpNoticeText: { color: '#7F1D1D', fontSize: 10, lineHeight: 14, marginTop: 2 },
+  helpersLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  taskActivityActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  taskActivityBtn: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 9, backgroundColor: '#EAF2FF' },
+  taskActivityBtnText: { color: colors.primary, fontSize: 9, fontWeight: '800' },
+  taskHelpBtn: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 9, backgroundColor: '#FFF1F0' },
+  taskHelpBtnText: { color: '#B42318', fontSize: 9, fontWeight: '800' },
+  taskResolveBtn: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 9, backgroundColor: '#E9F8F1' },
+  taskResolveBtnText: { color: '#16885A', fontSize: 9, fontWeight: '800' },
+  taskJoinBtn: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 9, backgroundColor: '#B42318' },
+  taskJoinBtnText: { color: colors.white, fontSize: 9, fontWeight: '800' },
   kpiTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 },
   kpiTagBox: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
   kpiTag: { fontSize: 9, fontWeight: '800' },
@@ -1546,11 +2104,34 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
   sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, maxHeight: '86%' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  activityModalHeading: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  activityTaskTitle: { color: colors.muted, fontSize: 11, marginBottom: 6 },
+  progressEditorSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  progressEditorPercent: { color: colors.primary, fontSize: 22, fontWeight: '800' },
+  progressPercentInput: { minHeight: 44, borderWidth: 1, borderColor: colors.border, borderRadius: 11, backgroundColor: colors.background, textAlign: 'center', color: colors.ink, fontSize: 18, fontWeight: '800', paddingVertical: 6 },
+  activityNoteField: { minHeight: 92, textAlignVertical: 'top' },
+  activityCharCount: { color: colors.muted, textAlign: 'right', fontSize: 9 },
+  helpHint: { color: colors.muted, fontSize: 10, lineHeight: 14 },
   sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', flex: 1 },
   closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   form: { gap: 8, paddingBottom: 10 },
   label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
+  attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: '#FAFBFD' },
+  attachmentNameButton: { flex: 1, minWidth: 0 },
+  attachmentName: { color: colors.ink, fontSize: 11, fontWeight: '700' },
+  attachmentMeta: { color: colors.muted, fontSize: 9, marginTop: 2 },
+  attachmentRemove: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF1F0' },
+  attachmentActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  attachmentAction: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white },
+  attachmentActionText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  recordingAction: { backgroundColor: '#FFF1F0', borderColor: '#FECACA' },
+  recordingActionText: { color: '#B42318' },
+  attachmentLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  attachmentLinkInput: { flex: 1 },
+  addAttachmentLink: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, borderRadius: 9, backgroundColor: colors.primary },
+  addAttachmentLinkText: { color: colors.white, fontSize: 10, fontWeight: '700' },
+  attachmentUploading: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8 },
   dateTimeField: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 11, paddingVertical: 8 },
   dateTimeInputRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   dateTimeClear: { width: 30, height: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
