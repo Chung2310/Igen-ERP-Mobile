@@ -137,6 +137,7 @@ export function HrRecruitmentPanel({
   const [jDesc, setJDesc] = useState('');
   const [jReq, setJReq] = useState('');
   const [jBenefits, setJBenefits] = useState('');
+  const [jApplicationDeadline, setJApplicationDeadline] = useState('');
 
   // Applicant detail & create/edit
   const [selectedApp, setSelectedApp] = useState<HrRecruitmentApplicant | null>(null);
@@ -223,9 +224,10 @@ export function HrRecruitmentPanel({
     ].filter(Boolean))];
   }, [aDepartment, departments, jobs]);
   const applicantJobs = useMemo(() => {
-    if (!aDepartment) return jobs;
+    const openJobs = jobs.filter((job) => job.status === 'open');
+    if (!aDepartment) return openJobs;
     const selectedDepartment = aDepartment.trim().toLowerCase();
-    return jobs.filter((job) => (job.department || 'Chung').trim().toLowerCase() === selectedDepartment);
+    return openJobs.filter((job) => (job.department || 'Chung').trim().toLowerCase() === selectedDepartment);
   }, [aDepartment, jobs]);
   const appMap = useMemo(() => new Map(applicants.map((a) => [a.id, a])), [applicants]);
   const stages = useMemo(
@@ -277,6 +279,7 @@ export function HrRecruitmentPanel({
     setJDesc(job?.description || '');
     setJReq(job?.requirements || '');
     setJBenefits(job?.benefits || '');
+    setJApplicationDeadline(job?.applicationDeadline?.slice(0, 10) || '');
   }, []);
 
   const onSaveJob = useCallback(async () => {
@@ -296,6 +299,7 @@ export function HrRecruitmentPanel({
         description: jDesc.trim(),
         requirements: jReq.trim(),
         benefits: jBenefits.trim(),
+        applicationDeadline: jApplicationDeadline.trim() || null,
       };
       if (jobModalMode === 'edit' && selectedJob) {
         const updated = await updateRecruitmentJob(
@@ -316,10 +320,26 @@ export function HrRecruitmentPanel({
     } finally {
       setSaving(false);
     }
-  }, [branchId, jBenefits, jDept, jDesc, jHeadcount, jLocation, jReq, jTitle, jWorkplace, jobModalMode, saving, selectedJob]);
+  }, [branchId, jApplicationDeadline, jBenefits, jDept, jDesc, jHeadcount, jLocation, jReq, jTitle, jWorkplace, jobModalMode, saving, selectedJob]);
 
   const onChangeJobStatus = useCallback(
     async (job: HrRecruitmentJob, status: HrRecruitmentJobStatus) => {
+      if (status === 'open') {
+        const missing = [
+          !job.title?.trim() && 'Tên vị trí',
+          !job.description?.trim() && 'Mô tả công việc',
+          !job.requirements?.trim() && 'Yêu cầu ứng viên',
+          (!Number.isFinite(Number(job.headcount)) || Number(job.headcount) <= 0) && 'Số lượng tuyển',
+          !job.workplaceType && 'Hình thức làm việc',
+          !job.location?.trim() && 'Địa điểm',
+        ].filter((item): item is string => Boolean(item));
+        const deadline = job.applicationDeadline ? new Date(job.applicationDeadline) : null;
+        if (!deadline || Number.isNaN(deadline.valueOf()) || deadline <= new Date()) missing.push('Hạn ứng tuyển sau hôm nay');
+        if (missing.length) {
+          Alert.alert('Chưa đủ điều kiện mở tin', `Bổ sung: ${missing.join(', ')}.`);
+          return;
+        }
+      }
       try {
         const updated = await changeRecruitmentJobStatus(job.id, job.version ?? 1, status, branchId);
         setJobs((prev) => prev.map((j) => (j.id === updated.id ? updated : j)));
@@ -362,7 +382,7 @@ export function HrRecruitmentPanel({
 
   const openApplicantEditor = useCallback(
     (app?: HrRecruitmentApplicant) => {
-      const initialJob = jobs.find((job) => job.id === app?.jobId) || jobs[0];
+      const initialJob = jobs.find((job) => job.id === app?.jobId) || jobs.find((job) => job.status === 'open');
       setEditingApp(app || null);
       setAJobId(app?.jobId || initialJob?.id || '');
       setADepartment(initialJob?.department || 'Chung');
@@ -388,7 +408,7 @@ export function HrRecruitmentPanel({
   const selectApplicantDepartment = (department: string) => {
     setADepartment(department);
     const matchingJob = jobs.find(
-      (job) => (job.department || 'Chung').trim().toLowerCase() === department.trim().toLowerCase(),
+      (job) => job.status === 'open' && (job.department || 'Chung').trim().toLowerCase() === department.trim().toLowerCase(),
     );
     setAJobId(matchingJob?.id || '');
     setAppDepartmentOpen(false);
@@ -396,7 +416,8 @@ export function HrRecruitmentPanel({
   };
 
   const onSaveApplicant = useCallback(async () => {
-    if ((!editingApp && !aJobId) || !aName.trim() || saving) {
+    const selectedJobIsOpen = jobs.some((job) => job.id === aJobId && job.status === 'open');
+    if ((!editingApp && !selectedJobIsOpen) || !aName.trim() || saving) {
       Alert.alert('Thiếu thông tin', 'Hãy chọn Vị trí tuyển dụng và nhập Họ tên ứng viên.');
       return;
     }
@@ -466,6 +487,7 @@ export function HrRecruitmentPanel({
     aSource,
     branchId,
     editingApp,
+    jobs,
     saving,
     selectedApp?.id,
   ]);
@@ -1140,13 +1162,13 @@ export function HrRecruitmentPanel({
                             </Pressable>
                           ))}
                           {!applicantJobs.length ? (
-                            <Text style={styles.departmentEmptyText}>Chưa có vị trí tuyển dụng</Text>
+                            <Text style={styles.departmentEmptyText}>Chưa có tin đang tuyển. Hãy mở tin tuyển dụng trước.</Text>
                           ) : null}
                         </ScrollView>
                       </View>
                     ) : null}
                     {!applicantJobs.length ? (
-                      <Text style={styles.muted}>Phòng ban này chưa có vị trí tuyển dụng.</Text>
+                      <Text style={styles.muted}>Phòng ban này chưa có tin đang tuyển. Hãy mở tin tuyển dụng trước.</Text>
                     ) : null}
                   </>
                 ) : null}
@@ -1367,6 +1389,19 @@ export function HrRecruitmentPanel({
                   >
                     {JOB_STATUS_LABELS[job.status || 'open'] || job.status}
                   </Text>
+                  {canManage ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Sửa tin tuyển dụng ${job.title}`}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        openJobEditor(job);
+                      }}
+                      style={styles.jobEditIconBtn}
+                    >
+                      <Pencil size={14} color={colors.primary} />
+                    </Pressable>
+                  ) : null}
                 </View>
                 <Text style={styles.subMeta}>
                   {job.department || 'Chung'} · {job.location || 'Văn phòng'}
@@ -1510,6 +1545,11 @@ export function HrRecruitmentPanel({
                     <Text style={styles.subMeta}>
                       {selectedJob.department} · {selectedJob.location} · SL: {selectedJob.headcount ?? 1}
                     </Text>
+                    <Text style={styles.subMeta}>
+                      Hạn ứng tuyển: {selectedJob.applicationDeadline
+                        ? new Date(selectedJob.applicationDeadline).toLocaleDateString('vi-VN')
+                        : 'Chưa thiết lập'}
+                    </Text>
                     {selectedJob.description ? (
                       <>
                         <Text style={styles.label}>Mô tả công việc</Text>
@@ -1651,6 +1691,14 @@ export function HrRecruitmentPanel({
                 </View>
                 <Text style={styles.label}>Địa điểm làm việc</Text>
                 <TextInput value={jLocation} onChangeText={setJLocation} placeholder="Hà Nội / TP.HCM" style={styles.field} />
+                <DateTimeField
+                  label="Hạn ứng tuyển"
+                  mode="date"
+                  value={jApplicationDeadline}
+                  onChange={setJApplicationDeadline}
+                  allowClear
+                  placeholder="Chọn hạn nhận hồ sơ"
+                />
                 <Text style={styles.label}>Hình thức làm việc</Text>
                 <View style={styles.wrapRow}>
                   {(['onsite', 'hybrid', 'remote'] as const).map((wp) => (
@@ -1808,6 +1856,7 @@ const styles = StyleSheet.create({
   linkChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5, alignSelf: 'flex-start' },
   linkText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  jobEditIconBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#EAF2FF' },
   smallGreenBtn: { backgroundColor: '#E9F8F1', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   smallGreenText: { color: '#16885A', fontSize: 11, fontWeight: '700' },
   smallRedBtn: { backgroundColor: '#FEE2E2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
