@@ -196,7 +196,6 @@ export function StudentDataTransfer({ students, batches, scope, onImported, filt
   return <>
     <View style={styles.actionsRow}>
       <Pressable onPress={() => void exportStudents(students, `danh_sach_hoc_vien_${new Date().toISOString().slice(0, 10)}.xlsx`)} style={[styles.button, styles.rowButton]}><Download size={12} color={colors.primary} /><Text numberOfLines={1} style={styles.buttonText}>Xuất Excel</Text></Pressable>
-      <Pressable onPress={() => void exportStudents([], 'mau_import_hoc_vien.xlsx')} style={[styles.button, styles.rowButton]}><Download size={12} color={colors.primary} /><Text numberOfLines={1} style={styles.buttonText}>Tải mẫu</Text></Pressable>
       <Pressable disabled={busy} onPress={() => void chooseImport()} style={[styles.button, styles.rowButton]}><Upload size={12} color={colors.primary} />{busy ? <ActivityIndicator size="small" color={colors.primary} /> : <Text numberOfLines={1} style={styles.buttonText}>Nhập CSV/XLSX</Text>}</Pressable>
       {onFilterPress ? <Pressable onPress={onFilterPress} style={[styles.button, styles.rowButton, hasActiveFilter && styles.filterButtonActive]}><SlidersHorizontal size={12} color={colors.primary} /><Text numberOfLines={1} style={styles.buttonText}>{filterLabel || 'Bộ lọc'}</Text><ChevronDown size={11} color={colors.primary} /></Pressable> : null}
     </View>

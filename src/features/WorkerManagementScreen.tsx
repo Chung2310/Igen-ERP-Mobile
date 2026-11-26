@@ -30,6 +30,19 @@ const tabs: Array<{ key: Tab; label: string; Icon: typeof BriefcaseBusiness }> =
   { key: 'contracts', label: 'Hợp đồng', Icon: FileSignature }, { key: 'notifications', label: 'Thông báo', Icon: Bell },
 ];
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+function shiftDateKey(value: string, days: number) {
+  const date = new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return today();
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+function addCalendarYear(value: string) {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (![year, month, day].every(Number.isFinite)) return today();
+  const targetYear = year + 1;
+  const lastDay = new Date(Date.UTC(targetYear, month, 0)).getUTCDate();
+  return `${targetYear}-${String(month).padStart(2, '0')}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+}
 const workerStatusLabel = (value: string) => ({ active: 'Đang tuyển', inactive: 'Ngừng xử lý', placed: 'Đã trúng tuyển' } as Record<string, string>)[value] || value;
 const laborTypeLabel = (value?: string) => ({ official: 'Chính thức', seasonal: 'Thời vụ', foreign: 'Người nước ngoài' } as Record<string, string>)[value || ''] || 'Chưa phân loại';
 const contractStatusLabel = (value: LaborContractStatus) => ({ draft: 'Nháp', active: 'Đang hiệu lực', renewed: 'Đã gia hạn', expired: 'Hết hạn', terminated: 'Đã chấm dứt' } as const)[value];
@@ -441,9 +454,14 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
 
   function openContractCreate() { setEditingContract(null); setContractForm(blankContract()); setContractModal('create'); }
   function openContractEdit(contract: LaborContract) { setEditingContract(contract); setContractForm({ workerId: contract.workerId, code: contract.code, clientName: contract.clientName, startDate: contract.startDate.slice(0, 10), endDate: contract.endDate.slice(0, 10), status: contract.status, note: contract.note || '' }); setContractModal('edit'); }
-  function openContractRenew(contract: LaborContract) { setEditingContract(contract); setContractForm({ workerId: contract.workerId, code: '', clientName: contract.clientName, startDate: contract.endDate.slice(0, 10), endDate: contract.endDate.slice(0, 10), status: 'draft', note: '' }); setContractModal('renew'); }
+  function openContractRenew(contract: LaborContract) { const startDate = shiftDateKey(contract.endDate, 1); setEditingContract(contract); setContractForm({ workerId: contract.workerId, code: '', clientName: contract.clientName, startDate, endDate: addCalendarYear(startDate), status: 'draft', note: '' }); setContractModal('renew'); }
   async function saveContractForm() {
     if (!scope || !contractForm.workerId || !contractForm.code.trim() || !contractForm.clientName.trim() || contractForm.startDate > contractForm.endDate) { setError('Kiểm tra lao động, mã hợp đồng, đơn vị sử dụng và thời hạn hợp đồng.'); return; }
+    if (contractModal === 'renew' && editingContract) {
+      const currentEndDate = editingContract.endDate.slice(0, 10);
+      if (contractForm.startDate <= currentEndDate || contractForm.endDate <= currentEndDate) { setError('Kỳ gia hạn phải bắt đầu và kết thúc sau ngày kết thúc hợp đồng hiện tại.'); return; }
+    }
+    setError('');
     setBusy(true);
     try { if (contractModal === 'renew' && editingContract) await renewLaborContract(scope, editingContract._id, contractForm); else await saveLaborContract(scope, contractForm, contractModal === 'edit' ? editingContract?._id : undefined); setContractModal(null); await loadContracts(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Không lưu được hợp đồng.'); }
