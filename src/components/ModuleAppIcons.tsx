@@ -21,6 +21,11 @@ const MODULE_PALETTES: Record<string, IconPalette> = {
   resources: { from: '#FFD22A', to: '#F4A307', accent: '#F7B010' },
   quotes: { from: '#22CA7E', to: '#0DA361', accent: '#14B06B' },
   inventory: { from: '#3E7EFF', to: '#1E54E8', accent: '#2860EE' },
+  'retail-sales': { from: '#FF9E2C', to: '#EB6209', accent: '#F27814' },
+  'repair-warranty': { from: '#5B6CFF', to: '#3844E6', accent: '#4854F0' },
+  'student-partners': { from: '#38B6FF', to: '#0E7AE6', accent: '#1E92F0' },
+  'labor-partners': { from: '#34D399', to: '#059669', accent: '#10B981' },
+  'retail-partners': { from: '#F45CA8', to: '#D12677', accent: '#E0398B' },
 };
 
 const DEFAULT_PALETTE: IconPalette = {
@@ -160,6 +165,105 @@ function renderGlyph(slug: string, accent: string) {
             fill="#FFFFFF"
           />
           <Rect x="23.6" y="31.4" width="8.8" height="9.6" rx="2.2" fill="#FFFFFF" fillOpacity={0.62} />
+        </>
+      );
+
+    case 'retail-sales':
+      return (
+        <>
+          <Path
+            d="M21 21.5V19C21 15.1 24.1 12 28 12C31.9 12 35 15.1 35 19V21.5"
+            stroke="#FFFFFF"
+            strokeOpacity={0.82}
+            strokeWidth="3.2"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <Path
+            d="M14.5 21.5C14.5 20.1 15.6 19 17 19H39C40.4 19 41.5 20.1 41.5 21.5L40.1 38.2C39.9 40.9 37.6 43 34.9 43H21.1C18.4 43 16.1 40.9 15.9 38.2L14.5 21.5Z"
+            fill="#FFFFFF"
+          />
+          <Circle cx="22.8" cy="25.8" r="2.2" fill={accent} />
+          <Circle cx="33.2" cy="25.8" r="2.2" fill={accent} />
+          <Path
+            d="M23 32.5C24.3 34.8 26 35.8 28 35.8C30 35.8 31.7 34.8 33 32.5"
+            stroke={accent}
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            fill="none"
+          />
+        </>
+      );
+
+    case 'repair-warranty':
+      return (
+        <>
+          <Path
+            d="M28 12.2L40.2 17.2C41.3 17.6 42 18.7 42 19.9V28.4C42 35.4 36.2 40.8 28 43.8C19.8 40.8 14 35.4 14 28.4V19.9C14 18.7 14.7 17.6 15.8 17.2L28 12.2Z"
+            fill="#FFFFFF"
+          />
+          <Path
+            d="M22.2 28.4L26.2 32.4L34.4 23.8"
+            stroke={accent}
+            strokeWidth="3.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </>
+      );
+
+    case 'student-partners':
+      return (
+        <>
+          <Circle cx="36.2" cy="21.5" r="4.2" fill="#FFFFFF" fillOpacity={0.74} />
+          <Path
+            d="M32.2 37.2C32.6 32.4 35.5 29.2 39.4 29.2C42.3 29.2 44.5 31.2 45.2 34.4C45.5 35.9 44.4 37.2 42.9 37.2H32.2Z"
+            fill="#FFFFFF"
+            fillOpacity={0.74}
+          />
+          <Circle cx="23.2" cy="22.8" r="5.3" fill="#FFFFFF" />
+          <Path
+            d="M12.2 39.2C12.2 33.5 16.9 29.8 23.2 29.8C29.5 29.8 34.2 33.5 34.2 39.2C34.2 40.5 33.2 41.5 31.9 41.5H14.5C13.2 41.5 12.2 40.5 12.2 39.2Z"
+            fill="#FFFFFF"
+          />
+          <Path d="M23.2 13L15.4 16.6L23.2 20.2L31 16.6L23.2 13Z" fill="#FFFFFF" fillOpacity={0.92} />
+        </>
+      );
+
+    case 'labor-partners':
+      return (
+        <>
+          <Path
+            d="M22 18.8V16.8C22 15.1 23.4 13.8 25 13.8H31C32.6 13.8 34 15.1 34 16.8V18.8"
+            stroke="#FFFFFF"
+            strokeOpacity={0.82}
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <Rect x="13" y="18.8" width="30" height="22.4" rx="5.5" fill="#FFFFFF" />
+          <Path
+            d="M13 27.6H43"
+            stroke={accent}
+            strokeOpacity={0.3}
+            strokeWidth="2.2"
+          />
+          <Rect x="24.2" y="25.2" width="7.6" height="5.2" rx="2.2" fill={accent} />
+        </>
+      );
+
+    case 'retail-partners':
+      return (
+        <>
+          <Path
+            d="M14.2 20.8C14.2 17.3 17 14.5 20.5 14.5H35.5C39 14.5 41.8 17.3 41.8 20.8V23.8H14.2V20.8Z"
+            fill="#FFFFFF"
+            fillOpacity={0.78}
+          />
+          <Rect x="14.2" y="22.8" width="27.6" height="18.8" rx="4.5" fill="#FFFFFF" />
+          <Rect x="19" y="27.8" width="6.2" height="5.8" rx="1.6" fill={accent} fillOpacity={0.78} />
+          <Rect x="29.4" y="27.8" width="7.2" height="13.8" rx="2" fill={accent} />
         </>
       );
 
