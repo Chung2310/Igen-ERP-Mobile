@@ -1,5 +1,5 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
-import { BrandLoader } from '@/components/BrandLoader';
+import { BrandLoader, CenteredPageLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -447,7 +447,7 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
         {!scopeReady && <PopupError error="Chưa xác định được doanh nghiệp hoặc chi nhánh làm việc trong ERP." title="Chưa có phạm vi làm việc" />}
         {!!error && <PopupError error={error} title="Không tải được báo giá" onRetry={refresh} />}
 
-        {loading ? <BrandLoader size={42} style={styles.loading} /> : quotes.map((quote) => <QuoteRow key={quote._id} quote={quote} onPress={() => setSelectedId(quote._id)} />)}
+        {loading ? <CenteredPageLoader /> : quotes.map((quote) => <QuoteRow key={quote._id} quote={quote} onPress={() => setSelectedId(quote._id)} />)}
         {scopeReady && !loading && !error && quotes.length === 0 && <Card style={styles.emptyCard}><FileText size={24} color={colors.muted} /><Text style={styles.emptyTitle}>Chưa có báo giá</Text><Text style={styles.emptyCopy}>{search || status ? 'Thử đổi bộ lọc hoặc từ khóa tìm kiếm.' : 'Báo giá được tạo trên ERP sẽ xuất hiện tại đây.'}</Text>{canCreate && <Pressable style={styles.emptyButton} onPress={() => setCreating(true)}><Plus size={15} color={colors.primary} /><Text style={styles.emptyButtonText}>Tạo báo giá</Text></Pressable>}</Card>}
 
         {totalPages > 1 && <View style={styles.pagination}><Pressable disabled={page <= 1} onPress={() => setPage((value) => Math.max(1, value - 1))} style={[styles.pageButton, page <= 1 && styles.disabledButton]}><ChevronLeft size={17} color={page <= 1 ? '#B7C0CF' : colors.ink} /><Text style={styles.pageButtonText}>Trước</Text></Pressable><Text style={styles.pageLabel}>Trang {page} / {totalPages}</Text><Pressable disabled={page >= totalPages} onPress={() => setPage((value) => Math.min(totalPages, value + 1))} style={[styles.pageButton, page >= totalPages && styles.disabledButton]}><Text style={styles.pageButtonText}>Sau</Text><ChevronRight size={17} color={page >= totalPages ? '#B7C0CF' : colors.ink} /></Pressable></View>}

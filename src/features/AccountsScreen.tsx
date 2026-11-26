@@ -1,4 +1,4 @@
-import { BrandLoader } from '@/components/BrandLoader';
+import { CenteredPageLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
@@ -276,7 +276,7 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
           </Pressable>)}
         </ScrollView>}
 
-        {loading ? <View style={styles.state}><BrandLoader size={42} label="Đang tải tài khoản từ IGen-ERP…" /></View> : error ? <PopupError error={error} onRetry={() => void loadAccounts()} /> : visibleAccounts.length === 0 ? (
+        {loading ? <CenteredPageLoader /> : error ? <PopupError error={error} onRetry={() => void loadAccounts()} /> : visibleAccounts.length === 0 ? (
           <View style={styles.state}><UserRound size={26} color={colors.muted} /><Text style={styles.emptyTitle}>{accounts.length ? 'Không tìm thấy tài khoản phù hợp' : 'Chưa có tài khoản'}</Text><Text style={styles.stateText}>{accounts.length ? 'Thử từ khóa hoặc bộ lọc vai trò khác.' : 'Thêm thành viên đầu tiên vào doanh nghiệp.'}</Text></View>
         ) : (
           <View style={styles.list}>

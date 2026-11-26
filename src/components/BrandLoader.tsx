@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -8,6 +8,14 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Svg, { Circle, Defs, G, LinearGradient, Path, Stop } from 'react-native-svg';
+
+let globalOverlayCount = 0;
+const overlayListeners = new Set<(count: number) => void>();
+
+function updateGlobalOverlay(delta: number) {
+  globalOverlayCount = Math.max(0, globalOverlayCount + delta);
+  overlayListeners.forEach((listener) => listener(globalOverlayCount));
+}
 
 type BrandLoaderProps = {
   size?: number;
@@ -169,12 +177,42 @@ export function BrandLoader({ size = 46, style }: BrandLoaderProps) {
   );
 }
 
+/**
+ * Mounts into the root-level BrandLoadingHost so every screen shows the spinner
+ * at the exact same dead-center (50%, 50%) viewport coordinate.
+ */
 export function BrandLoadingOverlay({ visible }: BrandLoadingOverlayProps) {
-  if (!visible) return null;
+  useEffect(() => {
+    if (!visible) return;
+    updateGlobalOverlay(1);
+    return () => updateGlobalOverlay(-1);
+  }, [visible]);
+
+  return null;
+}
+
+/** Drop-in page-level loader that always renders dead-center of the device screen. */
+export function CenteredPageLoader() {
+  return <BrandLoadingOverlay visible />;
+}
+
+/** Single root host rendered in src/app/_layout.tsx to guarantee pixel-identical centering. */
+export function BrandLoadingHost() {
+  const [count, setCount] = useState(globalOverlayCount);
+
+  useEffect(() => {
+    setCount(globalOverlayCount);
+    overlayListeners.add(setCount);
+    return () => {
+      overlayListeners.delete(setCount);
+    };
+  }, []);
+
+  if (count <= 0) return null;
 
   return (
-    <View style={styles.overlay} pointerEvents="auto">
-      <BrandLoader size={54} />
+    <View style={styles.overlay} pointerEvents="none">
+      <BrandLoader size={52} />
     </View>
   );
 }
@@ -195,7 +233,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(255, 255, 255, 0.48)',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 99,

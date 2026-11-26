@@ -1,5 +1,5 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
-import { BrandLoader } from '@/components/BrandLoader';
+import { CenteredPageLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -415,7 +415,7 @@ export function ResourcesScreen() {
             }}
             onMore={() => { setActionItem(item); setDetailItem(null); }}
           />)}
-          {loading && <BrandLoader size={42} style={styles.loading} />}
+          {loading && <CenteredPageLoader />}
           {!loading && !error && visibleItems.length === 0 && <Text style={styles.empty}>
             {query ? 'Không tìm thấy tài nguyên phù hợp.' : localView === 'trash' ? 'Thùng rác đang trống.' : localView === 'shared' ? 'Chưa có tài nguyên nào được chia sẻ với bạn.' : 'Thư mục này chưa có tài nguyên.'}
           </Text>}

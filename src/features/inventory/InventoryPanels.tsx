@@ -1,4 +1,4 @@
-import { BrandLoader } from '@/components/BrandLoader';
+import { CenteredPageLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -71,7 +71,7 @@ function StatusPill({ value, tone }: { value: string; tone?: 'green' | 'yellow' 
   const bg = tone === 'green' ? '#E8F7F0' : tone === 'yellow' ? '#FFF4D8' : tone === 'red' ? '#FDEDEC' : '#EEF4FF';
   return <View style={[styles.statusPill, { backgroundColor: bg }]}><Text style={[styles.statusPillText, { color }]}>{value}</Text></View>;
 }
-function LoadingState() { return <View style={styles.loadingState}><BrandLoader size={42} /></View>; }
+function LoadingState() { return <CenteredPageLoader />; }
 function EmptyState({ title, copy }: { title: string; copy?: string }) { return <Card style={styles.emptyCard}><Package size={22} color={colors.muted} /><Text style={styles.emptyTitle}>{title}</Text>{copy ? <Text style={styles.emptyCopy}>{copy}</Text> : null}</Card>; }
 function Sheet({ visible, title, subtitle, onClose, children }: { visible: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>

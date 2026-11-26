@@ -1,4 +1,4 @@
-import { BrandLoader } from '@/components/BrandLoader';
+import { CenteredPageLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -440,7 +440,7 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
       {/* Conversation Area */}
       {loadingConversation ? (
         <View style={styles.centered}>
-          <BrandLoader size={42} label="Đang tải cuộc trò chuyện..." />
+          <CenteredPageLoader />
         </View>
       ) : messages.length === 0 ? (
         <ScrollView

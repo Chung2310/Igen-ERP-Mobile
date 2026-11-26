@@ -6,7 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppSplashScreen } from '@/components/AppSplashScreen';
-import { BrandLoader } from '@/components/BrandLoader';
+import { BrandLoader, BrandLoadingHost } from '@/components/BrandLoader';
 import { AuthProvider, useAuth } from '@/core/auth/AuthProvider';
 import { HrConfirmHost } from '@/features/hr/components/HrConfirmModal';
 import { canAccessOverview } from '@/features/overview/overviewCatalog';
@@ -100,6 +100,7 @@ function AuthenticatedRouter() {
             />
           </Stack>
           <HrConfirmHost />
+          <BrandLoadingHost />
         </>
       )}
       {(isLoading || redirectPending) && !showLockScreen && !splashVisible && (
