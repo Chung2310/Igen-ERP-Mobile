@@ -216,18 +216,20 @@ function renderGlyph(slug: string, accent: string) {
     case 'student-partners':
       return (
         <>
-          <Circle cx="36.2" cy="21.5" r="4.2" fill="#FFFFFF" fillOpacity={0.74} />
+          {/* Symmetrical dual partner figures centered at (28, 28) */}
+          <Circle cx="35.6" cy="23.2" r="4.1" fill="#FFFFFF" fillOpacity={0.76} />
           <Path
-            d="M32.2 37.2C32.6 32.4 35.5 29.2 39.4 29.2C42.3 29.2 44.5 31.2 45.2 34.4C45.5 35.9 44.4 37.2 42.9 37.2H32.2Z"
+            d="M31.4 39.2C31.8 34.4 34.6 31.2 38.4 31.2C41.4 31.2 43.4 33.1 44 36.4C44.2 37.9 43.2 39.2 41.7 39.2H31.4Z"
             fill="#FFFFFF"
-            fillOpacity={0.74}
+            fillOpacity={0.76}
           />
-          <Circle cx="23.2" cy="22.8" r="5.3" fill="#FFFFFF" />
+          <Circle cx="22.8" cy="23.8" r="5" fill="#FFFFFF" />
           <Path
-            d="M12.2 39.2C12.2 33.5 16.9 29.8 23.2 29.8C29.5 29.8 34.2 33.5 34.2 39.2C34.2 40.5 33.2 41.5 31.9 41.5H14.5C13.2 41.5 12.2 40.5 12.2 39.2Z"
+            d="M12.2 39.4C12.2 33.9 16.7 30.4 22.8 30.4C28.9 30.4 33.4 33.9 33.4 39.4C33.4 40.6 32.4 41.6 31.2 41.6H14.4C13.2 41.6 12.2 40.6 12.2 39.4Z"
             fill="#FFFFFF"
           />
-          <Path d="M23.2 13L15.4 16.6L23.2 20.2L31 16.6L23.2 13Z" fill="#FFFFFF" fillOpacity={0.92} />
+          {/* Centered graduation cap accent above */}
+          <Path d="M22.8 14L15.8 17.2L22.8 20.4L29.8 17.2L22.8 14Z" fill="#FFFFFF" fillOpacity={0.92} />
         </>
       );
 
@@ -256,14 +258,18 @@ function renderGlyph(slug: string, accent: string) {
     case 'retail-partners':
       return (
         <>
+          {/* Symmetrical storefront centered exactly at (28, 28) */}
           <Path
-            d="M14.2 20.8C14.2 17.3 17 14.5 20.5 14.5H35.5C39 14.5 41.8 17.3 41.8 20.8V23.8H14.2V20.8Z"
+            d="M13.5 21.2C13.5 17.5 16.5 14.5 20.2 14.5H35.8C39.5 14.5 42.5 17.5 42.5 21.2V23.5H13.5V21.2Z"
             fill="#FFFFFF"
-            fillOpacity={0.78}
+            fillOpacity={0.8}
           />
-          <Rect x="14.2" y="22.8" width="27.6" height="18.8" rx="4.5" fill="#FFFFFF" />
-          <Rect x="19" y="27.8" width="6.2" height="5.8" rx="1.6" fill={accent} fillOpacity={0.78} />
-          <Rect x="29.4" y="27.8" width="7.2" height="13.8" rx="2" fill={accent} />
+          <Rect x="15" y="23.5" width="26" height="18" rx="4" fill="#FFFFFF" />
+          {/* Centered arched shop doorway */}
+          <Path
+            d="M23.5 41.5V32C23.5 29.5 25.5 27.5 28 27.5C30.5 27.5 32.5 29.5 32.5 32V41.5H23.5Z"
+            fill={accent}
+          />
         </>
       );
 
