@@ -1382,7 +1382,7 @@ const styles = StyleSheet.create({
   quoteTotalLabel: { color: colors.muted, fontSize: 9, fontWeight: '600', marginBottom: 3 },
   quoteTotal: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   quoteChevron: { width: 32, height: 32, borderRadius: 11, backgroundColor: '#EEF4FF', alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
-  loading: { flex: 1, minHeight: 380, alignItems: 'center', justifyContent: 'center', paddingVertical: 26 },
+  loading: { flex: 1, minHeight: 320, alignItems: 'center', justifyContent: 'center', paddingVertical: 26, paddingBottom: 100 },
   emptyCard: { alignItems: 'center', padding: 22, marginTop: 4 },
   emptyTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', marginTop: 9 },
   emptyCopy: { color: colors.muted, fontSize: 10, lineHeight: 16, textAlign: 'center', marginTop: 5 },

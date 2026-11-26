@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   statusInactive: { color: '#B34B55' },
   deleteButton: { width: 30, height: 34, alignItems: 'center', justifyContent: 'center' },
   protectedTag: { width: 28, alignItems: 'center' },
-  state: { flex: 1, minHeight: 380, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 25, gap: 9 },
+  state: { flex: 1, minHeight: 320, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 25, paddingBottom: 100, gap: 9 },
   stateText: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center' },
   errorTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   emptyTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },

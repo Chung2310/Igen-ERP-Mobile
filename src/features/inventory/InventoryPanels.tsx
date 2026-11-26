@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
   errorBanner: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, marginBottom: 6, borderRadius: 10, backgroundColor: '#FFF3F2' },
   errorBannerText: { flex: 1, color: '#A33D3A', fontSize: 9, lineHeight: 13 },
   linkText: { color: colors.primary, fontSize: 9, fontWeight: '800' },
-  loadingState: { flex: 1, minHeight: 360, alignItems: 'center', justifyContent: 'center' },
+  loadingState: { flex: 1, minHeight: 300, paddingBottom: 80, alignItems: 'center', justifyContent: 'center' },
   emptyCard: { minHeight: 145, alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: 15 },
   emptyTitle: { color: colors.ink, fontSize: 11, fontWeight: '800', marginTop: 8 },
   emptyCopy: { color: colors.muted, fontSize: 9, lineHeight: 14, textAlign: 'center', marginTop: 4 },
