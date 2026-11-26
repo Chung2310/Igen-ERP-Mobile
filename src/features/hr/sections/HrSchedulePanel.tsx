@@ -614,8 +614,14 @@ function AttendanceAndCalendarSection({
               </Text>
             </Card>
           ) : (
-            <View style={[styles.tableWrap, styles.tableContentRow]}>
-              {/* Frozen Left Columns: # | Họ và Tên | Số công */}
+            <ScrollView
+              horizontal
+              nestedScrollEnabled
+              showsHorizontalScrollIndicator
+              style={styles.tableWrap}
+              contentContainerStyle={styles.tableContentRow}
+            >
+              {/* STT | Họ và Tên | Tổng công */}
               <View style={styles.tableLeft}>
                 <View style={[styles.tableHeaderRow, styles.tableHeaderLeft]}>
                   <Text style={[styles.thText, { width: 24, textAlign: 'center' }]}>#</Text>
@@ -647,145 +653,137 @@ function AttendanceAndCalendarSection({
                 ))}
               </View>
 
-              {/* Scrollable Day Columns 1..daysInMonth */}
-              <ScrollView
-                horizontal
-                nestedScrollEnabled
-                showsHorizontalScrollIndicator
-                style={{ flex: 1 }}
-              >
-                  {/* Day Columns 1..daysInMonth */}
-                  <View>
-                    {/* Day Header Row */}
-                    <View style={styles.tableHeaderRow}>
-                      {dayColumns.map((day) => {
-                        const dObj = new Date(histYear, histMonth - 1, day);
-                        const dow = dObj.getDay();
-                        const dateStr = `${histYear}-${String(histMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                        const hol = holidayMap.get(dateStr);
-                        const isWeekend =
-                          hol && hol.isApplied
-                            ? hol.dayType !== 'working_override'
-                            : dow === 0 || dow === 6;
-                        const isToday = dateStr === today;
+              {/* Day Columns 1..daysInMonth */}
+              <View>
+                {/* Day Header Row */}
+                <View style={styles.tableHeaderRow}>
+                  {dayColumns.map((day) => {
+                    const dObj = new Date(histYear, histMonth - 1, day);
+                    const dow = dObj.getDay();
+                    const dateStr = `${histYear}-${String(histMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const hol = holidayMap.get(dateStr);
+                    const isWeekend =
+                      hol && hol.isApplied
+                        ? hol.dayType !== 'working_override'
+                        : dow === 0 || dow === 6;
+                    const isToday = dateStr === today;
+                    return (
+                      <View
+                        key={day}
+                        style={[
+                          styles.dayHeaderCell,
+                          isWeekend && styles.dayHeaderWeekend,
+                          isToday && styles.dayHeaderToday,
+                        ]}
+                      >
+                        <Text style={[styles.dayDowText, isToday && { color: colors.primary }]}>
+                          {DOW_SHORT[dow]}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.dayNumText,
+                            isWeekend && { color: '#64748B' },
+                            isToday && { color: colors.primary },
+                          ]}
+                        >
+                          {day}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Employee Day Rows */}
+                {monthlyRows.map((row, rIdx) => (
+                  <View
+                    key={row.key}
+                    style={[styles.tableBodyRow, rIdx % 2 === 1 && styles.tableRowAlt]}
+                  >
+                    {dayColumns.map((day) => {
+                      const dObj = new Date(histYear, histMonth - 1, day);
+                      const dow = dObj.getDay();
+                      const dateStr = `${histYear}-${String(histMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                      const hol = holidayMap.get(dateStr);
+                      const isWeekend =
+                        hol && hol.isApplied
+                          ? hol.dayType !== 'working_override'
+                          : dow === 0 || dow === 6;
+                      const isFuture = dateStr > today;
+                      const isToday = dateStr === today;
+                      const log = row.byDate.get(dateStr);
+
+                      if (isWeekend && !log) {
                         return (
-                          <View
-                            key={day}
-                            style={[
-                              styles.dayHeaderCell,
-                              isWeekend && styles.dayHeaderWeekend,
-                              isToday && styles.dayHeaderToday,
-                            ]}
-                          >
-                            <Text style={[styles.dayDowText, isToday && { color: colors.primary }]}>
-                              {DOW_SHORT[dow]}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.dayNumText,
-                                isWeekend && { color: '#64748B' },
-                                isToday && { color: colors.primary },
-                              ]}
-                            >
-                              {day}
-                            </Text>
+                          <View key={day} style={[styles.dayCell, styles.dayCellWeekend]}>
+                            <Text style={styles.dayCellDash}>—</Text>
                           </View>
                         );
-                      })}
-                    </View>
+                      }
+                      if (isFuture && !log) {
+                        return (
+                          <View key={day} style={[styles.dayCell, isToday && styles.dayCellToday]}>
+                            <Text style={styles.dayCellDot}>·</Text>
+                          </View>
+                        );
+                      }
 
-                    {/* Employee Day Rows */}
-                    {monthlyRows.map((row, rIdx) => (
-                      <View
-                        key={row.key}
-                        style={[styles.tableBodyRow, rIdx % 2 === 1 && styles.tableRowAlt]}
-                      >
-                        {dayColumns.map((day) => {
-                          const dObj = new Date(histYear, histMonth - 1, day);
-                          const dow = dObj.getDay();
-                          const dateStr = `${histYear}-${String(histMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                          const hol = holidayMap.get(dateStr);
-                          const isWeekend =
-                            hol && hol.isApplied
-                              ? hol.dayType !== 'working_override'
-                              : dow === 0 || dow === 6;
-                          const isFuture = dateStr > today;
-                          const isToday = dateStr === today;
-                          const log = row.byDate.get(dateStr);
+                      const coeff = calcLogCoeff(log);
+                      const isFull = coeff >= 1;
+                      const isAbsent = coeff === 0;
+                      const statusTxt = shortAttendanceStatus(log?.attendanceStatus || log?.status);
+                      const cellColor = isAbsent
+                        ? '#DC2626'
+                        : isFull
+                          ? '#059669'
+                          : '#D97706';
 
-                          if (isWeekend && !log) {
-                            return (
-                              <View key={day} style={[styles.dayCell, styles.dayCellWeekend]}>
-                                <Text style={styles.dayCellDash}>—</Text>
-                              </View>
-                            );
-                          }
-                          if (isFuture && !log) {
-                            return (
-                              <View key={day} style={[styles.dayCell, isToday && styles.dayCellToday]}>
-                                <Text style={styles.dayCellDot}>·</Text>
-                              </View>
-                            );
-                          }
-
-                          const coeff = calcLogCoeff(log);
-                          const isFull = coeff >= 1;
-                          const isAbsent = coeff === 0;
-                          const statusTxt = shortAttendanceStatus(log?.attendanceStatus || log?.status);
-                          const cellColor = isAbsent
-                            ? '#DC2626'
-                            : isFull
-                              ? '#059669'
-                              : '#D97706';
-
-                          return (
-                            <Pressable
-                              key={day}
-                              disabled={!canViewAllAttendance && row.key !== (user?._id || user?.id)}
-                              onPress={() => {
-                                if (!log) return;
-                                const ci = formatTime(log.checkIn || log.checkInTime);
-                                const co = formatTime(log.checkOut || log.checkOutTime);
-                                if (canEditAttendance && log._id) {
-                                  setEditingRec(log);
-                                  setEditIn(ci === '--:--' ? '' : ci);
-                                  setEditOut(co === '--:--' ? '' : co);
-                                  setEditNote(log.note || '');
-                                } else if (canViewAllAttendance || row.key === (user?._id || user?.id)) {
-                                  Alert.alert(
-                                    `${row.name} · ${formatViDate(dateStr)}`,
-                                    `Giờ vào: ${ci}\nGiờ ra: ${co}\nTrạng thái: ${log.attendanceStatus || log.status || '—'}\nHệ số công: ${coeff}`,
-                                  );
-                                }
-                              }}
-                              style={[styles.dayCell, isToday && styles.dayCellToday]}
-                            >
-                              <Text style={[styles.dayCellVal, { color: cellColor }]}>
-                                {cellMode === 'coeff'
-                                  ? coeff === 1
-                                    ? '1'
-                                    : coeff === 0
-                                      ? '0'
-                                      : String(coeff)
-                                  : log?.workHours && log.workHours > 0
-                                    ? `${log.workHours}h`
-                                    : isFull
-                                      ? '8h'
-                                      : '0h'}
-                              </Text>
-                              {statusTxt ? (
-                                <Text numberOfLines={1} style={[styles.dayCellStatus, { color: cellColor }]}>
-                                  {statusTxt}
-                                </Text>
-                              ) : null}
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    ))}
+                      return (
+                        <Pressable
+                          key={day}
+                          disabled={!canViewAllAttendance && row.key !== (user?._id || user?.id)}
+                          onPress={() => {
+                            if (!log) return;
+                            const ci = formatTime(log.checkIn || log.checkInTime);
+                            const co = formatTime(log.checkOut || log.checkOutTime);
+                            if (canEditAttendance && log._id) {
+                              setEditingRec(log);
+                              setEditIn(ci === '--:--' ? '' : ci);
+                              setEditOut(co === '--:--' ? '' : co);
+                              setEditNote(log.note || '');
+                            } else if (canViewAllAttendance || row.key === (user?._id || user?.id)) {
+                              Alert.alert(
+                                `${row.name} · ${formatViDate(dateStr)}`,
+                                `Giờ vào: ${ci}\nGiờ ra: ${co}\nTrạng thái: ${log.attendanceStatus || log.status || '—'}\nHệ số công: ${coeff}`,
+                              );
+                            }
+                          }}
+                          style={[styles.dayCell, isToday && styles.dayCellToday]}
+                        >
+                          <Text style={[styles.dayCellVal, { color: cellColor }]}>
+                            {cellMode === 'coeff'
+                              ? coeff === 1
+                                ? '1'
+                                : coeff === 0
+                                  ? '0'
+                                  : String(coeff)
+                              : log?.workHours && log.workHours > 0
+                                ? `${log.workHours}h`
+                                : isFull
+                                  ? '8h'
+                                  : '0h'}
+                          </Text>
+                          {statusTxt ? (
+                            <Text numberOfLines={1} style={[styles.dayCellStatus, { color: cellColor }]}>
+                              {statusTxt}
+                            </Text>
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
                   </View>
-              </ScrollView>
-            </View>
+                ))}
+              </View>
+            </ScrollView>
           )}
 
           <Text style={[styles.subMeta, { marginTop: 8, textAlign: 'center' }]}>
