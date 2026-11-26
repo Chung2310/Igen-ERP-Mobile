@@ -614,13 +614,15 @@ function AttendanceAndCalendarSection({
               </Text>
             </Card>
           ) : (
-            <ScrollView
-              horizontal
-              nestedScrollEnabled
-              showsHorizontalScrollIndicator
-              style={styles.tableWrap}
-              contentContainerStyle={styles.tableContentRow}
-            >
+            <View style={styles.tableWrap}>
+              <ScrollView
+                horizontal
+                nestedScrollEnabled
+                directionalLockEnabled
+                showsHorizontalScrollIndicator
+                style={styles.tableHorizontalScroll}
+                contentContainerStyle={styles.tableContentRow}
+              >
               {/* STT | Họ và Tên | Tổng công */}
               <View style={styles.tableLeft}>
                 <View style={[styles.tableHeaderRow, styles.tableHeaderLeft]}>
@@ -783,7 +785,8 @@ function AttendanceAndCalendarSection({
                   </View>
                 ))}
               </View>
-            </ScrollView>
+              </ScrollView>
+            </View>
           )}
 
           <Text style={[styles.subMeta, { marginTop: 8, textAlign: 'center' }]}>
@@ -2287,7 +2290,8 @@ const styles = StyleSheet.create({
   modeToggleActive: { backgroundColor: colors.primary },
   modeToggleText: { color: colors.muted, fontSize: 10, fontWeight: '800' },
   modeToggleTextActive: { color: colors.white },
-  tableWrap: { backgroundColor: colors.white, borderColor: '#DCE7F4', borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  tableWrap: { alignSelf: 'stretch', backgroundColor: colors.white, borderColor: '#DCE7F4', borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  tableHorizontalScroll: { width: '100%', flexGrow: 0, flexShrink: 1 },
   tableContentRow: { flexDirection: 'row' },
   tableLeft: { width: 174, borderRightWidth: 1.5, borderRightColor: '#BCEAFF', backgroundColor: colors.white },
   tableHeaderRow: { flexDirection: 'row', alignItems: 'center', height: 46, backgroundColor: '#E8F7FF', borderBottomWidth: 1, borderBottomColor: '#DCE7F4' },
