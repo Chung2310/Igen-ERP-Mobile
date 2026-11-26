@@ -170,20 +170,35 @@ export async function listMonthlyAttendanceLogs(params: {
   qs.set('date[$gte]', params.startDate);
   qs.set('date[$lte]', params.endDate);
   if (params.uid) qs.set('uid', params.uid);
-  const res = await apiRequest<{ data?: HrAttendanceRecord[] }>(
+  type ApiAttendanceRecord = Omit<HrAttendanceRecord, 'checkIn' | 'checkOut'> & {
+    checkIn?: string | { time?: string | null } | null;
+    checkOut?: string | { time?: string | null } | null;
+  };
+  const res = await apiRequest<{ data?: ApiAttendanceRecord[] }>(
     `/crud/timekeeping-logs?${qs.toString()}`,
     { headers: branchHeaders(params.branchId) },
   );
-  return res?.data ?? [];
+  return (res?.data ?? []).map((log) => ({
+    ...log,
+    checkIn: typeof log.checkIn === 'object' && log.checkIn ? log.checkIn.time ?? null : log.checkIn,
+    checkOut: typeof log.checkOut === 'object' && log.checkOut ? log.checkOut.time ?? null : log.checkOut,
+  }));
 }
 
 export async function listAttendanceRoster(branchId?: string): Promise<HrAttendanceRosterEntry[]> {
   const query = buildQuery({ branchId });
-  const res = await apiRequest<{ data?: HrAttendanceRosterEntry[] }>(
-    `/auth/users/attendance-roster${query}`,
+  type ApiRosterUser = Partial<HrAttendanceRosterEntry> & { _id?: string; id?: string };
+  const res = await apiRequest<{ data?: ApiRosterUser[] }>(
+    `/auth/users${query}`,
     { headers: branchHeaders(branchId) },
   );
-  return res?.data ?? [];
+  return (res?.data ?? [])
+    .map((user) => ({
+      uid: user.uid || user._id || user.id || '',
+      displayName: user.displayName || 'Nhân viên',
+      branchId: user.branchId,
+    }))
+    .filter((user) => Boolean(user.uid));
 }
 
 export type TodayTimekeepingData = {

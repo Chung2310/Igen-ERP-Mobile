@@ -15,15 +15,12 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import * as Location from 'expo-location';
 import {
   CalendarCheck,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock3,
-  LogIn,
-  LogOut,
   Pencil,
   Plus,
   RefreshCw,
@@ -34,18 +31,11 @@ import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
-  authenticateBiometric,
-  biometricErrorMessage,
-  getBiometricAvailability,
-  isBiometricCancellation,
-} from '@/core/auth/biometricAuth';
-import {
   assignHrWorkShift,
   createHrCalendarEvent,
   createHrWorkCalendarDay,
   deleteHrCalendarEvent,
   deleteHrWorkCalendarDay,
-  getTodayTimekeeping,
   listHrCalendarEvents,
   listAttendanceRoster,
   listHrEmployeeWorkHours,
@@ -55,9 +45,6 @@ import {
   listMonthlyAttendanceLogs,
   saveHrWorkShift,
   syncHrWorkCalendar,
-  submitCheckIn,
-  submitCheckOut,
-  type TodayTimekeepingData,
   updateAttendanceLog,
   updateHrEmployeeWorkHours,
   updateHrWorkCalendarDay,
@@ -254,7 +241,7 @@ function AttendanceAndCalendarSection({
   canEditAttendance: boolean;
   canManageCalendar: boolean;
 }) {
-  const { user, biometricSettings } = useAuth();
+  const { user } = useAuth();
   const [mode, setMode] = useState<'monthly' | 'calendar'>('monthly');
   const today = useMemo(() => getTodayKey(), []);
   const [monthlyLogs, setMonthlyLogs] = useState<HrAttendanceRecord[]>([]);
@@ -267,8 +254,6 @@ function AttendanceAndCalendarSection({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [todayAttendance, setTodayAttendance] = useState<TodayTimekeepingData | null>(null);
-  const [actionChecking, setActionChecking] = useState<'in' | 'out' | null>(null);
 
   const histYear = monthlyDate.getFullYear();
   const histMonth = monthlyDate.getMonth() + 1; // 1-12
@@ -335,9 +320,10 @@ function AttendanceAndCalendarSection({
             companyCode,
             startDate,
             endDate,
+            uid: canEditAttendance ? undefined : (user?._id || user?.id),
             branchId,
           }),
-          listAttendanceRoster(branchId).catch(() => []),
+          canEditAttendance ? listAttendanceRoster(branchId).catch(() => []) : Promise.resolve([]),
           listHrWorkCalendar(histYear, true).catch(() => []),
         ]);
         setMonthlyLogs(list);
@@ -350,79 +336,8 @@ function AttendanceAndCalendarSection({
         setRefreshing(false);
       }
     },
-    [branchId, companyCode, histMonth, histYear],
+    [branchId, canEditAttendance, companyCode, histMonth, histYear, user?._id, user?.id],
   );
-
-  const loadTodayAttendance = useCallback(async () => {
-    if (!branchId) {
-      setTodayAttendance(null);
-      return;
-    }
-    try {
-      const result = await getTodayTimekeeping({
-        uid: user?._id || user?.id,
-        companyCode,
-        branchId,
-      });
-      setTodayAttendance(result);
-    } catch {
-      // Keep the check-in buttons available if today's status cannot be loaded.
-    }
-  }, [branchId, companyCode, user?._id, user?.id]);
-
-  useEffect(() => {
-    void loadTodayAttendance();
-  }, [loadTodayAttendance]);
-
-  const onCheck = useCallback(async (type: 'in' | 'out') => {
-    if (actionChecking) return;
-    if (!branchId) {
-      Alert.alert('Chưa có chi nhánh', 'Chọn chi nhánh trước khi chấm công.');
-      return;
-    }
-
-    setActionChecking(type);
-    try {
-      if (biometricSettings.attendanceEnabled) {
-        const availability = await getBiometricAvailability('attendanceEnabled');
-        if (!availability.available) throw new Error(availability.message || 'Thiết bị chưa sẵn sàng cho xác thực chấm công.');
-        const result = await authenticateBiometric(
-          'attendanceEnabled',
-          type === 'in' ? 'Xác thực khuôn mặt để check-in' : 'Xác thực khuôn mặt để check-out',
-        );
-        if (!result.success) {
-          if (isBiometricCancellation(result)) return;
-          throw new Error(biometricErrorMessage(result.error));
-        }
-      }
-
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        Alert.alert('Chưa có quyền vị trí', 'Cấp quyền vị trí để ghi nhận địa điểm chấm công.');
-        return;
-      }
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }).catch(() => null);
-      if (!position) {
-        Alert.alert('Không xác định được vị trí', 'Bật định vị và thử chấm công lại.');
-        return;
-      }
-
-      const payload = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        deviceInfo: `ERP-Mobile (${Platform.OS} ${String(Platform.Version)})`,
-      };
-      const response = type === 'in'
-        ? await submitCheckIn(branchId, payload)
-        : await submitCheckOut(branchId, payload);
-      Alert.alert(type === 'in' ? 'Check-in thành công' : 'Check-out thành công', response.message || 'Đã ghi nhận chấm công.');
-      await Promise.all([loadTodayAttendance(), loadMonthly(true)]);
-    } catch (error) {
-      Alert.alert('Chấm công thất bại', error instanceof Error ? error.message : 'Vui lòng thử lại.');
-    } finally {
-      setActionChecking(null);
-    }
-  }, [actionChecking, biometricSettings.attendanceEnabled, branchId, loadMonthly, loadTodayAttendance]);
 
   useEffect(() => {
     if (mode === 'monthly') void loadMonthly();
@@ -523,9 +438,6 @@ function AttendanceAndCalendarSection({
 
   const pickedEvents = useMemo(() => eventsForDay(pickedDayKey), [eventsForDay, pickedDayKey]);
   const pickedHoliday = holidayMap.get(pickedDayKey);
-  const hasTodayCheckIn = Boolean(todayAttendance?.log?.checkIn?.time);
-  const hasTodayCheckOut = Boolean(todayAttendance?.log?.checkOut?.time);
-
   const monthlyRows = useMemo(() => {
     type Row = {
       key: string;
@@ -552,6 +464,7 @@ function AttendanceAndCalendarSection({
 
     for (const log of monthlyLogs) {
       const key = log.uid || log.employeeId || log.employeeName || 'unknown';
+      if (!canEditAttendance && key !== (user?._id || user?.id)) continue;
       const row = addOrGet(
         key,
         log.employeeName || log.displayName || 'Nhân viên',
@@ -627,41 +540,6 @@ function AttendanceAndCalendarSection({
         </Pressable>
       </View>
 
-      <Card style={styles.quickCheckCard}>
-        <View style={styles.quickCheckHeading}>
-          <Text style={styles.sectionTitle}>Chấm công hôm nay</Text>
-          <Text style={styles.subMeta}>
-            {biometricSettings.attendanceEnabled
-              ? Platform.OS === 'ios' ? 'Xác thực bằng Face ID' : 'Xác thực bằng khuôn mặt'
-              : 'Check-in / check-out bằng tài khoản hiện tại'}
-          </Text>
-        </View>
-        <View style={styles.quickCheckButtons}>
-          <Pressable
-            accessibilityRole="button"
-            disabled={actionChecking !== null || hasTodayCheckIn || !branchId}
-            onPress={() => { void onCheck('in'); }}
-            style={[styles.quickCheckButton, styles.quickCheckInButton, (actionChecking !== null || hasTodayCheckIn || !branchId) && styles.quickCheckDisabled]}
-          >
-            {actionChecking === 'in' ? <ActivityIndicator size="small" color={colors.white} /> : <LogIn size={15} color={colors.white} />}
-            <Text numberOfLines={1} style={styles.quickCheckInText}>
-              {actionChecking === 'in' ? 'Đang xử lý…' : hasTodayCheckIn ? 'Đã check-in' : biometricSettings.attendanceEnabled ? Platform.OS === 'ios' ? 'Face ID · Check-in' : 'Khuôn mặt · Check-in' : 'Check-in'}
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={actionChecking !== null || !hasTodayCheckIn || hasTodayCheckOut || !branchId}
-            onPress={() => { void onCheck('out'); }}
-            style={[styles.quickCheckButton, styles.quickCheckOutButton, (actionChecking !== null || !hasTodayCheckIn || hasTodayCheckOut || !branchId) && styles.quickCheckDisabled]}
-          >
-            {actionChecking === 'out' ? <ActivityIndicator size="small" color={colors.primary} /> : <LogOut size={15} color={colors.primary} />}
-            <Text numberOfLines={1} style={styles.quickCheckOutText}>
-              {actionChecking === 'out' ? 'Đang xử lý…' : hasTodayCheckOut ? 'Đã check-out' : biometricSettings.attendanceEnabled ? Platform.OS === 'ios' ? 'Face ID · Check-out' : 'Khuôn mặt · Check-out' : 'Check-out'}
-            </Text>
-          </Pressable>
-        </View>
-      </Card>
-
       {mode === 'monthly' ? (
         <>
           {/* Month Navigator + Coeff/Hours toggle */}
@@ -731,7 +609,7 @@ function AttendanceAndCalendarSection({
               </Text>
             </Card>
           ) : (
-            <View style={styles.tableWrap}>
+            <View style={[styles.tableWrap, styles.tableContentRow]}>
               {/* Frozen Left Columns: # | Họ và Tên | Số công */}
               <View style={styles.tableLeft}>
                 <View style={[styles.tableHeaderRow, styles.tableHeaderLeft]}>
@@ -2362,15 +2240,6 @@ const styles = StyleSheet.create({
 
   content: { paddingHorizontal: 18, paddingBottom: 28 },
   segmentRow: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 11, padding: 3, marginBottom: 12 },
-  quickCheckCard: { padding: 12, gap: 9, marginBottom: 12 },
-  quickCheckHeading: { gap: 3 },
-  quickCheckButtons: { flexDirection: 'row', gap: 8 },
-  quickCheckButton: { flex: 1, minHeight: 40, borderRadius: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 6 },
-  quickCheckInButton: { backgroundColor: colors.primary },
-  quickCheckOutButton: { backgroundColor: '#EAF2FF', borderWidth: 1, borderColor: '#C9DDFD' },
-  quickCheckInText: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  quickCheckOutText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
-  quickCheckDisabled: { opacity: 0.45 },
   segmentBtn: { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
   segmentBtnActive: { backgroundColor: colors.white },
   segmentText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
