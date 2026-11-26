@@ -1,10 +1,12 @@
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LockKeyhole } from 'lucide-react-native';
 import { ModuleAppIcon } from '@/components/ModuleAppIcons';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   canAccessModule,
+  isModuleVisibleForTenant,
   moduleCatalog,
   type ModuleDefinition,
 } from '@/features/modules/moduleCatalog';
@@ -27,14 +29,16 @@ function chunkRows(items: ModuleDefinition[]): Array<Array<ModuleDefinition | nu
 export default function ModulesScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const visibleModules = moduleCatalog.filter((module) => canAccessModule(user, module.slug));
+  const visibleModules = moduleCatalog.filter((module) =>
+    isModuleVisibleForTenant(user, module.slug),
+  );
   const rows = chunkRows(visibleModules);
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Danh mục</Text>
+          <Text style={styles.title}>Tính năng</Text>
         </View>
 
         <View style={styles.gridCard}>
@@ -49,17 +53,30 @@ export default function ModulesScreen() {
                 }
 
                 const label = module.shortName ?? module.name;
+                const locked = !canAccessModule(user, module.slug);
                 return (
                   <View key={module.slug} style={styles.cell}>
                     <Pressable
+                      disabled={locked}
                       onPress={() =>
                         router.push({ pathname: '/modules/[slug]', params: { slug: module.slug } })
                       }
-                      style={({ pressed }) => [styles.itemButton, pressed && styles.itemPressed]}
+                      style={({ pressed }) => [
+                        styles.itemButton,
+                        locked && styles.itemLocked,
+                        pressed && !locked && styles.itemPressed,
+                      ]}
                       accessibilityRole="button"
                       accessibilityLabel={module.name}
                     >
-                      <ModuleAppIcon slug={module.slug} size={48} />
+                      <View style={styles.iconWrap}>
+                        <ModuleAppIcon slug={module.slug} size={48} />
+                        {locked ? (
+                          <View style={styles.lockBadge}>
+                            <LockKeyhole size={11} color={colors.muted} />
+                          </View>
+                        ) : null}
+                      </View>
                       <Text numberOfLines={2} style={styles.moduleName}>
                         {label}
                       </Text>
@@ -120,9 +137,28 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
+  itemLocked: {
+    opacity: 0.55,
+  },
   itemPressed: {
     opacity: 0.72,
     transform: [{ scale: 0.94 }],
+  },
+  iconWrap: {
+    position: 'relative',
+  },
+  lockBadge: {
+    position: 'absolute',
+    right: -3,
+    bottom: -3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#DCE3EE',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   moduleName: {
     marginTop: 8,

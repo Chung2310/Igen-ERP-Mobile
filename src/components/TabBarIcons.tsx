@@ -195,6 +195,44 @@ export function AiChatTabIcon({ color, focused = false, size = 24 }: TabIconProp
 }
 
 /**
+ * Thông báo — Rounded bell icon matching the footer icon set.
+ */
+export function NotificationsTabIcon({ color, focused = false, size = 24 }: TabIconProps) {
+  return (
+    <BouncyIcon focused={focused}>
+      {focused ? (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 3C8.55 3 5.75 5.8 5.75 9.25V12.8C5.75 13.68 5.38 14.52 4.74 15.12L4.04 15.77C3.42 16.35 3.83 17.4 4.68 17.4H19.32C20.17 17.4 20.58 16.35 19.96 15.77L19.26 15.12C18.62 14.52 18.25 13.68 18.25 12.8V9.25C18.25 5.8 15.45 3 12 3Z"
+            fill={color}
+          />
+          <Path
+            d="M9.6 18.8C10.05 20.08 10.95 21 12 21C13.05 21 13.95 20.08 14.4 18.8H9.6Z"
+            fill={color}
+          />
+        </Svg>
+      ) : (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12 3.75C8.82 3.75 6.25 6.32 6.25 9.5V12.7C6.25 13.55 5.9 14.37 5.28 14.95L4.55 15.65C4.04 16.13 4.38 17 5.08 17H18.92C19.62 17 19.96 16.13 19.45 15.65L18.72 14.95C18.1 14.37 17.75 13.55 17.75 12.7V9.5C17.75 6.32 15.18 3.75 12 3.75Z"
+            stroke={color}
+            strokeWidth={INACTIVE_STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Path
+            d="M9.75 19.25C10.22 20.02 11.05 20.5 12 20.5C12.95 20.5 13.78 20.02 14.25 19.25"
+            stroke={color}
+            strokeWidth={INACTIVE_STROKE}
+            strokeLinecap="round"
+          />
+        </Svg>
+      )}
+    </BouncyIcon>
+  );
+}
+
+/**
  * Cài đặt cá nhân — Rounded geometric gear icon.
  * Inactive: crisp thin slate outline. Active: solid blue fill with white center cutout.
  */

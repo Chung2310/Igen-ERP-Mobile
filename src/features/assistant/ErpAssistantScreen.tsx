@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { BookMarked, Bot, ChevronRight, ExternalLink, FileText, FolderOpen, Palette, Plus, Send, Settings, Sparkles, X } from 'lucide-react-native';
+import { BookMarked, Bot, ChevronRight, ExternalLink, FileText, FolderOpen, Mic, NotebookPen, Palette, Plus, Send, Settings, Sparkles, WandSparkles, X } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -24,13 +24,20 @@ import {
   deleteAssistantConversation,
   generateUuidV4,
   getAssistantConversationState,
+  getAssistantSettings,
   listAssistantConversations,
   sendAssistantTurn,
 } from '@/features/assistant/assistantApi';
 import {
+  MemoryPanel,
   SettingsPanel,
   StudioPanel,
+  WorkflowsPanel,
 } from '@/features/assistant/sections/MemoryWorkflowSettingsPanels';
+import { AgentsPanel } from '@/features/assistant/sections/AgentsPanel';
+import { AssistantToolsPanel } from '@/features/assistant/sections/AssistantToolsPanel';
+import { MeetingNotesPanel } from '@/features/assistant/sections/MeetingNotesPanel';
+import { NotebookPanel } from '@/features/assistant/sections/NotebookPanel';
 import {
   ProjectsPanel,
   PromptLibraryPanel,
@@ -42,6 +49,7 @@ import type {
   AssistantModuleTab,
   AssistantProject,
   AssistantReply,
+  AssistantSettings,
   AssistantTurnInput,
 } from '@/features/assistant/types';
 import { fetchCompanyBranches } from '@/features/overview/overviewApi';
@@ -49,10 +57,16 @@ import { colors } from '@/theme/colors';
 
 const MODULE_TABS: Array<{ key: AssistantModuleTab; label: string; icon: LucideIcon }> = [
   { key: 'chat', label: 'Trò chuyện', icon: Sparkles },
-  { key: 'agents', label: 'Trợ lý AI', icon: Bot },
+  { key: 'erp', label: 'Trợ lý ERP', icon: Bot },
+  { key: 'agents', label: 'Agent AI', icon: Bot },
   { key: 'projects', label: 'Dự án', icon: FolderOpen },
   { key: 'prompts', label: 'Thư viện', icon: BookMarked },
   { key: 'studio', label: 'Studio', icon: Palette },
+  { key: 'notebook', label: 'Notebook', icon: NotebookPen },
+  { key: 'meeting', label: 'Ghi chép họp', icon: Mic },
+  { key: 'tools', label: 'Công cụ', icon: WandSparkles },
+  { key: 'memory', label: 'Ghi nhớ', icon: FileText },
+  { key: 'workflows', label: 'Quy trình', icon: Settings },
   { key: 'settings', label: 'Cài đặt', icon: Settings },
 ];
 
@@ -114,6 +128,7 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
   const [sending, setSending] = useState(false);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [assistantSettings, setAssistantSettings] = useState<AssistantSettings | null>(null);
 
   // Confirmation password & reference selections state
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -127,6 +142,12 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
   const [conversations, setConversations] = useState<AssistantConversationSummary[]>([]);
 
   const listRef = useRef<FlatList<AssistantChatMessage>>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getAssistantSettings(controller.signal).then(setAssistantSettings).catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
@@ -144,8 +165,8 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
 
   const switchModuleTab = useCallback((tab: AssistantModuleTab) => {
     if (sending) return;
-    if (tab === 'chat' || tab === 'agents') {
-      const nextMode: AssistantMode = tab === 'agents' ? 'work' : 'qa';
+    if (tab === 'chat' || tab === 'erp') {
+      const nextMode: AssistantMode = tab === 'erp' ? 'work' : 'qa';
       if (nextMode !== mode) {
         startNewConversation();
         setMode(nextMode);
@@ -173,7 +194,7 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
   );
 
   const openHistory = useCallback(() => {
-    const selectedMode: AssistantMode = activeTab === 'agents' ? 'work' : 'qa';
+    const selectedMode: AssistantMode = activeTab === 'erp' ? 'work' : 'qa';
     setHistoryMode(selectedMode);
     setHistoryOpen(true);
     void loadHistory(historySearch, selectedMode);
@@ -351,9 +372,9 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
       <View style={styles.topBar}>
         <View style={styles.topCopy}>
           <Text style={styles.eyebrow}>MODULE TRỢ LÝ ERP</Text>
-          <Text style={styles.title}>{activeTab === 'chat' ? 'Trò chuyện AI' : 'Trợ lý AI'}</Text>
+          <Text style={styles.title}>{activeTab === 'erp' ? 'Trợ lý ERP' : activeTab === 'chat' ? 'Trò chuyện AI' : 'Trợ lý AI'}</Text>
         </View>
-        {activeTab === 'chat' || activeTab === 'agents' ? (
+        {activeTab === 'chat' || activeTab === 'erp' ? (
           <View style={styles.topActions}>
             <Pressable accessibilityRole="button" disabled={sending} onPress={openHistory} style={styles.headerBtn}>
               <Text style={styles.headerBtnText}>Lịch sử</Text>
@@ -419,8 +440,25 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
         />
       ) : activeTab === 'studio' ? (
         <StudioPanel />
+      ) : activeTab === 'notebook' ? (
+        <NotebookPanel />
+      ) : activeTab === 'meeting' ? (
+        <MeetingNotesPanel />
+      ) : activeTab === 'tools' ? (
+        <AssistantToolsPanel onUsePrompt={(prompt) => {
+          startNewConversation();
+          setDraft(prompt);
+          setMode('qa');
+          setActiveTab('chat');
+        }} />
+      ) : activeTab === 'memory' ? (
+        <MemoryPanel />
+      ) : activeTab === 'workflows' ? (
+        <WorkflowsPanel />
       ) : activeTab === 'settings' ? (
-        <SettingsPanel />
+        <SettingsPanel onSettingsSaved={setAssistantSettings} />
+      ) : activeTab === 'agents' ? (
+        <AgentsPanel />
       ) : (
         <>
           {/* Active Project Badge */}
@@ -451,25 +489,29 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
             <View style={styles.assistantIcon}>
               <Sparkles size={25} color={colors.primary} />
             </View>
-            <Text style={styles.assistantTitle}>{activeTab === 'agents' ? 'Thao tác cùng ERP' : 'Hỏi đáp chung'}</Text>
-            <Text style={styles.assistantText}>{activeTab === 'agents'
+            <Text style={styles.assistantTitle}>{activeTab === 'erp' ? 'Thao tác cùng ERP' : 'Hỏi đáp chung'}</Text>
+            <Text style={styles.assistantText}>{activeTab === 'erp'
               ? 'Mô tả nghiệp vụ cần thực hiện. Trợ lý sẽ kiểm tra dữ liệu, hỏi thông tin còn thiếu và yêu cầu xác nhận trước khi cập nhật ERP.'
               : 'Đặt câu hỏi, nhờ giải thích, tóm tắt hoặc soạn nội dung. Chế độ này chỉ dùng để hỏi đáp chung.'}</Text>
           </Card>
 
-          <Text style={styles.sectionTitle}>{activeTab === 'agents' ? 'Gợi ý thao tác ERP' : 'Gợi ý hỏi đáp'}</Text>
-          <View style={styles.suggestions}>
-            {(activeTab === 'agents' ? ACTION_SUGGESTIONS : CHAT_SUGGESTIONS).map((suggestion) => (
-              <Card
-                key={suggestion}
-                onPress={() => onSendText(suggestion)}
-                style={styles.suggestion}
-              >
-                <Text style={styles.suggestionText}>{suggestion}</Text>
-                <ChevronRight size={17} color={colors.primary} />
-              </Card>
-            ))}
-          </View>
+          {assistantSettings?.showSuggestions !== false ? (
+            <>
+              <Text style={styles.sectionTitle}>{activeTab === 'erp' ? 'Gợi ý thao tác ERP' : 'Gợi ý hỏi đáp'}</Text>
+              <View style={styles.suggestions}>
+                {(activeTab === 'erp' ? ACTION_SUGGESTIONS : CHAT_SUGGESTIONS).map((suggestion) => (
+                  <Card
+                    key={suggestion}
+                    onPress={() => onSendText(suggestion)}
+                    style={styles.suggestion}
+                  >
+                    <Text style={styles.suggestionText}>{suggestion}</Text>
+                    <ChevronRight size={14} color={colors.primary} />
+                  </Card>
+                ))}
+              </View>
+            </>
+          ) : null}
         </ScrollView>
       ) : (
         <FlatList
@@ -482,7 +524,7 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
             const isUser = item.role === 'user';
             return (
               <View style={[styles.msgRow, isUser && styles.msgRowUser]}>
-                {!isUser ? <View style={styles.botLabelRow}><Sparkles size={12} color={colors.primary} /><Text style={styles.botLabel}>{activeTab === 'agents' ? 'Trợ lý ERP' : 'Trợ lý AI'}</Text></View> : null}
+                {!isUser ? <View style={styles.botLabelRow}><Sparkles size={12} color={colors.primary} /><Text style={styles.botLabel}>{activeTab === 'erp' ? 'Trợ lý ERP' : 'Trợ lý AI'}</Text></View> : null}
                 <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleBot]}>
                   <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>
                     {item.content}
@@ -512,12 +554,12 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
               {sending ? (
                 <View style={styles.thinkingRow}>
                   <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={styles.thinkingText}>{activeTab === 'agents' ? 'Trợ lý ERP đang xử lý...' : 'Trợ lý AI đang trả lời...'}</Text>
+                  <Text style={styles.thinkingText}>{activeTab === 'erp' ? 'Trợ lý ERP đang xử lý...' : 'Trợ lý AI đang trả lời...'}</Text>
                 </View>
               ) : null}
 
               {/* Pending Action Confirmation Card */}
-              {activeTab === 'agents' && !sending && lastReply?.status === 'confirmation' && lastReply.action ? (
+              {activeTab === 'erp' && !sending && lastReply?.status === 'confirmation' && lastReply.action ? (
                 <Card style={styles.actionCard}>
                   <Text style={styles.actionTitle}>Xác nhận thao tác ERP</Text>
                   <Text style={styles.actionSubtitle}>{lastReply.action.title}</Text>
@@ -557,7 +599,7 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
               ) : null}
 
               {/* Reference Selection Card */}
-              {activeTab === 'agents' && !sending && lastReply?.referenceSelections?.length ? (
+              {activeTab === 'erp' && !sending && lastReply?.referenceSelections?.length ? (
                 <Card style={styles.actionCard}>
                   <Text style={styles.actionTitle}>Chọn thông tin tham chiếu</Text>
                   {lastReply.referenceSelections.map((group) => (
@@ -604,9 +646,14 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
         <TextInput
           value={draft}
           onChangeText={setDraft}
-          placeholder={activeTab === 'agents' ? 'Mô tả thao tác cần thực hiện trên ERP...' : 'Hỏi bất kỳ điều gì...'}
+          placeholder={activeTab === 'erp' ? 'Mô tả thao tác cần thực hiện trên ERP...' : 'Hỏi bất kỳ điều gì...'}
           placeholderTextColor={colors.muted}
           multiline
+          submitBehavior={assistantSettings?.enterToSend ? 'submit' : 'newline'}
+          returnKeyType={assistantSettings?.enterToSend ? 'send' : 'default'}
+          onSubmitEditing={() => {
+            if (assistantSettings?.enterToSend) onSendText(draft);
+          }}
           editable={!sending}
           style={styles.input}
         />

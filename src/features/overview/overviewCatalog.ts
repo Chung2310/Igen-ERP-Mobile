@@ -1,4 +1,5 @@
 import type { ErpUser } from '@/core/auth/authApi';
+import { isTenantModuleEnabled } from '@/features/modules/moduleCatalog';
 import type { OverviewPageDefinition } from '@/features/overview/types';
 import {
   BriefcaseBusiness,
@@ -113,16 +114,7 @@ export function resolveAllowedOverviewPages(user: ErpUser | null): OverviewPageD
   const isAdmin = user.role === 'superadmin' || user.role === 'admin';
   const isManager = isAdmin || user.role === 'manager';
   const isTeacher = user.role === 'teacher';
-  const enabledModules = user.enabledModules ?? [];
-
-  // Nếu API /auth/me chưa trả về enabledModules, giữ các phân hệ cốt lõi.
-  if (enabledModules.length === 0) {
-    return ALL_OVERVIEW_PAGES.filter((page) =>
-      ['finance', 'hr', 'quotation', 'retail', 'marketing'].includes(page.id),
-    );
-  }
-
-  const hasModule = (key: string) => enabledModules.includes(key);
+  const hasModule = (key: string) => isTenantModuleEnabled(user, key);
 
   return ALL_OVERVIEW_PAGES.filter((page) => {
     switch (page.id) {

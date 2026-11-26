@@ -2,10 +2,16 @@ export type AssistantMode = 'work' | 'qa';
 
 export type AssistantModuleTab =
   | 'chat'
+  | 'erp'
   | 'agents'
   | 'projects'
   | 'prompts'
   | 'studio'
+  | 'notebook'
+  | 'meeting'
+  | 'tools'
+  | 'memory'
+  | 'workflows'
   | 'settings';
 
 export type AssistantValue = string | number | boolean;
