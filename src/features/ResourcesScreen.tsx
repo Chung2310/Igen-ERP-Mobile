@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
   rowMeta: { color: colors.muted, fontSize: 8, marginTop: 4 },
   rowChevron: { marginLeft: 7 },
   moreButton: { minWidth: 34, minHeight: 36, alignItems: 'center', justifyContent: 'center', marginLeft: 3 },
-  loading: { padding: 24 },
+  loading: { flex: 1, minHeight: 380, alignItems: 'center', justifyContent: 'center', padding: 24 },
   empty: { paddingVertical: 24, paddingHorizontal: 12, color: colors.muted, textAlign: 'center', fontSize: 9, lineHeight: 15 },
   emptySmall: { paddingVertical: 17, color: colors.muted, textAlign: 'center', fontSize: 9 },
   errorCard: { padding: 12, marginBottom: 12, backgroundColor: '#FFF1F0', borderColor: '#F6D6D4' },
