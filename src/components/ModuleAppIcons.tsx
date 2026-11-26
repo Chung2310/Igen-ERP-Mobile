@@ -171,27 +171,23 @@ function renderGlyph(slug: string, accent: string) {
     case 'retail-sales':
       return (
         <>
+          {/* Clean modern shopping cart centered at (28, 28) */}
           <Path
-            d="M21 21.5V19C21 15.1 24.1 12 28 12C31.9 12 35 15.1 35 19V21.5"
+            d="M12.5 16.5H16.8C17.9 16.5 18.8 17.2 19.1 18.3L22.3 31.2C22.6 32.4 23.6 33.2 24.8 33.2H37.2C38.4 33.2 39.4 32.4 39.7 31.3L42.3 21.8C42.6 20.6 41.7 19.5 40.5 19.5H20"
             stroke="#FFFFFF"
-            strokeOpacity={0.82}
             strokeWidth="3.2"
             strokeLinecap="round"
+            strokeLinejoin="round"
             fill="none"
           />
           <Path
-            d="M14.5 21.5C14.5 20.1 15.6 19 17 19H39C40.4 19 41.5 20.1 41.5 21.5L40.1 38.2C39.9 40.9 37.6 43 34.9 43H21.1C18.4 43 16.1 40.9 15.9 38.2L14.5 21.5Z"
+            d="M20.6 20.5H40.6L38.4 30.8C38.2 31.6 37.5 32.2 36.6 32.2H24.6C23.7 32.2 23 31.6 22.8 30.8L20.6 20.5Z"
             fill="#FFFFFF"
+            fillOpacity={0.9}
           />
-          <Circle cx="22.8" cy="25.8" r="2.2" fill={accent} />
-          <Circle cx="33.2" cy="25.8" r="2.2" fill={accent} />
-          <Path
-            d="M23 32.5C24.3 34.8 26 35.8 28 35.8C30 35.8 31.7 34.8 33 32.5"
-            stroke={accent}
-            strokeWidth="2.6"
-            strokeLinecap="round"
-            fill="none"
-          />
+          <Rect x="25" y="24.2" width="11.5" height="2.4" rx="1.2" fill={accent} fillOpacity={0.8} />
+          <Circle cx="24.5" cy="39.2" r="2.9" fill="#FFFFFF" />
+          <Circle cx="36.5" cy="39.2" r="2.9" fill="#FFFFFF" />
         </>
       );
 
@@ -258,18 +254,18 @@ function renderGlyph(slug: string, accent: string) {
     case 'retail-partners':
       return (
         <>
-          {/* Symmetrical storefront centered exactly at (28, 28) */}
+          {/* Symmetrical retail shop with awning canopy & double glass doors */}
           <Path
-            d="M13.5 21.2C13.5 17.5 16.5 14.5 20.2 14.5H35.8C39.5 14.5 42.5 17.5 42.5 21.2V23.5H13.5V21.2Z"
+            d="M16.2 14.5H39.8C40.8 14.5 41.7 15.2 42 16.2L43.5 21.8C43.9 23.4 42.7 25 41 25H15C13.3 25 12.1 23.4 12.5 21.8L14 16.2C14.3 15.2 15.2 14.5 16.2 14.5Z"
             fill="#FFFFFF"
-            fillOpacity={0.8}
           />
-          <Rect x="15" y="23.5" width="26" height="18" rx="4" fill="#FFFFFF" />
-          {/* Centered arched shop doorway */}
-          <Path
-            d="M23.5 41.5V32C23.5 29.5 25.5 27.5 28 27.5C30.5 27.5 32.5 29.5 32.5 32V41.5H23.5Z"
-            fill={accent}
-          />
+          <Rect x="16.5" y="25" width="23" height="16.5" rx="3.2" fill="#FFFFFF" fillOpacity={0.86} />
+          {/* Centered double glass storefront door */}
+          <Rect x="22.2" y="29.5" width="11.6" height="12" rx="2.4" fill={accent} />
+          <Rect x="27.3" y="29.5" width="1.4" height="12" fill="#FFFFFF" fillOpacity={0.88} />
+          {/* Subtle awning divider stripes */}
+          <Rect x="21.5" y="14.5" width="2" height="10.5" fill={accent} fillOpacity={0.22} />
+          <Rect x="32.5" y="14.5" width="2" height="10.5" fill={accent} fillOpacity={0.22} />
         </>
       );
 
