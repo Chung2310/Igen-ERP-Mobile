@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { BrandLoadingOverlay } from '@/components/BrandLoader';
 import { Card } from '@/components/Card';
 import { BranchAppIcon, IgenAssistantAvatarIcon, OverviewTabIcon } from '@/components/OverviewTabIcons';
 import { Screen } from '@/components/Screen';
@@ -33,10 +34,7 @@ import {
   getOverviewDateRange,
   OVERVIEW_PERIOD_OPTIONS,
 } from '@/features/overview/overviewPeriod';
-import {
-  OverviewError,
-  OverviewLoading,
-} from '@/features/overview/OverviewWidgets';
+import { OverviewError } from '@/features/overview/OverviewWidgets';
 import {
   HealthcareOverviewView,
   StudentOverviewView,
@@ -346,6 +344,10 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     ]).start();
   }, [activePageId, sectionOpacity, sectionTranslateX]);
 
+  const isInitialPageLoading = Boolean(
+    activePageId && loading && (!payload || payload.kind !== activePageId),
+  );
+
   const renderSection = () => {
     if (!activePageId) {
       return (
@@ -356,8 +358,8 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         </Card>
       );
     }
-    if (loading && (!payload || payload.kind !== activePageId)) {
-      return <OverviewLoading label={`Đang tải ${activePage?.label ?? 'tổng quan'} từ ERP...`} />;
+    if (isInitialPageLoading) {
+      return null;
     }
     if (error && (!payload || payload.kind !== activePageId)) {
       return <OverviewError message={error} onRetry={onRetry} />;
@@ -662,6 +664,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
           </Pressable>
         </Pressable>
       </Modal>
+      <BrandLoadingOverlay visible={isInitialPageLoading} />
     </View>
   );
 

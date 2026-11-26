@@ -1027,7 +1027,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   unreadBadgeText: { color: colors.white, fontSize: 10.5, fontWeight: '600' },
-  stateBox: { padding: 28, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  stateBox: { flex: 1, minHeight: 320, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 10 },
   stateText: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center', lineHeight: 18 },
   retryBtn: {

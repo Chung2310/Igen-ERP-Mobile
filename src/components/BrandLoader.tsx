@@ -96,6 +96,8 @@ export function BrandLoader({ size = 46, style }: BrandLoaderProps) {
           style={[
             styles.layer,
             {
+              width: haloSize,
+              height: haloSize,
               opacity: haloOpacity,
               transform: [{ scale: haloScale }],
             },
@@ -120,7 +122,16 @@ export function BrandLoader({ size = 46, style }: BrandLoaderProps) {
         </Animated.View>
 
         {/* Spinning 4-petal brand gradient vortex */}
-        <Animated.View style={[styles.layer, { transform: [{ rotate }] }]}>
+        <Animated.View
+          style={[
+            styles.layer,
+            {
+              width: size,
+              height: size,
+              transform: [{ rotate }],
+            },
+          ]}
+        >
           <Svg width={size} height={size} viewBox="0 0 64 64" fill="none">
             <Defs>
               <LinearGradient id={`p1_${uid}`} x1="0" y1="0" x2="1" y2="1">
@@ -184,9 +195,9 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(255, 255, 255, 0.56)',
+    backgroundColor: 'rgba(255, 255, 255, 0.48)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 50,
+    zIndex: 99,
   },
 });

@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   stateCard: {
-    ...HAIRLINE_CARD,
+    minHeight: 280,
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
