@@ -992,7 +992,7 @@ export function OrgChartPanel({
                           {selectedNode.isLeader ? <Crown size={14} color="#D97706" /> : null}
                           <Text style={styles.detailRole}>
                             {selectedNode.isLeader ? 'Trưởng nhóm · ' : ''}
-                            {selectedNode.jobTitle || ROLE_LABELS[selectedNode.role || 'user']}
+                            {selectedNode.jobTitle || selectedNode.position || 'Chưa cập nhật chức vụ'}
                           </Text>
                         </View>
                         <Text style={styles.muted}>
@@ -1004,7 +1004,6 @@ export function OrgChartPanel({
                       <View style={styles.infoGrid}>
                         <InfoLine label="Email" value={selectedNode.email || '—'} />
                         <InfoLine label="Điện thoại" value={selectedNode.phone || 'Chưa cập nhật'} />
-                        <InfoLine label="Vai trò" value={ROLE_LABELS[selectedNode.role || 'user'] || selectedNode.role || '—'} />
                         <InfoLine label="Chuyên môn" value={selectedNode.qualification || '—'} />
                         {selectedNode.monthlySalary != null ? (
                           <InfoLine label="Lương tháng" value={formatCompactMoney(selectedNode.monthlySalary)} />
@@ -1012,7 +1011,7 @@ export function OrgChartPanel({
                         {leaveBalance ? (
                           <InfoLine
                             label={`Phép năm ${leaveBalance.year ?? new Date().getFullYear()}`}
-                            value={`Còn ${leaveBalance.remainingDays ?? 0} / ${leaveBalance.totalDays ?? 0} ngày`}
+                            value={`Còn ${leaveBalance.remaining ?? 0} / ${leaveBalance.entitlement ?? 0} ngày`}
                           />
                         ) : null}
                       </View>

@@ -59,10 +59,11 @@ export type HrEmployee = {
 
 export type HrLeaveBalance = {
   year?: number;
-  totalDays?: number;
-  usedDays?: number;
-  remainingDays?: number;
-  pendingDays?: number;
+  entitlement?: number;
+  used?: number;
+  pending?: number;
+  unexcused?: number;
+  remaining?: number;
 };
 
 export type HrAttendanceRecord = {
