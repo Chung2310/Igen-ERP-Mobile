@@ -1,4 +1,5 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { CenteredPageLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -414,7 +415,7 @@ export function ResourcesScreen() {
             }}
             onMore={() => { setActionItem(item); setDetailItem(null); }}
           />)}
-          {loading && <ActivityIndicator color={colors.primary} style={styles.loading} />}
+          {loading && <CenteredPageLoader />}
           {!loading && !error && visibleItems.length === 0 && <Text style={styles.empty}>
             {query ? 'Không tìm thấy tài nguyên phù hợp.' : localView === 'trash' ? 'Thùng rác đang trống.' : localView === 'shared' ? 'Chưa có tài nguyên nào được chia sẻ với bạn.' : 'Thư mục này chưa có tài nguyên.'}
           </Text>}
@@ -612,7 +613,7 @@ const styles = StyleSheet.create({
   rowMeta: { color: colors.muted, fontSize: 8, marginTop: 4 },
   rowChevron: { marginLeft: 7 },
   moreButton: { minWidth: 34, minHeight: 36, alignItems: 'center', justifyContent: 'center', marginLeft: 3 },
-  loading: { padding: 24 },
+  loading: { flex: 1, minHeight: 320, alignItems: 'center', justifyContent: 'center', padding: 24, paddingBottom: 100 },
   empty: { paddingVertical: 24, paddingHorizontal: 12, color: colors.muted, textAlign: 'center', fontSize: 9, lineHeight: 15 },
   emptySmall: { paddingVertical: 17, color: colors.muted, textAlign: 'center', fontSize: 9 },
   errorCard: { padding: 12, marginBottom: 12, backgroundColor: '#FFF1F0', borderColor: '#F6D6D4' },

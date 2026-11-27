@@ -136,13 +136,13 @@ export function formatCompactMoney(value: number | null | undefined, suffix = '�
   if (value == null || !Number.isFinite(value)) return '—';
   const abs = Math.abs(value);
   if (abs >= 1e9) {
-    return `${(value / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} tỷ`;
+    return `${(value / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 2 })} tỉ`;
   }
   if (abs >= 1e6) {
     return `${(value / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tr`;
   }
   if (abs >= 1e3) {
-    return `${(value / 1e3).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} nghìn`;
+    return `${(value / 1e3).toLocaleString('vi-VN', { maximumFractionDigits: 0 })} K`;
   }
   return `${Math.round(value).toLocaleString('vi-VN')}${suffix ? ` ${suffix}` : ''}`;
 }

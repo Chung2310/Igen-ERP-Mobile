@@ -77,13 +77,13 @@ export function StudentOverviewView({
       label: 'Thu trong kỳ',
       value: st.tuitionRevenue,
       displayValue: formatCompactMoney(st.tuitionRevenue),
-      color: '#16885A',
+      color: '#18C93A',
     },
     {
       label: 'Còn phải thu',
       value: st.outstandingDebt,
       displayValue: formatCompactMoney(st.outstandingDebt),
-      color: '#C27617',
+      color: '#F5D610',
     },
   ];
 
@@ -179,8 +179,8 @@ export function WorkerOverviewView({
   ];
 
   const statusRows = [
-    { label: 'Đang hoạt động', value: data.workersByStatus.active, displayValue: formatInt(data.workersByStatus.active), color: '#2463EB' },
-    { label: 'Đã bố trí', value: data.workersByStatus.placed, displayValue: formatInt(data.workersByStatus.placed), color: '#16885A' },
+    { label: 'Đang hoạt động', value: data.workersByStatus.active, displayValue: formatInt(data.workersByStatus.active), color: '#2196F3' },
+    { label: 'Đã bố trí', value: data.workersByStatus.placed, displayValue: formatInt(data.workersByStatus.placed), color: '#18C93A' },
     { label: 'Tạm ngưng', value: data.workersByStatus.inactive, displayValue: formatInt(data.workersByStatus.inactive), color: '#94A3B8' },
   ];
 
@@ -205,7 +205,7 @@ export function WorkerOverviewView({
       <KpiGrid items={kpis} />
 
       <SectionHeading title="Hồ sơ tiếp nhận gần đây" />
-      <VerticalBarChart data={monthlyBars} primaryLabel="Hồ sơ mới" primaryColor="#C27617" />
+      <VerticalBarChart data={monthlyBars} primaryLabel="Hồ sơ mới" primaryColor="#2196F3" />
 
       <SectionHeading title="Cơ cấu trạng thái lao động" />
       <BreakdownBars rows={statusRows} />

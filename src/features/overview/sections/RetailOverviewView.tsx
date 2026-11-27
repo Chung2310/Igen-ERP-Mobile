@@ -131,8 +131,8 @@ export function RetailOverviewView({
         data={buildRetailBars(report)}
         primaryLabel="Doanh số thuần"
         secondaryLabel="Thực thu"
-        primaryColor="#2463EB"
-        secondaryColor="#16885A"
+        primaryColor="#2196F3"
+        secondaryColor="#18C93A"
       />
 
       <SectionHeading title="Phương thức thanh toán" />

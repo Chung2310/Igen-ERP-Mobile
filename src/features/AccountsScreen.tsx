@@ -1,3 +1,4 @@
+import { CenteredPageLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
@@ -292,7 +293,7 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
           </Pressable>)}
         </ScrollView>}
 
-        {loading ? <View style={styles.state}><ActivityIndicator color={colors.primary} /><Text style={styles.stateText}>Đang tải tài khoản từ IGen-ERP…</Text></View> : error ? <PopupError error={error} onRetry={() => void loadAccounts()} /> : visibleAccounts.length === 0 ? (
+        {loading ? <CenteredPageLoader /> : error ? <PopupError error={error} onRetry={() => void loadAccounts()} /> : visibleAccounts.length === 0 ? (
           <View style={styles.state}><UserRound size={26} color={colors.muted} /><Text style={styles.emptyTitle}>{accounts.length ? 'Không tìm thấy tài khoản phù hợp' : 'Chưa có tài khoản'}</Text><Text style={styles.stateText}>{accounts.length ? 'Thử từ khóa hoặc bộ lọc vai trò khác.' : 'Thêm thành viên đầu tiên vào doanh nghiệp.'}</Text></View>
         ) : (
           <View style={styles.list}>
@@ -412,7 +413,7 @@ const styles = StyleSheet.create({
   statusInactive: { color: '#B34B55' },
   deleteButton: { width: 30, height: 34, alignItems: 'center', justifyContent: 'center' },
   protectedTag: { width: 28, alignItems: 'center' },
-  state: { minHeight: 210, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 25, gap: 9 },
+  state: { flex: 1, minHeight: 320, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 25, paddingBottom: 100, gap: 9 },
   stateText: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center' },
   errorTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   emptyTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
