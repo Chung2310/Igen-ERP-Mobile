@@ -13,6 +13,7 @@ type IconPalette = {
 };
 
 const MODULE_PALETTES: Record<string, IconPalette> = {
+  'quick-attendance': { from: '#16C9A2', to: '#089974', accent: '#0DA981' },
   'ai-plans': { from: '#8E63FA', to: '#5E38E8', accent: '#6C42EE' },
   users: { from: '#28C4FF', to: '#0B8CE8', accent: '#1299EE' },
   hr: { from: '#FF8452', to: '#F25430', accent: '#F5603A' },
@@ -36,6 +37,36 @@ const DEFAULT_PALETTE: IconPalette = {
 
 function renderGlyph(slug: string, accent: string) {
   switch (slug) {
+    case 'quick-attendance':
+      return (
+        <>
+          {/* Clock dial */}
+          <Circle cx="26.5" cy="27" r="12.5" fill="#FFFFFF" />
+          {/* Clock hands */}
+          <Path
+            d="M26.5 20.4V27.2L31 29.8"
+            stroke={accent}
+            strokeWidth="2.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          {/* Top crown stem */}
+          <Rect x="23.5" y="11.2" width="6" height="2.6" rx="1.3" fill="#FFFFFF" fillOpacity={0.86} />
+          {/* Bottom-right check-in badge */}
+          <Circle cx="38.2" cy="37.4" r="6.8" fill={accent} />
+          <Circle cx="38.2" cy="37.4" r="5.3" fill="#FFFFFF" />
+          <Path
+            d="M35.7 37.5L37.4 39.2L40.9 35.7"
+            stroke={accent}
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </>
+      );
+
     case 'ai-plans':
       return (
         <>
