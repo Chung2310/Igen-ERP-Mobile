@@ -1,7 +1,8 @@
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Pencil, Plus, RotateCcw, Save, Search, Smartphone, X } from 'lucide-react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pencil, Plus, RotateCcw, Save, Search, Smartphone } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 import { DateTimeField } from '@/features/quotation/DateTimeField';
 import { getRetailPartnerStatement, getRetailProductCommissions, listRetailCommissionPolicies, saveRetailCommissionPolicy, saveRetailProductCommission, type RetailCommissionPolicy, type RetailLegacyPolicy, type RetailPartner, type RetailPartnerStatementData, type RetailProductCommissionData } from '@/features/partnersApi';
@@ -146,74 +147,75 @@ export function RetailPartnerOperations({ companyCode, partners, initialTab = 'p
       </>}
     </ScrollView>
 
-    <Modal visible={Boolean(policyForm)} transparent animationType="fade" onRequestClose={() => { if (!busy) setPolicyForm(null); }}>
-      <Pressable style={styles.backdrop} onPress={() => { if (!busy) setPolicyForm(null); }}>
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.heading}>{policyForm === 'new' ? 'Tạo chính sách hoa hồng' : 'Sửa chính sách hoa hồng'}</Text>
-            <Pressable onPress={() => setPolicyForm(null)} style={styles.closeBtn}><X size={18} color={colors.muted} /></Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-            <Text style={styles.label}>Áp dụng cho (để trống = toàn công ty)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>{[{ _id: '', name: 'Toàn công ty' }, ...partners.filter((p) => p.roles.includes('collaborator'))].map((p) => <Pressable key={p._id} onPress={() => setPolicyFields((f) => ({ ...f, partnerId: p._id }))} style={[styles.choice, policyFields.partnerId === p._id && styles.choiceSelected]}><Text style={[styles.choiceText, policyFields.partnerId === p._id && styles.choiceTextSelected]}>{p.name}</Text></Pressable>)}</ScrollView>
-            <DateTimeField
-              label="Ngày hiệu lực (để trống = ngay)"
-              mode="date"
-              value={policyFields.effectiveAt ? policyFields.effectiveAt.slice(0, 10) : ''}
-              onChange={(dateVal) => setPolicyFields((f) => ({ ...f, effectiveAt: dateVal ? `${dateVal}T${f.effectiveAt.slice(11, 16) || '00:00'}` : '' }))}
-              allowClear
+    <FullScreenFormModal
+      visible={Boolean(policyForm)}
+      title={policyForm === 'new' ? 'Tạo chính sách hoa hồng' : 'Sửa chính sách hoa hồng'}
+      onClose={() => { if (!busy) setPolicyForm(null); }}
+      footer={
+        <View style={styles.rowEnd}>
+          <Pressable onPress={() => setPolicyForm(null)} style={styles.secondary}><Text style={styles.secondaryText}>Hủy</Text></Pressable>
+          <Pressable onPress={() => void savePolicy()} style={styles.action}><Save size={14} color={colors.white} /><Text style={styles.actionText}>{busy ? 'Đang lưu…' : 'Lưu'}</Text></Pressable>
+        </View>
+      }
+    >
+      <View style={{ gap: 8 }}>
+        <Text style={styles.label}>Áp dụng cho (để trống = toàn công ty)</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>{[{ _id: '', name: 'Toàn công ty' }, ...partners.filter((p) => p.roles.includes('collaborator'))].map((p) => <Pressable key={p._id} onPress={() => setPolicyFields((f) => ({ ...f, partnerId: p._id }))} style={[styles.choice, policyFields.partnerId === p._id && styles.choiceSelected]}><Text style={[styles.choiceText, policyFields.partnerId === p._id && styles.choiceTextSelected]}>{p.name}</Text></Pressable>)}</ScrollView>
+        <DateTimeField
+          label="Ngày hiệu lực (để trống = ngay)"
+          mode="date"
+          value={policyFields.effectiveAt ? policyFields.effectiveAt.slice(0, 10) : ''}
+          onChange={(dateVal) => setPolicyFields((f) => ({ ...f, effectiveAt: dateVal ? `${dateVal}T${f.effectiveAt.slice(11, 16) || '00:00'}` : '' }))}
+          allowClear
+        />
+        <Text style={styles.label}>Điện thoại / thiết bị (VND mỗi máy)</Text>
+        <View style={styles.moneyInputWrap}>
+          <TextInput
+            value={policyFields.phone}
+            onChangeText={(phone) => setPolicyFields((f) => ({ ...f, phone: formatVndInput(phone) }))}
+            placeholder="200.000"
+            placeholderTextColor={colors.muted}
+            keyboardType="numeric"
+            style={styles.moneyInput}
+          />
+          <Text style={styles.currencySuffix}>VND</Text>
+        </View>
+        <Text style={styles.label}>Phụ kiện (% doanh thu)</Text>{field(policyFields.accessory, (accessory) => setPolicyFields((f) => ({ ...f, accessory })), '10', 'numeric')}
+        <Text style={styles.label}>Công sửa chữa (%)</Text>{field(policyFields.repair, (repair) => setPolicyFields((f) => ({ ...f, repair })), '10', 'numeric')}
+      </View>
+    </FullScreenFormModal>
+    <FullScreenFormModal
+      visible={Boolean(commissionForm)}
+      title={`Cấu hình ${commissionForm?.skus.length ?? 0} SKU`}
+      onClose={() => setCommissionForm(null)}
+      footer={
+        <View style={styles.inline}>
+          <Pressable onPress={() => void saveCommission(commissionForm?.kind === 'phone' ? { kind: 'phone', amount: parseVndInput(commissionForm.value) } : { kind: 'accessory', rateBps: Math.round(Number(commissionForm?.value) * 100) })} style={styles.action}><Save size={14} color={colors.white} /><Text style={styles.actionText}>Lưu mức riêng</Text></Pressable>
+          <Pressable onPress={() => void saveCommission(null)} style={styles.secondary}><RotateCcw size={14} color={colors.ink} /><Text style={styles.secondaryText}>Dùng chính sách chung</Text></Pressable>
+        </View>
+      }
+    >
+      <View style={{ gap: 10 }}>
+        <View style={styles.inline}>
+          <Pressable onPress={() => setCommissionForm((f) => f && ({ ...f, kind: 'phone', value: formatVndInput(200000) }))} style={[styles.choice, commissionForm?.kind === 'phone' && styles.choiceSelected]}><Smartphone size={14} color={commissionForm?.kind === 'phone' ? colors.white : colors.primary} /><Text style={[styles.choiceText, commissionForm?.kind === 'phone' && styles.choiceTextSelected]}>Theo máy</Text></Pressable>
+          <Pressable onPress={() => setCommissionForm((f) => f && ({ ...f, kind: 'accessory', value: '10' }))} style={[styles.choice, commissionForm?.kind === 'accessory' && styles.choiceSelected]}><Text style={[styles.choiceText, commissionForm?.kind === 'accessory' && styles.choiceTextSelected]}>Theo %</Text></Pressable>
+        </View>
+        <Text style={styles.label}>Mức riêng {commissionForm?.kind === 'phone' ? '(VND/máy)' : '(%)'}</Text>
+        {commissionForm?.kind === 'phone' ? (
+          <View style={styles.moneyInputWrap}>
+            <TextInput
+              value={commissionForm.value}
+              onChangeText={(value) => setCommissionForm((f) => f && ({ ...f, value: formatVndInput(value) }))}
+              placeholder="200.000"
+              placeholderTextColor={colors.muted}
+              keyboardType="numeric"
+              style={styles.moneyInput}
             />
-            <Text style={styles.label}>Điện thoại / thiết bị (VND mỗi máy)</Text>
-            <View style={styles.moneyInputWrap}>
-              <TextInput
-                value={policyFields.phone}
-                onChangeText={(phone) => setPolicyFields((f) => ({ ...f, phone: formatVndInput(phone) }))}
-                placeholder="200.000"
-                placeholderTextColor={colors.muted}
-                keyboardType="numeric"
-                style={styles.moneyInput}
-              />
-              <Text style={styles.currencySuffix}>VND</Text>
-            </View>
-            <Text style={styles.label}>Phụ kiện (% doanh thu)</Text>{field(policyFields.accessory, (accessory) => setPolicyFields((f) => ({ ...f, accessory })), '10', 'numeric')}
-            <Text style={styles.label}>Công sửa chữa (%)</Text>{field(policyFields.repair, (repair) => setPolicyFields((f) => ({ ...f, repair })), '10', 'numeric')}
-          </ScrollView>
-          <View style={styles.modalActions}>
-            <Pressable onPress={() => setPolicyForm(null)} style={styles.secondary}><Text style={styles.secondaryText}>Hủy</Text></Pressable>
-            <Pressable onPress={() => void savePolicy()} style={styles.action}><Save size={14} color={colors.white} /><Text style={styles.actionText}>{busy ? 'Đang lưu…' : 'Lưu'}</Text></Pressable>
+            <Text style={styles.currencySuffix}>VND</Text>
           </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-    <Modal visible={Boolean(commissionForm)} transparent animationType="fade" onRequestClose={() => setCommissionForm(null)}>
-      <Pressable style={styles.backdrop} onPress={() => setCommissionForm(null)}>
-        <Pressable style={styles.dialog} onPress={() => {}}>
-          <View style={styles.rowBetween}><Text style={styles.heading}>Cấu hình {commissionForm?.skus.length} SKU</Text><Pressable onPress={() => setCommissionForm(null)} style={styles.closeBtn}><X size={18} color={colors.muted} /></Pressable></View>
-          <View style={styles.inline}>
-            <Pressable onPress={() => setCommissionForm((f) => f && ({ ...f, kind: 'phone', value: formatVndInput(200000) }))} style={[styles.choice, commissionForm?.kind === 'phone' && styles.choiceSelected]}><Smartphone size={14} color={commissionForm?.kind === 'phone' ? colors.white : colors.primary} /><Text style={[styles.choiceText, commissionForm?.kind === 'phone' && styles.choiceTextSelected]}>Theo máy</Text></Pressable>
-            <Pressable onPress={() => setCommissionForm((f) => f && ({ ...f, kind: 'accessory', value: '10' }))} style={[styles.choice, commissionForm?.kind === 'accessory' && styles.choiceSelected]}><Text style={[styles.choiceText, commissionForm?.kind === 'accessory' && styles.choiceTextSelected]}>Theo %</Text></Pressable>
-          </View>
-          <Text style={styles.label}>Mức riêng {commissionForm?.kind === 'phone' ? '(VND/máy)' : '(%)'}</Text>
-          {commissionForm?.kind === 'phone' ? (
-            <View style={styles.moneyInputWrap}>
-              <TextInput
-                value={commissionForm.value}
-                onChangeText={(value) => setCommissionForm((f) => f && ({ ...f, value: formatVndInput(value) }))}
-                placeholder="200.000"
-                placeholderTextColor={colors.muted}
-                keyboardType="numeric"
-                style={styles.moneyInput}
-              />
-              <Text style={styles.currencySuffix}>VND</Text>
-            </View>
-          ) : field(commissionForm?.value || '', (value) => setCommissionForm((f) => f && ({ ...f, value })), 'Nhập mức', 'numeric')}
-          <View style={styles.inline}>
-            <Pressable onPress={() => void saveCommission(commissionForm?.kind === 'phone' ? { kind: 'phone', amount: parseVndInput(commissionForm.value) } : { kind: 'accessory', rateBps: Math.round(Number(commissionForm?.value) * 100) })} style={styles.action}><Save size={14} color={colors.white} /><Text style={styles.actionText}>Lưu mức riêng</Text></Pressable>
-            <Pressable onPress={() => void saveCommission(null)} style={styles.secondary}><RotateCcw size={14} color={colors.ink} /><Text style={styles.secondaryText}>Dùng chính sách chung</Text></Pressable>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        ) : field(commissionForm?.value || '', (value) => setCommissionForm((f) => f && ({ ...f, value })), 'Nhập mức', 'numeric')}
+      </View>
+    </FullScreenFormModal>
   </View>;
 }
 
@@ -229,6 +231,7 @@ const styles = StyleSheet.create({
   count: { color: colors.muted, fontSize: 10, fontWeight: '700' },
   card: { padding: 13, borderWidth: 1, borderColor: colors.border, borderRadius: 16, backgroundColor: colors.white, gap: 5 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  rowEnd: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
   inline: { flexDirection: 'row', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
   cardTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' },
   meta: { color: colors.muted, fontSize: 10, lineHeight: 15 },

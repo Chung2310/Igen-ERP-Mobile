@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -17,6 +16,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import { Check, ChevronLeft, ChevronRight, Paperclip, Plus, X } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -480,76 +480,66 @@ export function HrWorkflowsPanel({
       setEditingWorkflow(null);
     };
     return (
-      <Modal
+      <FullScreenFormModal
         visible={createOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={close}
+        title={editingWorkflow ? 'Sửa quy trình' : 'Tạo quy trình mới'}
+        cancelLabel="Hủy"
+        onSave={() => void (editingWorkflow ? onUpdateWorkflow() : onCreateWorkflow())}
+        saving={savingWf}
+        onClose={close}
       >
-        <Pressable style={styles.backdrop} onPress={close}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>
-                {editingWorkflow ? 'Sửa quy trình' : 'Tạo quy trình mới'}
-              </Text>
-              <Pressable onPress={close} hitSlop={8} disabled={savingWf}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Tên quy trình *</Text>
+          <TextInput
+            value={wfName}
+            onChangeText={setWfName}
+            placeholder="VD: Quy trình tiếp nhận nhân sự mới"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Danh mục</Text>
+          <TextInput
+            value={wfCategory}
+            onChangeText={setWfCategory}
+            placeholder="VD: Nhân sự / Vận hành"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          {categories.length > 1 ? (
+            <View style={styles.categorySuggestions}>
+              {categories.slice(1).map((category) => (
+                <Pressable
+                  key={category}
+                  onPress={() => setWfCategory(category)}
+                  style={[styles.catChip, wfCategory.trim() === category && styles.catChipActive]}
+                >
+                  <Text style={[styles.catText, wfCategory.trim() === category && styles.catTextActive]}>{category}</Text>
+                </Pressable>
+              ))}
             </View>
-            <View style={{ gap: 8 }}>
-              <Text style={styles.label}>Tên quy trình *</Text>
-              <TextInput
-                value={wfName}
-                onChangeText={setWfName}
-                placeholder="VD: Quy trình tiếp nhận nhân sự mới"
-                placeholderTextColor={colors.muted}
-                style={styles.field}
-              />
-              <Text style={styles.label}>Danh mục</Text>
-              <TextInput
-                value={wfCategory}
-                onChangeText={setWfCategory}
-                placeholder="VD: Nhân sự / Vận hành"
-                placeholderTextColor={colors.muted}
-                style={styles.field}
-              />
-              {categories.length > 1 ? (
-                <View style={styles.categorySuggestions}>
-                  {categories.slice(1).map((category) => (
-                    <Pressable
-                      key={category}
-                      onPress={() => setWfCategory(category)}
-                      style={[styles.catChip, wfCategory.trim() === category && styles.catChipActive]}
-                    >
-                      <Text style={[styles.catText, wfCategory.trim() === category && styles.catTextActive]}>{category}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-              <Text style={styles.label}>Mô tả</Text>
-              <TextInput
-                value={wfDesc}
-                onChangeText={setWfDesc}
-                multiline
-                placeholder="Mục đích và phạm vi áp dụng..."
-                placeholderTextColor={colors.muted}
-                style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
-              />
-              <Pressable
-                disabled={savingWf}
-                onPress={() => void (editingWorkflow ? onUpdateWorkflow() : onCreateWorkflow())}
-                style={[styles.submitBtn, savingWf && styles.disabled]}
-              >
-                <Text style={styles.submitBtnText}>
-                  {savingWf
-                    ? 'Đang lưu...'
-                    : editingWorkflow ? 'Lưu quy trình' : 'Tạo quy trình'}
-                </Text>
-              </Pressable>
-            </View>
+          ) : null}
+          <Text style={styles.label}>Mô tả</Text>
+          <TextInput
+            value={wfDesc}
+            onChangeText={setWfDesc}
+            multiline
+            placeholder="Mục đích và phạm vi áp dụng..."
+            placeholderTextColor={colors.muted}
+            style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+          />
+          <Pressable
+            disabled={savingWf}
+            onPress={() => void (editingWorkflow ? onUpdateWorkflow() : onCreateWorkflow())}
+            style={[styles.submitBtn, savingWf && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingWf
+                ? 'Đang lưu...'
+                : editingWorkflow ? 'Lưu quy trình' : 'Tạo quy trình'}
+            </Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     );
   }
 
@@ -652,257 +642,228 @@ export function HrWorkflowsPanel({
           </View>
         )}
 
-        {/* Step Detail Modal */}
-        <Modal
+        {/* Step Detail Full-Screen Page */}
+        <FullScreenFormModal
           visible={Boolean(selectedStep)}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setSelectedStep(null)}
+          title={
+            selectedStep
+              ? `Bước ${selectedStep.index + 1}: ${selectedStep.step.title || `Bước ${selectedStep.index + 1}`}`
+              : 'Chi tiết bước'
+          }
+          onClose={() => setSelectedStep(null)}
         >
-          <Pressable style={styles.backdrop} onPress={() => setSelectedStep(null)}>
-            <Pressable style={styles.sheet} onPress={() => {}}>
-              {selectedStep ? (
-                <>
-                  <View style={styles.modalHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.stepEyebrow}>BƯỚC {selectedStep.index + 1}</Text>
-                      <Text style={styles.sheetTitle}>
-                        {selectedStep.step.title || `Bước ${selectedStep.index + 1}`}
-                      </Text>
-                    </View>
-                    <Pressable onPress={() => setSelectedStep(null)} hitSlop={8}>
-                      <Text style={styles.closeText}>Đóng</Text>
-                    </Pressable>
-                  </View>
+          {selectedStep ? (
+            <View style={{ gap: 12, paddingBottom: 12 }}>
+              {selectedStep.step.description ? (
+                <Text style={styles.bodyText}>{selectedStep.step.description}</Text>
+              ) : (
+                <Text style={styles.muted}>Chưa có mô tả chi tiết cho bước này.</Text>
+              )}
 
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }}>
-                    <View style={{ gap: 12, paddingBottom: 10 }}>
-                      {selectedStep.step.description ? (
-                        <Text style={styles.bodyText}>{selectedStep.step.description}</Text>
-                      ) : (
-                        <Text style={styles.muted}>Chưa có mô tả chi tiết cho bước này.</Text>
-                      )}
-
-                      {selectedStep.step.note ? (
-                        <View style={styles.noteBox}>
-                          <Text style={styles.noteTitle}>Lưu ý</Text>
-                          <Text style={styles.noteText}>{selectedStep.step.note}</Text>
-                        </View>
-                      ) : null}
-
-                      {selectedStep.step.deliverable ? (
-                        <View style={styles.deliverableBox}>
-                          <Text style={styles.deliverableTitle}>Kết quả cần đạt</Text>
-                          <Text style={styles.deliverableText}>
-                            {selectedStep.step.deliverable}
-                          </Text>
-                        </View>
-                      ) : null}
-
-                      {selectedStep.step.subTasks?.length ? (
-                        <View style={{ gap: 6 }}>
-                          <Text style={styles.subSectionLabel}>
-                            Công việc con ({selectedStep.step.subTasks.length})
-                          </Text>
-                          {selectedStep.step.subTasks.map((sub, i) => (
-                            <View key={sub.id || i} style={styles.subTaskRow}>
-                              <View style={styles.subDot} />
-                              <Text style={styles.subTaskText}>{sub.title}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      ) : null}
-
-                      {selectedStep.step.attachments?.length ? (
-                        <View style={{ gap: 6 }}>
-                          <Text style={styles.subSectionLabel}>
-                            Tệp đính kèm ({selectedStep.step.attachments.length})
-                          </Text>
-                          {selectedStep.step.attachments.map((att, i) => (
-                            <Pressable
-                              key={att.id || i}
-                              onPress={() => {
-                                if (att.url) void Linking.openURL(att.url);
-                              }}
-                              style={styles.attachBtn}
-                            >
-                              <View style={styles.attachBtnContent}>
-                                <Paperclip size={14} color={colors.primary} />
-                                <Text numberOfLines={1} style={styles.attachBtnText}>{att.name || 'Mở tệp đính kèm'}</Text>
-                                <ChevronRight size={14} color={colors.primary} />
-                              </View>
-                            </Pressable>
-                          ))}
-                        </View>
-                      ) : null}
-
-                      {canManage ? (
-                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                          <Pressable
-                            onPress={() => openEditStep(selectedStep.step)}
-                            style={[styles.submitBtn, { flex: 1 }]}
-                          >
-                            <Text style={styles.submitBtnText}>Chỉnh sửa bước</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => onDeleteStep(selectedStep.step)}
-                            style={styles.deleteBtn}
-                          >
-                            <Text style={styles.deleteBtnText}>Xóa</Text>
-                          </Pressable>
-                        </View>
-                      ) : null}
-                    </View>
-                  </ScrollView>
-                </>
+              {selectedStep.step.note ? (
+                <View style={styles.noteBox}>
+                  <Text style={styles.noteTitle}>Lưu ý</Text>
+                  <Text style={styles.noteText}>{selectedStep.step.note}</Text>
+                </View>
               ) : null}
-            </Pressable>
-          </Pressable>
-        </Modal>
 
-        {/* Add / Edit Step Modal */}
-        <Modal
+              {selectedStep.step.deliverable ? (
+                <View style={styles.deliverableBox}>
+                  <Text style={styles.deliverableTitle}>Kết quả cần đạt</Text>
+                  <Text style={styles.deliverableText}>
+                    {selectedStep.step.deliverable}
+                  </Text>
+                </View>
+              ) : null}
+
+              {selectedStep.step.subTasks?.length ? (
+                <View style={{ gap: 6 }}>
+                  <Text style={styles.subSectionLabel}>
+                    Công việc con ({selectedStep.step.subTasks.length})
+                  </Text>
+                  {selectedStep.step.subTasks.map((sub, i) => (
+                    <View key={sub.id || i} style={styles.subTaskRow}>
+                      <View style={styles.subDot} />
+                      <Text style={styles.subTaskText}>{sub.title}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {selectedStep.step.attachments?.length ? (
+                <View style={{ gap: 6 }}>
+                  <Text style={styles.subSectionLabel}>
+                    Tệp đính kèm ({selectedStep.step.attachments.length})
+                  </Text>
+                  {selectedStep.step.attachments.map((att, i) => (
+                    <Pressable
+                      key={att.id || i}
+                      onPress={() => {
+                        if (att.url) void Linking.openURL(att.url);
+                      }}
+                      style={styles.attachBtn}
+                    >
+                      <View style={styles.attachBtnContent}>
+                        <Paperclip size={14} color={colors.primary} />
+                        <Text numberOfLines={1} style={styles.attachBtnText}>{att.name || 'Mở tệp đính kèm'}</Text>
+                        <ChevronRight size={14} color={colors.primary} />
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              {canManage ? (
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                  <Pressable
+                    onPress={() => openEditStep(selectedStep.step)}
+                    style={[styles.submitBtn, { flex: 1 }]}
+                  >
+                    <Text style={styles.submitBtnText}>Chỉnh sửa bước</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => onDeleteStep(selectedStep.step)}
+                    style={styles.deleteBtn}
+                  >
+                    <Text style={styles.deleteBtnText}>Xóa</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </FullScreenFormModal>
+
+        {/* Add / Edit Step Full-Screen Page */}
+        <FullScreenFormModal
           visible={stepModalOpen}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setStepModalOpen(false)}
+          title={editingStepId ? 'Chỉnh sửa bước' : 'Thêm bước mới'}
+          cancelLabel="Hủy"
+          onSave={() => void onSaveStep()}
+          saving={savingStep || uploadingStepAttachments}
+          onClose={() => setStepModalOpen(false)}
         >
-          <Pressable style={styles.backdrop} onPress={() => setStepModalOpen(false)}>
-            <Pressable style={styles.sheet} onPress={() => {}}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.sheetTitle}>
-                  {editingStepId ? 'Chỉnh sửa bước' : 'Thêm bước mới'}
-                </Text>
-                <Pressable onPress={() => setStepModalOpen(false)} hitSlop={8}>
-                  <Text style={styles.closeText}>Đóng</Text>
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.label}>Tên bước *</Text>
+            <TextInput value={stepTitle} onChangeText={setStepTitle} style={styles.field} />
+
+            <Text style={styles.label}>Mô tả chi tiết</Text>
+            <TextInput
+              value={stepDesc}
+              onChangeText={setStepDesc}
+              multiline
+              style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+            />
+
+            <Text style={styles.label}>Lưu ý quan trọng</Text>
+            <TextInput value={stepNote} onChangeText={setStepNote} style={styles.field} />
+
+            <Text style={styles.label}>Kết quả cần đạt</Text>
+            <TextInput
+              value={stepDeliverable}
+              onChangeText={setStepDeliverable}
+              style={styles.field}
+            />
+
+            <Text style={styles.label}>Công việc con ({stepSubTasks.length})</Text>
+            {stepSubTasks.map((task) => (
+              <View key={task.id} style={styles.subTaskEditRow}>
+                <View style={styles.subDot} />
+                <Text style={styles.subTaskText}>{task.title}</Text>
+                <Pressable
+                  onPress={() => removeStepSubTask(task.id)}
+                  hitSlop={8}
+                  accessibilityLabel={`Xóa công việc con ${task.title}`}
+                >
+                  <X size={15} color={colors.muted} />
                 </Pressable>
               </View>
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }}>
-                <View style={{ gap: 8, paddingBottom: 10 }}>
-                  <Text style={styles.label}>Tên bước *</Text>
-                  <TextInput value={stepTitle} onChangeText={setStepTitle} style={styles.field} />
+            ))}
+            <View style={styles.subTaskAddRow}>
+              <TextInput
+                value={stepSubTaskDraft}
+                onChangeText={setStepSubTaskDraft}
+                onSubmitEditing={addStepSubTask}
+                returnKeyType="done"
+                placeholder="Nhập tên công việc con..."
+                placeholderTextColor={colors.muted}
+                style={[styles.field, { flex: 1 }]}
+              />
+              <Pressable
+                onPress={addStepSubTask}
+                disabled={!stepSubTaskDraft.trim()}
+                style={[styles.subTaskAddBtn, !stepSubTaskDraft.trim() && styles.disabled]}
+              >
+                <Plus size={14} color={colors.primary} />
+                <Text style={styles.categoryAddText}>Thêm</Text>
+              </Pressable>
+            </View>
 
-                  <Text style={styles.label}>Mô tả chi tiết</Text>
-                  <TextInput
-                    value={stepDesc}
-                    onChangeText={setStepDesc}
-                    multiline
-                    style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
-                  />
-
-                  <Text style={styles.label}>Lưu ý quan trọng</Text>
-                  <TextInput value={stepNote} onChangeText={setStepNote} style={styles.field} />
-
-                  <Text style={styles.label}>Kết quả cần đạt</Text>
-                  <TextInput
-                    value={stepDeliverable}
-                    onChangeText={setStepDeliverable}
-                    style={styles.field}
-                  />
-
-                  <Text style={styles.label}>Công việc con ({stepSubTasks.length})</Text>
-                  {stepSubTasks.map((task) => (
-                    <View key={task.id} style={styles.subTaskEditRow}>
-                      <View style={styles.subDot} />
-                      <Text style={styles.subTaskText}>{task.title}</Text>
+            <View style={styles.attachmentSection}>
+              <View style={styles.attachmentHeading}>
+                <Text style={styles.label}>Tệp đính kèm ({stepAttachments.length})</Text>
+                <Pressable
+                  onPress={() => void pickStepAttachments()}
+                  disabled={uploadingStepAttachments || savingStep}
+                  style={[
+                    styles.attachmentAddBtn,
+                    (uploadingStepAttachments || savingStep) && styles.disabled,
+                  ]}
+                >
+                  {uploadingStepAttachments ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Paperclip size={14} color={colors.primary} />
+                  )}
+                  <Text style={styles.attachmentAddText}>
+                    {uploadingStepAttachments ? 'Đang tải...' : 'Thêm tệp'}
+                  </Text>
+                </Pressable>
+              </View>
+              {stepAttachments.length ? (
+                <View style={{ gap: 6 }}>
+                  {stepAttachments.map((attachment, index) => (
+                    <View key={attachment.id || `${attachment.url}-${index}`} style={styles.attachmentRow}>
+                      <Paperclip size={14} color={colors.primary} />
+                      <Text numberOfLines={1} style={styles.attachmentName}>
+                        {attachment.name || 'Tệp đính kèm'}
+                      </Text>
                       <Pressable
-                        onPress={() => removeStepSubTask(task.id)}
+                        onPress={() =>
+                          setStepAttachments((current) =>
+                            current.filter((_, itemIndex) => itemIndex !== index),
+                          )
+                        }
                         hitSlop={8}
-                        accessibilityLabel={`Xóa công việc con ${task.title}`}
+                        accessibilityLabel={`Gỡ tệp ${attachment.name}`}
                       >
-                        <X size={15} color={colors.muted} />
+                        <X size={16} color={colors.muted} />
                       </Pressable>
                     </View>
                   ))}
-                  <View style={styles.subTaskAddRow}>
-                    <TextInput
-                      value={stepSubTaskDraft}
-                      onChangeText={setStepSubTaskDraft}
-                      onSubmitEditing={addStepSubTask}
-                      returnKeyType="done"
-                      placeholder="Nhập tên công việc con..."
-                      placeholderTextColor={colors.muted}
-                      style={[styles.field, { flex: 1 }]}
-                    />
-                    <Pressable
-                      onPress={addStepSubTask}
-                      disabled={!stepSubTaskDraft.trim()}
-                      style={[styles.subTaskAddBtn, !stepSubTaskDraft.trim() && styles.disabled]}
-                    >
-                      <Plus size={14} color={colors.primary} />
-                      <Text style={styles.categoryAddText}>Thêm</Text>
-                    </Pressable>
-                  </View>
-
-                  <View style={styles.attachmentSection}>
-                    <View style={styles.attachmentHeading}>
-                      <Text style={styles.label}>Tệp đính kèm ({stepAttachments.length})</Text>
-                      <Pressable
-                        onPress={() => void pickStepAttachments()}
-                        disabled={uploadingStepAttachments || savingStep}
-                        style={[
-                          styles.attachmentAddBtn,
-                          (uploadingStepAttachments || savingStep) && styles.disabled,
-                        ]}
-                      >
-                        {uploadingStepAttachments ? (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        ) : (
-                          <Paperclip size={14} color={colors.primary} />
-                        )}
-                        <Text style={styles.attachmentAddText}>
-                          {uploadingStepAttachments ? 'Đang tải...' : 'Thêm tệp'}
-                        </Text>
-                      </Pressable>
-                    </View>
-                    {stepAttachments.length ? (
-                      <View style={{ gap: 6 }}>
-                        {stepAttachments.map((attachment, index) => (
-                          <View key={attachment.id || `${attachment.url}-${index}`} style={styles.attachmentRow}>
-                            <Paperclip size={14} color={colors.primary} />
-                            <Text numberOfLines={1} style={styles.attachmentName}>
-                              {attachment.name || 'Tệp đính kèm'}
-                            </Text>
-                            <Pressable
-                              onPress={() =>
-                                setStepAttachments((current) =>
-                                  current.filter((_, itemIndex) => itemIndex !== index),
-                                )
-                              }
-                              hitSlop={8}
-                              accessibilityLabel={`Gỡ tệp ${attachment.name}`}
-                            >
-                              <X size={16} color={colors.muted} />
-                            </Pressable>
-                          </View>
-                        ))}
-                      </View>
-                    ) : (
-                      <Text style={styles.muted}>Chưa có tệp đính kèm.</Text>
-                    )}
-                  </View>
-
-                  <Pressable
-                    disabled={savingStep || uploadingStepAttachments}
-                    onPress={() => void onSaveStep()}
-                    style={[
-                      styles.submitBtn,
-                      (savingStep || uploadingStepAttachments) && styles.disabled,
-                    ]}
-                  >
-                    <Text style={styles.submitBtnText}>
-                      {uploadingStepAttachments
-                        ? 'Đang tải tệp...'
-                        : savingStep
-                          ? 'Đang lưu...'
-                          : 'Lưu bước'}
-                    </Text>
-                  </Pressable>
                 </View>
-              </ScrollView>
+              ) : (
+                <Text style={styles.muted}>Chưa có tệp đính kèm.</Text>
+              )}
+            </View>
+
+            <Pressable
+              disabled={savingStep || uploadingStepAttachments}
+              onPress={() => void onSaveStep()}
+              style={[
+                styles.submitBtn,
+                (savingStep || uploadingStepAttachments) && styles.disabled,
+              ]}
+            >
+              <Text style={styles.submitBtnText}>
+                {uploadingStepAttachments
+                  ? 'Đang tải tệp...'
+                  : savingStep
+                    ? 'Đang lưu...'
+                    : 'Lưu bước'}
+              </Text>
             </Pressable>
-          </Pressable>
-        </Modal>
+          </View>
+        </FullScreenFormModal>
         {renderWorkflowFormModal()}
       </ScrollView>
     );
@@ -1042,106 +1003,97 @@ export function HrWorkflowsPanel({
       )}
 
       {renderWorkflowFormModal()}
-      <Modal
+      <FullScreenFormModal
         visible={categoryManagerOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCategoryManagerOpen(false)}
+        title={
+          categoryManagerMode === 'list'
+            ? 'Quản lý phân loại'
+            : categoryManagerMode === 'rename' ? 'Đổi tên phân loại' : 'Tạo phân loại'
+        }
+        cancelLabel={categoryManagerMode === 'list' ? undefined : 'Hủy'}
+        onSave={categoryManagerMode === 'list' ? undefined : () => void onSaveCategory()}
+        saving={savingCategory}
+        onClose={() => {
+          if (categoryManagerMode === 'list') {
+            setCategoryManagerOpen(false);
+          } else {
+            setCategoryManagerMode('list');
+          }
+        }}
       >
-        <Pressable style={styles.backdrop} onPress={() => setCategoryManagerOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sheetTitle}>
-                  {categoryManagerMode === 'list'
-                    ? 'Quản lý phân loại'
-                    : categoryManagerMode === 'rename' ? 'Đổi tên phân loại' : 'Tạo phân loại'}
-                </Text>
-                {categoryManagerMode === 'list' ? (
-                  <Text style={styles.muted}>Tạo phân loại riêng và gán cho quy trình bất cứ lúc nào.</Text>
-                ) : null}
+        {categoryManagerMode === 'list' ? (
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.muted}>Tạo phân loại riêng và gán cho quy trình bất cứ lúc nào.</Text>
+            <Pressable onPress={openCreateCategory} style={styles.categoryAddBtn}>
+              <View style={styles.iconButtonContent}>
+                <Plus size={14} color={colors.primary} />
+                <Text style={styles.categoryAddText}>Tạo phân loại</Text>
               </View>
-              <Pressable onPress={() => setCategoryManagerOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
+            </Pressable>
+            {categories.slice(1).length ? categories.slice(1).map((category) => {
+              const count = workflows.filter((workflow) => workflow.category?.trim() === category).length;
+              return (
+                <View key={category} style={styles.categoryRow}>
+                  <View style={styles.categoryRowCopy}>
+                    <Text style={styles.rowTitle}>{category}</Text>
+                    <Text style={styles.muted}>{count} quy trình</Text>
+                  </View>
+                  <Pressable onPress={() => openRenameCategory(category)} style={styles.categoryActionBtn}>
+                    <Text style={styles.categoryActionText}>Đổi tên</Text>
+                  </Pressable>
+                  {category !== 'Chung' ? (
+                    <Pressable
+                      disabled={savingCategory}
+                      onPress={() => onDeleteCategory(category)}
+                      style={styles.categoryDeleteBtn}
+                    >
+                      <Text style={styles.categoryDeleteText}>Xóa</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            }) : (
+              <Text style={styles.categoryEmpty}>Chưa có phân loại. Bạn có thể tạo danh mục trước khi có quy trình.</Text>
+            )}
+          </View>
+        ) : (
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.label}>Tên phân loại *</Text>
+            <TextInput
+              value={categoryNameDraft}
+              onChangeText={setCategoryNameDraft}
+              placeholder="Ví dụ: Nhân sự / Vận hành"
+              placeholderTextColor={colors.muted}
+              style={styles.field}
+            />
+            {categoryManagerMode === 'rename' ? (
+              <Text style={styles.muted}>
+                Tên phân loại sẽ được cập nhật cho tất cả {workflows.filter((workflow) => workflow.category?.trim() === categoryEditFrom).length} quy trình đang sử dụng.
+              </Text>
+            ) : (
+              <Text style={styles.muted}>Phân loại sẽ được lưu riêng. Bạn có thể gán vào quy trình khi tạo hoặc cập nhật quy trình.</Text>
+            )}
+            <View style={styles.categoryFormActions}>
+              <Pressable
+                disabled={savingCategory}
+                onPress={() => setCategoryManagerMode('list')}
+                style={[styles.categoryCancelBtn, savingCategory && styles.disabled]}
+              >
+                <Text style={styles.categoryActionText}>Hủy</Text>
+              </Pressable>
+              <Pressable
+                disabled={savingCategory}
+                onPress={() => void onSaveCategory()}
+                style={[styles.submitBtn, styles.categorySaveBtn, savingCategory && styles.disabled]}
+              >
+                <Text style={styles.submitBtnText}>
+                  {savingCategory ? 'Đang lưu...' : categoryManagerMode === 'rename' ? 'Lưu thay đổi' : 'Tạo phân loại'}
+                </Text>
               </Pressable>
             </View>
-
-            {categoryManagerMode === 'list' ? (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-                <Pressable onPress={openCreateCategory} style={styles.categoryAddBtn}>
-                  <View style={styles.iconButtonContent}>
-                    <Plus size={14} color={colors.primary} />
-                    <Text style={styles.categoryAddText}>Tạo phân loại</Text>
-                  </View>
-                </Pressable>
-                {categories.slice(1).length ? categories.slice(1).map((category) => {
-                  const count = workflows.filter((workflow) => workflow.category?.trim() === category).length;
-                  return (
-                    <View key={category} style={styles.categoryRow}>
-                      <View style={styles.categoryRowCopy}>
-                        <Text style={styles.rowTitle}>{category}</Text>
-                        <Text style={styles.muted}>{count} quy trình</Text>
-                      </View>
-                      <Pressable onPress={() => openRenameCategory(category)} style={styles.categoryActionBtn}>
-                        <Text style={styles.categoryActionText}>Đổi tên</Text>
-                      </Pressable>
-                      {category !== 'Chung' ? (
-                        <Pressable
-                          disabled={savingCategory}
-                          onPress={() => onDeleteCategory(category)}
-                          style={styles.categoryDeleteBtn}
-                        >
-                          <Text style={styles.categoryDeleteText}>Xóa</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  );
-                }) : (
-                  <Text style={styles.categoryEmpty}>Chưa có phân loại. Bạn có thể tạo danh mục trước khi có quy trình.</Text>
-                )}
-              </ScrollView>
-            ) : (
-              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-                <View style={{ gap: 8, paddingBottom: 12 }}>
-                  <Text style={styles.label}>Tên phân loại *</Text>
-                  <TextInput
-                    value={categoryNameDraft}
-                    onChangeText={setCategoryNameDraft}
-                    placeholder="Ví dụ: Nhân sự / Vận hành"
-                    placeholderTextColor={colors.muted}
-                    style={styles.field}
-                  />
-                  {categoryManagerMode === 'rename' ? (
-                    <Text style={styles.muted}>
-                      Tên phân loại sẽ được cập nhật cho tất cả {workflows.filter((workflow) => workflow.category?.trim() === categoryEditFrom).length} quy trình đang sử dụng.
-                    </Text>
-                  ) : (
-                    <Text style={styles.muted}>Phân loại sẽ được lưu riêng. Bạn có thể gán vào quy trình khi tạo hoặc cập nhật quy trình.</Text>
-                  )}
-                  <View style={styles.categoryFormActions}>
-                    <Pressable
-                      disabled={savingCategory}
-                      onPress={() => setCategoryManagerMode('list')}
-                      style={[styles.categoryCancelBtn, savingCategory && styles.disabled]}
-                    >
-                      <Text style={styles.categoryActionText}>Hủy</Text>
-                    </Pressable>
-                    <Pressable
-                      disabled={savingCategory}
-                      onPress={() => void onSaveCategory()}
-                      style={[styles.submitBtn, styles.categorySaveBtn, savingCategory && styles.disabled]}
-                    >
-                      <Text style={styles.submitBtnText}>
-                        {savingCategory ? 'Đang lưu...' : categoryManagerMode === 'rename' ? 'Lưu thay đổi' : 'Tạo phân loại'}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+        )}
+      </FullScreenFormModal>
     </ScrollView>
   );
 }

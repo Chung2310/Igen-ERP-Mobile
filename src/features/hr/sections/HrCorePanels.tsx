@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { LogIn, LogOut, Plus, RefreshCw } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import {
   createKanbanTask,
   createLeaveApplication,
@@ -422,35 +422,39 @@ export function TasksPanel({ branchId }: { branchId?: string }) {
         </View>
       )}
 
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.sheetTitle}>Tạo công việc mới</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Tên công việc..."
-              placeholderTextColor={colors.muted}
-              style={styles.field}
-            />
-            <TextInput
-              value={desc}
-              onChangeText={setDesc}
-              placeholder="Mô tả chi tiết..."
-              placeholderTextColor={colors.muted}
-              multiline
-              style={[styles.field, { minHeight: 80, textAlignVertical: 'top' }]}
-            />
-            <Pressable
-              disabled={saving}
-              onPress={() => void onCreate()}
-              style={[styles.submitBtn, saving && styles.disabled]}
-            >
-              <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo công việc'}</Text>
-            </Pressable>
+      <FullScreenFormModal
+        visible={createOpen}
+        title="Tạo công việc mới"
+        cancelLabel="Hủy"
+        onSave={() => void onCreate()}
+        saving={saving}
+        onClose={() => setCreateOpen(false)}
+      >
+        <View style={{ gap: 10, paddingBottom: 12 }}>
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Tên công việc..."
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <TextInput
+            value={desc}
+            onChangeText={setDesc}
+            placeholder="Mô tả chi tiết..."
+            placeholderTextColor={colors.muted}
+            multiline
+            style={[styles.field, { minHeight: 80, textAlignVertical: 'top' }]}
+          />
+          <Pressable
+            disabled={saving}
+            onPress={() => void onCreate()}
+            style={[styles.submitBtn, saving && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo công việc'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
   );
 }
@@ -595,51 +599,55 @@ export function LeavesPanel({
         </View>
       )}
 
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.sheetTitle}>Tạo đơn nghỉ phép</Text>
+      <FullScreenFormModal
+        visible={createOpen}
+        title="Tạo đơn nghỉ phép"
+        cancelLabel="Hủy"
+        onSave={() => void onCreate()}
+        saving={saving}
+        onClose={() => setCreateOpen(false)}
+      >
+        <View style={{ gap: 10, paddingBottom: 12 }}>
+          <TextInput
+            value={leaveType}
+            onChangeText={setLeaveType}
+            placeholder="Loại đơn (VD: Nghỉ phép năm)"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
             <TextInput
-              value={leaveType}
-              onChangeText={setLeaveType}
-              placeholder="Loại đơn (VD: Nghỉ phép năm)"
+              value={startDate}
+              onChangeText={setStartDate}
+              placeholder="Từ ngày (YYYY-MM-DD)"
               placeholderTextColor={colors.muted}
-              style={styles.field}
+              style={[styles.field, { flex: 1 }]}
             />
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TextInput
-                value={startDate}
-                onChangeText={setStartDate}
-                placeholder="Từ ngày (YYYY-MM-DD)"
-                placeholderTextColor={colors.muted}
-                style={[styles.field, { flex: 1 }]}
-              />
-              <TextInput
-                value={endDate}
-                onChangeText={setEndDate}
-                placeholder="Đến ngày (YYYY-MM-DD)"
-                placeholderTextColor={colors.muted}
-                style={[styles.field, { flex: 1 }]}
-              />
-            </View>
             <TextInput
-              value={reason}
-              onChangeText={setReason}
-              placeholder="Lý do..."
+              value={endDate}
+              onChangeText={setEndDate}
+              placeholder="Đến ngày (YYYY-MM-DD)"
               placeholderTextColor={colors.muted}
-              multiline
-              style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+              style={[styles.field, { flex: 1 }]}
             />
-            <Pressable
-              disabled={saving}
-              onPress={() => void onCreate()}
-              style={[styles.submitBtn, saving && styles.disabled]}
-            >
-              <Text style={styles.submitBtnText}>{saving ? 'Đang gửi...' : 'Gửi đơn'}</Text>
-            </Pressable>
+          </View>
+          <TextInput
+            value={reason}
+            onChangeText={setReason}
+            placeholder="Lý do..."
+            placeholderTextColor={colors.muted}
+            multiline
+            style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+          />
+          <Pressable
+            disabled={saving}
+            onPress={() => void onCreate()}
+            style={[styles.submitBtn, saving && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{saving ? 'Đang gửi...' : 'Gửi đơn'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
   );
 }

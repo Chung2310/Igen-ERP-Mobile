@@ -1,4 +1,5 @@
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -1209,96 +1210,94 @@ function AttendanceAndCalendarSection({
         </>
       )}
 
-      {/* Edit attendance modal */}
-      <Modal visible={Boolean(editingRec)} transparent animationType="slide" onRequestClose={() => setEditingRec(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setEditingRec(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Chỉnh sửa chấm công</Text>
-              <Pressable onPress={() => setEditingRec(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
+      {/* Edit attendance full-screen page */}
+      <FullScreenFormModal
+        visible={Boolean(editingRec)}
+        title="Chỉnh sửa chấm công"
+        cancelLabel="Hủy"
+        onSave={() => void onSaveRec()}
+        saving={savingRec}
+        onClose={() => setEditingRec(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.muted}>
+            {editingRec?.employeeName || editingRec?.displayName} · {formatViDate(editingRec?.date)}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Giờ vào (HH:mm)</Text>
+              <TextInput value={editIn} onChangeText={setEditIn} placeholder="08:30" style={styles.field} />
             </View>
-            <Text style={styles.muted}>
-              {editingRec?.employeeName || editingRec?.displayName} · {formatViDate(editingRec?.date)}
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Giờ vào (HH:mm)</Text>
-                <TextInput value={editIn} onChangeText={setEditIn} placeholder="08:30" style={styles.field} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Giờ ra (HH:mm)</Text>
-                <TextInput value={editOut} onChangeText={setEditOut} placeholder="17:30" style={styles.field} />
-              </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Giờ ra (HH:mm)</Text>
+              <TextInput value={editOut} onChangeText={setEditOut} placeholder="17:30" style={styles.field} />
             </View>
-            <Text style={styles.label}>Ghi chú</Text>
-            <TextInput value={editNote} onChangeText={setEditNote} placeholder="Lý do điều chỉnh..." style={styles.field} />
-            <Pressable
-              disabled={savingRec}
-              onPress={() => void onSaveRec()}
-              style={[styles.submitBtn, savingRec && styles.disabled]}
-            >
-              <Text style={styles.submitBtnText}>{savingRec ? 'Đang lưu...' : 'Lưu điều chỉnh'}</Text>
-            </Pressable>
+          </View>
+          <Text style={styles.label}>Ghi chú</Text>
+          <TextInput value={editNote} onChangeText={setEditNote} placeholder="Lý do điều chỉnh..." style={styles.field} />
+          <Pressable
+            disabled={savingRec}
+            onPress={() => void onSaveRec()}
+            style={[styles.submitBtn, savingRec && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{savingRec ? 'Đang lưu...' : 'Lưu điều chỉnh'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
-      {/* Create Calendar Event Modal */}
-      <Modal visible={eventModalOpen} transparent animationType="slide" onRequestClose={() => setEventModalOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setEventModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Thêm lịch làm việc</Text>
-              <Pressable onPress={() => setEventModalOpen(false)}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Create Calendar Event full-screen page */}
+      <FullScreenFormModal
+        visible={eventModalOpen}
+        title="Thêm lịch làm việc"
+        cancelLabel="Hủy"
+        onSave={() => void onCreateEvent()}
+        saving={savingEv}
+        onClose={() => setEventModalOpen(false)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Loại lịch</Text>
+          <View style={styles.wrapRow}>
+            {(Object.keys(EVENT_TYPE_LABELS) as HrCalendarEventType[]).map((t) => (
+              <Pressable
+                key={t}
+                onPress={() => setEvType(t)}
+                style={[styles.chip, evType === t && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, evType === t && styles.chipTextActive]}>
+                  {EVENT_TYPE_LABELS[t]}
+                </Text>
               </Pressable>
+            ))}
+          </View>
+          <Text style={styles.label}>Tiêu đề *</Text>
+          <TextInput value={evTitle} onChangeText={setEvTitle} placeholder="VD: Họp giao ban đầu tuần" style={styles.field} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Từ ngày (YYYY-MM-DD)</Text>
+              <TextInput value={evStart} onChangeText={setEvStart} style={styles.field} />
             </View>
-            <Text style={styles.label}>Loại lịch</Text>
-            <View style={styles.wrapRow}>
-              {(Object.keys(EVENT_TYPE_LABELS) as HrCalendarEventType[]).map((t) => (
-                <Pressable
-                  key={t}
-                  onPress={() => setEvType(t)}
-                  style={[styles.chip, evType === t && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, evType === t && styles.chipTextActive]}>
-                    {EVENT_TYPE_LABELS[t]}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Đến ngày</Text>
+              <TextInput value={evEnd} onChangeText={setEvEnd} style={styles.field} />
             </View>
-            <Text style={styles.label}>Tiêu đề *</Text>
-            <TextInput value={evTitle} onChangeText={setEvTitle} placeholder="VD: Họp giao ban đầu tuần" style={styles.field} />
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Từ ngày (YYYY-MM-DD)</Text>
-                <TextInput value={evStart} onChangeText={setEvStart} style={styles.field} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Đến ngày</Text>
-                <TextInput value={evEnd} onChangeText={setEvEnd} style={styles.field} />
-              </View>
-            </View>
-            <Text style={styles.label}>Mô tả</Text>
-            <TextInput
-              value={evDesc}
-              onChangeText={setEvDesc}
-              multiline
-              placeholder="Ghi chú chi tiết..."
-              style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]}
-            />
-            <Pressable
-              disabled={savingEv}
-              onPress={() => void onCreateEvent()}
-              style={[styles.submitBtn, savingEv && styles.disabled]}
-            >
-              <Text style={styles.submitBtnText}>{savingEv ? 'Đang lưu...' : 'Tạo lịch'}</Text>
-            </Pressable>
+          </View>
+          <Text style={styles.label}>Mô tả</Text>
+          <TextInput
+            value={evDesc}
+            onChangeText={setEvDesc}
+            multiline
+            placeholder="Ghi chú chi tiết..."
+            style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]}
+          />
+          <Pressable
+            disabled={savingEv}
+            onPress={() => void onCreateEvent()}
+            style={[styles.submitBtn, savingEv && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{savingEv ? 'Đang lưu...' : 'Tạo lịch'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
     </ScrollView>
   );
@@ -1637,109 +1636,102 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
         })}
       </View>
 
-      {/* Edit / Create Shift Modal */}
-      <Modal visible={Boolean(editing)} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setEditing(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>
-                {editing === 'new' ? 'Thêm ca làm việc' : 'Chỉnh sửa ca làm việc'}
-              </Text>
-              <Pressable onPress={() => setEditing(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Edit / Create Shift Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(editing)}
+        title={editing === 'new' ? 'Thêm ca làm việc' : 'Chỉnh sửa ca làm việc'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveShift()}
+        saving={saving}
+        onClose={() => setEditing(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Mã ca *</Text>
+              <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="CA_SANG" style={styles.field} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Tên ca *</Text>
+              <TextInput value={name} onChangeText={setName} placeholder="Ca hành chính" style={styles.field} />
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Bắt đầu</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openShiftTimePicker('startTime')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>{startTime}</Text>
+                <Clock3 size={15} color={colors.primary} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
-              <View style={{ gap: 8 }}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Mã ca *</Text>
-                    <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="CA_SANG" style={styles.field} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Tên ca *</Text>
-                    <TextInput value={name} onChangeText={setName} placeholder="Ca hành chính" style={styles.field} />
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Bắt đầu</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openShiftTimePicker('startTime')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>{startTime}</Text>
-                      <Clock3 size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Kết thúc</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openShiftTimePicker('endTime')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>{endTime}</Text>
-                      <Clock3 size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Nghỉ trưa từ</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openShiftTimePicker('lunchStart')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>{lunchStart}</Text>
-                      <Clock3 size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Đến</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openShiftTimePicker('lunchEnd')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>{lunchEnd}</Text>
-                      <Clock3 size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                </View>
-                <Text style={styles.label}>Ngày làm việc trong tuần</Text>
-                <View style={styles.wrapRow}>
-                  {DAYS_OF_WEEK.map((d) => {
-                    const active = workingDays.includes(d.v);
-                    return (
-                      <Pressable
-                        key={d.v}
-                        onPress={() =>
-                          setWorkingDays((prev) =>
-                            prev.includes(d.v) ? prev.filter((x) => x !== d.v) : [...prev, d.v],
-                          )
-                        }
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <View style={styles.switchRow}>
-                  <Text style={styles.label}>Đặt làm ca mặc định</Text>
-                  <Switch value={isDefault} onValueChange={setIsDefault} trackColor={{ true: colors.primary, false: '#CBD5E1' }} />
-                </View>
-                <Pressable disabled={saving} onPress={() => void onSaveShift()} style={[styles.submitBtn, saving && styles.disabled]}>
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu ca làm việc'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Kết thúc</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openShiftTimePicker('endTime')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>{endTime}</Text>
+                <Clock3 size={15} color={colors.primary} />
+              </Pressable>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Nghỉ trưa từ</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openShiftTimePicker('lunchStart')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>{lunchStart}</Text>
+                <Clock3 size={15} color={colors.primary} />
+              </Pressable>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Đến</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openShiftTimePicker('lunchEnd')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>{lunchEnd}</Text>
+                <Clock3 size={15} color={colors.primary} />
+              </Pressable>
+            </View>
+          </View>
+          <Text style={styles.label}>Ngày làm việc trong tuần</Text>
+          <View style={styles.wrapRow}>
+            {DAYS_OF_WEEK.map((d) => {
+              const active = workingDays.includes(d.v);
+              return (
+                <Pressable
+                  key={d.v}
+                  onPress={() =>
+                    setWorkingDays((prev) =>
+                      prev.includes(d.v) ? prev.filter((x) => x !== d.v) : [...prev, d.v],
+                    )
+                  }
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
                 </Pressable>
-              </View>
-            </ScrollView>
+              );
+            })}
+          </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Đặt làm ca mặc định</Text>
+            <Switch value={isDefault} onValueChange={setIsDefault} trackColor={{ true: colors.primary, false: '#CBD5E1' }} />
+          </View>
+          <Pressable disabled={saving} onPress={() => void onSaveShift()} style={[styles.submitBtn, saving && styles.disabled]}>
+            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu ca làm việc'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS !== 'android' && activeTimePicker ? (
         <Modal
@@ -2039,42 +2031,40 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
       )}
 
       {/* Create / Edit Holiday Modal */}
-      <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setFormOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>{editingId ? 'Sửa ngày công ty' : 'Thêm ngày công ty'}</Text>
-              <Pressable onPress={() => setFormOpen(false)}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.label}>Ngày *</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={openHolidayDatePicker}
-              style={styles.pickerField}
-            >
-              <Text style={styles.pickerFieldText}>{formatViDate(fDate)}</Text>
-              <CalendarDays size={15} color={colors.primary} />
-            </Pressable>
-            <Text style={styles.label}>Tên ngày *</Text>
-            <TextInput value={fName} onChangeText={setFName} placeholder="VD: Tết Dương Lịch" style={styles.field} />
-            <Text style={styles.label}>Loại ngày</Text>
-            <View style={styles.wrapRow}>
-              {(Object.keys(HOLIDAY_TYPE_LABELS) as HrWorkCalendarDayType[]).map((t) => (
-                <Pressable key={t} onPress={() => setFType(t)} style={[styles.chip, fType === t && styles.chipActive]}>
-                  <Text style={[styles.chipText, fType === t && styles.chipTextActive]}>
-                    {HOLIDAY_TYPE_LABELS[t]}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable onPress={() => void onSaveDay()} style={styles.submitBtn}>
-              <Text style={styles.submitBtnText}>Lưu thay đổi</Text>
-            </Pressable>
+      <FullScreenFormModal
+        visible={formOpen}
+        title={editingId ? 'Sửa ngày công ty' : 'Thêm ngày công ty'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveDay()}
+        onClose={() => setFormOpen(false)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Ngày *</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={openHolidayDatePicker}
+            style={styles.pickerField}
+          >
+            <Text style={styles.pickerFieldText}>{formatViDate(fDate)}</Text>
+            <CalendarDays size={15} color={colors.primary} />
           </Pressable>
-        </Pressable>
-      </Modal>
+          <Text style={styles.label}>Tên ngày *</Text>
+          <TextInput value={fName} onChangeText={setFName} placeholder="VD: Tết Dương Lịch" style={styles.field} />
+          <Text style={styles.label}>Loại ngày</Text>
+          <View style={styles.wrapRow}>
+            {(Object.keys(HOLIDAY_TYPE_LABELS) as HrWorkCalendarDayType[]).map((t) => (
+              <Pressable key={t} onPress={() => setFType(t)} style={[styles.chip, fType === t && styles.chipActive]}>
+                <Text style={[styles.chipText, fType === t && styles.chipTextActive]}>
+                  {HOLIDAY_TYPE_LABELS[t]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable onPress={() => void onSaveDay()} style={styles.submitBtn}>
+            <Text style={styles.submitBtnText}>Lưu thay đổi</Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS !== 'android' && activeHolidayDatePicker ? (
         <Modal
@@ -2111,30 +2101,29 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
         </Modal>
       ) : null}
 
-      {/* Disable Reason Modal */}
-      <Modal visible={Boolean(disableTarget)} transparent animationType="slide" onRequestClose={() => setDisableTarget(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setDisableTarget(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Tắt áp dụng {disableTarget?.name}</Text>
-              <Pressable onPress={() => setDisableTarget(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.label}>Lý do tắt áp dụng *</Text>
-            <TextInput
-              value={disableReason}
-              onChangeText={setDisableReason}
-              multiline
-              placeholder="Nhập lý do chi tiết..."
-              style={[styles.field, { minHeight: 72, textAlignVertical: 'top' }]}
-            />
-            <Pressable onPress={() => void onConfirmDisable()} style={styles.submitBtn}>
-              <Text style={styles.submitBtnText}>Xác nhận</Text>
-            </Pressable>
+      {/* Disable Reason Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(disableTarget)}
+        title={`Tắt áp dụng ${disableTarget?.name || ''}`}
+        cancelLabel="Hủy"
+        onSave={() => void onConfirmDisable()}
+        saveLabel="Xác nhận"
+        onClose={() => setDisableTarget(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Lý do tắt áp dụng *</Text>
+          <TextInput
+            value={disableReason}
+            onChangeText={setDisableReason}
+            multiline
+            placeholder="Nhập lý do chi tiết..."
+            style={[styles.field, { minHeight: 72, textAlignVertical: 'top' }]}
+          />
+          <Pressable onPress={() => void onConfirmDisable()} style={styles.submitBtn}>
+            <Text style={styles.submitBtnText}>Xác nhận</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
   );
 }
@@ -2322,156 +2311,149 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
         </View>
       )}
 
-      {/* Edit Work Hours Modal */}
-      <Modal visible={Boolean(editing)} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setEditing(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>
-                Giờ làm việc: {editing?.displayName || editing?.email}
-              </Text>
-              <Pressable onPress={() => setEditing(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Edit Work Hours Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(editing)}
+        title={`Giờ làm việc: ${editing?.displayName || editing?.email || ''}`}
+        cancelLabel="Hủy"
+        onSave={() => void onSave()}
+        saving={saving}
+        onClose={() => setEditing(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Dùng giờ làm việc riêng</Text>
+            <Switch
+              value={form.useCustom}
+              onValueChange={(v) => setForm((f) => ({ ...f, useCustom: v }))}
+              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
+            />
+          </View>
+
+          <Text style={styles.label}>Trạng thái nhân sự</Text>
+          <View style={styles.wrapRow}>
+            {(['official', 'probation', 'internship'] as const).map((st) => (
+              <Pressable
+                key={st}
+                onPress={() => setForm((f) => ({ ...f, employmentStatus: st }))}
+                style={[styles.chip, form.employmentStatus === st && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, form.employmentStatus === st && styles.chipTextActive]}>
+                  {EMPLOYMENT_STATUS_LABELS[st]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Ngày chính thức</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openWorkHoursPicker('officialDate')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>
+                  {form.officialDate ? formatViDate(form.officialDate) : 'Chọn ngày'}
+                </Text>
+                <CalendarDays size={15} color={colors.primary} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-              <View style={{ gap: 8, paddingBottom: 10 }}>
-                <View style={styles.switchRow}>
-                  <Text style={styles.label}>Dùng giờ làm việc riêng</Text>
-                  <Switch
-                    value={form.useCustom}
-                    onValueChange={(v) => setForm((f) => ({ ...f, useCustom: v }))}
-                    trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                  />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Phép năm riêng</Text>
+              <TextInput
+                value={form.annualLeaveDays != null ? String(form.annualLeaveDays) : ''}
+                onChangeText={(v) =>
+                  setForm((f) => ({ ...f, annualLeaveDays: v.trim() === '' ? undefined : Number(v) }))
+                }
+                keyboardType="numeric"
+                placeholder="Theo công ty"
+                style={styles.field}
+              />
+            </View>
+          </View>
+
+          {form.useCustom ? (
+            <>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Giờ vào</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => openWorkHoursPicker('checkInLimit')}
+                    style={styles.pickerField}
+                  >
+                    <Text style={styles.pickerFieldText}>{form.checkInLimit || '08:30'}</Text>
+                    <Clock3 size={15} color={colors.primary} />
+                  </Pressable>
                 </View>
-
-                <Text style={styles.label}>Trạng thái nhân sự</Text>
-                <View style={styles.wrapRow}>
-                  {(['official', 'probation', 'internship'] as const).map((st) => (
-                    <Pressable
-                      key={st}
-                      onPress={() => setForm((f) => ({ ...f, employmentStatus: st }))}
-                      style={[styles.chip, form.employmentStatus === st && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, form.employmentStatus === st && styles.chipTextActive]}>
-                        {EMPLOYMENT_STATUS_LABELS[st]}
-                      </Text>
-                    </Pressable>
-                  ))}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Giờ ra</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => openWorkHoursPicker('checkOutLimit')}
+                    style={styles.pickerField}
+                  >
+                    <Text style={styles.pickerFieldText}>{form.checkOutLimit || '17:30'}</Text>
+                    <Clock3 size={15} color={colors.primary} />
+                  </Pressable>
                 </View>
-
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Ngày chính thức</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openWorkHoursPicker('officialDate')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>
-                        {form.officialDate ? formatViDate(form.officialDate) : 'Chọn ngày'}
-                      </Text>
-                      <CalendarDays size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Phép năm riêng</Text>
-                    <TextInput
-                      value={form.annualLeaveDays != null ? String(form.annualLeaveDays) : ''}
-                      onChangeText={(v) =>
-                        setForm((f) => ({ ...f, annualLeaveDays: v.trim() === '' ? undefined : Number(v) }))
-                      }
-                      keyboardType="numeric"
-                      placeholder="Theo công ty"
-                      style={styles.field}
-                    />
-                  </View>
-                </View>
-
-                {form.useCustom ? (
-                  <>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Giờ vào</Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => openWorkHoursPicker('checkInLimit')}
-                          style={styles.pickerField}
-                        >
-                          <Text style={styles.pickerFieldText}>{form.checkInLimit || '08:30'}</Text>
-                          <Clock3 size={15} color={colors.primary} />
-                        </Pressable>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Giờ ra</Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => openWorkHoursPicker('checkOutLimit')}
-                          style={styles.pickerField}
-                        >
-                          <Text style={styles.pickerFieldText}>{form.checkOutLimit || '17:30'}</Text>
-                          <Clock3 size={15} color={colors.primary} />
-                        </Pressable>
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Nghỉ trưa từ</Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => openWorkHoursPicker('lunchBreakStart')}
-                          style={styles.pickerField}
-                        >
-                          <Text style={styles.pickerFieldText}>{form.lunchBreakStart || '12:00'}</Text>
-                          <Clock3 size={15} color={colors.primary} />
-                        </Pressable>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Đến</Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => openWorkHoursPicker('lunchBreakEnd')}
-                          style={styles.pickerField}
-                        >
-                          <Text style={styles.pickerFieldText}>{form.lunchBreakEnd || '13:00'}</Text>
-                          <Clock3 size={15} color={colors.primary} />
-                        </Pressable>
-                      </View>
-                    </View>
-                    <Text style={styles.label}>Ngày làm việc</Text>
-                    <View style={styles.wrapRow}>
-                      {DAYS_OF_WEEK.map((d) => {
-                        const list = form.workingDays || [];
-                        const active = list.includes(d.v);
-                        return (
-                          <Pressable
-                            key={d.v}
-                            onPress={() =>
-                              setForm((f) => ({
-                                ...f,
-                                workingDays: active ? list.filter((x) => x !== d.v) : [...list, d.v],
-                              }))
-                            }
-                            style={[styles.chip, active && styles.chipActive]}
-                          >
-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </>
-                ) : (
-                  <Text style={styles.muted}>Nhân viên này đang áp dụng giờ làm việc chung của công ty.</Text>
-                )}
-
-                <Pressable disabled={saving} onPress={() => void onSave()} style={[styles.submitBtn, saving && styles.disabled]}>
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu cấu hình'}</Text>
-                </Pressable>
               </View>
-            </ScrollView>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Nghỉ trưa từ</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => openWorkHoursPicker('lunchBreakStart')}
+                    style={styles.pickerField}
+                  >
+                    <Text style={styles.pickerFieldText}>{form.lunchBreakStart || '12:00'}</Text>
+                    <Clock3 size={15} color={colors.primary} />
+                  </Pressable>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Đến</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => openWorkHoursPicker('lunchBreakEnd')}
+                    style={styles.pickerField}
+                  >
+                    <Text style={styles.pickerFieldText}>{form.lunchBreakEnd || '13:00'}</Text>
+                    <Clock3 size={15} color={colors.primary} />
+                  </Pressable>
+                </View>
+              </View>
+              <Text style={styles.label}>Ngày làm việc</Text>
+              <View style={styles.wrapRow}>
+                {DAYS_OF_WEEK.map((d) => {
+                  const list = form.workingDays || [];
+                  const active = list.includes(d.v);
+                  return (
+                    <Pressable
+                      key={d.v}
+                      onPress={() =>
+                        setForm((f) => ({
+                          ...f,
+                          workingDays: active ? list.filter((x) => x !== d.v) : [...list, d.v],
+                        }))
+                      }
+                      style={[styles.chip, active && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : (
+            <Text style={styles.muted}>Nhân viên này đang áp dụng giờ làm việc chung của công ty.</Text>
+          )}
+
+          <Pressable disabled={saving} onPress={() => void onSave()} style={[styles.submitBtn, saving && styles.disabled]}>
+            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu cấu hình'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS !== 'android' && activeWorkHoursPicker ? (
         <Modal

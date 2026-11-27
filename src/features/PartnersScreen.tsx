@@ -1,4 +1,5 @@
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
@@ -345,51 +346,50 @@ export function RetailPartnersScreen(_props: FeatureScreenProps) {
         {commissionBalanceError && canManagePolicies ? <PopupError error={commissionBalanceError} title="Không tải được số dư hoa hồng" /> : null}
       </ScrollView>
 
-      <Modal visible={formOpen} transparent animationType="fade" onRequestClose={closeForm}>
-        <Pressable style={styles.modalBackdrop} onPress={closeForm}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}><Text style={styles.modalTitle}>{editing ? 'Cập nhật đối tác' : 'Thêm đối tác'}</Text><Text style={styles.modalSubtitle}>Mỗi đối tác có một vai trò bán lẻ.</Text></View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Đóng biểu mẫu" disabled={saving} onPress={closeForm} style={styles.closeButton}><X size={18} color={colors.muted} /></Pressable>
-            </View>
-            <ScrollView style={styles.formScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
-              <Field label="Mã đối tác *" value={form.code} onChangeText={(value) => setField('code', value)} placeholder="VD: CTV-001" autoCapitalize="characters" maxLength={60} />
-              <Field label="Tên đối tác *" value={form.name} onChangeText={(value) => setField('name', value)} placeholder="Tên cá nhân hoặc doanh nghiệp" maxLength={200} />
-              <Field label="Số điện thoại" value={form.phone} onChangeText={(value) => setField('phone', value)} placeholder="Số điện thoại" keyboardType="phone-pad" maxLength={30} />
-              <Field label="Email" value={form.email} onChangeText={(value) => setField('email', value)} placeholder="email@congty.vn" keyboardType="email-address" autoCapitalize="none" maxLength={200} />
-              <Field label="Địa chỉ" value={form.address} onChangeText={(value) => setField('address', value)} placeholder="Địa chỉ liên hệ" maxLength={500} />
+      <FullScreenFormModal
+        visible={formOpen}
+        title={editing ? 'Cập nhật đối tác' : 'Thêm đối tác'}
+        onClose={closeForm}
+        footer={
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+            <Pressable disabled={saving} onPress={closeForm} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable>
+            <Pressable disabled={saving} onPress={() => void save()} style={[styles.saveButton, saving && styles.buttonDisabled]}>{saving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>{editing ? 'Lưu thay đổi' : 'Tạo đối tác'}</Text>}</Pressable>
+          </View>
+        }
+      >
+        <View style={{ gap: 10 }}>
+          <Text style={styles.modalSubtitle}>Mỗi đối tác có một vai trò bán lẻ.</Text>
+          <Field label="Mã đối tác *" value={form.code} onChangeText={(value) => setField('code', value)} placeholder="VD: CTV-001" autoCapitalize="characters" maxLength={60} />
+          <Field label="Tên đối tác *" value={form.name} onChangeText={(value) => setField('name', value)} placeholder="Tên cá nhân hoặc doanh nghiệp" maxLength={200} />
+          <Field label="Số điện thoại" value={form.phone} onChangeText={(value) => setField('phone', value)} placeholder="Số điện thoại" keyboardType="phone-pad" maxLength={30} />
+          <Field label="Email" value={form.email} onChangeText={(value) => setField('email', value)} placeholder="email@congty.vn" keyboardType="email-address" autoCapitalize="none" maxLength={200} />
+          <Field label="Địa chỉ" value={form.address} onChangeText={(value) => setField('address', value)} placeholder="Địa chỉ liên hệ" maxLength={500} />
 
-              <Text style={styles.sectionLabel}>Vai trò & liên kết</Text>
-              <View style={styles.roleOptions}>
-                {roles.map((role) => {
-                  const Icon = role.icon;
-                  const selected = form.role === role.value;
-                  return <Pressable key={role.value} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setField('role', role.value)} style={[styles.roleOption, selected && styles.roleOptionSelected]}>
-                    <View style={styles.roleOptionTitle}><Icon size={16} color={selected ? colors.primary : colors.muted} /><Text style={[styles.roleOptionText, selected && styles.roleOptionTextSelected]}>{role.label}</Text></View>
-                    <Text style={styles.roleDetail}>{role.detail}</Text>
-                  </Pressable>;
-                })}
-              </View>
+          <Text style={styles.sectionLabel}>Vai trò & liên kết</Text>
+          <View style={styles.roleOptions}>
+            {roles.map((role) => {
+              const Icon = role.icon;
+              const selected = form.role === role.value;
+              return <Pressable key={role.value} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setField('role', role.value)} style={[styles.roleOption, selected && styles.roleOptionSelected]}>
+                <View style={styles.roleOptionTitle}><Icon size={16} color={selected ? colors.primary : colors.muted} /><Text style={[styles.roleOptionText, selected && styles.roleOptionTextSelected]}>{role.label}</Text></View>
+                <Text style={styles.roleDetail}>{role.detail}</Text>
+              </Pressable>;
+            })}
+          </View>
 
-              {switchingAwayFromLink && <View style={styles.warning}><Text style={styles.warningText}>Đổi vai trò sẽ gỡ liên kết hiện tại. Liên kết đã gỡ không tự khôi phục khi đổi lại vai trò cũ.</Text></View>}
+          {switchingAwayFromLink && <View style={styles.warning}><Text style={styles.warningText}>Đổi vai trò sẽ gỡ liên kết hiện tại. Liên kết đã gỡ không tự khôi phục khi đổi lại vai trò cũ.</Text></View>}
 
-              {form.role === 'collaborator' && <PartnerPickerField label="Tài khoản xem sao kê" value={linkedLabel('user')} onPress={() => { setPickerKind('user'); setPickerSearch(''); }} locked={Boolean(editing?.userId)} hint={editing?.userId ? 'Tài khoản đã liên kết không thể đổi.' : 'Có thể để trống nếu chưa cần liên kết tài khoản.'} />}
-              {form.role === 'dealer' && <PartnerPickerField label="Khách hàng liên kết công nợ" value={linkedLabel('customer')} onPress={() => { setPickerKind('customer'); setPickerSearch(''); }} locked={Boolean(editing?.customerId)} hint={editing?.customerId ? 'Khách hàng đã liên kết không thể đổi.' : 'Có thể để trống nếu đại lý chưa gắn hồ sơ khách hàng.'} />}
-              {form.role === 'supplier' && <PartnerPickerField label="Nhà cung cấp trong Kho" value={linkedLabel('supplier')} onPress={() => { setPickerKind('supplier'); setPickerSearch(''); }} locked={Boolean(editing?.supplierId)} hint={editing?.supplierId ? 'Nhà cung cấp đã liên kết không thể đổi.' : 'Có thể để trống nếu chưa liên kết hồ sơ Kho.'} />}
+          {form.role === 'collaborator' && <PartnerPickerField label="Tài khoản xem sao kê" value={linkedLabel('user')} onPress={() => { setPickerKind('user'); setPickerSearch(''); }} locked={Boolean(editing?.userId)} hint={editing?.userId ? 'Tài khoản đã liên kết không thể đổi.' : 'Có thể để trống nếu chưa cần liên kết tài khoản.'} />}
+          {form.role === 'dealer' && <PartnerPickerField label="Khách hàng liên kết công nợ" value={linkedLabel('customer')} onPress={() => { setPickerKind('customer'); setPickerSearch(''); }} locked={Boolean(editing?.customerId)} hint={editing?.customerId ? 'Khách hàng đã liên kết không thể đổi.' : 'Có thể để trống nếu đại lý chưa gắn hồ sơ khách hàng.'} />}
+          {form.role === 'supplier' && <PartnerPickerField label="Nhà cung cấp trong Kho" value={linkedLabel('supplier')} onPress={() => { setPickerKind('supplier'); setPickerSearch(''); }} locked={Boolean(editing?.supplierId)} hint={editing?.supplierId ? 'Nhà cung cấp đã liên kết không thể đổi.' : 'Có thể để trống nếu chưa liên kết hồ sơ Kho.'} />}
 
-              <Text style={styles.sectionLabel}>Trạng thái</Text>
-              <View style={styles.statusOptions}>
-                {([{ value: 'active', label: 'Đang hoạt động' }, { value: 'inactive', label: 'Ngừng hoạt động' }] as const).map((item) => <Pressable key={item.value} onPress={() => setField('status', item.value)} style={[styles.statusOption, form.status === item.value && styles.statusOptionSelected]}><Text style={[styles.statusOptionText, form.status === item.value && styles.statusOptionTextSelected]}>{item.label}</Text></Pressable>)}
-              </View>
-              {formError ? <PopupError error={formError} title="Thông tin chưa hợp lệ" /> : null}
-            </ScrollView>
-            <View style={styles.modalActions}>
-              <Pressable disabled={saving} onPress={closeForm} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable>
-              <Pressable disabled={saving} onPress={() => void save()} style={[styles.saveButton, saving && styles.buttonDisabled]}>{saving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>{editing ? 'Lưu thay đổi' : 'Tạo đối tác'}</Text>}</Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          <Text style={styles.sectionLabel}>Trạng thái</Text>
+          <View style={styles.statusOptions}>
+            {([{ value: 'active', label: 'Đang hoạt động' }, { value: 'inactive', label: 'Ngừng hoạt động' }] as const).map((item) => <Pressable key={item.value} onPress={() => setField('status', item.value)} style={[styles.statusOption, form.status === item.value && styles.statusOptionSelected]}><Text style={[styles.statusOptionText, form.status === item.value && styles.statusOptionTextSelected]}>{item.label}</Text></Pressable>)}
+          </View>
+          {formError ? <PopupError error={formError} title="Thông tin chưa hợp lệ" /> : null}
+        </View>
+      </FullScreenFormModal>
 
       <Modal visible={Boolean(pickerKind)} transparent animationType="fade" onRequestClose={() => setPickerKind(null)}>
         <Pressable style={styles.pickerBackdrop} onPress={() => setPickerKind(null)}>

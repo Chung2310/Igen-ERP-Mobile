@@ -1,9 +1,9 @@
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -232,39 +232,42 @@ export function ProjectsPanel({
         </View>
       )}
 
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.sheetTitle}>{editingProject ? 'Sửa dự án' : 'Tạo dự án mới'}</Text>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Tên dự án (VD: Kế hoạch quý 4)"
-              placeholderTextColor={colors.muted}
-              style={styles.field}
-            />
-            <TextInput
-              value={instructions}
-              onChangeText={setInstructions}
-              placeholder="Chỉ dẫn ngữ cảnh cho Trợ lý khi làm việc trong dự án này..."
-              placeholderTextColor={colors.muted}
-              multiline
-              style={[styles.field, styles.fieldMulti]}
-            />
-            <Pressable
-              disabled={saving}
-              onPress={() => void onCreate()}
-              style={[styles.submitBtn, saving && styles.disabled]}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.white} />
-              ) : (
-                <Text style={styles.submitBtnText}>{editingProject ? 'Lưu thay đổi' : 'Tạo dự án'}</Text>
-              )}
-            </Pressable>
+      <FullScreenFormModal
+        visible={createOpen}
+        title={editingProject ? 'Sửa dự án' : 'Tạo dự án mới'}
+        onClose={() => setCreateOpen(false)}
+        footer={
+          <Pressable
+            disabled={saving}
+            onPress={() => void onCreate()}
+            style={[styles.submitBtn, saving && styles.disabled]}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Text style={styles.submitBtnText}>{editingProject ? 'Lưu thay đổi' : 'Tạo dự án'}</Text>
+            )}
           </Pressable>
-        </Pressable>
-      </Modal>
+        }
+      >
+        <View style={styles.formBody}>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Tên dự án (VD: Kế hoạch quý 4)"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <TextInput
+            value={instructions}
+            onChangeText={setInstructions}
+            placeholder="Chỉ dẫn ngữ cảnh cho Trợ lý khi làm việc trong dự án này..."
+            placeholderTextColor={colors.muted}
+            multiline
+            style={[styles.field, styles.fieldMulti]}
+          />
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
   );
 }
@@ -457,53 +460,56 @@ export function PromptLibraryPanel({
         </View>
       )}
 
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.sheetTitle}>Thêm mẫu câu lệnh</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Tiêu đề mẫu câu lệnh"
-              placeholderTextColor={colors.muted}
-              style={styles.field}
-            />
-            <TextInput
-              value={desc}
-              onChangeText={setDesc}
-              placeholder="Mô tả ngắn"
-              placeholderTextColor={colors.muted}
-              style={styles.field}
-            />
-            <TextInput
-              value={newCategory}
-              onChangeText={setNewCategory}
-              placeholder="Danh mục (Kinh doanh, Tài chính, Nhân sự...)"
-              placeholderTextColor={colors.muted}
-              style={styles.field}
-            />
-            <TextInput
-              value={promptText}
-              onChangeText={setPromptText}
-              placeholder="Nội dung câu lệnh chi tiết..."
-              placeholderTextColor={colors.muted}
-              multiline
-              style={[styles.field, styles.fieldMulti]}
-            />
-            <Pressable
-              disabled={saving}
-              onPress={() => void onCreate()}
-              style={[styles.submitBtn, saving && styles.disabled]}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.white} />
-              ) : (
-                <Text style={styles.submitBtnText}>Lưu mẫu câu lệnh</Text>
-              )}
-            </Pressable>
+      <FullScreenFormModal
+        visible={createOpen}
+        title="Thêm mẫu câu lệnh"
+        onClose={() => setCreateOpen(false)}
+        footer={
+          <Pressable
+            disabled={saving}
+            onPress={() => void onCreate()}
+            style={[styles.submitBtn, saving && styles.disabled]}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Text style={styles.submitBtnText}>Lưu mẫu câu lệnh</Text>
+            )}
           </Pressable>
-        </Pressable>
-      </Modal>
+        }
+      >
+        <View style={styles.formBody}>
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Tiêu đề mẫu câu lệnh"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <TextInput
+            value={desc}
+            onChangeText={setDesc}
+            placeholder="Mô tả ngắn"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <TextInput
+            value={newCategory}
+            onChangeText={setNewCategory}
+            placeholder="Danh mục (Kinh doanh, Tài chính, Nhân sự...)"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <TextInput
+            value={promptText}
+            onChangeText={setPromptText}
+            placeholder="Nội dung câu lệnh chi tiết..."
+            placeholderTextColor={colors.muted}
+            multiline
+            style={[styles.field, styles.fieldMulti]}
+          />
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
   );
 }
@@ -548,12 +554,10 @@ const styles = StyleSheet.create({
   usePromptBtn: { marginTop: 8, alignSelf: 'flex-start' },
   usePromptContent: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   usePromptText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.white, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, paddingBottom: 28, gap: 10 },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', marginBottom: 4 },
+  formBody: { gap: 10 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 12, color: colors.ink },
   fieldMulti: { minHeight: 86, textAlignVertical: 'top' },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   submitBtnText: { color: colors.white, fontSize: 13, fontWeight: '700' },
   disabled: { opacity: 0.45 },
 });

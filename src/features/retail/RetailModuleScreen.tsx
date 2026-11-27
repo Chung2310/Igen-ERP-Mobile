@@ -35,6 +35,7 @@ import {
   FileText,
   X,
 } from 'lucide-react-native';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { fetchCompanyBranches, type ErpBranch } from '@/features/overview/overviewApi';
 import { colors } from '@/theme/colors';
@@ -1140,20 +1141,16 @@ export function RetailModuleScreen() {
         </View>
       </Modal>
 
-      <Modal visible={Boolean(selectedOrder)} transparent animationType="fade" onRequestClose={() => { if (!cancelAttempt) setSelectedOrder(null); }}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.orderDetailSheet}>
-            <View style={styles.modalHeading}>
-              <Text style={styles.modalTitle}>Chi tiết đơn bán</Text>
-              <Pressable accessibilityRole="button" disabled={Boolean(cancelAttempt)} onPress={() => setSelectedOrder(null)} style={styles.modalCloseBtn}>
-                <X size={18} color={cancelAttempt ? colors.border : colors.muted} />
-              </Pressable>
-            </View>
-            {orderDetailLoading ? <ActivityIndicator style={{ marginVertical: 24 }} color={colors.primary} /> : selectedOrder && (() => {
-              const statusMeta = orderStatusMeta(selectedOrder.status);
-              const payMeta = paymentStatusMeta(selectedOrder.paymentStatus, selectedOrder.dueAmount);
-              return (
-                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6, paddingBottom: 8 }}>
+      <FullScreenFormModal
+        visible={Boolean(selectedOrder)}
+        title="Chi tiết đơn bán"
+        onClose={() => { if (!cancelAttempt) setSelectedOrder(null); }}
+      >
+        {orderDetailLoading ? <ActivityIndicator style={{ marginVertical: 24 }} color={colors.primary} /> : selectedOrder && (() => {
+          const statusMeta = orderStatusMeta(selectedOrder.status);
+          const payMeta = paymentStatusMeta(selectedOrder.paymentStatus, selectedOrder.dueAmount);
+          return (
+            <View style={{ gap: 12, paddingTop: 2, paddingBottom: 8 }}>
                   <View style={styles.detailHero}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <Text numberOfLines={1} ellipsizeMode="middle" style={[styles.orderCode, { flexShrink: 1 }]}>{selectedOrder.orderCode || selectedOrder._id}</Text>
@@ -1234,12 +1231,10 @@ export function RetailModuleScreen() {
                     {orderRefundableAmount > 0 && <View style={styles.paymentMethods}>{(['cash', 'card', 'transfer', 'ewallet'] as const).map((method) => <Pressable key={method} disabled={Boolean(cancelAttempt)} onPress={() => setCancelMethod(method)} style={[styles.paymentMethod, cancelMethod === method && styles.paymentMethodSelected, cancelAttempt && styles.buttonDisabled]}><Text style={[styles.paymentMethodText, cancelMethod === method && styles.paymentMethodTextSelected]}>{paymentMethodLabel(method)}</Text></Pressable>)}</View>}
                     {cancelAttempt?.orderId === selectedOrder._id ? <><Text style={[styles.cardCopy, { textAlign: 'left' }]}>Yêu cầu {String(cancelAttempt.payload.idempotencyKey || '').slice(0, 18)}… · {cancelAttempt.status === 'not_found' ? 'ERP chưa ghi nhận' : cancelAttempt.status === 'processing' ? 'Đang xử lý' : 'Cần đối chiếu'}</Text><SecondaryButton disabled={orderActionBusy} label={orderActionBusy ? 'Đang đối chiếu…' : 'Đối chiếu trạng thái hủy'} onPress={() => void reconcileCancelOrder()} />{cancelAttempt.status === 'not_found' && <><SecondaryButton disabled={orderActionBusy} label="Gửi lại đúng yêu cầu hủy" onPress={() => void sendCancelAttempt()} /><SecondaryButton disabled={orderActionBusy} label="Thu hồi yêu cầu chưa ghi nhận" onPress={() => void revokeCancelOrder()} /></>}</> : <Pressable accessibilityRole="button" disabled={orderActionBusy || Boolean(cancelAttempt) || (orderRefundableAmount > 0 && cancelMethod === 'cash' && !shift)} onPress={startCancelOrder} style={[styles.dangerButton, (orderActionBusy || Boolean(cancelAttempt) || (orderRefundableAmount > 0 && cancelMethod === 'cash' && !shift)) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>{orderActionBusy ? 'Đang hủy…' : orderRefundableAmount > 0 ? `Hủy đơn và hoàn ${money(orderRefundableAmount)}` : 'Hủy đơn'}</Text></Pressable>}
                   </View>}
-                </ScrollView>
-              );
-            })()}
-          </View>
-        </View>
-      </Modal>
+            </View>
+          );
+        })()}
+      </FullScreenFormModal>
     </View>
   );
 }

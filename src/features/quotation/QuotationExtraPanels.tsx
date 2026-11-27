@@ -1,11 +1,12 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { strToU8, zipSync } from 'fflate';
 import { ArrowDownWideNarrow, BadgeCheck, BriefcaseBusiness, Check, ChevronLeft, ChevronRight, CircleAlert, CircleDollarSign, Download, FileSpreadsheet, FileText, Files, Package, Plus, RefreshCw, Search, Trash2, Upload, X } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { showAppAlert, showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import {
   CATALOG_PAGE_SIZE,
@@ -680,7 +681,8 @@ function PriceListImportSheet({ pending, busy, error, onClose, onUpdate, onConfi
   onUpdate: (sheetName: string, update: (sheet: PriceListSheetPreview & { included: boolean; roles: PriceListColumnRole[] }) => PriceListSheetPreview & { included: boolean; roles: PriceListColumnRole[] }) => void;
   onConfirm: () => void;
 }) {
-  return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.importSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View style={styles.rowCopy}><Text style={styles.sheetTitle}>Nhập bảng giá</Text><Text style={styles.sheetSubtitle}>{pending.filename}</Text></View><Pressable disabled={busy} onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+  return <FullScreenFormModal visible title="Nhập bảng giá" onClose={() => { if (!busy) onClose(); }}><View style={styles.formContent}>
+    <Text style={styles.sheetSubtitle}>{pending.filename}</Text>
     <Text style={styles.mutedText}>Chọn sheet, dòng tiêu đề và ghép cột trước khi ghi sản phẩm vào bảng giá.</Text>
     {pending.sheets.map((sheet) => {
       const header = sheet.headerRows.find((row) => row.row === sheet.headerRow);
@@ -694,7 +696,7 @@ function PriceListImportSheet({ pending, busy, error, onClose, onUpdate, onConfi
     })}
     {!!error && <ErrorCard error={error} />}
     <View style={styles.modalActions}><Pressable disabled={busy} onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={busy} onPress={onConfirm} style={[styles.primaryButton, busy && styles.disabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryText}>{busy ? 'Đang nhập...' : 'Xác nhận nhập'}</Text></Pressable></View>
-  </ScrollView></View></View></Modal>;
+  </View></FullScreenFormModal>;
 }
 
 function BulkPriceAdjustmentSheet({ visible, busy, onClose, onApply }: {
@@ -708,13 +710,13 @@ function BulkPriceAdjustmentSheet({ visible, busy, onClose, onApply }: {
   const [value, setValue] = useState('');
   const amount = Number(value);
   const valid = value.trim() !== '' && Number.isFinite(amount) && amount >= 0 && (mode !== 'percent' || amount <= 100);
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.editorSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Điều chỉnh giá hàng loạt</Text><Pressable disabled={busy} onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView contentContainerStyle={styles.formContent}>
+  return <FullScreenFormModal visible={visible} title="Điều chỉnh giá hàng loạt" onClose={() => { if (!busy) onClose(); }}><View style={styles.formContent}>
     <Text style={styles.mutedText}>Xem trước từng sản phẩm trước khi áp dụng thay đổi.</Text>
     <Text style={styles.fieldLabel}>Hướng điều chỉnh</Text><View style={styles.chipWrap}><Pressable onPress={() => setDirection(1)} style={[styles.chip, direction === 1 && styles.chipActive]}><Text style={[styles.chipText, direction === 1 && styles.chipTextActive]}>Tăng giá</Text></Pressable><Pressable onPress={() => setDirection(-1)} style={[styles.chip, direction === -1 && styles.chipActive]}><Text style={[styles.chipText, direction === -1 && styles.chipTextActive]}>Giảm giá</Text></Pressable></View>
     <Text style={styles.fieldLabel}>Cách tính</Text><View style={styles.chipWrap}><Pressable onPress={() => setMode('percent')} style={[styles.chip, mode === 'percent' && styles.chipActive]}><Text style={[styles.chipText, mode === 'percent' && styles.chipTextActive]}>Theo phần trăm (%)</Text></Pressable><Pressable onPress={() => setMode('amount')} style={[styles.chip, mode === 'amount' && styles.chipActive]}><Text style={[styles.chipText, mode === 'amount' && styles.chipTextActive]}>Theo số tiền</Text></Pressable></View>
     <Field label={mode === 'percent' ? 'Mức điều chỉnh (0–100%)' : 'Mức điều chỉnh'} value={value} onChangeText={setValue} keyboardType="decimal-pad" />
     <View style={styles.modalActions}><Pressable disabled={busy} onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={busy || !valid} onPress={() => onApply({ mode, value: direction * amount })} style={[styles.primaryButton, (busy || !valid) && styles.disabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryText}>Xem trước thay đổi</Text></Pressable></View>
-  </ScrollView></View></View></Modal>;
+  </View></FullScreenFormModal>;
 }
 
 type CatalogDraft = { sku: string; name: string; description: string; unit: string; price: string; currency: string; active: boolean; effectiveFrom: string; effectiveTo: string; attributes: string };
@@ -728,7 +730,7 @@ function CatalogEditor({ visible, item, duplicate, onClose, onSave }: { visible:
   }, [item, duplicate, visible]);
   function update<K extends keyof CatalogDraft>(key: K, value: CatalogDraft[K]) { setDraft((current) => ({ ...current, [key]: value })); }
   async function submit() { setSaving(true); try { await onSave(draft); } finally { setSaving(false); } }
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.editorSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>{duplicate ? 'Nhân bản sản phẩm' : item ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}</Text><Pressable onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formContent}>
+  return <FullScreenFormModal visible={visible} title={duplicate ? 'Nhân bản sản phẩm' : item ? 'Sửa sản phẩm' : 'Thêm sản phẩm'} onClose={onClose}><View style={styles.formContent}>
     <Field label="Mã SKU *" value={draft.sku} onChangeText={(value) => update('sku', value)} />
     <Field label="Tên sản phẩm *" value={draft.name} onChangeText={(value) => update('name', value)} />
     <Field label="Mô tả" value={draft.description} onChangeText={(value) => update('description', value)} multiline />
@@ -737,7 +739,7 @@ function CatalogEditor({ visible, item, duplicate, onClose, onSave }: { visible:
     <DateTimeField label="Hiệu lực đến" mode="date" value={draft.effectiveTo} onChange={(value) => update('effectiveTo', value)} allowClear />
     <Field label="Thuộc tính (mỗi dòng: tên=giá trị)" value={draft.attributes} onChangeText={(value) => update('attributes', value)} multiline />
     <View style={styles.modalActions}><Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={saving} onPress={() => { void submit(); }} style={[styles.primaryButton, saving && styles.disabled]}>{saving ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryText}>{saving ? 'Đang lưu...' : 'Lưu sản phẩm'}</Text></Pressable></View>
-  </ScrollView></View></View></Modal>;
+  </View></FullScreenFormModal>;
 }
 
 export function ContractWorkflowPanel({ scope, view, initialQuote, onInitialQuoteHandled, canReadContracts, canReadAcceptances, canReadTemplates, canManage, canManageAcceptance, canUseAi }: { scope: QuotationScope; view: 'contracts' | 'acceptances'; initialQuote?: Quote | null; onInitialQuoteHandled?: () => void; canReadContracts: boolean; canReadAcceptances: boolean; canReadTemplates: boolean; canManage: boolean; canManageAcceptance: boolean; canUseAi: boolean }) {
@@ -966,7 +968,8 @@ function ContractDetailSheet({ scope, contract, canManage, canManageAcceptance, 
     ['depositAmount', 'Tiền đặt cọc / tạm ứng'], ['bankDetails', 'Thông tin tài khoản'], ['paymentTerms', 'Điều khoản thanh toán *', true],
     ['deliveryTerms', 'Tiến độ và bàn giao *', true], ['otherTerms', 'Điều khoản bổ sung', true],
   ];
-  return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.detailSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>{contract.contractNumber}</Text><Text style={styles.sheetSubtitle}>{contract.customerName} · Dự toán {contract.quoteNumber}</Text></View><Pressable onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+  return <FullScreenFormModal visible title={contract.contractNumber} onClose={onClose}><View style={styles.formContent}>
+    <Text style={styles.sheetSubtitle}>{contract.customerName} · Dự toán {contract.quoteNumber}</Text>
     <View style={styles.budgetTotals}><View><Text style={styles.metaLabel}>Giá trị hợp đồng</Text><Text style={styles.metric}>{money(contract.total, contract.currency)}</Text></View><View><Text style={styles.metaLabel}>Đặt cọc</Text><Text style={styles.metric}>{money(contract.depositAmount ?? 0, contract.currency)}</Text></View><StatusPill label={contract.status === 'signed' ? 'Đã ký' : 'Bản nháp'} complete={contract.status === 'signed'} /></View>
     <Text style={styles.sectionTitle}>Thông tin hai bên</Text>
     {[['Khách hàng', contract.customerName], ['Địa chỉ khách hàng', contract.customerAddress], ['Người đại diện', contract.customerRepresentative], ['Email / điện thoại', [contract.customerEmail, contract.customerPhone].filter(Boolean).join(' · ')], ['Đơn vị thực hiện', contract.companyName], ['Đại diện bên thực hiện', contract.companyRepresentative], ['Địa chỉ đơn vị', contract.companyAddress], ['MST đơn vị', contract.companyTaxId]].map(([label, value]) => <InfoRow key={label} label={label} value={value} />)}
@@ -978,7 +981,7 @@ function ContractDetailSheet({ scope, contract, canManage, canManageAcceptance, 
     {canUseAi && <GeneratedFileActions scope={scope} sourceId={contract._id} kind="contract" updatedAt={contract.updatedAt} label="File hợp đồng" canGenerate onGenerate={() => queueContractFile(scope, contract._id)} />}
     <View style={styles.actionRow}>{contract.status === 'signed' && canManageAcceptance && <Pressable disabled={busy} onPress={onCreateAcceptance} style={styles.secondaryButton}><BadgeCheck size={14} color={colors.primary} /><Text style={styles.secondaryText}>Tạo nghiệm thu</Text></Pressable>}{editable && <Pressable disabled={busy} onPress={() => { void onSave(form, contract); }} style={[styles.secondaryButton, busy && styles.disabled]}><Check size={14} color={colors.primary} /><Text style={styles.secondaryText}>Lưu nội dung</Text></Pressable>}</View>
     {editable && <Pressable disabled={busy} onPress={() => onSign(form, contract)} style={[styles.primaryButton, busy && styles.disabled]}><BadgeCheck size={15} color={colors.white} /><Text style={styles.primaryText}>Xác nhận đã ký</Text></Pressable>}
-  </ScrollView></View></View></Modal>;
+  </View></FullScreenFormModal>;
 }
 
 function AcceptanceDetailSheet({ scope, record, contract, canManage, canUseAi, busy, error, onClose, onSave, onComplete }: {
@@ -1003,7 +1006,8 @@ function AcceptanceDetailSheet({ scope, record, contract, canManage, canUseAi, b
   }), [record._id, record.updatedAt, contract._id]);
   function set(key: keyof Omit<AcceptanceForm, 'lines'>, value: string) { setForm((current) => ({ ...current, [key]: value })); }
   const due = Math.max(0, Number(form.settlementAmount || 0) - Number(form.amountPaid || 0));
-  return <Modal visible transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.detailSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>{record.acceptanceNumber}</Text><Text style={styles.sheetSubtitle}>Hợp đồng {contract.contractNumber} · {contract.customerName}</Text></View><Pressable onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+  return <FullScreenFormModal visible title={record.acceptanceNumber} onClose={onClose}><View style={styles.formContent}>
+    <Text style={styles.sheetSubtitle}>Hợp đồng {contract.contractNumber} · {contract.customerName}</Text>
     <View style={styles.budgetTotals}><View><Text style={styles.metaLabel}>Giá trị quyết toán</Text><Text style={styles.metric}>{money(record.settlementAmount, contract.currency)}</Text></View><View><Text style={styles.metaLabel}>Còn phải thu</Text><Text style={styles.metric}>{money(Math.max(0, record.settlementAmount - record.amountPaid), contract.currency)}</Text></View><StatusPill label={record.status === 'completed' ? 'Hoàn tất' : 'Bản nháp'} complete={record.status === 'completed'} /></View>
     {editable ? <>
       <View style={styles.twoColumns}><DateTimeField label="Ngày nghiệm thu *" mode="date" value={form.acceptedDate} onChange={(value) => set('acceptedDate', value)} /><Field label="Địa điểm nghiệm thu *" value={form.location} onChangeText={(value) => set('location', value)} /></View>
@@ -1027,7 +1031,7 @@ function AcceptanceDetailSheet({ scope, record, contract, canManage, canUseAi, b
     {canUseAi && <GeneratedFileActions scope={scope} sourceId={record._id} kind="acceptance" updatedAt={record.updatedAt} label="File biên bản nghiệm thu" canGenerate onGenerate={() => queueAcceptanceFile(scope, record._id)} />}
     <View style={styles.actionRow}>{editable && <Pressable disabled={busy} onPress={() => { void onSave(form, record); }} style={[styles.secondaryButton, busy && styles.disabled]}><Check size={14} color={colors.primary} /><Text style={styles.secondaryText}>Lưu bản nháp</Text></Pressable>}</View>
     {editable && <Pressable disabled={busy || !form.lines.some((line) => Number(line.acceptedQuantity) > 0)} onPress={() => onComplete(form, record)} style={[styles.primaryButton, busy && styles.disabled]}><BadgeCheck size={15} color={colors.white} /><Text style={styles.primaryText}>Hoàn tất nghiệm thu</Text></Pressable>}
-  </ScrollView></View></View></Modal>;
+  </View></FullScreenFormModal>;
 }
 
 type ContractForm = Record<string, string>;
@@ -1045,13 +1049,13 @@ function ContractCreateSheet({ visible, quotes, preselectedQuoteId, templates, c
   function set(key: string, value: string) { setForm((current) => ({ ...current, [key]: value })); }
   const fields: Array<[string, string, boolean?]> = [['customerName', 'Tên khách hàng *', true], ['customerAddress', 'Địa chỉ khách hàng *', true], ['customerRepresentative', 'Người đại diện khách hàng *', true], ['customerTaxId', 'Mã số thuế khách hàng'], ['customerPhone', 'Điện thoại khách hàng'], ['customerEmail', 'Email khách hàng'], ['projectName', 'Tên công trình / dự án *', true], ['projectAddress', 'Địa điểm thực hiện *', true], ['signedDate', 'Ngày ký dự kiến *'], ['signingPlace', 'Địa điểm ký *', true], ['scope', 'Phạm vi công việc *', true], ['deliverables', 'Hồ sơ / sản phẩm bàn giao *', true], ['paymentTerms', 'Điều khoản thanh toán *', true], ['deliveryTerms', 'Tiến độ / điều khoản giao hàng *', true], ['depositAmount', 'Tiền đặt cọc'], ['bankDetails', 'Thông tin tài khoản'], ['otherTerms', 'Điều khoản bổ sung']];
   if (!visible) return null;
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.editorSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Tạo hợp đồng từ dự toán</Text><Pressable onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+  return <FullScreenFormModal visible={visible} title="Tạo hợp đồng từ dự toán" onClose={onClose}><View style={styles.formContent}>
     <Text style={styles.fieldLabel}>Dự toán đã duyệt</Text>{quotes.map((item) => <Pressable key={item._id} onPress={() => { setQuoteId(item._id); setForm((current) => ({ ...current, customerName: item.customerName, customerEmail: item.customerEmail, customerPhone: item.customerPhone ?? '' })); }} style={[styles.choiceRow, quoteId === item._id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.quoteNumber} · {item.customerName} · {money(item.total, item.currency)}</Text>{quoteId === item._id && <Check size={14} color={colors.primary} />}</Pressable>)}
     <Text style={styles.fieldLabel}>Mẫu hợp đồng</Text>{(templates ?? []).map((item, idx) => <Pressable key={`${item.id || item.originalFilename || 'tpl'}-${idx}`} onPress={() => setTemplateId(item.id)} style={[styles.choiceRow, templateId === item.id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.name || item.originalFilename} · {(item.extension ?? '').toUpperCase()}</Text>{templateId === item.id && <Check size={14} color={colors.primary} />}</Pressable>)}
     {fields.map(([key, label, multiline]) => key === 'signedDate' ? <DateTimeField key={key} label={label} mode="date" value={form[key] ?? ''} onChange={(value) => set(key, value)} /> : <Field key={key} label={label} value={form[key] ?? ''} onChangeText={(value) => set(key, value)} multiline={multiline} keyboardType={key === 'depositAmount' ? 'decimal-pad' : undefined} />)}
     {!!error && <ErrorCard error={error} />}
     <View style={styles.modalActions}><Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={busy || !quote} onPress={() => { if (quote) void onSave(form, quote, templateId); }} style={[styles.primaryButton, busy && styles.disabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryText}>Tạo hợp đồng</Text></Pressable></View>
-  </ScrollView></View></View></Modal>;
+  </View></FullScreenFormModal>;
 }
 
 type AcceptanceForm = { acceptedDate: string; startTime: string; endTime: string; location: string; result: string; handoverDetails: string; qualityAssessment: string; settlementAmount: string; amountPaid: string; paymentDueDays: string; notes: string; lines: Array<{ lineIndex: number; acceptedQuantity: string; acceptedDetails: string }> };
@@ -1091,7 +1095,7 @@ function AcceptanceCreateSheet({ visible, contracts, selectedContract, templates
   const contractLines = contract?.lines ?? [];
   function set(key: keyof Omit<AcceptanceForm, 'lines'>, value: string) { setForm((current) => ({ ...current, [key]: value })); }
   if (!visible) return null;
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalBackdrop}><View style={styles.editorSheet}><View style={styles.sheetHandle} /><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Tạo biên bản nghiệm thu</Text><Pressable onPress={onClose}><X size={18} color={colors.muted} /></Pressable></View><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
+  return <FullScreenFormModal visible={visible} title="Tạo biên bản nghiệm thu" onClose={onClose}><View style={styles.formContent}>
     <Text style={styles.fieldLabel}>Hợp đồng đã ký</Text>{safeContracts.map((item) => <Pressable key={item._id} onPress={() => { const itemLines = item.lines ?? []; setContractId(item._id); setForm((current) => ({ ...current, settlementAmount: String(item.total ?? 0), amountPaid: String(item.depositAmount ?? 0), lines: itemLines.map((line, index) => ({ lineIndex: index, acceptedQuantity: String(line?.quantity ?? 0), acceptedDetails: '' })) })); }} style={[styles.choiceRow, contractId === item._id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.contractNumber} · {item.customerName}</Text>{contractId === item._id && <Check size={14} color={colors.primary} />}</Pressable>)}
     <Text style={styles.fieldLabel}>Mẫu nghiệm thu / quyết toán</Text>{safeTemplates.map((item, idx) => <Pressable key={`${item.id || item.originalFilename || 'tpl'}-${idx}`} onPress={() => setTemplateId(item.id)} style={[styles.choiceRow, templateId === item.id && styles.choiceSelected]}><Text style={styles.rowTitle}>{item.name || item.originalFilename}</Text>{templateId === item.id && <Check size={14} color={colors.primary} />}</Pressable>)}
     <DateTimeField label="Ngày nghiệm thu *" mode="date" value={form.acceptedDate} onChange={(value) => set('acceptedDate', value)} />
@@ -1106,7 +1110,7 @@ function AcceptanceCreateSheet({ visible, contracts, selectedContract, templates
     {!!contract && <View style={styles.subSection}><Text style={styles.sectionTitle}>Khối lượng nghiệm thu</Text>{contractLines.map((line, index) => <View key={`${line.catalogItemId || 'line'}-${index}`} style={styles.acceptanceLine}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{line.name}</Text><Text style={styles.mutedText}>Theo hợp đồng: {line.quantity} {line.unit}</Text></View><TextInput value={form.lines[index]?.acceptedQuantity ?? '0'} onChangeText={(value) => setForm((current) => ({ ...current, lines: current.lines.map((entry) => entry.lineIndex === index ? { ...entry, acceptedQuantity: value } : entry) }))} style={styles.quantityInput} keyboardType="decimal-pad" /></View>)}</View>}
     {!!error && <ErrorCard error={error} />}
     <View style={styles.modalActions}><Pressable onPress={onClose} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={busy || !contract} onPress={() => { if (contract) void onSave(form, contract, templateId); }} style={[styles.primaryButton, busy && styles.disabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryText}>Lưu nghiệm thu</Text></Pressable></View>
-  </ScrollView></View></View></Modal>;
+  </View></FullScreenFormModal>;
 }
 
 function StatusPill({ label, complete }: { label: string; complete: boolean }) { return <View style={[styles.statusPill, complete && styles.statusPillComplete]}><Text style={[styles.statusPillText, complete && styles.statusPillTextComplete]}>{label}</Text></View>; }

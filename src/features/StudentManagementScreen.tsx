@@ -1,4 +1,5 @@
 import { BrandLoader, CenteredPageLoader } from '@/components/BrandLoader';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
 import { Stack } from 'expo-router';
@@ -1126,183 +1127,266 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       </>}
     </ScrollView>
 
-    <Modal visible={formOpen} transparent animationType="fade" onRequestClose={() => { if (!saving) { setFormOpen(false); setPaymentToEdit(null); setProgressionClassCreate(false); } }}>
-      <View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title={formTitle(area, Boolean(editingId), Boolean(paymentToEdit))} onClose={() => { if (!saving) { setFormOpen(false); setPaymentToEdit(null); setProgressionClassCreate(false); } }} />
-        <ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {area === 'notifications' ? <Text style={styles.helperText}>Biến cá nhân hóa: {'{{studentName}}'}, {'{{phone}}'}, {'{{courseName}}'}, {'{{dueAmount}}'}, {'{{paidAmount}}'}. Nhắc theo đợt: {'{{installmentAmount}}'}, {'{{installmentPercent}}'}, {'{{installmentLabel}}'}, {'{{installmentDueDate}}'}.</Text> : null}
-          {formFields().filter((field) => !(area === 'students' && Boolean(editingId) && field.key === 'batchId')).map((field) => <View key={field.key} style={styles.fieldWrap}>
-            {field.key === 'daysOfWeek' ? (() => {
-              const selectedDays = new Set(draft.daysOfWeek.split(/[\s,;]+/).filter(Boolean).map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6));
-              const toggleDay = (day: number) => {
-                const next = new Set(selectedDays);
-                if (next.has(day)) next.delete(day); else next.add(day);
-                const ordered = WEEKDAY_OPTIONS.map((opt) => opt.value).filter((value) => next.has(value));
-                setValue('daysOfWeek', ordered.join(','));
-              };
-              return <View>
-                <Text style={styles.fieldLabel}>{field.label}</Text>
-                <View style={styles.weekdayGrid}>
-                  {WEEKDAY_OPTIONS.map((option) => {
-                    const active = selectedDays.has(option.value);
-                    return <Pressable key={option.value} onPress={() => toggleDay(option.value)} style={[styles.weekdayChip, active && styles.weekdayChipActive]}>
-                      <Text style={[styles.weekdayChipText, active && styles.weekdayChipTextActive]}>{option.label}</Text>
-                    </Pressable>;
-                  })}
-                </View>
-              </View>;
-            })() : field.mode ? <DateTimeField label={field.label} mode={field.mode} value={String(draft[field.key as keyof Draft] || '')} onChange={(value) => setValue(field.key, value)} allowClear={!field.label.includes('*')} /> : field.options ? <View><Text style={styles.fieldLabel}>{field.label}</Text><Pressable onPress={() => openPicker(field.key)} style={styles.selectField}><Text numberOfLines={2} style={[styles.selectValue, !draft[field.key as keyof Draft] && styles.placeholder]}>{field.options.find((option) => option.value === draft[field.key as keyof Draft])?.label || 'Chọn'}</Text><ChevronDown size={15} color={colors.muted} /></Pressable></View> : <Field label={field.label} value={String(draft[field.key as keyof Draft] || '')} onChangeText={(value) => setValue(field.key, value)} placeholder={field.placeholder} multiline={field.multiline} keyboardType={field.keyboardType} autoCapitalize={field.key === 'email' ? 'none' : 'sentences'} />}
-          </View>)}
-          {area === 'roadmap' && !editingId ? <View style={styles.roadmapStepsField}><Text style={styles.fieldLabel}>Các chặng khóa học *</Text>{roadmapCourseIds.map((courseId, index) => <View key={`roadmap-step-${index}`} style={styles.roadmapStepBlock}><View style={styles.roadmapStepRow}><Text style={styles.roadmapStepNumber}>{index + 1}</Text><Pressable onPress={() => openPicker(`roadmap-course-${index}`)} style={styles.selectField}><Text numberOfLines={2} style={[styles.selectValue, !courseId && styles.placeholder]}>{courses.find((item) => item.id === courseId)?.title || `Chọn khóa học cho chặng ${index + 1}`}</Text><ChevronDown size={14} color={colors.muted} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Xóa chặng ${index + 1}`} disabled={roadmapCourseIds.length === 1} onPress={() => { setRoadmapCourseIds((current) => current.filter((_, stepIndex) => stepIndex !== index)); setRoadmapStepRules((current) => current.filter((_, stepIndex) => stepIndex !== index)); }} style={[styles.removeStepButton, roadmapCourseIds.length === 1 && styles.disabled]}><X size={15} color="#B42318" /></Pressable></View><View style={styles.roadmapRulePanel}><Text style={styles.optionDetail}>Điều kiện chuyển chặng (để trống nếu không áp dụng)</Text><View style={styles.filters}>{([{ value: 'all', label: 'Đạt tất cả điều kiện' }, { value: 'any', label: 'Đạt một điều kiện' }] as const).map((option) => <Pressable key={option.value} onPress={() => setRoadmapRule(index, 'matchMode', option.value)} style={[styles.filterChip, roadmapStepRules[index]?.matchMode === option.value && styles.filterChipSelected]}><Text style={[styles.filterChipText, roadmapStepRules[index]?.matchMode === option.value && styles.filterChipTextSelected]}>{option.label}</Text></Pressable>)}</View><View style={styles.twoColumns}><Field label="Sĩ số tối thiểu" value={roadmapStepRules[index]?.minClassSize || ''} onChangeText={(value) => setRoadmapRule(index, 'minClassSize', value)} keyboardType="number-pad" /><Field label="Sĩ số tối đa" value={roadmapStepRules[index]?.maxClassSize || ''} onChangeText={(value) => setRoadmapRule(index, 'maxClassSize', value)} keyboardType="number-pad" /></View><View style={styles.twoColumns}><Field label="Chuyên cần tối thiểu (%)" value={roadmapStepRules[index]?.minAttendanceRate || ''} onChangeText={(value) => setRoadmapRule(index, 'minAttendanceRate', value)} keyboardType="decimal-pad" /><Field label="Bài tập tối thiểu (%)" value={roadmapStepRules[index]?.minAssignmentRate || ''} onChangeText={(value) => setRoadmapRule(index, 'minAssignmentRate', value)} keyboardType="decimal-pad" /></View><View style={styles.twoColumns}><Field label="Mini test tối thiểu (%)" value={roadmapStepRules[index]?.minMiniTestRate || ''} onChangeText={(value) => setRoadmapRule(index, 'minMiniTestRate', value)} keyboardType="decimal-pad" /><Field label="Điểm thi tối thiểu (%)" value={roadmapStepRules[index]?.minExamRate || ''} onChangeText={(value) => setRoadmapRule(index, 'minExamRate', value)} keyboardType="decimal-pad" /></View></View></View>)}<Pressable onPress={() => { setRoadmapCourseIds((current) => [...current, '']); setRoadmapStepRules((current) => [...current, emptyRoadmapStepRule()]); }} style={styles.addStepButton}><Plus size={14} color={colors.primary} /><Text style={styles.addStepText}>Thêm chặng tiếp theo</Text></Pressable></View> : null}
-        </ScrollView>
-        <View style={styles.modalActions}><Pressable onPress={() => { if (!saving) { setFormOpen(false); setPaymentToEdit(null); setProgressionClassCreate(false); } }} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable onPress={() => area === 'notifications' ? void submitNotice() : void saveForm()} disabled={saving} style={[styles.saveButton, saving && styles.disabled]}>{saving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>{area === 'notifications' ? 'Gửi email' : editingId ? 'Lưu thay đổi' : 'Tạo mới'}</Text>}</Pressable></View>
-      </View></View>
-    </Modal>
+    <FullScreenFormModal
+      visible={formOpen}
+      title={formTitle(area, Boolean(editingId), Boolean(paymentToEdit))}
+      onClose={() => { if (!saving) { setFormOpen(false); setPaymentToEdit(null); setProgressionClassCreate(false); } }}
+      footer={
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+          <Pressable onPress={() => { if (!saving) { setFormOpen(false); setPaymentToEdit(null); setProgressionClassCreate(false); } }} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable>
+          <Pressable onPress={() => area === 'notifications' ? void submitNotice() : void saveForm()} disabled={saving} style={[styles.saveButton, saving && styles.disabled]}>{saving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>{area === 'notifications' ? 'Gửi email' : editingId ? 'Lưu thay đổi' : 'Tạo mới'}</Text>}</Pressable>
+        </View>
+      }
+    >
+      <View style={{ gap: 10 }}>
+        {area === 'notifications' ? <Text style={styles.helperText}>Biến cá nhân hóa: {'{{studentName}}'}, {'{{phone}}'}, {'{{courseName}}'}, {'{{dueAmount}}'}, {'{{paidAmount}}'}. Nhắc theo đợt: {'{{installmentAmount}}'}, {'{{installmentPercent}}'}, {'{{installmentLabel}}'}, {'{{installmentDueDate}}'}.</Text> : null}
+        {formFields().filter((field) => !(area === 'students' && Boolean(editingId) && field.key === 'batchId')).map((field) => <View key={field.key} style={styles.fieldWrap}>
+          {field.key === 'daysOfWeek' ? (() => {
+            const selectedDays = new Set(draft.daysOfWeek.split(/[\s,;]+/).filter(Boolean).map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6));
+            const toggleDay = (day: number) => {
+              const next = new Set(selectedDays);
+              if (next.has(day)) next.delete(day); else next.add(day);
+              const ordered = WEEKDAY_OPTIONS.map((opt) => opt.value).filter((value) => next.has(value));
+              setValue('daysOfWeek', ordered.join(','));
+            };
+            return <View>
+              <Text style={styles.fieldLabel}>{field.label}</Text>
+              <View style={styles.weekdayGrid}>
+                {WEEKDAY_OPTIONS.map((option) => {
+                  const active = selectedDays.has(option.value);
+                  return <Pressable key={option.value} onPress={() => toggleDay(option.value)} style={[styles.weekdayChip, active && styles.weekdayChipActive]}>
+                    <Text style={[styles.weekdayChipText, active && styles.weekdayChipTextActive]}>{option.label}</Text>
+                  </Pressable>;
+                })}
+              </View>
+            </View>;
+          })() : field.mode ? <DateTimeField label={field.label} mode={field.mode} value={String(draft[field.key as keyof Draft] || '')} onChange={(value) => setValue(field.key, value)} allowClear={!field.label.includes('*')} /> : field.options ? <View><Text style={styles.fieldLabel}>{field.label}</Text><Pressable onPress={() => openPicker(field.key)} style={styles.selectField}><Text numberOfLines={2} style={[styles.selectValue, !draft[field.key as keyof Draft] && styles.placeholder]}>{field.options.find((option) => option.value === draft[field.key as keyof Draft])?.label || 'Chọn'}</Text><ChevronDown size={15} color={colors.muted} /></Pressable></View> : <Field label={field.label} value={String(draft[field.key as keyof Draft] || '')} onChangeText={(value) => setValue(field.key, value)} placeholder={field.placeholder} multiline={field.multiline} keyboardType={field.keyboardType} autoCapitalize={field.key === 'email' ? 'none' : 'sentences'} />}
+        </View>)}
+        {area === 'roadmap' && !editingId ? <View style={styles.roadmapStepsField}><Text style={styles.fieldLabel}>Các chặng khóa học *</Text>{roadmapCourseIds.map((courseId, index) => <View key={`roadmap-step-${index}`} style={styles.roadmapStepBlock}><View style={styles.roadmapStepRow}><Text style={styles.roadmapStepNumber}>{index + 1}</Text><Pressable onPress={() => openPicker(`roadmap-course-${index}`)} style={styles.selectField}><Text numberOfLines={2} style={[styles.selectValue, !courseId && styles.placeholder]}>{courses.find((item) => item.id === courseId)?.title || `Chọn khóa học cho chặng ${index + 1}`}</Text><ChevronDown size={14} color={colors.muted} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Xóa chặng ${index + 1}`} disabled={roadmapCourseIds.length === 1} onPress={() => { setRoadmapCourseIds((current) => current.filter((_, stepIndex) => stepIndex !== index)); setRoadmapStepRules((current) => current.filter((_, stepIndex) => stepIndex !== index)); }} style={[styles.removeStepButton, roadmapCourseIds.length === 1 && styles.disabled]}><X size={15} color="#B42318" /></Pressable></View><View style={styles.roadmapRulePanel}><Text style={styles.optionDetail}>Điều kiện chuyển chặng (để trống nếu không áp dụng)</Text><View style={styles.filters}>{([{ value: 'all', label: 'Đạt tất cả điều kiện' }, { value: 'any', label: 'Đạt một điều kiện' }] as const).map((option) => <Pressable key={option.value} onPress={() => setRoadmapRule(index, 'matchMode', option.value)} style={[styles.filterChip, roadmapStepRules[index]?.matchMode === option.value && styles.filterChipSelected]}><Text style={[styles.filterChipText, roadmapStepRules[index]?.matchMode === option.value && styles.filterChipTextSelected]}>{option.label}</Text></Pressable>)}</View><View style={styles.twoColumns}><Field label="Sĩ số tối thiểu" value={roadmapStepRules[index]?.minClassSize || ''} onChangeText={(value) => setRoadmapRule(index, 'minClassSize', value)} keyboardType="number-pad" /><Field label="Sĩ số tối đa" value={roadmapStepRules[index]?.maxClassSize || ''} onChangeText={(value) => setRoadmapRule(index, 'maxClassSize', value)} keyboardType="number-pad" /></View><View style={styles.twoColumns}><Field label="Chuyên cần tối thiểu (%)" value={roadmapStepRules[index]?.minAttendanceRate || ''} onChangeText={(value) => setRoadmapRule(index, 'minAttendanceRate', value)} keyboardType="decimal-pad" /><Field label="Bài tập tối thiểu (%)" value={roadmapStepRules[index]?.minAssignmentRate || ''} onChangeText={(value) => setRoadmapRule(index, 'minAssignmentRate', value)} keyboardType="decimal-pad" /></View><View style={styles.twoColumns}><Field label="Mini test tối thiểu (%)" value={roadmapStepRules[index]?.minMiniTestRate || ''} onChangeText={(value) => setRoadmapRule(index, 'minMiniTestRate', value)} keyboardType="decimal-pad" /><Field label="Điểm thi tối thiểu (%)" value={roadmapStepRules[index]?.minExamRate || ''} onChangeText={(value) => setRoadmapRule(index, 'minExamRate', value)} keyboardType="decimal-pad" /></View></View></View>)}<Pressable onPress={() => { setRoadmapCourseIds((current) => [...current, '']); setRoadmapStepRules((current) => [...current, emptyRoadmapStepRule()]); }} style={styles.addStepButton}><Plus size={14} color={colors.primary} /><Text style={styles.addStepText}>Thêm chặng tiếp theo</Text></Pressable></View> : null}
+      </View>
+    </FullScreenFormModal>
 
     <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}><View style={styles.backdrop}><View style={[styles.dialog, styles.pickerDialog]}><ModalHeader title="Chọn thông tin" onClose={() => setPickerOpen(false)} /><View style={styles.searchBox}><Search size={15} color={colors.muted} /><TextInput value={pickerSearch} onChangeText={setPickerSearch} placeholder="Tìm kiếm" placeholderTextColor={colors.muted} style={styles.searchInput} /></View><ScrollView style={{ maxHeight: 440 }} keyboardShouldPersistTaps="handled">{optionsForPicker().map((option) => <Pressable key={option.value} onPress={() => { if (pickerField?.startsWith('roadmap-course-')) { const selectedIndex = Number(pickerField.slice('roadmap-course-'.length)); setRoadmapCourseIds((current) => current.map((value, index) => index === selectedIndex ? option.value : value)); } else if (pickerField) setValue(pickerField, option.value); setPickerOpen(false); }} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{option.label}</Text>{option.detail ? <Text style={styles.optionDetail}>{option.detail}</Text> : null}</View>{pickerField?.startsWith('roadmap-course-') ? <Check size={17} color={colors.primary} /> : pickerField && draft[pickerField as keyof Draft] === option.value ? <Check size={17} color={colors.primary} /> : null}</Pressable>)}{optionsForPicker().length === 0 ? <Text style={styles.helperText}>Không tìm thấy lựa chọn phù hợp.</Text> : null}</ScrollView></View></View></Modal>
 
-    <Modal visible={Boolean(studentDetail)} transparent animationType="slide" onRequestClose={() => setStudentDetail(null)}><View style={styles.backdrop}><View style={[styles.dialog, styles.detailDialog]}><ModalHeader title="Hồ sơ học viên" onClose={() => setStudentDetail(null)} />{detailLoading ? <LoadState title="Đang tải hồ sơ" detail="Đang lấy học phí và lịch sử đào tạo…" busy /> : studentDetail ? <ScrollView contentContainerStyle={styles.detailContent}>
-      <View style={styles.studentIdentity}><View style={styles.studentAvatar}><UsersRound size={20} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{studentDetail.fullName}</Text><Text style={styles.cardMeta}>{studentDetail.phone} · {studentDetail.email || 'Chưa có email'}</Text></View></View>
-      <View style={styles.detailGrid}><Detail label="Ngày sinh" value={studentDetail.birthday || '—'} /><Detail label="CCCD" value={studentDetail.idCard || '—'} /><Detail label="Ngày đăng ký" value={studentDetail.registrationDate || '—'} /><Detail label="Địa chỉ" value={studentDetail.address || '—'} /></View>
-      <View style={styles.detailSection}><Text style={styles.detailSectionTitle}>Học phí</Text><View style={styles.detailGrid}><Detail label="Đã thu" value={money(studentDetail.paidAmount)} /><Detail label="Còn nợ" value={money(studentDue(studentDetail))} /></View>
-        {installments.map((item, index) => <View key={`${item.no || index}`} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>Đợt {item.no || index + 1} · {money(item.amountDue)}</Text><Text style={styles.optionDetail}>{item.dueDate || 'Chưa có hạn'} · {item.status || 'Chưa thanh toán'}</Text></View>{item.status !== 'Đã thanh toán' ? <Pressable onPress={() => void markStudentInstallmentPaid(studentDetail.id, Number(item.no || index + 1), scope).then(() => openStudentDetail(studentDetail)).catch((cause) => Alert.alert('Không cập nhật được', cause instanceof Error ? cause.message : 'Lỗi cập nhật.'))} style={styles.miniAction}><Check size={13} color={colors.primary} /><Text style={styles.miniActionText}>Đã thu</Text></Pressable> : null}</View>)}
-      </View>
-      <View style={styles.detailSection}><Text style={styles.detailSectionTitle}>Lịch sử giao dịch</Text>{payments.filter((payment) => payment.studentId === studentDetail.id).map((payment, index) => <View key={payment.id || payment._id || index} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{money(payment.amount)} · {payment.method || '—'}</Text><Text style={styles.optionDetail}>{payment.date || payment.paidOn || '—'} {payment.note ? `· ${payment.note}` : ''}</Text></View></View>)}{!payments.some((payment) => payment.studentId === studentDetail.id) ? <Text style={styles.emptyHint}>Chưa có giao dịch thu học phí.</Text> : null}</View>
-      {learningHistory ? <View style={styles.detailSection}><Text style={styles.detailSectionTitle}>Tiến trình đào tạo · {learningHistory.summary?.totalClasses || learningHistory.entries?.length || 0} lớp · {learningHistory.summary?.totalCourses || learningHistory.completedCourses?.length || 0} khóa</Text>{learningHistory.completedCourses?.length ? <View style={styles.filters}>{learningHistory.completedCourses.map((course) => <View key={course.id} style={styles.filterChipSelected}><Text style={styles.filterChipTextSelected}>{course.title}{course.code ? ` · ${course.code}` : ''}</Text></View>)}</View> : null}{learningHistory.entries?.map((entry) => <View key={entry.id} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{entry.batchCode} · {entry.courseTitle}</Text><Text style={styles.optionDetail}>{entry.status === 'active' ? 'Đang học' : entry.status === 'completed' ? 'Hoàn thành' : 'Đã rời lớp'} · {entry.instructorName || 'Chưa phân công'} · {entry.enrolledAt ? toDisplayDate(entry.enrolledAt) : 'Chưa xác định'}{entry.leftAt ? ` → ${toDisplayDate(entry.leftAt)}` : ''}</Text>{entry.roadmap ? <Text style={styles.optionDetail}>{entry.roadmap.name} · Chặng {entry.roadmap.stepOrder || 1}/{entry.roadmap.totalSteps}</Text> : null}{entry.suspensionReason ? <Text style={styles.optionDetail}>Lý do bảo lưu: {entry.suspensionReason}{entry.expectedReturnAt ? ` · Dự kiến quay lại ${toDisplayDate(entry.expectedReturnAt)}` : ''}</Text> : null}</View><Badge label={entry.enrollmentStatus || entry.batchStatus || entry.status} /></View>)}{!learningHistory.entries?.length ? <Text style={styles.emptyHint}>Chưa có lịch sử lớp học.</Text> : null}</View> : null}
-      {canManage && <View style={styles.detailActionRow}>{actionButton('Sửa hồ sơ', Pencil, () => { setStudentDetail(null); openEdit(studentDetail); }, 'primary')}{actionButton('Xóa hồ sơ', Trash2, () => { setStudentDetail(null); confirmDelete('hồ sơ học viên', () => deleteStudent(studentDetail.id, scope)); }, 'danger')}</View>}
-    </ScrollView> : null}</View></View></Modal>
-
-    <Modal visible={Boolean(manageBatch)} transparent animationType="slide" onRequestClose={() => setManageBatch(null)}><View style={styles.backdrop}><View style={[styles.dialog, styles.detailDialog]}><ModalHeader title={manageBatch ? `Danh sách lớp ${manageBatch.code}` : 'Danh sách lớp'} onClose={() => setManageBatch(null)} /><View style={styles.detailActionRow}>{manageBatch && canManage && actionButton('Điểm danh / QR', ClipboardCheck, () => void openAttendance(manageBatch), 'primary')}</View>{batchBusy ? <LoadState title="Đang cập nhật lớp" detail="Đang đồng bộ danh sách học viên…" busy /> : <ScrollView contentContainerStyle={styles.detailContent}>
-      <Text style={styles.detailSectionTitle}>Đã xếp lớp ({enrollments.length})</Text>{enrollments.map((enrollment) => { const student = students.find((item) => item.id === enrollment.studentId); return <View key={enrollment.studentId} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{student?.fullName || enrollment.studentId}</Text><Text style={styles.optionDetail}>{student?.phone || ''} · {enrollment.status || 'Đang học'}</Text></View>{canManage && student ? <Pressable onPress={() => void updateBatchLearner(manageBatch!, student, true)} style={styles.miniAction}><Trash2 size={13} color="#B42318" /><Text style={[styles.miniActionText, { color: '#B42318' }]}>Gỡ</Text></Pressable> : null}</View>; })}
-      <Text style={[styles.detailSectionTitle, { marginTop: 18 }]}>Thêm học viên</Text>{students.filter((student) => !enrollments.some((entry) => entry.studentId === student.id)).slice(0, 80).map((student) => <Pressable key={student.id} onPress={() => void updateBatchLearner(manageBatch!, student, false)} disabled={!canManage || batchBusy} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{student.fullName}</Text><Text style={styles.optionDetail}>{student.phone} · {statusOf(student)}</Text></View><Plus size={16} color={colors.primary} /></Pressable>)}
-    </ScrollView>}</View></View></Modal>
-
-    <Modal visible={Boolean(attendanceBatch)} transparent animationType="slide" onRequestClose={() => setAttendanceBatch(null)}>
-      <View style={styles.backdrop}>
-        <View style={[styles.dialog, styles.detailDialog]}>
-          <ModalHeader title={attendanceBatch ? `Điểm danh · ${attendanceBatch.code}` : 'Điểm danh lớp'} onClose={() => setAttendanceBatch(null)} />
-          <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <DateTimeField label="Ngày điểm danh" mode="date" value={attendanceDate} onChange={(value) => void changeAttendanceDate(value)} />
-            <View style={[styles.twoColumns, { marginTop: 10, marginBottom: 10 }]}>
-              <Pressable disabled={qrCreating} onPress={() => attendanceBatch && void startQrAttendance(attendanceBatch)} style={[styles.saveButton, { flex: 1, gap: 6 }, qrCreating && styles.disabled]}>
-                {qrCreating ? <ActivityIndicator color={colors.white} size="small" /> : <QrCode size={14} color={colors.white} />}
-                <Text style={styles.saveText}>{qrCreating ? 'Đang tạo QR…' : qrSession ? 'Tạo lại QR' : 'Tạo QR'}</Text>
-              </Pressable>
-              <Pressable disabled={batchBusy} onPress={() => void saveAttendance()} style={[styles.secondaryWide, { flex: 1, marginVertical: 0 }, batchBusy && styles.disabled]}>
-                {batchBusy ? <ActivityIndicator color={colors.primary} size="small" /> : <Check size={14} color={colors.primary} />}
-                <Text style={styles.secondaryWideText}>Lưu điểm danh</Text>
-              </Pressable>
-            </View>
-            {qrSession ? (
-              <View style={styles.qrPanel}>
-                <QRCode value={qrSession.url} size={172} backgroundColor={colors.white} color={colors.ink} />
-                <Text style={styles.optionTitle}>Đã điểm danh qua QR: {qrSession.checkedIn}</Text>
-                <Text selectable style={styles.qrUrl}>{qrSession.url}</Text>
-                <View style={[styles.twoColumns, { width: '100%', marginTop: 4 }]}>
-                  <Pressable onPress={() => void Share.share({ message: qrSession.url, url: qrSession.url })} style={[styles.secondaryWide, { flex: 1, marginVertical: 0 }]}>
-                    <Share2 size={14} color={colors.primary} />
-                    <Text style={styles.secondaryWideText}>Chia sẻ link</Text>
-                  </Pressable>
-                  <Pressable onPress={() => void closeStudentQrSession(qrSession.sessionId, scope).then(() => setQrSession(null)).catch((cause) => Alert.alert('Không đóng được', cause instanceof Error ? cause.message : 'Lỗi đóng phiên.'))} style={[styles.cancelButton, { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#FFF1F0' }]}>
-                    <X size={14} color="#B42318" />
-                    <Text style={[styles.cancelText, { color: '#B42318' }]}>Đóng phiên</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : null}
-            <Text style={[styles.detailSectionTitle, { marginTop: 8 }]}>Danh sách học viên ({attendanceLearners.length})</Text>
-            {attendanceLearners.length === 0 ? <Text style={styles.emptyHint}>Chưa có học viên nào trong lớp này.</Text> : null}
-            {attendanceLearners.map((enrollment) => { const studentId = enrollment.studentId; const student = students.find((item) => item.id === studentId); if (!student) return null; const state = attendanceDraft[studentId]; const label = state ? attendanceStatusLabel(state) : 'Chưa điểm danh'; return <Pressable key={studentId} onPress={() => setAttendanceDraft((current) => ({ ...current, [studentId]: nextAttendanceStatus(current[studentId]) }))} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{student.fullName}</Text><Text style={styles.optionDetail}>{student.phone}</Text></View><Badge label={label} /></Pressable>; })}
-          </ScrollView>
+    <FullScreenFormModal
+      visible={Boolean(studentDetail)}
+      title="Hồ sơ học viên"
+      onClose={() => setStudentDetail(null)}
+    >
+      {detailLoading ? <LoadState title="Đang tải hồ sơ" detail="Đang lấy học phí và lịch sử đào tạo…" busy /> : studentDetail ? <View style={{ gap: 12 }}>
+        <View style={styles.studentIdentity}><View style={styles.studentAvatar}><UsersRound size={20} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{studentDetail.fullName}</Text><Text style={styles.cardMeta}>{studentDetail.phone} · {studentDetail.email || 'Chưa có email'}</Text></View></View>
+        <View style={styles.detailGrid}><Detail label="Ngày sinh" value={studentDetail.birthday || '—'} /><Detail label="CCCD" value={studentDetail.idCard || '—'} /><Detail label="Ngày đăng ký" value={studentDetail.registrationDate || '—'} /><Detail label="Địa chỉ" value={studentDetail.address || '—'} /></View>
+        <View style={styles.detailSection}><Text style={styles.detailSectionTitle}>Học phí</Text><View style={styles.detailGrid}><Detail label="Đã thu" value={money(studentDetail.paidAmount)} /><Detail label="Còn nợ" value={money(studentDue(studentDetail))} /></View>
+          {installments.map((item, index) => <View key={`${item.no || index}`} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>Đợt {item.no || index + 1} · {money(item.amountDue)}</Text><Text style={styles.optionDetail}>{item.dueDate || 'Chưa có hạn'} · {item.status || 'Chưa thanh toán'}</Text></View>{item.status !== 'Đã thanh toán' ? <Pressable onPress={() => void markStudentInstallmentPaid(studentDetail.id, Number(item.no || index + 1), scope).then(() => openStudentDetail(studentDetail)).catch((cause) => Alert.alert('Không cập nhật được', cause instanceof Error ? cause.message : 'Lỗi cập nhật.'))} style={styles.miniAction}><Check size={13} color={colors.primary} /><Text style={styles.miniActionText}>Đã thu</Text></Pressable> : null}</View>)}
         </View>
+        <View style={styles.detailSection}><Text style={styles.detailSectionTitle}>Lịch sử giao dịch</Text>{payments.filter((payment) => payment.studentId === studentDetail.id).map((payment, index) => <View key={payment.id || payment._id || index} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{money(payment.amount)} · {payment.method || '—'}</Text><Text style={styles.optionDetail}>{payment.date || payment.paidOn || '—'} {payment.note ? `· ${payment.note}` : ''}</Text></View></View>)}{!payments.some((payment) => payment.studentId === studentDetail.id) ? <Text style={styles.emptyHint}>Chưa có giao dịch thu học phí.</Text> : null}</View>
+        {learningHistory ? <View style={styles.detailSection}><Text style={styles.detailSectionTitle}>Tiến trình đào tạo · {learningHistory.summary?.totalClasses || learningHistory.entries?.length || 0} lớp · {learningHistory.summary?.totalCourses || learningHistory.completedCourses?.length || 0} khóa</Text>{learningHistory.completedCourses?.length ? <View style={styles.filters}>{learningHistory.completedCourses.map((course) => <View key={course.id} style={styles.filterChipSelected}><Text style={styles.filterChipTextSelected}>{course.title}{course.code ? ` · ${course.code}` : ''}</Text></View>)}</View> : null}{learningHistory.entries?.map((entry) => <View key={entry.id} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{entry.batchCode} · {entry.courseTitle}</Text><Text style={styles.optionDetail}>{entry.status === 'active' ? 'Đang học' : entry.status === 'completed' ? 'Hoàn thành' : 'Đã rời lớp'} · {entry.instructorName || 'Chưa phân công'} · {entry.enrolledAt ? toDisplayDate(entry.enrolledAt) : 'Chưa xác định'}{entry.leftAt ? ` → ${toDisplayDate(entry.leftAt)}` : ''}</Text>{entry.roadmap ? <Text style={styles.optionDetail}>{entry.roadmap.name} · Chặng {entry.roadmap.stepOrder || 1}/{entry.roadmap.totalSteps}</Text> : null}{entry.suspensionReason ? <Text style={styles.optionDetail}>Lý do bảo lưu: {entry.suspensionReason}{entry.expectedReturnAt ? ` · Dự kiến quay lại ${toDisplayDate(entry.expectedReturnAt)}` : ''}</Text> : null}</View><Badge label={entry.enrollmentStatus || entry.batchStatus || entry.status} /></View>)}{!learningHistory.entries?.length ? <Text style={styles.emptyHint}>Chưa có lịch sử lớp học.</Text> : null}</View> : null}
+        {canManage && <View style={styles.detailActionRow}>{actionButton('Sửa hồ sơ', Pencil, () => { setStudentDetail(null); openEdit(studentDetail); }, 'primary')}{actionButton('Xóa hồ sơ', Trash2, () => { setStudentDetail(null); confirmDelete('hồ sơ học viên', () => deleteStudent(studentDetail.id, scope)); }, 'danger')}</View>}
+      </View> : null}
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={Boolean(manageBatch)}
+      title={manageBatch ? `Danh sách lớp ${manageBatch.code}` : 'Danh sách lớp'}
+      onClose={() => setManageBatch(null)}
+    >
+      <View style={{ gap: 10 }}>
+        <View style={styles.detailActionRow}>{manageBatch && canManage && actionButton('Điểm danh / QR', ClipboardCheck, () => void openAttendance(manageBatch), 'primary')}</View>
+        {batchBusy ? <LoadState title="Đang cập nhật lớp" detail="Đang đồng bộ danh sách học viên…" busy /> : <>
+          <Text style={styles.detailSectionTitle}>Đã xếp lớp ({enrollments.length})</Text>{enrollments.map((enrollment) => { const student = students.find((item) => item.id === enrollment.studentId); return <View key={enrollment.studentId} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{student?.fullName || enrollment.studentId}</Text><Text style={styles.optionDetail}>{student?.phone || ''} · {enrollment.status || 'Đang học'}</Text></View>{canManage && student ? <Pressable onPress={() => void updateBatchLearner(manageBatch!, student, true)} style={styles.miniAction}><Trash2 size={13} color="#B42318" /><Text style={[styles.miniActionText, { color: '#B42318' }]}>Gỡ</Text></Pressable> : null}</View>; })}
+          <Text style={[styles.detailSectionTitle, { marginTop: 18 }]}>Thêm học viên</Text>{students.filter((student) => !enrollments.some((entry) => entry.studentId === student.id)).slice(0, 80).map((student) => <Pressable key={student.id} onPress={() => void updateBatchLearner(manageBatch!, student, false)} disabled={!canManage || batchBusy} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{student.fullName}</Text><Text style={styles.optionDetail}>{student.phone} · {statusOf(student)}</Text></View><Plus size={16} color={colors.primary} /></Pressable>)}
+        </>}
       </View>
-    </Modal>
+    </FullScreenFormModal>
 
-    <Modal visible={Boolean(qualityDetail)} transparent animationType="slide" onRequestClose={() => { setQualityDetail(null); setQualityDetailData(null); }}><View style={styles.backdrop}><View style={[styles.dialog, styles.detailDialog]}><ModalHeader title={qualityDetail ? `Đánh giá · ${qualityDetail.studentName}` : 'Đánh giá học viên'} onClose={() => { setQualityDetail(null); setQualityDetailData(null); }} />{!qualityDetailLoading ? <Pressable onPress={() => void saveAssessment()} disabled={savingAssessment} style={[styles.saveButton, { marginHorizontal: 14, marginTop: 10 }, savingAssessment && styles.disabled]}>{savingAssessment ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.saveText}>Lưu nhận xét</Text>}</Pressable> : null}{qualityDetailLoading ? <LoadState title="Đang tải tiến trình học tập" detail="Đang lấy mini test, bài tập và kết quả thi…" busy /> : <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled"><View style={styles.detailGrid}><Detail label="Lớp / khóa" value={`${qualityDetail?.batchCode || ''} · ${qualityDetail?.courseTitle || ''}`} /><Detail label="Chuyên cần" value={`${qualityDetail?.attendance.attended || 0}/${qualityDetail?.attendance.total || 0} · ${qualityDetail?.attendance.rate ?? '—'}%`} /><Detail label="Bài tập" value={`${qualityDetail?.assignments.completed || 0}/${qualityDetail?.assignments.total || 0}`} /><Detail label="Cảnh báo" value={qualityDetail?.warningLevel || '—'} /></View><Field label="Thái độ học viên" value={draft.attitudeNote} onChangeText={(value) => setDraft((current) => ({ ...current, attitudeNote: value }))} multiline /><Field label="Nhận xét giáo viên" value={draft.teacherAssessment} onChangeText={(value) => setDraft((current) => ({ ...current, teacherAssessment: value }))} multiline /><Text style={styles.detailSectionTitle}>Thêm mini test</Text><Field label="Tên bài kiểm tra" value={draft.miniTestTitle} onChangeText={(value) => setDraft((current) => ({ ...current, miniTestTitle: value }))} /><View style={styles.twoColumns}><Field label="Điểm" value={draft.miniTestScore} onChangeText={(value) => setDraft((current) => ({ ...current, miniTestScore: value }))} keyboardType="decimal-pad" /><Field label="Thang điểm" value={draft.miniTestMax} onChangeText={(value) => setDraft((current) => ({ ...current, miniTestMax: value }))} keyboardType="decimal-pad" /></View><DateTimeField label="Ngày kiểm tra" mode="date" value={draft.miniTestDate} onChange={(value) => setDraft((current) => ({ ...current, miniTestDate: value }))} /><Field label="Nhận xét" value={draft.miniTestNote} onChangeText={(value) => setDraft((current) => ({ ...current, miniTestNote: value }))} /><Pressable onPress={() => void saveMiniTest()} disabled={saving} style={styles.secondaryWide}><Plus size={14} color={colors.primary} /><Text style={styles.secondaryWideText}>Lưu điểm mini test</Text></Pressable><Text style={styles.detailSectionTitle}>Lịch sử mini test</Text>{qualityDetailData?.miniTests.map((item) => <View key={item.id} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.title} · {item.score == null ? 'Chưa chấm' : `${item.score}/${item.maxScore}`}</Text><Text style={styles.optionDetail}>{item.date}{item.note ? ` · ${item.note}` : ''}</Text></View><Pressable onPress={() => confirmDeleteMiniTest(item)}><Trash2 size={15} color="#B42318" /></Pressable></View>)}{!qualityDetailData?.miniTests.length ? <Text style={styles.emptyHint}>Chưa có mini test.</Text> : null}<Text style={styles.detailSectionTitle}>Bài tập đã giao</Text>{qualityDetailData?.assignments.items.map((item) => <View key={item.id} style={styles.progressionCard}><View style={styles.cardHead}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.title}</Text><Text style={styles.optionDetail}>{item.status === 'not_submitted' ? 'Chưa nộp' : item.status === 'graded' ? 'Đã chấm' : item.status === 'late' ? 'Nộp muộn' : 'Đã nộp'} · {item.score == null ? `Thang điểm ${item.maxScore}` : `${item.score}/${item.maxScore}`}</Text></View>{item.status !== 'not_submitted' ? <Pressable onPress={() => setAssignmentGrade((current) => current?.id === item.id ? null : { id: item.id, score: item.score == null ? '' : String(item.score), feedback: item.feedback || '' })}><Pencil size={15} color={colors.primary} /></Pressable> : null}</View>{item.feedback ? <Text style={styles.optionDetail}>Nhận xét: {item.feedback}</Text> : null}{assignmentGrade?.id === item.id ? <><View style={styles.twoColumns}><Field label={`Điểm / ${item.maxScore}`} value={assignmentGrade.score} onChangeText={(value) => setAssignmentGrade((current) => current ? { ...current, score: value } : current)} keyboardType="decimal-pad" /><Field label="Phản hồi" value={assignmentGrade.feedback} onChangeText={(value) => setAssignmentGrade((current) => current ? { ...current, feedback: value } : current)} /></View><Pressable onPress={() => void saveAssignmentGrade(item)} disabled={saving} style={styles.secondaryWide}><Check size={14} color={colors.primary} /><Text style={styles.secondaryWideText}>Lưu điểm bài tập</Text></Pressable></> : null}</View>)}{!qualityDetailData?.assignments.items.length ? <Text style={styles.emptyHint}>Lớp chưa giao bài tập.</Text> : null}<Text style={styles.detailSectionTitle}>Kết quả thi</Text>{qualityDetailData?.examResults.map((item, index) => <View key={item.id || `${item.name}-${index}`} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.name || 'Kỳ thi'}</Text><Text style={styles.optionDetail}>{item.date || ''} · {item.result?.overall || 'Chưa có kết quả'}</Text></View></View>)}{!qualityDetailData?.examResults.length ? <Text style={styles.emptyHint}>Chưa có kết quả thi.</Text> : null}</ScrollView>}</View></View></Modal>
-
-    <Modal visible={Boolean(scoreDialog)} transparent animationType="slide" onRequestClose={() => setScoreDialog(null)}><View style={styles.backdrop}><View style={[styles.dialog, styles.detailDialog]}><ModalHeader title={`Điểm thi · ${scoreDialog?.exam.name || ''}`} onClose={() => setScoreDialog(null)} /><ScrollView contentContainerStyle={styles.detailContent} keyboardShouldPersistTaps="handled">{scoreDialog?.students.map((student) => { const existing = scoreDialog.exam.results?.find((item) => item.studentId === student.id); const score = scoreValues[student.id] || ''; const outcome = existing?.outcome || existing?.overallResult || (existing?.score == null ? 'Chưa có' : existing.score >= (scoreDialog.exam.passScore ?? Math.ceil((scoreDialog.exam.maxScore || 100) / 2)) ? 'Đậu' : 'Trượt'); return <View key={student.id} style={styles.progressionCard}><View style={styles.cardHead}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{student.fullName}</Text><Text style={styles.cardMeta}>{student.phone} · Kết quả: {outcome}</Text></View><Pressable onPress={() => confirmUnassignExamStudent(scoreDialog.exam, student)}><Trash2 size={16} color="#B42318" /></Pressable></View><View style={styles.row}><Text style={styles.fieldLabel}>Điểm (tối đa {scoreDialog.exam.maxScore || 100})</Text><TextInput value={score} onChangeText={(value) => setScoreValues((current) => ({ ...current, [student.id]: value }))} keyboardType="decimal-pad" placeholder="Chưa nhập" placeholderTextColor={colors.muted} style={[styles.input, { flex: 1 }]} /></View><View style={styles.filters}>{(['Đậu', 'Trượt', 'Chưa có'] as const).map((value) => <Pressable key={value} onPress={() => void updateExamOutcome(scoreDialog.exam, student, value)} style={[styles.filterChip, outcome === value && styles.filterChipSelected]}><Text style={[styles.filterChipText, outcome === value && styles.filterChipTextSelected]}>{value}</Text></Pressable>)}</View></View>; })}<Pressable onPress={() => void saveExamScores()} disabled={saving} style={[styles.saveButton, saving && styles.disabled]}><Text style={styles.saveText}>Lưu điểm thi</Text></Pressable></ScrollView></View></View></Modal>
-
-    <Modal visible={Boolean(assignmentDraft)} transparent animationType="slide" onRequestClose={() => setAssignmentDraft(null)}><View style={styles.backdrop}><View style={[styles.dialog, styles.detailDialog]}><ModalHeader title="Xếp học viên dự thi" onClose={() => setAssignmentDraft(null)} /><ScrollView contentContainerStyle={styles.detailContent}>{assignmentDraft?.candidates.map((student) => { const selected = assignmentDraft.selected.includes(student.id); return <Pressable key={student.id} onPress={() => setAssignmentDraft((current) => current ? { ...current, selected: selected ? current.selected.filter((id) => id !== student.id) : [...current.selected, student.id] } : current)} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{student.fullName}</Text><Text style={styles.optionDetail}>{student.phone}</Text></View><View style={[styles.checkbox, selected && styles.checkboxSelected]}>{selected ? <Check size={13} color={colors.white} /> : null}</View></Pressable> })}{assignmentDraft?.candidates.length === 0 ? <Text style={styles.emptyHint}>Không có học viên đủ điều kiện dự thi.</Text> : null}<Pressable onPress={() => void saveExamAssignment()} disabled={saving} style={styles.saveButton}><Text style={styles.saveText}>Thêm {assignmentDraft?.selected.length || 0} học viên</Text></Pressable></ScrollView></View></View></Modal>
-
-    <Modal visible={Boolean(progressionDialog) && !progressionClassCreate} transparent animationType="slide" onRequestClose={() => setProgressionDialog(null)}><View style={styles.backdrop}><View style={[styles.dialog, styles.detailDialog]}><ModalHeader title={`Mở lớp theo lộ trình · ${progressionDialog?.batch.code || ''}`} onClose={() => setProgressionDialog(null)} /><ScrollView contentContainerStyle={styles.detailContent} keyboardShouldPersistTaps="handled">
-      <Text style={styles.fieldLabel}>Lộ trình</Text>{progressionDialog?.roadmaps.map((item) => { const id = String(item.id || item._id || ''); return <Pressable key={id} onPress={() => void chooseProgressionRoadmap(id)} style={[styles.optionRow, progressionDialog.roadmapId === id && styles.optionSelected]}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.name || item.code || 'Lộ trình'}</Text><Text style={styles.optionDetail}>{(item.steps || []).map((step) => courses.find((course) => course.id === String(step.courseId || ''))?.title || '').filter(Boolean).join(' → ')}</Text></View>{progressionDialog.roadmapId === id ? <Check size={15} color={colors.primary} /> : null}</Pressable>; })}
-      {progressionDialog?.loading ? <LoadState title="Đang tải dữ liệu lộ trình" detail="Đang tổng hợp chuyên cần, bài tập, mini test và kết quả thi…" busy inline /> : null}
-      {progressionDialog?.data?.rows.map((row) => { const choice = progressionDrafts[row.studentId] || { intent: row.intent, teacherNote: row.teacherNote || '' }; return <View key={row.studentId} style={styles.progressionCard}><View style={styles.cardHead}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{row.studentName}</Text><Text style={styles.cardMeta}>{row.studentPhone}</Text></View><Badge label={row.eligible ? 'Đạt điều kiện' : 'Chưa đạt'} /></View><View style={styles.detailGrid}><Detail label="Chuyên cần" value={`${row.attendanceRate ?? '—'}%`} /><Detail label="Bài tập" value={`${row.assignmentRate ?? '—'}%`} /><Detail label="Mini test" value={`${row.miniTestRate ?? '—'}%`} /><Detail label="Kết quả thi" value={`${row.examRate ?? '—'}%`} /></View>{row.eligibilityReasons?.length ? <Text style={styles.formError}>{row.eligibilityReasons.join(' · ')}</Text> : null}<Text style={styles.fieldLabel}>Quyết định</Text><View style={styles.filters}>{([{ value: 'continue', label: 'Học tiếp' }, { value: 'pending', label: 'Chờ xác nhận' }, { value: 'repeat', label: 'Học lại' }, { value: 'preserve', label: 'Bảo lưu' }, { value: 'stop', label: 'Dừng' }] as Array<{ value: ProgressionIntent; label: string }>).map((option) => <Pressable key={option.value} onPress={() => setProgressionDrafts((current) => ({ ...current, [row.studentId]: { ...choice, intent: option.value } }))} style={[styles.filterChip, choice.intent === option.value && styles.filterChipSelected]}><Text style={[styles.filterChipText, choice.intent === option.value && styles.filterChipTextSelected]}>{option.label}</Text></Pressable>)}</View><TextInput value={choice.teacherNote} onChangeText={(value) => setProgressionDrafts((current) => ({ ...current, [row.studentId]: { ...choice, teacherNote: value } }))} placeholder="Ghi chú điều phối" placeholderTextColor={colors.muted} style={styles.input} /><Pressable onPress={() => void saveProgressionDecision(row.studentId)} disabled={saving} style={styles.secondaryWide}><Check size={14} color={colors.primary} /><Text style={styles.secondaryWideText}>Lưu quyết định</Text></Pressable></View>; })}
-      {progressionDialog?.data?.targetStep ? <View style={styles.progressionCard}><Text style={styles.detailSectionTitle}>Chuyển học viên đủ điều kiện sang chặng kế tiếp</Text><Text style={styles.helperText}>Khóa học tiếp theo: {courses.find((item) => item.id === progressionDialog.data?.targetStep?.courseId)?.title || progressionDialog.data.targetStep.courseId}</Text><Pressable onPress={openProgressionClassForm} disabled={!canManage} style={[styles.secondaryWide, !canManage && styles.disabled]}><Plus size={14} color={colors.primary} /><Text style={styles.secondaryWideText}>Tạo lớp kế tiếp</Text></Pressable>{batches.filter((item) => item.courseId === progressionDialog.data?.targetStep?.courseId && !['Đã hủy', 'Đã kết thúc'].includes(item.status || '')).map((item) => <Pressable key={item.id} onPress={() => setProgressionDialog((current) => current ? { ...current, targetBatchId: item.id } : current)} style={[styles.optionRow, progressionDialog.targetBatchId === item.id && styles.optionSelected]}><Text style={styles.optionTitle}>{item.code} · {item.startDate || 'Chưa có ngày khai giảng'}</Text>{progressionDialog.targetBatchId === item.id ? <Check size={15} color={colors.primary} /> : null}</Pressable>)}<Pressable onPress={() => void promoteProgressionStudents()} disabled={!canManage || saving || !progressionDialog.targetBatchId} style={[styles.saveButton, (!canManage || saving || !progressionDialog.targetBatchId) && styles.disabled]}><Text style={styles.saveText}>Chuyển học viên đã chọn học tiếp</Text></Pressable></View> : null}
-    </ScrollView></View></View></Modal>
-
-    <Modal visible={Boolean(enrollmentAction)} transparent animationType="fade" onRequestClose={() => setEnrollmentAction(null)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title={enrollmentAction?.enrollment.status === 'Bảo lưu' ? 'Cập nhật tình trạng học' : enrollmentAction?.enrollment.status === 'Chờ xếp học lại' ? 'Xếp học viên học lại' : 'Bảo lưu học viên'} onClose={() => setEnrollmentAction(null)} /><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled"><Text style={styles.cardMeta}>{enrollmentAction?.student?.fullName} · {enrollmentAction?.batch.code}</Text><Field label="Lý do *" value={draft.reason} onChangeText={(value) => setDraft((current) => ({ ...current, reason: value }))} multiline /><DateTimeField label="Ngày dự kiến quay lại" mode="date" value={draft.expectedReturnAt} onChange={(value) => setDraft((current) => ({ ...current, expectedReturnAt: value }))} allowClear />{enrollmentAction?.enrollment.status === 'Chờ xếp học lại' ? <><Text style={styles.fieldLabel}>Lớp học lại *</Text>{batches.filter((item) => item.id !== enrollmentAction.batch.id && item.status !== 'Đã hủy').map((item) => <Pressable key={item.id} onPress={() => setDraft((current) => ({ ...current, targetBatchId: item.id }))} style={[styles.optionRow, draft.targetBatchId === item.id && styles.optionSelected]}><Text style={styles.optionTitle}>{item.code} · {item.courseTitle || item.name || ''}</Text>{draft.targetBatchId === item.id ? <Check size={15} color={colors.primary} /> : null}</Pressable>)}<Field label="Lệ phí học lại (VND)" value={draft.retakeFee} onChangeText={(value) => setDraft((current) => ({ ...current, retakeFee: formatVndInput(value) }))} keyboardType="number-pad" /></> : enrollmentAction?.enrollment.status === 'Bảo lưu' ? <Text style={styles.helperText}>Xác nhận sẽ đưa học viên trở lại trạng thái đang học.</Text> : null}<Pressable onPress={() => void saveEnrollmentAction()} disabled={saving} style={styles.saveButton}><Text style={styles.saveText}>{enrollmentAction?.enrollment.status === 'Bảo lưu' ? 'Cho học lại' : enrollmentAction?.enrollment.status === 'Chờ xếp học lại' ? 'Xếp vào lớp học lại' : 'Xác nhận bảo lưu'}</Text></Pressable></ScrollView></View></View></Modal>
-
-    <Modal visible={Boolean(bookingResource)} transparent animationType="fade" onRequestClose={() => setBookingResource(null)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title={`Đặt lịch · ${bookingResource?.name || ''}`} onClose={() => setBookingResource(null)} /><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled"><Field label="Mục đích sử dụng *" value={draft.purpose} onChangeText={(value) => setDraft((current) => ({ ...current, purpose: value }))} /><Field label="Người đăng ký *" value={draft.by} onChangeText={(value) => setDraft((current) => ({ ...current, by: value }))} /><DateTimeField label="Ngày sử dụng" mode="date" value={draft.bookingDate} onChange={(value) => setDraft((current) => ({ ...current, bookingDate: value }))} /><View style={styles.twoColumns}><DateTimeField label="Từ" mode="time" value={draft.startTime} onChange={(value) => setDraft((current) => ({ ...current, startTime: value }))} /><DateTimeField label="Đến" mode="time" value={draft.endTime} onChange={(value) => setDraft((current) => ({ ...current, endTime: value }))} /></View><Pressable onPress={() => void saveBooking()} disabled={saving} style={styles.saveButton}><Text style={styles.saveText}>Xác nhận đặt lịch</Text></Pressable></ScrollView></View></View></Modal>
-
-    <Modal visible={qualityThresholdDialog} transparent animationType="fade" onRequestClose={() => setQualityThresholdDialog(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Ngưỡng cảnh báo chất lượng" onClose={() => setQualityThresholdDialog(false)} /><ScrollView contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled"><Text style={styles.helperText}>Đặt tỷ lệ tối thiểu cho chuyên cần, bài tập và mini test. Học viên thấp hơn ngưỡng rủi ro sẽ được đánh dấu để theo dõi.</Text><View style={styles.twoColumns}><Field label="Rủi ro · chuyên cần (%)" value={String(qualityThresholds.riskAttendance)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, riskAttendance: Number(value) }))} keyboardType="decimal-pad" /><Field label="Theo dõi · chuyên cần (%)" value={String(qualityThresholds.watchAttendance)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, watchAttendance: Number(value) }))} keyboardType="decimal-pad" /></View><View style={styles.twoColumns}><Field label="Rủi ro · bài tập (%)" value={String(qualityThresholds.riskAssignment)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, riskAssignment: Number(value) }))} keyboardType="decimal-pad" /><Field label="Theo dõi · bài tập (%)" value={String(qualityThresholds.watchAssignment)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, watchAssignment: Number(value) }))} keyboardType="decimal-pad" /></View><View style={styles.twoColumns}><Field label="Rủi ro · mini test (%)" value={String(qualityThresholds.riskMiniTest)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, riskMiniTest: Number(value) }))} keyboardType="decimal-pad" /><Field label="Theo dõi · mini test (%)" value={String(qualityThresholds.watchMiniTest)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, watchMiniTest: Number(value) }))} keyboardType="decimal-pad" /></View><Field label="Thang điểm mặc định cho bài tập" value={String(qualityThresholds.assignmentMaxScore)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, assignmentMaxScore: Number(value) }))} keyboardType="decimal-pad" /><Pressable onPress={() => void saveQualityThresholdSettings()} disabled={saving} style={styles.saveButton}><Text style={styles.saveText}>Lưu ngưỡng</Text></Pressable></ScrollView></View></View></Modal>
-
-    <Modal visible={categoryModalOpen} transparent animationType="fade" onRequestClose={() => { if (!categoryBusy) setCategoryModalOpen(false); }}>
-      <View style={styles.backdrop}>
-        <View style={styles.dialog}>
-          <ModalHeader title={area === 'courses' ? 'Quản lý danh mục khóa học' : `Quản lý phân loại ${area === 'classrooms' ? 'phòng học' : 'thiết bị'}`} onClose={() => { if (!categoryBusy) setCategoryModalOpen(false); }} />
-          <View style={styles.detailContent}>
-            <View style={[styles.row, { marginBottom: 12 }]}>
-              <TextInput
-                value={newCategoryName}
-                onChangeText={setNewCategoryName}
-                placeholder={area === 'courses' ? 'Nhập tên danh mục mới...' : `Nhập phân loại ${area === 'classrooms' ? 'phòng học' : 'thiết bị'}...`}
-                placeholderTextColor={colors.muted}
-                style={[styles.input, { flex: 1 }]}
-                returnKeyType="done"
-                onSubmitEditing={() => { void addActiveCategory(); }}
-              />
-              <Pressable disabled={categoryBusy || !newCategoryName.trim()} onPress={() => void addActiveCategory()} style={[styles.saveButton, (categoryBusy || !newCategoryName.trim()) && styles.disabled]}>
-                {categoryBusy ? <ActivityIndicator color={colors.white} size="small" /> : <><Plus size={14} color={colors.white} style={{ marginRight: 4 }} /><Text style={styles.saveText}>Thêm</Text></>}
-              </Pressable>
-            </View>
-            <ScrollView style={{ maxHeight: 340 }} keyboardShouldPersistTaps="handled">
-              {(area === 'courses' ? courseCategories : visibleResourceCategories).length === 0 ? (
-                <Text style={styles.emptyHint}>{area === 'courses' ? 'Chưa có danh mục khóa học nào.' : `Chưa có phân loại ${area === 'classrooms' ? 'phòng học' : 'thiết bị'} nào.`}</Text>
-              ) : (
-                (area === 'courses' ? courseCategories : visibleResourceCategories).map((cat) => (
-                  <View key={cat.id} style={styles.optionRow}>
-                    <Tag size={14} color={colors.primary} />
-                    <Text style={[styles.optionTitle, { flex: 1 }]}>{cat.name}</Text>
-                    <Pressable disabled={categoryBusy} onPress={() => removeActiveCategory(cat)} style={styles.miniAction}>
-                      <Trash2 size={14} color="#B42318" />
-                    </Pressable>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </View>
+    <FullScreenFormModal
+      visible={Boolean(attendanceBatch)}
+      title={attendanceBatch ? `Điểm danh · ${attendanceBatch.code}` : 'Điểm danh lớp'}
+      onClose={() => setAttendanceBatch(null)}
+    >
+      <View style={{ gap: 10 }}>
+        <DateTimeField label="Ngày điểm danh" mode="date" value={attendanceDate} onChange={(value) => void changeAttendanceDate(value)} />
+        <View style={[styles.twoColumns, { marginTop: 4, marginBottom: 4 }]}>
+          <Pressable disabled={qrCreating} onPress={() => attendanceBatch && void startQrAttendance(attendanceBatch)} style={[styles.saveButton, { flex: 1, gap: 6 }, qrCreating && styles.disabled]}>
+            {qrCreating ? <ActivityIndicator color={colors.white} size="small" /> : <QrCode size={14} color={colors.white} />}
+            <Text style={styles.saveText}>{qrCreating ? 'Đang tạo QR…' : qrSession ? 'Tạo lại QR' : 'Tạo QR'}</Text>
+          </Pressable>
+          <Pressable disabled={batchBusy} onPress={() => void saveAttendance()} style={[styles.secondaryWide, { flex: 1, marginVertical: 0 }, batchBusy && styles.disabled]}>
+            {batchBusy ? <ActivityIndicator color={colors.primary} size="small" /> : <Check size={14} color={colors.primary} />}
+            <Text style={styles.secondaryWideText}>Lưu điểm danh</Text>
+          </Pressable>
         </View>
-      </View>
-    </Modal>
-
-    <Modal visible={registerQrOpen} transparent animationType="fade" onRequestClose={() => setRegisterQrOpen(false)}>
-      <View style={styles.backdrop}>
-        <View style={styles.dialog}>
-          <ModalHeader title="QR đăng ký học viên" onClose={() => setRegisterQrOpen(false)} />
-          <View style={styles.detailContent}>
-            <Text style={styles.helperText}>Học viên quét mã để tự điền hồ sơ, bản ghi sẽ về thẳng danh sách của bạn.</Text>
-            <View style={styles.qrPanel}>
-              {registerQrLoading ? (
-                <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: 64 }} />
-              ) : registerQrUrl ? (
-                <QRCode value={registerQrUrl} size={196} backgroundColor={colors.white} color={colors.ink} />
-              ) : null}
-              {registerQrUrl ? <Text selectable style={styles.qrUrl}>{registerQrUrl}</Text> : null}
-            </View>
-            <View style={styles.detailActionRow}>
-              <Pressable disabled={!registerQrUrl || registerQrLoading} onPress={() => void Share.share({ message: registerQrUrl, url: registerQrUrl })} style={[styles.saveButton, { flex: 1 }, (!registerQrUrl || registerQrLoading) && styles.disabled]}>
-                <Share2 size={14} color={colors.white} style={{ marginRight: 6 }} />
-                <Text style={styles.saveText}>Chia sẻ link</Text>
+        {qrSession ? (
+          <View style={styles.qrPanel}>
+            <QRCode value={qrSession.url} size={172} backgroundColor={colors.white} color={colors.ink} />
+            <Text style={styles.optionTitle}>Đã điểm danh qua QR: {qrSession.checkedIn}</Text>
+            <Text selectable style={styles.qrUrl}>{qrSession.url}</Text>
+            <View style={[styles.twoColumns, { width: '100%', marginTop: 4 }]}>
+              <Pressable onPress={() => void Share.share({ message: qrSession.url, url: qrSession.url })} style={[styles.secondaryWide, { flex: 1, marginVertical: 0 }]}>
+                <Share2 size={14} color={colors.primary} />
+                <Text style={styles.secondaryWideText}>Chia sẻ link</Text>
               </Pressable>
-              <Pressable disabled={registerQrLoading} onPress={() => void openRegisterQr()} style={[styles.cancelButton, { flexDirection: 'row', alignItems: 'center', gap: 5 }, registerQrLoading && styles.disabled]}>
-                <RefreshCw size={13} color={colors.ink} />
-                <Text style={styles.cancelText}>Tạo lại</Text>
+              <Pressable onPress={() => void closeStudentQrSession(qrSession.sessionId, scope).then(() => setQrSession(null)).catch((cause) => Alert.alert('Không đóng được', cause instanceof Error ? cause.message : 'Lỗi đóng phiên.'))} style={[styles.cancelButton, { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#FFF1F0' }]}>
+                <X size={14} color="#B42318" />
+                <Text style={[styles.cancelText, { color: '#B42318' }]}>Đóng phiên</Text>
               </Pressable>
             </View>
           </View>
+        ) : null}
+        <Text style={[styles.detailSectionTitle, { marginTop: 8 }]}>Danh sách học viên ({attendanceLearners.length})</Text>
+        {attendanceLearners.length === 0 ? <Text style={styles.emptyHint}>Chưa có học viên nào trong lớp này.</Text> : null}
+        {attendanceLearners.map((enrollment) => { const studentId = enrollment.studentId; const student = students.find((item) => item.id === studentId); if (!student) return null; const state = attendanceDraft[studentId]; const label = state ? attendanceStatusLabel(state) : 'Chưa điểm danh'; return <Pressable key={studentId} onPress={() => setAttendanceDraft((current) => ({ ...current, [studentId]: nextAttendanceStatus(current[studentId]) }))} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{student.fullName}</Text><Text style={styles.optionDetail}>{student.phone}</Text></View><Badge label={label} /></Pressable>; })}
+      </View>
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={Boolean(qualityDetail)}
+      title={qualityDetail ? `Đánh giá · ${qualityDetail.studentName}` : 'Đánh giá học viên'}
+      onClose={() => { setQualityDetail(null); setQualityDetailData(null); }}
+      footer={!qualityDetailLoading ? <Pressable onPress={() => void saveAssessment()} disabled={savingAssessment} style={[styles.saveButton, savingAssessment && styles.disabled]}>{savingAssessment ? <ActivityIndicator size="small" color={colors.white} /> : <Text style={styles.saveText}>Lưu nhận xét</Text>}</Pressable> : undefined}
+    >
+      {qualityDetailLoading ? <LoadState title="Đang tải tiến trình học tập" detail="Đang lấy mini test, bài tập và kết quả thi…" busy /> : <View style={{ gap: 10 }}><View style={styles.detailGrid}><Detail label="Lớp / khóa" value={`${qualityDetail?.batchCode || ''} · ${qualityDetail?.courseTitle || ''}`} /><Detail label="Chuyên cần" value={`${qualityDetail?.attendance.attended || 0}/${qualityDetail?.attendance.total || 0} · ${qualityDetail?.attendance.rate ?? '—'}%`} /><Detail label="Bài tập" value={`${qualityDetail?.assignments.completed || 0}/${qualityDetail?.assignments.total || 0}`} /><Detail label="Cảnh báo" value={qualityDetail?.warningLevel || '—'} /></View><Field label="Thái độ học viên" value={draft.attitudeNote} onChangeText={(value) => setDraft((current) => ({ ...current, attitudeNote: value }))} multiline /><Field label="Nhận xét giáo viên" value={draft.teacherAssessment} onChangeText={(value) => setDraft((current) => ({ ...current, teacherAssessment: value }))} multiline /><Text style={styles.detailSectionTitle}>Thêm mini test</Text><Field label="Tên bài kiểm tra" value={draft.miniTestTitle} onChangeText={(value) => setDraft((current) => ({ ...current, miniTestTitle: value }))} /><View style={styles.twoColumns}><Field label="Điểm" value={draft.miniTestScore} onChangeText={(value) => setDraft((current) => ({ ...current, miniTestScore: value }))} keyboardType="decimal-pad" /><Field label="Thang điểm" value={draft.miniTestMax} onChangeText={(value) => setDraft((current) => ({ ...current, miniTestMax: value }))} keyboardType="decimal-pad" /></View><DateTimeField label="Ngày kiểm tra" mode="date" value={draft.miniTestDate} onChange={(value) => setDraft((current) => ({ ...current, miniTestDate: value }))} /><Field label="Nhận xét" value={draft.miniTestNote} onChangeText={(value) => setDraft((current) => ({ ...current, miniTestNote: value }))} /><Pressable onPress={() => void saveMiniTest()} disabled={saving} style={styles.secondaryWide}><Plus size={14} color={colors.primary} /><Text style={styles.secondaryWideText}>Lưu điểm mini test</Text></Pressable><Text style={styles.detailSectionTitle}>Lịch sử mini test</Text>{qualityDetailData?.miniTests.map((item) => <View key={item.id} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.title} · {item.score == null ? 'Chưa chấm' : `${item.score}/${item.maxScore}`}</Text><Text style={styles.optionDetail}>{item.date}{item.note ? ` · ${item.note}` : ''}</Text></View><Pressable onPress={() => confirmDeleteMiniTest(item)}><Trash2 size={15} color="#B42318" /></Pressable></View>)}{!qualityDetailData?.miniTests.length ? <Text style={styles.emptyHint}>Chưa có mini test.</Text> : null}<Text style={styles.detailSectionTitle}>Bài tập đã giao</Text>{qualityDetailData?.assignments.items.map((item) => <View key={item.id} style={styles.progressionCard}><View style={styles.cardHead}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.title}</Text><Text style={styles.optionDetail}>{item.status === 'not_submitted' ? 'Chưa nộp' : item.status === 'graded' ? 'Đã chấm' : item.status === 'late' ? 'Nộp muộn' : 'Đã nộp'} · {item.score == null ? `Thang điểm ${item.maxScore}` : `${item.score}/${item.maxScore}`}</Text></View>{item.status !== 'not_submitted' ? <Pressable onPress={() => setAssignmentGrade((current) => current?.id === item.id ? null : { id: item.id, score: item.score == null ? '' : String(item.score), feedback: item.feedback || '' })}><Pencil size={15} color={colors.primary} /></Pressable> : null}</View>{item.feedback ? <Text style={styles.optionDetail}>Nhận xét: {item.feedback}</Text> : null}{assignmentGrade?.id === item.id ? <><View style={styles.twoColumns}><Field label={`Điểm / ${item.maxScore}`} value={assignmentGrade.score} onChangeText={(value) => setAssignmentGrade((current) => current ? { ...current, score: value } : current)} keyboardType="decimal-pad" /><Field label="Phản hồi" value={assignmentGrade.feedback} onChangeText={(value) => setAssignmentGrade((current) => current ? { ...current, feedback: value } : current)} /></View><Pressable onPress={() => void saveAssignmentGrade(item)} disabled={saving} style={styles.secondaryWide}><Check size={14} color={colors.primary} /><Text style={styles.secondaryWideText}>Lưu điểm bài tập</Text></Pressable></> : null}</View>)}{!qualityDetailData?.assignments.items.length ? <Text style={styles.emptyHint}>Lớp chưa giao bài tập.</Text> : null}<Text style={styles.detailSectionTitle}>Kết quả thi</Text>{qualityDetailData?.examResults.map((item, index) => <View key={item.id || `${item.name}-${index}`} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.name || 'Kỳ thi'}</Text><Text style={styles.optionDetail}>{item.date || ''} · {item.result?.overall || 'Chưa có kết quả'}</Text></View></View>)}{!qualityDetailData?.examResults.length ? <Text style={styles.emptyHint}>Chưa có kết quả thi.</Text> : null}</View>}
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={Boolean(scoreDialog)}
+      title={`Điểm thi · ${scoreDialog?.exam.name || ''}`}
+      onClose={() => setScoreDialog(null)}
+      footer={<Pressable onPress={() => void saveExamScores()} disabled={saving} style={[styles.saveButton, saving && styles.disabled]}><Text style={styles.saveText}>Lưu điểm thi</Text></Pressable>}
+    >
+      <View style={{ gap: 10 }}>{scoreDialog?.students.map((student) => { const existing = scoreDialog.exam.results?.find((item) => item.studentId === student.id); const score = scoreValues[student.id] || ''; const outcome = existing?.outcome || existing?.overallResult || (existing?.score == null ? 'Chưa có' : existing.score >= (scoreDialog.exam.passScore ?? Math.ceil((scoreDialog.exam.maxScore || 100) / 2)) ? 'Đậu' : 'Trượt'); return <View key={student.id} style={styles.progressionCard}><View style={styles.cardHead}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{student.fullName}</Text><Text style={styles.cardMeta}>{student.phone} · Kết quả: {outcome}</Text></View><Pressable onPress={() => confirmUnassignExamStudent(scoreDialog.exam, student)}><Trash2 size={16} color="#B42318" /></Pressable></View><View style={styles.row}><Text style={styles.fieldLabel}>Điểm (tối đa {scoreDialog.exam.maxScore || 100})</Text><TextInput value={score} onChangeText={(value) => setScoreValues((current) => ({ ...current, [student.id]: value }))} keyboardType="decimal-pad" placeholder="Chưa nhập" placeholderTextColor={colors.muted} style={[styles.input, { flex: 1 }]} /></View><View style={styles.filters}>{(['Đậu', 'Trượt', 'Chưa có'] as const).map((value) => <Pressable key={value} onPress={() => void updateExamOutcome(scoreDialog.exam, student, value)} style={[styles.filterChip, outcome === value && styles.filterChipSelected]}><Text style={[styles.filterChipText, outcome === value && styles.filterChipTextSelected]}>{value}</Text></Pressable>)}</View></View>; })}</View>
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={Boolean(assignmentDraft)}
+      title="Xếp học viên dự thi"
+      onClose={() => setAssignmentDraft(null)}
+      footer={<Pressable onPress={() => void saveExamAssignment()} disabled={saving} style={styles.saveButton}><Text style={styles.saveText}>Thêm {assignmentDraft?.selected.length || 0} học viên</Text></Pressable>}
+    >
+      <View style={{ gap: 8 }}>{assignmentDraft?.candidates.map((student) => { const selected = assignmentDraft.selected.includes(student.id); return <Pressable key={student.id} onPress={() => setAssignmentDraft((current) => current ? { ...current, selected: selected ? current.selected.filter((id) => id !== student.id) : [...current.selected, student.id] } : current)} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{student.fullName}</Text><Text style={styles.optionDetail}>{student.phone}</Text></View><View style={[styles.checkbox, selected && styles.checkboxSelected]}>{selected ? <Check size={13} color={colors.white} /> : null}</View></Pressable> })}{assignmentDraft?.candidates.length === 0 ? <Text style={styles.emptyHint}>Không có học viên đủ điều kiện dự thi.</Text> : null}</View>
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={Boolean(progressionDialog) && !progressionClassCreate}
+      title={`Mở lớp theo lộ trình · ${progressionDialog?.batch.code || ''}`}
+      onClose={() => setProgressionDialog(null)}
+    >
+      <View style={{ gap: 10 }}>
+        <Text style={styles.fieldLabel}>Lộ trình</Text>{progressionDialog?.roadmaps.map((item) => { const id = String(item.id || item._id || ''); return <Pressable key={id} onPress={() => void chooseProgressionRoadmap(id)} style={[styles.optionRow, progressionDialog.roadmapId === id && styles.optionSelected]}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{item.name || item.code || 'Lộ trình'}</Text><Text style={styles.optionDetail}>{(item.steps || []).map((step) => courses.find((course) => course.id === String(step.courseId || ''))?.title || '').filter(Boolean).join(' → ')}</Text></View>{progressionDialog.roadmapId === id ? <Check size={15} color={colors.primary} /> : null}</Pressable>; })}
+        {progressionDialog?.loading ? <LoadState title="Đang tải dữ liệu lộ trình" detail="Đang tổng hợp chuyên cần, bài tập, mini test và kết quả thi…" busy inline /> : null}
+        {progressionDialog?.data?.rows.map((row) => { const choice = progressionDrafts[row.studentId] || { intent: row.intent, teacherNote: row.teacherNote || '' }; return <View key={row.studentId} style={styles.progressionCard}><View style={styles.cardHead}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{row.studentName}</Text><Text style={styles.cardMeta}>{row.studentPhone}</Text></View><Badge label={row.eligible ? 'Đạt điều kiện' : 'Chưa đạt'} /></View><View style={styles.detailGrid}><Detail label="Chuyên cần" value={`${row.attendanceRate ?? '—'}%`} /><Detail label="Bài tập" value={`${row.assignmentRate ?? '—'}%`} /><Detail label="Mini test" value={`${row.miniTestRate ?? '—'}%`} /><Detail label="Kết quả thi" value={`${row.examRate ?? '—'}%`} /></View>{row.eligibilityReasons?.length ? <Text style={styles.formError}>{row.eligibilityReasons.join(' · ')}</Text> : null}<Text style={styles.fieldLabel}>Quyết định</Text><View style={styles.filters}>{([{ value: 'continue', label: 'Học tiếp' }, { value: 'pending', label: 'Chờ xác nhận' }, { value: 'repeat', label: 'Học lại' }, { value: 'preserve', label: 'Bảo lưu' }, { value: 'stop', label: 'Dừng' }] as Array<{ value: ProgressionIntent; label: string }>).map((option) => <Pressable key={option.value} onPress={() => setProgressionDrafts((current) => ({ ...current, [row.studentId]: { ...choice, intent: option.value } }))} style={[styles.filterChip, choice.intent === option.value && styles.filterChipSelected]}><Text style={[styles.filterChipText, choice.intent === option.value && styles.filterChipTextSelected]}>{option.label}</Text></Pressable>)}</View><TextInput value={choice.teacherNote} onChangeText={(value) => setProgressionDrafts((current) => ({ ...current, [row.studentId]: { ...choice, teacherNote: value } }))} placeholder="Ghi chú điều phối" placeholderTextColor={colors.muted} style={styles.input} /><Pressable onPress={() => void saveProgressionDecision(row.studentId)} disabled={saving} style={styles.secondaryWide}><Check size={14} color={colors.primary} /><Text style={styles.secondaryWideText}>Lưu quyết định</Text></Pressable></View>; })}
+        {progressionDialog?.data?.targetStep ? <View style={styles.progressionCard}><Text style={styles.detailSectionTitle}>Chuyển học viên đủ điều kiện sang chặng kế tiếp</Text><Text style={styles.helperText}>Khóa học tiếp theo: {courses.find((item) => item.id === progressionDialog.data?.targetStep?.courseId)?.title || progressionDialog.data.targetStep.courseId}</Text><Pressable onPress={openProgressionClassForm} disabled={!canManage} style={[styles.secondaryWide, !canManage && styles.disabled]}><Plus size={14} color={colors.primary} /><Text style={styles.secondaryWideText}>Tạo lớp kế tiếp</Text></Pressable>{batches.filter((item) => item.courseId === progressionDialog.data?.targetStep?.courseId && !['Đã hủy', 'Đã kết thúc'].includes(item.status || '')).map((item) => <Pressable key={item.id} onPress={() => setProgressionDialog((current) => current ? { ...current, targetBatchId: item.id } : current)} style={[styles.optionRow, progressionDialog.targetBatchId === item.id && styles.optionSelected]}><Text style={styles.optionTitle}>{item.code} · {item.startDate || 'Chưa có ngày khai giảng'}</Text>{progressionDialog.targetBatchId === item.id ? <Check size={15} color={colors.primary} /> : null}</Pressable>)}<Pressable onPress={() => void promoteProgressionStudents()} disabled={!canManage || saving || !progressionDialog.targetBatchId} style={[styles.saveButton, (!canManage || saving || !progressionDialog.targetBatchId) && styles.disabled]}><Text style={styles.saveText}>Chuyển học viên đã chọn học tiếp</Text></Pressable></View> : null}
+      </View>
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={Boolean(enrollmentAction)}
+      title={enrollmentAction?.enrollment.status === 'Bảo lưu' ? 'Cập nhật tình trạng học' : enrollmentAction?.enrollment.status === 'Chờ xếp học lại' ? 'Xếp học viên học lại' : 'Bảo lưu học viên'}
+      onClose={() => setEnrollmentAction(null)}
+      footer={<Pressable onPress={() => void saveEnrollmentAction()} disabled={saving} style={styles.saveButton}><Text style={styles.saveText}>{enrollmentAction?.enrollment.status === 'Bảo lưu' ? 'Cho học lại' : enrollmentAction?.enrollment.status === 'Chờ xếp học lại' ? 'Xếp vào lớp học lại' : 'Xác nhận bảo lưu'}</Text></Pressable>}
+    >
+      <View style={{ gap: 10 }}>
+        <Text style={styles.cardMeta}>{enrollmentAction?.student?.fullName} · {enrollmentAction?.batch.code}</Text>
+        <Field label="Lý do *" value={draft.reason} onChangeText={(value) => setDraft((current) => ({ ...current, reason: value }))} multiline />
+        <DateTimeField label="Ngày dự kiến quay lại" mode="date" value={draft.expectedReturnAt} onChange={(value) => setDraft((current) => ({ ...current, expectedReturnAt: value }))} allowClear />
+        {enrollmentAction?.enrollment.status === 'Chờ xếp học lại' ? <><Text style={styles.fieldLabel}>Lớp học lại *</Text>{batches.filter((item) => item.id !== enrollmentAction.batch.id && item.status !== 'Đã hủy').map((item) => <Pressable key={item.id} onPress={() => setDraft((current) => ({ ...current, targetBatchId: item.id }))} style={[styles.optionRow, draft.targetBatchId === item.id && styles.optionSelected]}><Text style={styles.optionTitle}>{item.code} · {item.courseTitle || item.name || ''}</Text>{draft.targetBatchId === item.id ? <Check size={15} color={colors.primary} /> : null}</Pressable>)}<Field label="Lệ phí học lại (VND)" value={draft.retakeFee} onChangeText={(value) => setDraft((current) => ({ ...current, retakeFee: formatVndInput(value) }))} keyboardType="number-pad" /></> : enrollmentAction?.enrollment.status === 'Bảo lưu' ? <Text style={styles.helperText}>Xác nhận sẽ đưa học viên trở lại trạng thái đang học.</Text> : null}
+      </View>
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={Boolean(bookingResource)}
+      title={`Đặt lịch · ${bookingResource?.name || ''}`}
+      onClose={() => setBookingResource(null)}
+      footer={<Pressable onPress={() => void saveBooking()} disabled={saving} style={styles.saveButton}><Text style={styles.saveText}>Xác nhận đặt lịch</Text></Pressable>}
+    >
+      <View style={{ gap: 10 }}>
+        <Field label="Mục đích sử dụng *" value={draft.purpose} onChangeText={(value) => setDraft((current) => ({ ...current, purpose: value }))} />
+        <Field label="Người đăng ký *" value={draft.by} onChangeText={(value) => setDraft((current) => ({ ...current, by: value }))} />
+        <DateTimeField label="Ngày sử dụng" mode="date" value={draft.bookingDate} onChange={(value) => setDraft((current) => ({ ...current, bookingDate: value }))} />
+        <View style={styles.twoColumns}><DateTimeField label="Từ" mode="time" value={draft.startTime} onChange={(value) => setDraft((current) => ({ ...current, startTime: value }))} /><DateTimeField label="Đến" mode="time" value={draft.endTime} onChange={(value) => setDraft((current) => ({ ...current, endTime: value }))} /></View>
+      </View>
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={qualityThresholdDialog}
+      title="Ngưỡng cảnh báo chất lượng"
+      onClose={() => setQualityThresholdDialog(false)}
+      footer={<Pressable onPress={() => void saveQualityThresholdSettings()} disabled={saving} style={styles.saveButton}><Text style={styles.saveText}>Lưu ngưỡng</Text></Pressable>}
+    >
+      <View style={{ gap: 10 }}>
+        <Text style={styles.helperText}>Đặt tỷ lệ tối thiểu cho chuyên cần, bài tập và mini test. Học viên thấp hơn ngưỡng rủi ro sẽ được đánh dấu để theo dõi.</Text>
+        <View style={styles.twoColumns}><Field label="Rủi ro · chuyên cần (%)" value={String(qualityThresholds.riskAttendance)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, riskAttendance: Number(value) }))} keyboardType="decimal-pad" /><Field label="Theo dõi · chuyên cần (%)" value={String(qualityThresholds.watchAttendance)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, watchAttendance: Number(value) }))} keyboardType="decimal-pad" /></View>
+        <View style={styles.twoColumns}><Field label="Rủi ro · bài tập (%)" value={String(qualityThresholds.riskAssignment)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, riskAssignment: Number(value) }))} keyboardType="decimal-pad" /><Field label="Theo dõi · bài tập (%)" value={String(qualityThresholds.watchAssignment)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, watchAssignment: Number(value) }))} keyboardType="decimal-pad" /></View>
+        <View style={styles.twoColumns}><Field label="Rủi ro · mini test (%)" value={String(qualityThresholds.riskMiniTest)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, riskMiniTest: Number(value) }))} keyboardType="decimal-pad" /><Field label="Theo dõi · mini test (%)" value={String(qualityThresholds.watchMiniTest)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, watchMiniTest: Number(value) }))} keyboardType="decimal-pad" /></View>
+        <Field label="Thang điểm mặc định cho bài tập" value={String(qualityThresholds.assignmentMaxScore)} onChangeText={(value) => setQualityThresholds((current) => ({ ...current, assignmentMaxScore: Number(value) }))} keyboardType="decimal-pad" />
+      </View>
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={categoryModalOpen}
+      title={area === 'courses' ? 'Quản lý danh mục khóa học' : `Quản lý phân loại ${area === 'classrooms' ? 'phòng học' : 'thiết bị'}`}
+      onClose={() => { if (!categoryBusy) setCategoryModalOpen(false); }}
+    >
+      <View style={{ gap: 10 }}>
+        <View style={[styles.row, { marginBottom: 4 }]}>
+          <TextInput
+            value={newCategoryName}
+            onChangeText={setNewCategoryName}
+            placeholder={area === 'courses' ? 'Nhập tên danh mục mới...' : `Nhập phân loại ${area === 'classrooms' ? 'phòng học' : 'thiết bị'}...`}
+            placeholderTextColor={colors.muted}
+            style={[styles.input, { flex: 1 }]}
+            returnKeyType="done"
+            onSubmitEditing={() => { void addActiveCategory(); }}
+          />
+          <Pressable disabled={categoryBusy || !newCategoryName.trim()} onPress={() => void addActiveCategory()} style={[styles.saveButton, (categoryBusy || !newCategoryName.trim()) && styles.disabled]}>
+            {categoryBusy ? <ActivityIndicator color={colors.white} size="small" /> : <><Plus size={14} color={colors.white} style={{ marginRight: 4 }} /><Text style={styles.saveText}>Thêm</Text></>}
+          </Pressable>
+        </View>
+        {(area === 'courses' ? courseCategories : visibleResourceCategories).length === 0 ? (
+          <Text style={styles.emptyHint}>{area === 'courses' ? 'Chưa có danh mục khóa học nào.' : `Chưa có phân loại ${area === 'classrooms' ? 'phòng học' : 'thiết bị'} nào.`}</Text>
+        ) : (
+          (area === 'courses' ? courseCategories : visibleResourceCategories).map((cat) => (
+            <View key={cat.id} style={styles.optionRow}>
+              <Tag size={14} color={colors.primary} />
+              <Text style={[styles.optionTitle, { flex: 1 }]}>{cat.name}</Text>
+              <Pressable disabled={categoryBusy} onPress={() => removeActiveCategory(cat)} style={styles.miniAction}>
+                <Trash2 size={14} color="#B42318" />
+              </Pressable>
+            </View>
+          ))
+        )}
+      </View>
+    </FullScreenFormModal>
+
+    <FullScreenFormModal
+      visible={registerQrOpen}
+      title="QR đăng ký học viên"
+      onClose={() => setRegisterQrOpen(false)}
+      footer={
+        <View style={styles.detailActionRow}>
+          <Pressable disabled={!registerQrUrl || registerQrLoading} onPress={() => void Share.share({ message: registerQrUrl, url: registerQrUrl })} style={[styles.saveButton, { flex: 1 }, (!registerQrUrl || registerQrLoading) && styles.disabled]}>
+            <Share2 size={14} color={colors.white} style={{ marginRight: 6 }} />
+            <Text style={styles.saveText}>Chia sẻ link</Text>
+          </Pressable>
+          <Pressable disabled={registerQrLoading} onPress={() => void openRegisterQr()} style={[styles.cancelButton, { flexDirection: 'row', alignItems: 'center', gap: 5 }, registerQrLoading && styles.disabled]}>
+            <RefreshCw size={13} color={colors.ink} />
+            <Text style={styles.cancelText}>Tạo lại</Text>
+          </Pressable>
+        </View>
+      }
+    >
+      <View style={{ gap: 12 }}>
+        <Text style={styles.helperText}>Học viên quét mã để tự điền hồ sơ, bản ghi sẽ về thẳng danh sách của bạn.</Text>
+        <View style={styles.qrPanel}>
+          {registerQrLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginVertical: 64 }} />
+          ) : registerQrUrl ? (
+            <QRCode value={registerQrUrl} size={196} backgroundColor={colors.white} color={colors.ink} />
+          ) : null}
+          {registerQrUrl ? <Text selectable style={styles.qrUrl}>{registerQrUrl}</Text> : null}
         </View>
       </View>
-    </Modal>
+    </FullScreenFormModal>
 
     <BatchDetailModal
       batch={viewingBatch}

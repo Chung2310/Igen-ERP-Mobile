@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -16,6 +15,7 @@ import {
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Check, ChevronDown, Coins, Gift, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Ticket, User, X } from 'lucide-react-native';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { colors } from '@/theme/colors';
 import { getAccessToken } from '@/core/auth/authSession';
 import { DateTimeField } from '@/features/quotation/DateTimeField';
@@ -215,16 +215,8 @@ export function RetailShiftOpenModal({
   const filteredCashiers = cashiers.filter((cashier) => cashier.name.toLowerCase().includes(cashierSearch.trim().toLowerCase()));
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { if (!saving) onClose(); }}>
-      <Pressable style={s.modalBackdrop} onPress={() => { if (!saving) onClose(); }}>
-        <Pressable style={s.modalSheet} onPress={() => { }}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Mở ca POS</Text>
-            <Pressable accessibilityRole="button" disabled={saving} onPress={onClose} style={s.modalCloseBtn}>
-              <X size={18} color={colors.muted} />
-            </Pressable>
-          </View>
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingTop: 6, paddingBottom: 4 }}>
+    <FullScreenFormModal visible={visible} title="Mở ca POS" onClose={() => { if (!saving) onClose(); }}>
+      <View style={{ gap: 14, paddingTop: 2, paddingBottom: 4 }}>
             <View style={{ gap: 6 }}>
               <Text style={s.label}>Nhân viên bán hàng</Text>
               <Pressable accessibilityRole="button" disabled={cashiersLoading || saving} onPress={() => setCashierPickerOpen((open) => !open)} style={s.selectField}>
@@ -260,10 +252,8 @@ export function RetailShiftOpenModal({
               <View style={{ flex: 1 }}><Action secondary disabled={saving} label="Hủy" onPress={onClose} /></View>
               <View style={{ flex: 1 }}><Action disabled={saving || cashiersLoading || !cashierId} label={saving ? 'Đang mở ca…' : 'Mở ca POS'} onPress={() => onOpen({ cashierId, openingFloat: parseVndInput(openingFloat) })} /></View>
             </View>
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+      </View>
+    </FullScreenFormModal>
   );
 }
 
@@ -579,26 +569,18 @@ function WarrantyPanel({ scope }: { scope: RetailScope }) {
         </View>
       </Section>
 
-      <Modal visible={Boolean(selectedRow)} transparent animationType="fade" onRequestClose={() => setSelectedRow(null)}>
-        <Pressable style={s.modalBackdrop} onPress={() => setSelectedRow(null)}>
-          <Pressable style={s.modalSheet} onPress={() => { }}>
-            <View style={s.modalHeader}>
-              <Text numberOfLines={1} ellipsizeMode="middle" style={[s.modalTitle, { flex: 1 }]}>Chi tiết bảo hành</Text>
-              <Pressable accessibilityRole="button" onPress={() => setSelectedRow(null)} style={s.modalCloseBtn}>
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-            {selectedRow && (() => {
-              const badge = warrantyBadgeColors(selectedRow.status);
-              const matchedItem = selectedOrderDetail?.items.find((item) =>
-                (selectedRow.sku && item.sku === selectedRow.sku) || item.productName === selectedRow.productName,
-              );
-              const deviceCodes = [
-                ...(matchedItem?.serialNumbers || []),
-                ...(matchedItem?.internalBarcodes || []),
-              ];
-              return (
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6 }}>
+      <FullScreenFormModal visible={Boolean(selectedRow)} title="Chi tiết bảo hành" onClose={() => setSelectedRow(null)}>
+        {selectedRow && (() => {
+          const badge = warrantyBadgeColors(selectedRow.status);
+          const matchedItem = selectedOrderDetail?.items.find((item) =>
+            (selectedRow.sku && item.sku === selectedRow.sku) || item.productName === selectedRow.productName,
+          );
+          const deviceCodes = [
+            ...(matchedItem?.serialNumbers || []),
+            ...(matchedItem?.internalBarcodes || []),
+          ];
+          return (
+            <View style={{ gap: 12, paddingTop: 2 }}>
                   <View style={s.summaryBox}>
                     <View style={s.cardTopRow}>
                       <Text style={[s.cardTitle, { flex: 1 }]}>{selectedRow.productName}</Text>
@@ -670,87 +652,65 @@ function WarrantyPanel({ scope }: { scope: RetailScope }) {
                       }}
                     />
                   )}
-                </ScrollView>
-              );
-            })()}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={lookupOpen} transparent animationType="fade" onRequestClose={() => setLookupOpen(false)}>
-        <Pressable style={s.modalBackdrop} onPress={() => setLookupOpen(false)}>
-          <Pressable style={s.modalSheet} onPress={() => { }}>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Tra cứu bảo hành</Text>
-              <Pressable accessibilityRole="button" onPress={() => setLookupOpen(false)} style={s.modalCloseBtn}>
-                <X size={18} color={colors.muted} />
-              </Pressable>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6 }}>
-              <View style={s.chipRow}>
-                <Chip label="IMEI / Serial / Mã máy" active={lookupType === 'serial'} onPress={() => { setLookupType('serial'); setLookupResult(null); setLookupError(''); }} />
-                <Chip label="Số điện thoại" active={lookupType === 'phone'} onPress={() => { setLookupType('phone'); setLookupResult(null); setLookupError(''); }} />
-              </View>
-              <Field
-                label={lookupType === 'phone' ? 'Số điện thoại khách hàng' : 'Mã máy / IMEI / Serial'}
-                value={lookup}
-                onChangeText={setLookup}
-                placeholder={lookupType === 'phone' ? 'Nhập số điện thoại' : 'Nhập IMEI, serial hoặc mã máy'}
-                keyboardType={lookupType === 'phone' ? 'phone-pad' : 'default'}
-              />
-              <Action label={lookupBusy ? 'Đang tra cứu…' : 'Tra cứu thời hạn'} disabled={lookupBusy} onPress={() => void searchLookup()} />
-              <ErrorText>{lookupError}</ErrorText>
-              {lookupResult && lookupType === 'serial' && <WarrantyLookupCard result={lookupResult as WarrantyLookupResult} />}
-              {lookupResult && lookupType === 'phone' && <PhoneWarrantyCard result={lookupResult as PhoneWarrantyLookupResult} />}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          );
+        })()}
+      </FullScreenFormModal>
 
-      <Modal visible={filterOpen} transparent animationType="fade" onRequestClose={() => setFilterOpen(false)}>
-        <Pressable style={s.modalBackdrop} onPress={() => setFilterOpen(false)}>
-          <Pressable style={s.modalSheet} onPress={() => { }}>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Bộ lọc bảo hành</Text>
-              <Pressable accessibilityRole="button" onPress={() => setFilterOpen(false)} style={s.modalCloseBtn}>
-                <X size={18} color={colors.muted} />
-              </Pressable>
+      <FullScreenFormModal visible={lookupOpen} title="Tra cứu bảo hành" onClose={() => setLookupOpen(false)}>
+        <View style={{ gap: 12, paddingTop: 2 }}>
+          <View style={s.chipRow}>
+            <Chip label="IMEI / Serial / Mã máy" active={lookupType === 'serial'} onPress={() => { setLookupType('serial'); setLookupResult(null); setLookupError(''); }} />
+            <Chip label="Số điện thoại" active={lookupType === 'phone'} onPress={() => { setLookupType('phone'); setLookupResult(null); setLookupError(''); }} />
+          </View>
+          <Field
+            label={lookupType === 'phone' ? 'Số điện thoại khách hàng' : 'Mã máy / IMEI / Serial'}
+            value={lookup}
+            onChangeText={setLookup}
+            placeholder={lookupType === 'phone' ? 'Nhập số điện thoại' : 'Nhập IMEI, serial hoặc mã máy'}
+            keyboardType={lookupType === 'phone' ? 'phone-pad' : 'default'}
+          />
+          <Action label={lookupBusy ? 'Đang tra cứu…' : 'Tra cứu thời hạn'} disabled={lookupBusy} onPress={() => void searchLookup()} />
+          <ErrorText>{lookupError}</ErrorText>
+          {lookupResult && lookupType === 'serial' && <WarrantyLookupCard result={lookupResult as WarrantyLookupResult} />}
+          {lookupResult && lookupType === 'phone' && <PhoneWarrantyCard result={lookupResult as PhoneWarrantyLookupResult} />}
+        </View>
+      </FullScreenFormModal>
+
+      <FullScreenFormModal visible={filterOpen} title="Bộ lọc bảo hành" onClose={() => setFilterOpen(false)}>
+        <View style={{ gap: 14, paddingTop: 2 }}>
+          <View style={{ gap: 8 }}>
+            <Text style={s.label}>Trạng thái bảo hành</Text>
+            <View style={s.chipRow}>
+              {['all', 'active', 'expiring', 'expired', 'pending', 'none', 'unrecorded'].map((value) => (
+                <Chip
+                  key={value}
+                  label={value === 'all' ? 'Tất cả' : warrantyStatus(value)}
+                  active={draftStatus === value}
+                  onPress={() => setDraftStatus(value)}
+                />
+              ))}
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingTop: 6 }}>
-              <View style={{ gap: 8 }}>
-                <Text style={s.label}>Trạng thái bảo hành</Text>
-                <View style={s.chipRow}>
-                  {['all', 'active', 'expiring', 'expired', 'pending', 'none', 'unrecorded'].map((value) => (
-                    <Chip
-                      key={value}
-                      label={value === 'all' ? 'Tất cả' : warrantyStatus(value)}
-                      active={draftStatus === value}
-                      onPress={() => setDraftStatus(value)}
-                    />
-                  ))}
-                </View>
-              </View>
-              <View style={{ gap: 8 }}>
-                <Text style={s.label}>Mốc cảnh báo sắp hết hạn</Text>
-                <View style={s.chipRow}>
-                  {[7, 30, 60, 90].map((value) => (
-                    <Chip
-                      key={value}
-                      label={`Trong ${value} ngày`}
-                      active={draftDays === value}
-                      onPress={() => setDraftDays(value)}
-                    />
-                  ))}
-                </View>
-              </View>
-              <View style={s.row}>
-                <View style={{ flex: 1 }}><Action secondary label="Đặt lại" onPress={resetFilter} /></View>
-                <View style={{ flex: 1 }}><Action label="Áp dụng" onPress={applyFilter} /></View>
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+          <View style={{ gap: 8 }}>
+            <Text style={s.label}>Mốc cảnh báo sắp hết hạn</Text>
+            <View style={s.chipRow}>
+              {[7, 30, 60, 90].map((value) => (
+                <Chip
+                  key={value}
+                  label={`Trong ${value} ngày`}
+                  active={draftDays === value}
+                  onPress={() => setDraftDays(value)}
+                />
+              ))}
+            </View>
+          </View>
+          <View style={s.row}>
+            <View style={{ flex: 1 }}><Action secondary label="Đặt lại" onPress={resetFilter} /></View>
+            <View style={{ flex: 1 }}><Action label="Áp dụng" onPress={applyFilter} /></View>
+          </View>
+        </View>
+      </FullScreenFormModal>
     </Page>
   );
 }
@@ -979,17 +939,9 @@ function ReturnsPanel({ scope, canManage, createRequest, onCreateRequestHandled 
             <Pressable accessibilityRole="button" onPress={clearFilters}><Text style={s.filterClearText}>Xóa</Text></Pressable>
           </View>
         ) : null}
-        {canManage && <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => { if (!saving) setShowCreate(false); }}>
-          <Pressable style={s.modalBackdrop} onPress={() => { if (!saving) setShowCreate(false); }}>
-            <Pressable style={s.modalSheet} onPress={() => { }}>
-              <View style={s.modalHeader}>
-                <Text style={s.modalTitle}>Tạo phiếu đổi trả</Text>
-                <Pressable accessibilityRole="button" disabled={saving} onPress={() => setShowCreate(false)} style={s.modalCloseBtn}>
-                  <X size={18} color={colors.muted} />
-                </Pressable>
-              </View>
-              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6, paddingBottom: 6 }}>
-                <View style={s.formBox}>
+        {canManage && <FullScreenFormModal visible={showCreate} title="Tạo phiếu đổi trả" onClose={() => { if (!saving) setShowCreate(false); }}>
+          <View style={{ gap: 12, paddingTop: 2, paddingBottom: 6 }}>
+            <View style={s.formBox}>
                   <Text style={s.subHeading}>Tạo chứng từ hậu mãi</Text>
                   <View style={s.chipRow}>
                     <Chip label="Khách trả hàng" active={kind === 'return'} onPress={() => setKind('return')} />
@@ -1065,11 +1017,9 @@ function ReturnsPanel({ scope, canManage, createRequest, onCreateRequestHandled 
                       <ErrorText>{error}</ErrorText>
                     </>
                   )}
-                </View>
-              </ScrollView>
-            </Pressable>
-          </Pressable>
-        </Modal>}
+            </View>
+          </View>
+        </FullScreenFormModal>}
 
         <Loading busy={busy} error={error} onRetry={() => void load()} />
         {rows.map((row) => (
@@ -1098,33 +1048,23 @@ function ReturnsPanel({ scope, canManage, createRequest, onCreateRequestHandled 
           <Action secondary compact disabled={rows.length < 20} label="Sau ›" onPress={() => setPage((v) => v + 1)} />
         </View>
       </Section>
-      <Modal visible={filterOpen} transparent animationType="fade" onRequestClose={() => setFilterOpen(false)}>
-        <Pressable style={s.modalBackdrop} onPress={() => setFilterOpen(false)}>
-          <Pressable style={s.modalSheet} onPress={() => { }}>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Lọc chứng từ đổi trả</Text>
-              <Pressable accessibilityRole="button" onPress={() => setFilterOpen(false)} style={s.modalCloseBtn}>
-                <X size={18} color={colors.muted} />
-              </Pressable>
+      <FullScreenFormModal visible={filterOpen} title="Lọc chứng từ đổi trả" onClose={() => setFilterOpen(false)}>
+        <View style={{ gap: 14, paddingTop: 2 }}>
+          <Field label="Tìm phiếu / đơn / khách hàng" value={draftQ} onChangeText={setDraftQ} placeholder="Nhập từ khóa" />
+          <View style={{ gap: 8 }}>
+            <Text style={s.label}>Loại chứng từ</Text>
+            <View style={s.chipRow}>
+              {[['', 'Tất cả'], ['return', 'Khách trả'], ['buyback', 'Thu mua']].map(([value, label]) => (
+                <Chip key={value} label={label} active={draftType === value} onPress={() => setDraftType(value)} />
+              ))}
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingTop: 6 }}>
-              <Field label="Tìm phiếu / đơn / khách hàng" value={draftQ} onChangeText={setDraftQ} placeholder="Nhập từ khóa" />
-              <View style={{ gap: 8 }}>
-                <Text style={s.label}>Loại chứng từ</Text>
-                <View style={s.chipRow}>
-                  {[['', 'Tất cả'], ['return', 'Khách trả'], ['buyback', 'Thu mua']].map(([value, label]) => (
-                    <Chip key={value} label={label} active={draftType === value} onPress={() => setDraftType(value)} />
-                  ))}
-                </View>
-              </View>
-              <View style={s.row}>
-                <View style={{ flex: 1 }}><Action secondary label="Xóa bộ lọc" onPress={clearFilters} /></View>
-                <View style={{ flex: 1 }}><Action label="Áp dụng" onPress={applyFilters} /></View>
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+          <View style={s.row}>
+            <View style={{ flex: 1 }}><Action secondary label="Xóa bộ lọc" onPress={clearFilters} /></View>
+            <View style={{ flex: 1 }}><Action label="Áp dụng" onPress={applyFilters} /></View>
+          </View>
+        </View>
+      </FullScreenFormModal>
       <ErrorText>{error}</ErrorText>
     </Page>
   );
@@ -1235,19 +1175,9 @@ function InvoicesPanel({ scope, canManage }: { scope: RetailScope; canManage: bo
         </View>
       </Section>
 
-      <Modal visible={Boolean(selected)} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
-        <View style={s.modalBackdrop}>
-          <View style={s.modalSheet}>
-            <View style={s.modalHeader}>
-              <Text numberOfLines={1} ellipsizeMode="middle" style={[s.modalTitle, { flex: 1 }]}>
-                Hóa đơn {selected?.invoiceNo}
-              </Text>
-              <Pressable accessibilityRole="button" onPress={() => setSelected(null)} style={s.modalCloseBtn}>
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-            {selected && (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6 }}>
+      <FullScreenFormModal visible={Boolean(selected)} title={`Hóa đơn ${selected?.invoiceNo || ''}`} onClose={() => setSelected(null)}>
+        {selected && (
+          <View style={{ gap: 12, paddingTop: 2 }}>
                 <View style={s.summaryBox}>
                   <Text style={s.cardTitle}>{selected.snapshot.customerName} · {selected.orderCode}</Text>
                   <Text style={s.copy}>Thu ngân: {selected.snapshot.cashierName} · Ngày phát hành: {dateLabel(selected.issuedAt)}</Text>
@@ -1293,11 +1223,9 @@ function InvoicesPanel({ scope, canManage }: { scope: RetailScope; canManage: bo
                     <View style={{ flex: 1 }}><Action secondary label="Ghi nhận in lại" onPress={() => void reprint()} /></View>
                   </View>
                 )}
-              </ScrollView>
-            )}
           </View>
-        </View>
-      </Modal>
+        )}
+      </FullScreenFormModal>
     </Page>
   );
 }
@@ -1443,44 +1371,34 @@ function ReportsPanel({ scope }: { scope: RetailScope }) {
         <Loading busy={busy} error={error} onRetry={() => void load()} />
       </Section>
 
-      <Modal visible={filterOpen} transparent animationType="fade" onRequestClose={() => setFilterOpen(false)}>
-        <Pressable style={s.modalBackdrop} onPress={() => setFilterOpen(false)}>
-          <Pressable style={s.modalSheet} onPress={() => { }}>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Lọc báo cáo bán lẻ</Text>
-              <Pressable accessibilityRole="button" onPress={() => setFilterOpen(false)} style={s.modalCloseBtn}>
-                <X size={18} color={colors.muted} />
-              </Pressable>
+      <FullScreenFormModal visible={filterOpen} title="Lọc báo cáo bán lẻ" onClose={() => setFilterOpen(false)}>
+        <View style={{ gap: 14, paddingTop: 2 }}>
+          <View style={{ gap: 8 }}>
+            <Text style={s.label}>Thời gian</Text>
+            <View style={s.chipRow}>
+              <Chip label="7 ngày" active={!draftCustom && draftPreset === '7d'} onPress={() => { setDraftCustom(false); setDraftPreset('7d'); }} />
+              <Chip label="30 ngày" active={!draftCustom && draftPreset === '30d'} onPress={() => { setDraftCustom(false); setDraftPreset('30d'); }} />
+              <Chip label="Khoảng ngày" active={draftCustom} onPress={() => setDraftCustom(true)} />
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingTop: 6 }}>
-              <View style={{ gap: 8 }}>
-                <Text style={s.label}>Thời gian</Text>
-                <View style={s.chipRow}>
-                  <Chip label="7 ngày" active={!draftCustom && draftPreset === '7d'} onPress={() => { setDraftCustom(false); setDraftPreset('7d'); }} />
-                  <Chip label="30 ngày" active={!draftCustom && draftPreset === '30d'} onPress={() => { setDraftCustom(false); setDraftPreset('30d'); }} />
-                  <Chip label="Khoảng ngày" active={draftCustom} onPress={() => setDraftCustom(true)} />
-                </View>
-              </View>
-              {draftCustom && (
-                <View style={s.row}>
-                  <View style={{ flex: 1 }}><DateTimeField label="Từ ngày" value={draftFrom} onChange={setDraftFrom} mode="date" /></View>
-                  <View style={{ flex: 1 }}><DateTimeField label="Đến ngày" value={draftTo} onChange={setDraftTo} mode="date" /></View>
-                </View>
-              )}
-              <Field label="Lọc SKU" value={draftSku} onChangeText={setDraftSku} placeholder="Nhập mã SKU (không bắt buộc)" />
-              <View style={s.row}>
-                <Field label="Danh mục" value={draftCategory} onChangeText={setDraftCategory} placeholder="Tất cả" />
-                <Field label="Thương hiệu" value={draftBrand} onChangeText={setDraftBrand} placeholder="Tất cả" />
-              </View>
-              <ErrorText>{error}</ErrorText>
-              <View style={s.row}>
-                <View style={{ flex: 1 }}><Action secondary label="Xóa bộ lọc" onPress={clearFilters} /></View>
-                <View style={{ flex: 1 }}><Action label="Áp dụng" onPress={applyFilters} /></View>
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+          {draftCustom && (
+            <View style={s.row}>
+              <View style={{ flex: 1 }}><DateTimeField label="Từ ngày" value={draftFrom} onChange={setDraftFrom} mode="date" /></View>
+              <View style={{ flex: 1 }}><DateTimeField label="Đến ngày" value={draftTo} onChange={setDraftTo} mode="date" /></View>
+            </View>
+          )}
+          <Field label="Lọc SKU" value={draftSku} onChangeText={setDraftSku} placeholder="Nhập mã SKU (không bắt buộc)" />
+          <View style={s.row}>
+            <Field label="Danh mục" value={draftCategory} onChangeText={setDraftCategory} placeholder="Tất cả" />
+            <Field label="Thương hiệu" value={draftBrand} onChangeText={setDraftBrand} placeholder="Tất cả" />
+          </View>
+          <ErrorText>{error}</ErrorText>
+          <View style={s.row}>
+            <View style={{ flex: 1 }}><Action secondary label="Xóa bộ lọc" onPress={clearFilters} /></View>
+            <View style={{ flex: 1 }}><Action label="Áp dụng" onPress={applyFilters} /></View>
+          </View>
+        </View>
+      </FullScreenFormModal>
 
       {report && (
         <>
@@ -1798,19 +1716,9 @@ function ShiftsPanel({ scope, terminalId, currentCashierId }: { scope: RetailSco
         {!busy && !rows.length && <Text style={s.empty}>Không có ca trong bộ lọc.</Text>}
       </Section>
 
-      <Modal visible={Boolean(selected)} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
-        <View style={s.modalBackdrop}>
-          <View style={s.modalSheet}>
-            <View style={s.modalHeader}>
-              <Text numberOfLines={1} ellipsizeMode="middle" style={[s.modalTitle, { flex: 1 }]}>
-                Chi tiết ca {selected?.shiftCode}
-              </Text>
-              <Pressable accessibilityRole="button" onPress={() => setSelected(null)} style={s.modalCloseBtn}>
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-            {selected && (
-              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6 }}>
+      <FullScreenFormModal visible={Boolean(selected)} title={`Chi tiết ca ${selected?.shiftCode || ''}`} onClose={() => setSelected(null)}>
+        {selected && (
+          <View style={{ gap: 12, paddingTop: 2 }}>
                 <View style={s.summaryBox}>
                   <View style={s.kvRow}><Text style={s.copy}>Thu ngân</Text><Text style={s.kvVal}>{selected.cashierName}</Text></View>
                   <View style={s.kvRow}><Text style={s.copy}>Đã thu</Text><Text style={s.kvVal}>{money(selected.collectedAmount)}</Text></View>
@@ -1869,11 +1777,9 @@ function ShiftsPanel({ scope, terminalId, currentCashierId }: { scope: RetailSco
                     ))}
                   </View>
                 )}
-              </ScrollView>
-            )}
           </View>
-        </View>
-      </Modal>
+        )}
+      </FullScreenFormModal>
     </Page>
   );
 }
@@ -2463,16 +2369,8 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
             )}
           </Section>
 
-          <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => { if (!saving) { setFormOpen(false); setEditing(null); } }}>
-            <Pressable style={s.modalBackdrop} onPress={() => { if (!saving) { setFormOpen(false); setEditing(null); } }}>
-              <Pressable style={s.modalSheet} onPress={() => {}}>
-                <View style={s.modalHeader}>
-                  <Text style={s.modalTitle}>{editing ? 'Sửa mã ưu đãi' : 'Tạo mã ưu đãi'}</Text>
-                  <Pressable accessibilityRole="button" disabled={saving} onPress={() => { setFormOpen(false); setEditing(null); }} style={s.modalCloseBtn}>
-                    <X size={18} color={colors.muted} />
-                  </Pressable>
-                </View>
-                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6, paddingBottom: 4 }}>
+          <FullScreenFormModal visible={formOpen} title={editing ? 'Sửa mã ưu đãi' : 'Tạo mã ưu đãi'} onClose={() => { if (!saving) { setFormOpen(false); setEditing(null); } }}>
+            <View style={{ gap: 12, paddingTop: 2, paddingBottom: 4 }}>
                   <View style={s.formBox}>
                     <View style={s.switchRow}>
                       <Text style={s.switchLabel}>Dành riêng cho một khách hàng</Text>
@@ -2592,10 +2490,8 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
                     <View style={{ flex: 1 }}><Action secondary disabled={saving} label="Hủy" onPress={() => { setFormOpen(false); setEditing(null); }} /></View>
                     <View style={{ flex: 1 }}><Action disabled={saving} label={saving ? 'Đang lưu…' : 'Lưu mã ưu đãi'} onPress={() => void saveCoupon()} /></View>
                   </View>
-                </ScrollView>
-              </Pressable>
-            </Pressable>
-          </Modal>
+            </View>
+          </FullScreenFormModal>
         </>
       )}
 
@@ -2692,16 +2588,8 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
             )}
           </Section>
 
-          <Modal visible={automationOpen} transparent animationType="slide" onRequestClose={() => { if (!saving) { setAutomationOpen(false); setEditingAutomation(null); } }}>
-            <Pressable style={s.modalBackdrop} onPress={() => { if (!saving) { setAutomationOpen(false); setEditingAutomation(null); } }}>
-              <Pressable style={s.modalSheet} onPress={() => {}}>
-                <View style={s.modalHeader}>
-                  <Text style={s.modalTitle}>{editingAutomation ? 'Sửa chương trình tự động' : 'Tạo chương trình tự động'}</Text>
-                  <Pressable accessibilityRole="button" disabled={saving} onPress={() => { setAutomationOpen(false); setEditingAutomation(null); }} style={s.modalCloseBtn}>
-                    <X size={18} color={colors.muted} />
-                  </Pressable>
-                </View>
-                <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6, paddingBottom: 4 }}>
+          <FullScreenFormModal visible={automationOpen} title={editingAutomation ? 'Sửa chương trình tự động' : 'Tạo chương trình tự động'} onClose={() => { if (!saving) { setAutomationOpen(false); setEditingAutomation(null); } }}>
+            <View style={{ gap: 12, paddingTop: 2, paddingBottom: 4 }}>
                   <Field label="Tên chương trình" value={automationName} onChangeText={setAutomationName} placeholder="VD: Tặng mã cho đơn từ 2 triệu" maxLength={120} editable={!editingAutomation?.legacy} />
                   <View style={s.chipRow}>
                     <Chip disabled={Boolean(editingAutomation?._id)} label="Sinh nhật khách hàng" active={automationTrigger === 'birthday'} onPress={() => { setAutomationTrigger('birthday'); setAutomationOrderMin(''); }} />
@@ -2763,10 +2651,8 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
                     <View style={{ flex: 1 }}><Action secondary disabled={saving} label="Hủy" onPress={() => { setAutomationOpen(false); setEditingAutomation(null); }} /></View>
                     <View style={{ flex: 1 }}><Action disabled={saving} label={saving ? 'Đang lưu…' : 'Lưu chương trình'} onPress={() => void saveAutomation()} /></View>
                   </View>
-                </ScrollView>
-              </Pressable>
-            </Pressable>
-          </Modal>
+            </View>
+          </FullScreenFormModal>
         </>
       )}
 

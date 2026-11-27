@@ -1,10 +1,10 @@
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { ArrowLeft, FilePlus2, Link2, Pencil, Plus, Send, Sparkles, Star, Trash2, X } from 'lucide-react-native';
+import { ArrowLeft, FilePlus2, Link2, Pencil, Plus, Send, Sparkles, Star, Trash2 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import {
@@ -357,105 +357,103 @@ export function AgentsPanel() {
         </View>
       )}
 
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <View style={styles.backdrop}>
-          <View style={styles.sheet}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{editingAgent ? 'Sửa Trợ lý AI' : 'Tạo Trợ lý AI mới'}</Text>
-              <Pressable accessibilityLabel="Đóng" onPress={() => setCreateOpen(false)} hitSlop={8}><X size={19} color={colors.muted} /></Pressable>
-            </View>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.editorFields}>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Tên trợ lý (VD: Chuyên viên báo giá)"
-              placeholderTextColor={colors.muted}
-              style={styles.field}
-            />
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Mô tả ngắn"
-              placeholderTextColor={colors.muted}
-              style={styles.field}
-            />
-            <TextInput
-              value={instructions}
-              onChangeText={setInstructions}
-              placeholder="Chỉ dẫn vai trò và cách trả lời..."
-              placeholderTextColor={colors.muted}
-              multiline
-              style={[styles.field, styles.fieldMulti]}
-            />
-            <TextInput
-              value={avoid}
-              onChangeText={setAvoid}
-              placeholder="Những điều trợ lý không được làm"
-              placeholderTextColor={colors.muted}
-              multiline
-              style={[styles.field, styles.fieldMulti]}
-            />
-            <Text style={styles.fieldLabel}>Câu hỏi mở đầu (mỗi dòng một câu, tối đa 4)</Text>
-            <TextInput
-              value={openingQuestions}
-              onChangeText={setOpeningQuestions}
-              placeholder="Ví dụ: Giúp tôi lập kế hoạch tuần này"
-              placeholderTextColor={colors.muted}
-              multiline
-              style={[styles.field, styles.openingField]}
-            />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toneRow}>
-              {TONE_OPTIONS.map((t) => (
-                <Pressable
-                  key={t}
-                  onPress={() => setTone(t)}
-                  style={[styles.toneChip, tone === t && styles.toneChipActive]}
-                >
-                  <Text style={[styles.toneText, tone === t && styles.toneTextActive]}>{t}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <Text style={styles.fieldLabel}>Kiến thức của trợ lý ({knowledge.length})</Text>
-            <TextInput value={knowledgeTitle} onChangeText={setKnowledgeTitle} placeholder="Tên tài liệu hoặc ghi chú" placeholderTextColor={colors.muted} style={styles.field} />
-            <TextInput value={knowledgeContent} onChangeText={setKnowledgeContent} placeholder="Nội dung kiến thức" placeholderTextColor={colors.muted} multiline style={[styles.field, styles.knowledgeField]} />
-            <Pressable
-              disabled={!knowledgeTitle.trim() || !knowledgeContent.trim()}
-              onPress={() => {
-                if (!knowledgeTitle.trim() || !knowledgeContent.trim()) return;
-                addKnowledge({ title: knowledgeTitle.trim(), kind: 'text', content: knowledgeContent.trim().slice(0, 10000) });
-              }}
-              style={[styles.secondaryBtn, (!knowledgeTitle.trim() || !knowledgeContent.trim()) && styles.disabled]}
-            ><Text style={styles.secondaryBtnText}>Thêm ghi chú kiến thức</Text></Pressable>
-            <TextInput value={knowledgeLink} onChangeText={setKnowledgeLink} placeholder="https:// liên kết tài liệu" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" style={styles.field} />
-            <View style={styles.knowledgeActions}>
-              <Pressable disabled={extracting || !knowledgeLink.trim()} onPress={() => void onAddKnowledgeLink()} style={[styles.secondaryBtn, (extracting || !knowledgeLink.trim()) && styles.disabled]}>
-                <View style={styles.iconButtonContent}><Link2 size={14} color={colors.primary} /><Text style={styles.secondaryBtnText}>{extracting ? 'Đang đọc...' : 'Thêm liên kết'}</Text></View>
+      <FullScreenFormModal
+        visible={createOpen}
+        title={editingAgent ? 'Sửa Trợ lý AI' : 'Tạo Trợ lý AI mới'}
+        onClose={() => setCreateOpen(false)}
+        footer={
+          <Pressable
+            disabled={saving || extracting}
+            onPress={() => void onSaveAgent()}
+            style={[styles.submitBtn, (saving || extracting) && styles.disabled]}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Text style={styles.submitBtnText}>{editingAgent ? 'Lưu thay đổi' : 'Lưu trợ lý'}</Text>
+            )}
+          </Pressable>
+        }
+      >
+        <View style={styles.editorFields}>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Tên trợ lý (VD: Chuyên viên báo giá)"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <TextInput
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Mô tả ngắn"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <TextInput
+            value={instructions}
+            onChangeText={setInstructions}
+            placeholder="Chỉ dẫn vai trò và cách trả lời..."
+            placeholderTextColor={colors.muted}
+            multiline
+            style={[styles.field, styles.fieldMulti]}
+          />
+          <TextInput
+            value={avoid}
+            onChangeText={setAvoid}
+            placeholder="Những điều trợ lý không được làm"
+            placeholderTextColor={colors.muted}
+            multiline
+            style={[styles.field, styles.fieldMulti]}
+          />
+          <Text style={styles.fieldLabel}>Câu hỏi mở đầu (mỗi dòng một câu, tối đa 4)</Text>
+          <TextInput
+            value={openingQuestions}
+            onChangeText={setOpeningQuestions}
+            placeholder="Ví dụ: Giúp tôi lập kế hoạch tuần này"
+            placeholderTextColor={colors.muted}
+            multiline
+            style={[styles.field, styles.openingField]}
+          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toneRow}>
+            {TONE_OPTIONS.map((t) => (
+              <Pressable
+                key={t}
+                onPress={() => setTone(t)}
+                style={[styles.toneChip, tone === t && styles.toneChipActive]}
+              >
+                <Text style={[styles.toneText, tone === t && styles.toneTextActive]}>{t}</Text>
               </Pressable>
-              <Pressable disabled={extracting} onPress={() => void onAddKnowledgeFile()} style={[styles.secondaryBtn, extracting && styles.disabled]}>
-                <View style={styles.iconButtonContent}><FilePlus2 size={14} color={colors.primary} /><Text style={styles.secondaryBtnText}>Tải tài liệu</Text></View>
-              </Pressable>
-            </View>
-            {knowledge.map((item) => (
-              <View key={item.id} style={styles.knowledgeRow}>
-                <View style={styles.cardCopy}><Text numberOfLines={1} style={styles.knowledgeName}>{item.title}</Text><Text style={styles.cardMeta}>{item.kind === 'file' ? 'Tệp' : item.kind === 'link' ? 'Liên kết' : 'Ghi chú'}</Text></View>
-                <Pressable accessibilityLabel={`Xóa ${item.title}`} onPress={() => setKnowledge((prev) => prev.filter((row) => row.id !== item.id))} hitSlop={8}><Trash2 size={15} color="#C74848" /></Pressable>
-              </View>
             ))}
-            </ScrollView>
-            <Pressable
-              disabled={saving || extracting}
-              onPress={() => void onSaveAgent()}
-              style={[styles.submitBtn, (saving || extracting) && styles.disabled]}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.white} />
-              ) : (
-                <Text style={styles.submitBtnText}>{editingAgent ? 'Lưu thay đổi' : 'Lưu trợ lý'}</Text>
-              )}
+          </ScrollView>
+          <Text style={styles.fieldLabel}>Kiến thức của trợ lý ({knowledge.length})</Text>
+          <TextInput value={knowledgeTitle} onChangeText={setKnowledgeTitle} placeholder="Tên tài liệu hoặc ghi chú" placeholderTextColor={colors.muted} style={styles.field} />
+          <TextInput value={knowledgeContent} onChangeText={setKnowledgeContent} placeholder="Nội dung kiến thức" placeholderTextColor={colors.muted} multiline style={[styles.field, styles.knowledgeField]} />
+          <Pressable
+            disabled={!knowledgeTitle.trim() || !knowledgeContent.trim()}
+            onPress={() => {
+              if (!knowledgeTitle.trim() || !knowledgeContent.trim()) return;
+              addKnowledge({ title: knowledgeTitle.trim(), kind: 'text', content: knowledgeContent.trim().slice(0, 10000) });
+            }}
+            style={[styles.secondaryBtn, (!knowledgeTitle.trim() || !knowledgeContent.trim()) && styles.disabled]}
+          ><Text style={styles.secondaryBtnText}>Thêm ghi chú kiến thức</Text></Pressable>
+          <TextInput value={knowledgeLink} onChangeText={setKnowledgeLink} placeholder="https:// liên kết tài liệu" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="url" style={styles.field} />
+          <View style={styles.knowledgeActions}>
+            <Pressable disabled={extracting || !knowledgeLink.trim()} onPress={() => void onAddKnowledgeLink()} style={[styles.secondaryBtn, (extracting || !knowledgeLink.trim()) && styles.disabled]}>
+              <View style={styles.iconButtonContent}><Link2 size={14} color={colors.primary} /><Text style={styles.secondaryBtnText}>{extracting ? 'Đang đọc...' : 'Thêm liên kết'}</Text></View>
+            </Pressable>
+            <Pressable disabled={extracting} onPress={() => void onAddKnowledgeFile()} style={[styles.secondaryBtn, extracting && styles.disabled]}>
+              <View style={styles.iconButtonContent}><FilePlus2 size={14} color={colors.primary} /><Text style={styles.secondaryBtnText}>Tải tài liệu</Text></View>
             </Pressable>
           </View>
+          {knowledge.map((item) => (
+            <View key={item.id} style={styles.knowledgeRow}>
+              <View style={styles.cardCopy}><Text numberOfLines={1} style={styles.knowledgeName}>{item.title}</Text><Text style={styles.cardMeta}>{item.kind === 'file' ? 'Tệp' : item.kind === 'link' ? 'Liên kết' : 'Ghi chú'}</Text></View>
+              <Pressable accessibilityLabel={`Xóa ${item.title}`} onPress={() => setKnowledge((prev) => prev.filter((row) => row.id !== item.id))} hitSlop={8}><Trash2 size={15} color="#C74848" /></Pressable>
+            </View>
+          ))}
         </View>
-      </Modal>
+      </FullScreenFormModal>
     </ScrollView>
   );
 }
@@ -502,11 +500,7 @@ const styles = StyleSheet.create({
   composerInput: { flex: 1, backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: colors.ink },
   sendBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.45 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.white, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, paddingBottom: 28, gap: 10, maxHeight: '92%' },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   editorFields: { gap: 10, paddingBottom: 8 },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', marginBottom: 4 },
   fieldLabel: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 3 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 12, color: colors.ink },
   fieldMulti: { minHeight: 86, textAlignVertical: 'top' },
@@ -522,7 +516,7 @@ const styles = StyleSheet.create({
   toneChipActive: { backgroundColor: '#EAF2FF', borderWidth: 1, borderColor: colors.primary },
   toneText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
   toneTextActive: { color: colors.primary, fontWeight: '700' },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   submitBtnText: { color: colors.white, fontSize: 13, fontWeight: '700' },
 });
 

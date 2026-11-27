@@ -4,6 +4,7 @@ import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/Modu
 import { BranchAppIcon } from '@/components/OverviewTabIcons';
 import { PASTEL_BACKDROP_TOP_COLOR, PastelBackdrop } from '@/components/PastelBackdrop';
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import type { FeatureScreenProps } from '@/features/modules/featureScreenRegistry';
@@ -743,84 +744,156 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
       <Text style={styles.section}>Dự án</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}><Chip label="Mọi dự án" selected={workerProjectFilter === 'all'} onPress={() => setWorkerProjectFilter('all')} />{projects.map((project) => <Chip key={project._id} label={project.name} selected={workerProjectFilter === project._id} onPress={() => setWorkerProjectFilter(project._id)} />)}</ScrollView>
       <View style={styles.row}><DateTimeField label="Tiếp nhận từ" mode="date" value={registrationFrom} onChange={setRegistrationFrom} allowClear /><DateTimeField label="Đến ngày" mode="date" value={registrationTo} onChange={setRegistrationTo} allowClear /></View>
     </ScrollView><View style={styles.toolbar}><Action label="Xóa bộ lọc" onPress={() => { setStatusFilter('all'); setLaborTypeFilter('all'); setWorkerProjectFilter('all'); setRegistrationFrom(''); setRegistrationTo(''); }} /><View style={{ flex: 1 }} /><Action label="Xong" onPress={() => setWorkerFiltersOpen(false)} primary /></View></View></View></Modal>
-    <Modal visible={workerModal} animationType="slide" onRequestClose={() => setWorkerModal(false)}><View style={styles.modal}><ModalHeader title={editingWorker ? 'Cập nhật hồ sơ lao động' : 'Thêm lao động'} onClose={() => setWorkerModal(false)} /><ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-      <Field label="Họ và tên *" value={workerForm.fullName} onChangeText={(value) => setWorkerForm((current) => ({ ...current, fullName: value }))} /><Field label="Số điện thoại *" value={workerForm.phone || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, phone: value }))} keyboardType="phone-pad" /><Field label="Email" value={workerForm.email || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, email: value }))} keyboardType="email-address" /><Text style={styles.label}>Đối tác giới thiệu (tùy chọn)</Text><Pressable disabled={laborPartnersLoading || activeLaborPartners.length === 0} onPress={() => { setLaborPartnerSearch(''); setLaborPartnerPickerOpen(true); }} style={[styles.partnerSelect, (laborPartnersLoading || activeLaborPartners.length === 0) && styles.disabled]}><Text numberOfLines={1} style={styles.partnerSelectText}>{selectedLaborPartner ? `${selectedLaborPartner.code} · ${selectedLaborPartner.name}` : laborPartnersLoading ? 'Đang tải đối tác...' : 'Không chọn đối tác'}</Text><ChevronDown size={14} color={colors.muted} /></Pressable>{laborPartnerLoadError ? <PopupError error={laborPartnerLoadError} /> : !laborPartnersLoading && activeLaborPartners.length === 0 ? <Text style={styles.muted}>Chưa có đối tác lao động đang hoạt động.</Text> : null}<Field label="CCCD/CMND" value={workerForm.idCard || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, idCard: value }))} /><DateTimeField label="Ngày sinh" mode="date" value={workerForm.birthday || ''} onChange={(value) => setWorkerForm((current) => ({ ...current, birthday: value }))} allowClear /><Field label="Địa chỉ" value={workerForm.address || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, address: value }))} /><DateTimeField label="Ngày đăng ký" mode="date" value={workerForm.registrationDate || ''} onChange={(value) => setWorkerForm((current) => ({ ...current, registrationDate: value }))} />
-      <Text style={styles.label}>Loại lao động</Text><View style={styles.chips}>{(['official', 'seasonal', 'foreign'] as const).map((value) => <Chip key={value} label={laborTypeLabel(value)} selected={workerForm.laborType === value} onPress={() => setWorkerForm((current) => ({ ...current, laborType: value }))} />)}</View><Text style={styles.label}>Trạng thái</Text><View style={styles.chips}>{(['active', 'inactive', 'placed'] as const).map((value) => <Chip key={value} label={workerStatusLabel(value)} selected={workerForm.status === value} onPress={() => setWorkerForm((current) => ({ ...current, status: value }))} />)}</View>
-      <Field label="Quốc tịch" value={workerForm.nationality || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, nationality: value }))} /><Field label="Số giấy phép lao động" value={workerForm.workPermitNumber || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, workPermitNumber: value }))} /><DateTimeField label="Hạn giấy phép" mode="date" value={workerForm.workPermitExpiry || ''} onChange={(value) => setWorkerForm((current) => ({ ...current, workPermitExpiry: value }))} allowClear /><Field label="Ghi chú" value={workerForm.note || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, note: value }))} multiline />
-      {workerFormError ? <PopupError error={workerFormError} /> : null}<Action label={busy ? 'Đang lưu…' : 'Lưu hồ sơ'} onPress={() => void saveWorkerForm()} disabled={!canManage || busy || laborPartnersLoading} primary />
-    </ScrollView></View></Modal>
+    <FullScreenFormModal
+      visible={workerModal}
+      title={editingWorker ? 'Cập nhật hồ sơ lao động' : 'Thêm lao động'}
+      onClose={() => setWorkerModal(false)}
+      footer={<Action label={busy ? 'Đang lưu…' : 'Lưu hồ sơ'} onPress={() => void saveWorkerForm()} disabled={!canManage || busy || laborPartnersLoading} primary />}
+    >
+      <View style={{ gap: 10 }}>
+        <Field label="Họ và tên *" value={workerForm.fullName} onChangeText={(value) => setWorkerForm((current) => ({ ...current, fullName: value }))} /><Field label="Số điện thoại *" value={workerForm.phone || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, phone: value }))} keyboardType="phone-pad" /><Field label="Email" value={workerForm.email || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, email: value }))} keyboardType="email-address" /><Text style={styles.label}>Đối tác giới thiệu (tùy chọn)</Text><Pressable disabled={laborPartnersLoading || activeLaborPartners.length === 0} onPress={() => { setLaborPartnerSearch(''); setLaborPartnerPickerOpen(true); }} style={[styles.partnerSelect, (laborPartnersLoading || activeLaborPartners.length === 0) && styles.disabled]}><Text numberOfLines={1} style={styles.partnerSelectText}>{selectedLaborPartner ? `${selectedLaborPartner.code} · ${selectedLaborPartner.name}` : laborPartnersLoading ? 'Đang tải đối tác...' : 'Không chọn đối tác'}</Text><ChevronDown size={14} color={colors.muted} /></Pressable>{laborPartnerLoadError ? <PopupError error={laborPartnerLoadError} /> : !laborPartnersLoading && activeLaborPartners.length === 0 ? <Text style={styles.muted}>Chưa có đối tác lao động đang hoạt động.</Text> : null}<Field label="CCCD/CMND" value={workerForm.idCard || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, idCard: value }))} /><DateTimeField label="Ngày sinh" mode="date" value={workerForm.birthday || ''} onChange={(value) => setWorkerForm((current) => ({ ...current, birthday: value }))} allowClear /><Field label="Địa chỉ" value={workerForm.address || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, address: value }))} /><DateTimeField label="Ngày đăng ký" mode="date" value={workerForm.registrationDate || ''} onChange={(value) => setWorkerForm((current) => ({ ...current, registrationDate: value }))} />
+        <Text style={styles.label}>Loại lao động</Text><View style={styles.chips}>{(['official', 'seasonal', 'foreign'] as const).map((value) => <Chip key={value} label={laborTypeLabel(value)} selected={workerForm.laborType === value} onPress={() => setWorkerForm((current) => ({ ...current, laborType: value }))} />)}</View><Text style={styles.label}>Trạng thái</Text><View style={styles.chips}>{(['active', 'inactive', 'placed'] as const).map((value) => <Chip key={value} label={workerStatusLabel(value)} selected={workerForm.status === value} onPress={() => setWorkerForm((current) => ({ ...current, status: value }))} />)}</View>
+        <Field label="Quốc tịch" value={workerForm.nationality || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, nationality: value }))} /><Field label="Số giấy phép lao động" value={workerForm.workPermitNumber || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, workPermitNumber: value }))} /><DateTimeField label="Hạn giấy phép" mode="date" value={workerForm.workPermitExpiry || ''} onChange={(value) => setWorkerForm((current) => ({ ...current, workPermitExpiry: value }))} allowClear /><Field label="Ghi chú" value={workerForm.note || ''} onChangeText={(value) => setWorkerForm((current) => ({ ...current, note: value }))} multiline />
+        {workerFormError ? <PopupError error={workerFormError} /> : null}
+      </View>
+    </FullScreenFormModal>
     <Modal visible={laborPartnerPickerOpen} transparent animationType="fade" onRequestClose={() => setLaborPartnerPickerOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Chọn đối tác giới thiệu" onClose={() => setLaborPartnerPickerOpen(false)} /><Field label="Tìm mã hoặc tên đối tác" value={laborPartnerSearch} onChangeText={setLaborPartnerSearch} placeholder="Nhập mã hoặc tên đối tác" /><ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled"><Pressable onPress={() => { setWorkerPartnerId(''); setLaborPartnerPickerOpen(false); }} style={[styles.branchOption, !workerPartnerId && styles.branchOptionSelected]}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Không chọn đối tác</Text></View>{!workerPartnerId && <Check size={17} color={colors.primary} />}</Pressable>{activeLaborPartners.filter((partner) => !laborPartnerSearch.trim() || normalize(`${partner.code} ${partner.name} ${partner.phone}`).includes(normalize(laborPartnerSearch))).map((partner) => { const selected = workerPartnerId === partner._id; return <Pressable key={partner._id} onPress={() => { setWorkerPartnerId(partner._id); setWorkerFormError(''); setLaborPartnerPickerOpen(false); }} style={[styles.branchOption, selected && styles.branchOptionSelected]}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{partner.code} · {partner.name}</Text><Text style={styles.muted}>{partner.phone}</Text></View>{selected && <Check size={17} color={colors.primary} />}</Pressable>; })}{!activeLaborPartners.some((partner) => !laborPartnerSearch.trim() || normalize(`${partner.code} ${partner.name} ${partner.phone}`).includes(normalize(laborPartnerSearch))) && <Empty text="Không tìm thấy đối tác phù hợp." />}</ScrollView></View></View></Modal>
-    <Modal visible={workerDetail !== null} transparent animationType="slide" onRequestClose={() => setWorkerDetail(null)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Chi tiết lao động" onClose={() => setWorkerDetail(null)} /><ScrollView contentContainerStyle={styles.form}>{workerDetail && <><Text style={styles.cardTitle}>{workerDetail.fullName}</Text><Detail label="Trạng thái" value={workerStatusLabel(workerDetail.status)} /><Detail label="Loại lao động" value={laborTypeLabel(workerDetail.laborType)} /><Detail label="Điện thoại" value={workerDetail.phone} /><Detail label="Email" value={workerDetail.email} /><Detail label="CCCD/CMND" value={workerDetail.idCard} /><Detail label="Ngày sinh" value={workerDetail.birthday?.slice(0, 10)} /><Detail label="Địa chỉ" value={workerDetail.address} /><Detail label="Quốc tịch" value={workerDetail.nationality} /><Detail label="Giấy phép" value={workerDetail.workPermitNumber} /><Detail label="Hạn giấy phép" value={workerDetail.workPermitExpiry?.slice(0, 10)} /><Detail label="Ngày đăng ký" value={workerDetail.registrationDate?.slice(0, 10)} /><Detail label="Đối tác giới thiệu" value={workerDetail.partnerName || workerDetail.partnerCode} />{Object.entries(workerDetail.customFields || {}).map(([key, value]) => <Detail key={key} label={key} value={typeof value === 'string' ? value : JSON.stringify(value)} />)}<Detail label="Ghi chú" value={workerDetail.note} />{canManage && <Action label="Chỉnh sửa" onPress={() => openWorkerEdit(workerDetail)} primary />}</>}</ScrollView></View></View></Modal>
-    <Modal visible={importPreview !== null} transparent animationType="slide" onRequestClose={() => setImportPreview(null)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Xem trước nhập lao động" onClose={() => setImportPreview(null)} /><Text style={styles.label}>Gán dự án cho lao động vừa nhập</Text><ScrollView horizontal contentContainerStyle={styles.chips}><Chip label="Không gán" selected={!importProjectId} onPress={() => setImportProjectId('')} />{projects.map((project) => <Chip key={project._id} label={project.name} selected={importProjectId === project._id} onPress={() => setImportProjectId(project._id)} />)}</ScrollView><ScrollView style={{ maxHeight: 390 }} contentContainerStyle={styles.form}>{importPreview?.map((item) => <View key={item.row} style={styles.card}><Text style={styles.cardTitle}>Dòng {item.row}: {item.worker.fullName || 'Thiếu tên'}</Text><Text style={item.error ? styles.error : styles.muted}>{item.error || `${item.worker.phone}${item.worker.partnerCode ? ` · Đối tác ${item.worker.partnerCode}` : ''}`}</Text><Text style={styles.muted}>{item.worker.email || item.worker.idCard || item.worker.address || ''}</Text></View>)}</ScrollView><View style={styles.cardActions}><Action label="Đóng" onPress={() => setImportPreview(null)} /><Action label={`Nhập ${importPreview?.filter((item) => !item.error).length || 0} dòng hợp lệ`} onPress={() => void commitWorkerImport()} primary disabled={!importPreview?.some((item) => !item.error) || busy} /></View></View></View></Modal>
+    <FullScreenFormModal
+      visible={workerDetail !== null}
+      title="Chi tiết lao động"
+      onClose={() => setWorkerDetail(null)}
+      footer={workerDetail && canManage ? <Action label="Chỉnh sửa" onPress={() => openWorkerEdit(workerDetail)} primary /> : undefined}
+    >
+      <View style={{ gap: 10 }}>{workerDetail && <><Text style={styles.cardTitle}>{workerDetail.fullName}</Text><Detail label="Trạng thái" value={workerStatusLabel(workerDetail.status)} /><Detail label="Loại lao động" value={laborTypeLabel(workerDetail.laborType)} /><Detail label="Điện thoại" value={workerDetail.phone} /><Detail label="Email" value={workerDetail.email} /><Detail label="CCCD/CMND" value={workerDetail.idCard} /><Detail label="Ngày sinh" value={workerDetail.birthday?.slice(0, 10)} /><Detail label="Địa chỉ" value={workerDetail.address} /><Detail label="Quốc tịch" value={workerDetail.nationality} /><Detail label="Giấy phép" value={workerDetail.workPermitNumber} /><Detail label="Hạn giấy phép" value={workerDetail.workPermitExpiry?.slice(0, 10)} /><Detail label="Ngày đăng ký" value={workerDetail.registrationDate?.slice(0, 10)} /><Detail label="Đối tác giới thiệu" value={workerDetail.partnerName || workerDetail.partnerCode} />{Object.entries(workerDetail.customFields || {}).map(([key, value]) => <Detail key={key} label={key} value={typeof value === 'string' ? value : JSON.stringify(value)} />)}<Detail label="Ghi chú" value={workerDetail.note} /></>}</View>
+    </FullScreenFormModal>
+    <FullScreenFormModal
+      visible={importPreview !== null}
+      title="Xem trước nhập lao động"
+      onClose={() => setImportPreview(null)}
+      footer={<View style={styles.cardActions}><Action label="Đóng" onPress={() => setImportPreview(null)} /><Action label={`Nhập ${importPreview?.filter((item) => !item.error).length || 0} dòng hợp lệ`} onPress={() => void commitWorkerImport()} primary disabled={!importPreview?.some((item) => !item.error) || busy} /></View>}
+    >
+      <View style={{ gap: 10 }}>
+        <Text style={styles.label}>Gán dự án cho lao động vừa nhập</Text>
+        <ScrollView horizontal contentContainerStyle={styles.chips}><Chip label="Không gán" selected={!importProjectId} onPress={() => setImportProjectId('')} />{projects.map((project) => <Chip key={project._id} label={project.name} selected={importProjectId === project._id} onPress={() => setImportProjectId(project._id)} />)}</ScrollView>
+        {importPreview?.map((item) => <View key={item.row} style={styles.card}><Text style={styles.cardTitle}>Dòng {item.row}: {item.worker.fullName || 'Thiếu tên'}</Text><Text style={item.error ? styles.error : styles.muted}>{item.error || `${item.worker.phone}${item.worker.partnerCode ? ` · Đối tác ${item.worker.partnerCode}` : ''}`}</Text><Text style={styles.muted}>{item.worker.email || item.worker.idCard || item.worker.address || ''}</Text></View>)}
+      </View>
+    </FullScreenFormModal>
 
-    <Modal visible={projectModal} animationType="slide" onRequestClose={() => setProjectModal(false)}><View style={styles.modal}><ModalHeader title={editingProject ? 'Sửa dự án' : 'Tạo dự án'} onClose={() => setProjectModal(false)} /><ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-      <Field label="Mã dự án *" value={projectForm.code} onChangeText={(value) => setProjectForm((current) => ({ ...current, code: value }))} /><Field label="Tên dự án *" value={projectForm.name} onChangeText={(value) => setProjectForm((current) => ({ ...current, name: value }))} /><Field label="Số lao động tối đa" value={String(projectForm.quota)} onChangeText={(value) => setProjectForm((current) => ({ ...current, quota: Number(value.replace(/\D/g, '')) || 0 }))} keyboardType="number-pad" /><Field label="Địa điểm" value={projectForm.location || ''} onChangeText={(value) => setProjectForm((current) => ({ ...current, location: value }))} /><View style={styles.row}><Text style={styles.label}>Chấm công theo vị trí GPS</Text><Chip label={projectForm.geoLocation ? 'Đang bật' : 'Đã tắt'} selected={Boolean(projectForm.geoLocation)} onPress={() => setProjectForm((current) => ({ ...current, geoLocation: current.geoLocation ? null : { latitude: 0, longitude: 0, radiusMeters: 100 } }))} /></View>{projectForm.geoLocation && <View style={styles.row}><Field label="Vĩ độ" value={String(projectForm.geoLocation.latitude)} onChangeText={(value) => setProjectForm((current) => ({ ...current, geoLocation: current.geoLocation ? { ...current.geoLocation, latitude: Number(value) || 0 } : null }))} keyboardType="decimal-pad" /><Field label="Kinh độ" value={String(projectForm.geoLocation.longitude)} onChangeText={(value) => setProjectForm((current) => ({ ...current, geoLocation: current.geoLocation ? { ...current.geoLocation, longitude: Number(value) || 0 } : null }))} keyboardType="decimal-pad" /><Field label="Bán kính (m)" value={String(projectForm.geoLocation.radiusMeters)} onChangeText={(value) => setProjectForm((current) => ({ ...current, geoLocation: current.geoLocation ? { ...current.geoLocation, radiusMeters: Number(value) || 0 } : null }))} keyboardType="number-pad" /></View>}<DateTimeField label="Ngày bắt đầu" mode="date" value={projectForm.startDate} onChange={(value) => setProjectForm((current) => ({ ...current, startDate: value }))} /><DateTimeField label="Ngày kết thúc" mode="date" value={projectForm.endDate} onChange={(value) => setProjectForm((current) => ({ ...current, endDate: value }))} /><View style={styles.row}><DateTimeField label="Giờ bắt đầu" mode="time" value={projectForm.startTime} onChange={(value) => setProjectForm((current) => ({ ...current, startTime: value }))} /><DateTimeField label="Giờ kết thúc" mode="time" value={projectForm.endTime} onChange={(value) => setProjectForm((current) => ({ ...current, endTime: value }))} /></View>
-      <Text style={styles.label}>Ngày làm trong tuần</Text><View style={styles.chips}>{['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((label, day) => <Chip key={day} label={label} selected={projectForm.daysOfWeek.includes(day)} onPress={() => setProjectForm((current) => ({ ...current, daysOfWeek: current.daysOfWeek.includes(day) ? current.daysOfWeek.filter((value) => value !== day) : [...current.daysOfWeek, day].sort() }))} />)}</View>
-      <Text style={styles.label}>Trạng thái</Text><View style={styles.chips}>{(['planned', 'active', 'completed'] as const).map((value) => <Chip key={value} label={projectStatusLabel(value)} selected={projectForm.status === value} onPress={() => setProjectForm((current) => ({ ...current, status: value }))} />)}</View><Field label="Ghi chú" value={projectForm.note || ''} onChangeText={(value) => setProjectForm((current) => ({ ...current, note: value }))} multiline /><Action label="Lưu dự án" onPress={() => void saveProjectForm()} primary disabled={!canManage || busy} />
-    </ScrollView></View></Modal>
-    <Modal visible={projectDetail !== null} transparent animationType="slide" onRequestClose={() => setProjectDetail(null)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title={projectDetail?.name || 'Chi tiết dự án'} onClose={() => setProjectDetail(null)} /><ScrollView contentContainerStyle={styles.form}>{projectDetail && <>
-      <Detail label="Mã dự án" value={projectDetail.code} /><Detail label="Trạng thái" value={projectStatusLabel(projectDetail.status)} /><Detail label="Địa điểm" value={projectDetail.location} /><Detail label="Thời gian" value={`${projectDetail.startDate} – ${projectDetail.endDate} · ${projectDetail.startTime}–${projectDetail.endTime}`} /><Detail label="Sức chứa" value={`${projectDetail.workerIds.length}/${projectDetail.quota || '∞'}`} /><Detail label="Ngày làm" value={projectDetail.daysOfWeek.map((day) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][day]).join(', ')} />{projectDetail.geoLocation && <Detail label="Vùng chấm công GPS" value={`${projectDetail.geoLocation.latitude}, ${projectDetail.geoLocation.longitude} · bán kính ${projectDetail.geoLocation.radiusMeters} m`} />}
-      <Text style={styles.section}>Lao động trong dự án</Text>{projectDetail.workerIds.map((id) => { const worker = workers.find((item) => item._id === id); return <View key={id} style={styles.row}><Text style={[styles.muted, { flex: 1 }]}>{worker?.fullName || id} · {worker?.phone || ''}</Text>{canManage && <Pressable onPress={() => void detachWorker(projectDetail, id)}><X size={16} color="#B42318" /></Pressable>}</View>; })}
-      <View style={styles.cardActions}><Action label="Chấm công / QR" icon={<QrCode size={13} color={colors.primary} />} onPress={() => void openAttendance(projectDetail)} /><Action label="Thêm lao động" onPress={() => { setProjectWorkerSelection([]); setProjectWorkerPicker(true); }} disabled={!canManage} /><Action label="Sửa" icon={<Pencil size={13} color={colors.primary} />} onPress={() => openProjectEdit(projectDetail)} disabled={!canManage} /><Action label="Xóa" danger onPress={() => confirmProjectDelete(projectDetail)} disabled={!canManage} /></View>
-    </>}</ScrollView></View></View></Modal>
+    <FullScreenFormModal
+      visible={projectModal}
+      title={editingProject ? 'Sửa dự án' : 'Tạo dự án'}
+      onClose={() => setProjectModal(false)}
+      footer={<Action label="Lưu dự án" onPress={() => void saveProjectForm()} primary disabled={!canManage || busy} />}
+    >
+      <View style={{ gap: 10 }}>
+        <Field label="Mã dự án *" value={projectForm.code} onChangeText={(value) => setProjectForm((current) => ({ ...current, code: value }))} /><Field label="Tên dự án *" value={projectForm.name} onChangeText={(value) => setProjectForm((current) => ({ ...current, name: value }))} /><Field label="Số lao động tối đa" value={String(projectForm.quota)} onChangeText={(value) => setProjectForm((current) => ({ ...current, quota: Number(value.replace(/\D/g, '')) || 0 }))} keyboardType="number-pad" /><Field label="Địa điểm" value={projectForm.location || ''} onChangeText={(value) => setProjectForm((current) => ({ ...current, location: value }))} /><View style={styles.row}><Text style={styles.label}>Chấm công theo vị trí GPS</Text><Chip label={projectForm.geoLocation ? 'Đang bật' : 'Đã tắt'} selected={Boolean(projectForm.geoLocation)} onPress={() => setProjectForm((current) => ({ ...current, geoLocation: current.geoLocation ? null : { latitude: 0, longitude: 0, radiusMeters: 100 } }))} /></View>{projectForm.geoLocation && <View style={styles.row}><Field label="Vĩ độ" value={String(projectForm.geoLocation.latitude)} onChangeText={(value) => setProjectForm((current) => ({ ...current, geoLocation: current.geoLocation ? { ...current.geoLocation, latitude: Number(value) || 0 } : null }))} keyboardType="decimal-pad" /><Field label="Kinh độ" value={String(projectForm.geoLocation.longitude)} onChangeText={(value) => setProjectForm((current) => ({ ...current, geoLocation: current.geoLocation ? { ...current.geoLocation, longitude: Number(value) || 0 } : null }))} keyboardType="decimal-pad" /><Field label="Bán kính (m)" value={String(projectForm.geoLocation.radiusMeters)} onChangeText={(value) => setProjectForm((current) => ({ ...current, geoLocation: current.geoLocation ? { ...current.geoLocation, radiusMeters: Number(value) || 0 } : null }))} keyboardType="number-pad" /></View>}<DateTimeField label="Ngày bắt đầu" mode="date" value={projectForm.startDate} onChange={(value) => setProjectForm((current) => ({ ...current, startDate: value }))} /><DateTimeField label="Ngày kết thúc" mode="date" value={projectForm.endDate} onChange={(value) => setProjectForm((current) => ({ ...current, endDate: value }))} /><View style={styles.row}><DateTimeField label="Giờ bắt đầu" mode="time" value={projectForm.startTime} onChange={(value) => setProjectForm((current) => ({ ...current, startTime: value }))} /><DateTimeField label="Giờ kết thúc" mode="time" value={projectForm.endTime} onChange={(value) => setProjectForm((current) => ({ ...current, endTime: value }))} /></View>
+        <Text style={styles.label}>Ngày làm trong tuần</Text><View style={styles.chips}>{['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((label, day) => <Chip key={day} label={label} selected={projectForm.daysOfWeek.includes(day)} onPress={() => setProjectForm((current) => ({ ...current, daysOfWeek: current.daysOfWeek.includes(day) ? current.daysOfWeek.filter((value) => value !== day) : [...current.daysOfWeek, day].sort() }))} />)}</View>
+        <Text style={styles.label}>Trạng thái</Text><View style={styles.chips}>{(['planned', 'active', 'completed'] as const).map((value) => <Chip key={value} label={projectStatusLabel(value)} selected={projectForm.status === value} onPress={() => setProjectForm((current) => ({ ...current, status: value }))} />)}</View><Field label="Ghi chú" value={projectForm.note || ''} onChangeText={(value) => setProjectForm((current) => ({ ...current, note: value }))} multiline />
+      </View>
+    </FullScreenFormModal>
+    <FullScreenFormModal
+      visible={projectDetail !== null}
+      title={projectDetail?.name || 'Chi tiết dự án'}
+      onClose={() => setProjectDetail(null)}
+    >
+      <View style={{ gap: 10 }}>{projectDetail && <>
+        <Detail label="Mã dự án" value={projectDetail.code} /><Detail label="Trạng thái" value={projectStatusLabel(projectDetail.status)} /><Detail label="Địa điểm" value={projectDetail.location} /><Detail label="Thời gian" value={`${projectDetail.startDate} – ${projectDetail.endDate} · ${projectDetail.startTime}–${projectDetail.endTime}`} /><Detail label="Sức chứa" value={`${projectDetail.workerIds.length}/${projectDetail.quota || '∞'}`} /><Detail label="Ngày làm" value={projectDetail.daysOfWeek.map((day) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][day]).join(', ')} />{projectDetail.geoLocation && <Detail label="Vùng chấm công GPS" value={`${projectDetail.geoLocation.latitude}, ${projectDetail.geoLocation.longitude} · bán kính ${projectDetail.geoLocation.radiusMeters} m`} />}
+        <Text style={styles.section}>Lao động trong dự án</Text>{projectDetail.workerIds.map((id) => { const worker = workers.find((item) => item._id === id); return <View key={id} style={styles.row}><Text style={[styles.muted, { flex: 1 }]}>{worker?.fullName || id} · {worker?.phone || ''}</Text>{canManage && <Pressable onPress={() => void detachWorker(projectDetail, id)}><X size={16} color="#B42318" /></Pressable>}</View>; })}
+        <View style={styles.cardActions}><Action label="Chấm công / QR" icon={<QrCode size={13} color={colors.primary} />} onPress={() => void openAttendance(projectDetail)} /><Action label="Thêm lao động" onPress={() => { setProjectWorkerSelection([]); setProjectWorkerPicker(true); }} disabled={!canManage} /><Action label="Sửa" icon={<Pencil size={13} color={colors.primary} />} onPress={() => openProjectEdit(projectDetail)} disabled={!canManage} /><Action label="Xóa" danger onPress={() => confirmProjectDelete(projectDetail)} disabled={!canManage} /></View>
+      </>}</View>
+    </FullScreenFormModal>
     <Modal visible={projectWorkerPicker} transparent animationType="fade" onRequestClose={() => setProjectWorkerPicker(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Thêm lao động vào dự án" onClose={() => setProjectWorkerPicker(false)} /><ScrollView style={{ maxHeight: 400 }}>{workers.filter((worker) => !projectDetail?.workerIds.includes(worker._id)).map((worker) => <Pressable key={worker._id} onPress={() => setProjectWorkerSelection((current) => current.includes(worker._id) ? current.filter((id) => id !== worker._id) : [...current, worker._id])} style={styles.row}><View style={[styles.checkbox, projectWorkerSelection.includes(worker._id) && styles.checkboxSelected]}>{projectWorkerSelection.includes(worker._id) && <Check color={colors.white} size={13} />}</View><Text style={styles.cardTitle}>{worker.fullName} · {worker.phone}</Text></Pressable>)}</ScrollView><Action label={`Thêm ${projectWorkerSelection.length} người`} onPress={() => void saveProjectWorkers()} disabled={!projectWorkerSelection.length || busy} primary /></View></View></Modal>
 
-    <Modal visible={attendanceProject !== null} animationType="slide" onRequestClose={() => void closeAttendance()}>
-      <View style={styles.modal}>
-        <ModalHeader title={`Chấm công · ${attendanceProject?.code || ''}`} onClose={() => void closeAttendance()} />
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.row}>
-            <Field label="Từ ngày" value={attendanceFrom} onChangeText={setAttendanceFrom} />
-            <Field label="Đến ngày" value={attendanceTo} onChangeText={setAttendanceTo} />
-          </View>
+    <FullScreenFormModal
+      visible={attendanceProject !== null}
+      title={`Chấm công · ${attendanceProject?.code || ''}`}
+      onClose={() => void closeAttendance()}
+    >
+      <View style={{ gap: 10 }}>
+        <View style={styles.row}>
+          <Field label="Từ ngày" value={attendanceFrom} onChangeText={setAttendanceFrom} />
+          <Field label="Đến ngày" value={attendanceTo} onChangeText={setAttendanceTo} />
+        </View>
+        <View style={styles.cardActions}>
+          <Action label="Tải chấm công" onPress={() => void loadAttendance()} />
+          <Action label={busy ? 'Đang tạo QR…' : qrSession ? 'Tạo phiên QR mới' : 'Tạo QR 60 phút'} icon={<QrCode size={13} color={colors.primary} />} onPress={() => void startQrSession()} disabled={!canManage || busy} />
+        </View>
+        {error ? <PopupError error={error} /> : null}
+        {qrSession && <View style={[styles.card, { alignItems: 'center' }]}>
+          <Text style={styles.cardTitle}>Điểm danh QR · Đã chấm công: {qrCheckedIn}</Text>
+          <QRCode value={qrSession.checkinUrl} size={168} backgroundColor={colors.white} color={colors.ink} />
+          <Pressable onPress={() => void openQrCheckinLink()} style={styles.qrLinkBox} accessibilityRole="link" accessibilityLabel="Mở link chấm công">
+            <Text style={styles.qrLinkLabel}>Link chấm công · chạm để mở</Text>
+            <Text selectable style={styles.qrLinkText}>{qrSession.checkinUrl}</Text>
+          </Pressable>
+          <Text style={styles.muted}>Hết hạn: {new Date(qrSession.expiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</Text>
           <View style={styles.cardActions}>
-            <Action label="Tải chấm công" onPress={() => void loadAttendance()} />
-            <Action label={busy ? 'Đang tạo QR…' : qrSession ? 'Tạo phiên QR mới' : 'Tạo QR 60 phút'} icon={<QrCode size={13} color={colors.primary} />} onPress={() => void startQrSession()} disabled={!canManage || busy} />
+            <Action label="Chia sẻ liên kết" onPress={() => void Share.share({ message: qrSession.checkinUrl })} />
+            <Action label="Đóng phiên" danger onPress={() => void stopQrSession()} />
           </View>
-          {error ? <PopupError error={error} /> : null}
-          {qrSession && <View style={[styles.card, { alignItems: 'center' }]}>
-            <Text style={styles.cardTitle}>Điểm danh QR · Đã chấm công: {qrCheckedIn}</Text>
-            <QRCode value={qrSession.checkinUrl} size={168} backgroundColor={colors.white} color={colors.ink} />
-            <Pressable onPress={() => void openQrCheckinLink()} style={styles.qrLinkBox} accessibilityRole="link" accessibilityLabel="Mở link chấm công">
-              <Text style={styles.qrLinkLabel}>Link chấm công · chạm để mở</Text>
-              <Text selectable style={styles.qrLinkText}>{qrSession.checkinUrl}</Text>
-            </Pressable>
-            <Text style={styles.muted}>Hết hạn: {new Date(qrSession.expiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</Text>
-            <View style={styles.cardActions}>
-              <Action label="Chia sẻ liên kết" onPress={() => void Share.share({ message: qrSession.checkinUrl })} />
-              <Action label="Đóng phiên" danger onPress={() => void stopQrSession()} />
-            </View>
-            {qrWorkers.map((worker) => <View key={worker.workerId} style={[styles.row, { alignSelf: 'stretch', justifyContent: 'space-between' }]}>
-              <Text style={styles.muted}>{worker.fullName} · {worker.phone}</Text>
-              <Text style={styles.muted}>{new Date(worker.checkinAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</Text>
-            </View>)}
-          </View>}
-          <Text style={styles.section}>Chấm công thủ công</Text>
-          {attendanceProject?.workerIds.map((workerId) => {
-            const worker = workers.find((item) => item._id === workerId);
-            const log = attendance.find((item) => item.workerId === workerId);
-            return <View key={workerId} style={[styles.card, styles.row]}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>{worker?.fullName || workerId}</Text>
-                <Text style={styles.muted}>{worker?.phone || 'Chưa có số điện thoại'}</Text>
-              </View>
-              <Action label={log?.checkIn ? 'Ghi nhận tiếp' : 'Check-in'} onPress={() => void manualCheckIn(workerId)} disabled={!canManage || busy} />
-            </View>;
-          })}
-          {attendance.map((item) => <View key={item._id} style={styles.card}>
-            <Text style={styles.cardTitle}>{workers.find((worker) => worker._id === item.workerId)?.fullName || item.workerId} · {item.date}</Text>
-            <Text style={styles.muted}>Vào {item.checkIn?.time || '—'} · Ra {item.checkOut?.time || '—'} · {attendanceLabel(item.status)} · {item.workedMinutes ?? 0} phút</Text>
-            {canManage && <Action label="Sửa chấm công" onPress={() => openAttendanceEdit(item)} />}
+          {qrWorkers.map((worker) => <View key={worker.workerId} style={[styles.row, { alignSelf: 'stretch', justifyContent: 'space-between' }]}>
+            <Text style={styles.muted}>{worker.fullName} · {worker.phone}</Text>
+            <Text style={styles.muted}>{new Date(worker.checkinAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</Text>
           </View>)}
-          {!attendance.length && <Empty text="Không có dữ liệu chấm công trong khoảng ngày." />}
-        </ScrollView>
+        </View>}
+        <Text style={styles.section}>Chấm công thủ công</Text>
+        {attendanceProject?.workerIds.map((workerId) => {
+          const worker = workers.find((item) => item._id === workerId);
+          const log = attendance.find((item) => item.workerId === workerId);
+          return <View key={workerId} style={[styles.card, styles.row]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>{worker?.fullName || workerId}</Text>
+              <Text style={styles.muted}>{worker?.phone || 'Chưa có số điện thoại'}</Text>
+            </View>
+            <Action label={log?.checkIn ? 'Ghi nhận tiếp' : 'Check-in'} onPress={() => void manualCheckIn(workerId)} disabled={!canManage || busy} />
+          </View>;
+        })}
+        {attendance.map((item) => <View key={item._id} style={styles.card}>
+          <Text style={styles.cardTitle}>{workers.find((worker) => worker._id === item.workerId)?.fullName || item.workerId} · {item.date}</Text>
+          <Text style={styles.muted}>Vào {item.checkIn?.time || '—'} · Ra {item.checkOut?.time || '—'} · {attendanceLabel(item.status)} · {item.workedMinutes ?? 0} phút</Text>
+          {canManage && <Action label="Sửa chấm công" onPress={() => openAttendanceEdit(item)} />}
+        </View>)}
+        {!attendance.length && <Empty text="Không có dữ liệu chấm công trong khoảng ngày." />}
       </View>
-    </Modal>
-    <Modal visible={attendanceEdit !== null} transparent animationType="fade" onRequestClose={() => setAttendanceEdit(null)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Điều chỉnh chấm công" onClose={() => setAttendanceEdit(null)} /><Field label="Giờ vào" value={attendanceCheckIn} onChangeText={setAttendanceCheckIn} /><Field label="Giờ ra" value={attendanceCheckOut} onChangeText={setAttendanceCheckOut} /><Field label="Ghi chú" value={attendanceNote} onChangeText={setAttendanceNote} multiline /><Action label="Lưu điều chỉnh" onPress={() => void saveAttendanceEdit()} primary disabled={busy} /></View></View></Modal>
+    </FullScreenFormModal>
+    <FullScreenFormModal
+      visible={attendanceEdit !== null}
+      title="Điều chỉnh chấm công"
+      onClose={() => setAttendanceEdit(null)}
+      footer={<Action label="Lưu điều chỉnh" onPress={() => void saveAttendanceEdit()} primary disabled={busy} />}
+    >
+      <View style={{ gap: 10 }}>
+        <Field label="Giờ vào" value={attendanceCheckIn} onChangeText={setAttendanceCheckIn} /><Field label="Giờ ra" value={attendanceCheckOut} onChangeText={setAttendanceCheckOut} /><Field label="Ghi chú" value={attendanceNote} onChangeText={setAttendanceNote} multiline />
+      </View>
+    </FullScreenFormModal>
 
-    <Modal visible={contractModal !== null} animationType="slide" onRequestClose={() => setContractModal(null)}><View style={styles.modal}><ModalHeader title={contractModal === 'renew' ? 'Gia hạn hợp đồng' : contractModal === 'edit' ? 'Sửa hợp đồng' : 'Tạo hợp đồng'} onClose={() => setContractModal(null)} /><ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled"><Text style={styles.label}>Người lao động *</Text><ScrollView horizontal>{contractWorkersAvailable.map((worker) => <Chip key={worker._id} label={worker.fullName} selected={contractForm.workerId === worker._id} onPress={() => setContractForm((current) => ({ ...current, workerId: worker._id }))} />)}</ScrollView>{contractModal === 'create' && contractWorkersAvailable.length === 0 && <Text style={styles.muted}>Không còn lao động đủ điều kiện lập hợp đồng mới.</Text>}<Field label="Mã hợp đồng *" value={contractForm.code} onChangeText={(value) => setContractForm((current) => ({ ...current, code: value }))} /><Field label="Khách hàng / đơn vị sử dụng *" value={contractForm.clientName} onChangeText={(value) => setContractForm((current) => ({ ...current, clientName: value }))} /><DateTimeField label="Ngày bắt đầu" mode="date" value={contractForm.startDate} onChange={(value) => setContractForm((current) => ({ ...current, startDate: value }))} /><DateTimeField label="Ngày kết thúc" mode="date" value={contractForm.endDate} onChange={(value) => setContractForm((current) => ({ ...current, endDate: value }))} /><Field label="Ghi chú" value={contractForm.note || ''} onChangeText={(value) => setContractForm((current) => ({ ...current, note: value }))} multiline /><Action label={contractModal === 'renew' ? 'Tạo kỳ gia hạn' : 'Lưu hợp đồng'} onPress={() => void saveContractForm()} primary disabled={!canManage || busy} /></ScrollView></View></Modal>
-    <Modal visible={contractHistory !== null} transparent animationType="slide" onRequestClose={() => setContractHistory(null)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Lịch sử hợp đồng" onClose={() => setContractHistory(null)} /><ScrollView>{contractHistory?.map((item) => <View key={item._id} style={styles.card}><Text style={styles.cardTitle}>{item.code} · kỳ {item.sequence}</Text><Text style={styles.muted}>{item.startDate.slice(0, 10)} – {item.endDate.slice(0, 10)} · {contractStatusLabel(item.status)}</Text><Text style={styles.muted}>{item.clientName}</Text></View>)}</ScrollView></View></View></Modal>
-    <Modal visible={notificationModal} transparent animationType="fade" onRequestClose={() => { setNotificationModal(false); setNotificationError(''); }}><KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}><View style={styles.dialog}><ModalHeader title="Gửi thông báo" onClose={() => { setNotificationModal(false); setNotificationError(''); }} /><ScrollView style={{ maxHeight: 480 }} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled"><Field label="Tiêu đề" value={notificationTitle} onChangeText={(value) => { setNotificationTitle(value); setNotificationError(''); }} placeholder="Nhập tiêu đề thông báo" maxLength={120} /><Field label="Nội dung" value={notificationContent} onChangeText={(value) => { setNotificationContent(value); setNotificationError(''); }} placeholder="Nhập nội dung thông báo" multiline maxLength={4000} />{notificationError ? <PopupError error={notificationError} /> : null}<Action label={busy ? 'Đang gửi...' : 'Gửi thông báo'} icon={busy ? <ActivityIndicator size="small" color={colors.white} /> : <Send size={13} color={colors.white} />} onPress={() => void sendNotification()} primary disabled={!notificationTitle.trim() || !notificationContent.trim() || busy} /></ScrollView></View></KeyboardAvoidingView></Modal>
+    <FullScreenFormModal
+      visible={contractModal !== null}
+      title={contractModal === 'renew' ? 'Gia hạn hợp đồng' : contractModal === 'edit' ? 'Sửa hợp đồng' : 'Tạo hợp đồng'}
+      onClose={() => setContractModal(null)}
+      footer={<Action label={contractModal === 'renew' ? 'Tạo kỳ gia hạn' : 'Lưu hợp đồng'} onPress={() => void saveContractForm()} primary disabled={!canManage || busy} />}
+    >
+      <View style={{ gap: 10 }}>
+        <Text style={styles.label}>Người lao động *</Text><ScrollView horizontal>{contractWorkersAvailable.map((worker) => <Chip key={worker._id} label={worker.fullName} selected={contractForm.workerId === worker._id} onPress={() => setContractForm((current) => ({ ...current, workerId: worker._id }))} />)}</ScrollView>{contractModal === 'create' && contractWorkersAvailable.length === 0 && <Text style={styles.muted}>Không còn lao động đủ điều kiện lập hợp đồng mới.</Text>}<Field label="Mã hợp đồng *" value={contractForm.code} onChangeText={(value) => setContractForm((current) => ({ ...current, code: value }))} /><Field label="Khách hàng / đơn vị sử dụng *" value={contractForm.clientName} onChangeText={(value) => setContractForm((current) => ({ ...current, clientName: value }))} /><DateTimeField label="Ngày bắt đầu" mode="date" value={contractForm.startDate} onChange={(value) => setContractForm((current) => ({ ...current, startDate: value }))} /><DateTimeField label="Ngày kết thúc" mode="date" value={contractForm.endDate} onChange={(value) => setContractForm((current) => ({ ...current, endDate: value }))} /><Field label="Ghi chú" value={contractForm.note || ''} onChangeText={(value) => setContractForm((current) => ({ ...current, note: value }))} multiline />
+      </View>
+    </FullScreenFormModal>
+    <FullScreenFormModal
+      visible={contractHistory !== null}
+      title="Lịch sử hợp đồng"
+      onClose={() => setContractHistory(null)}
+    >
+      <View style={{ gap: 10 }}>{contractHistory?.map((item) => <View key={item._id} style={styles.card}><Text style={styles.cardTitle}>{item.code} · kỳ {item.sequence}</Text><Text style={styles.muted}>{item.startDate.slice(0, 10)} – {item.endDate.slice(0, 10)} · {contractStatusLabel(item.status)}</Text><Text style={styles.muted}>{item.clientName}</Text></View>)}</View>
+    </FullScreenFormModal>
+    <FullScreenFormModal
+      visible={notificationModal}
+      title="Gửi thông báo"
+      onClose={() => { setNotificationModal(false); setNotificationError(''); }}
+      footer={<Action label={busy ? 'Đang gửi...' : 'Gửi thông báo'} icon={busy ? <ActivityIndicator size="small" color={colors.white} /> : <Send size={13} color={colors.white} />} onPress={() => void sendNotification()} primary disabled={!notificationTitle.trim() || !notificationContent.trim() || busy} />}
+    >
+      <View style={{ gap: 10 }}>
+        <Field label="Tiêu đề" value={notificationTitle} onChangeText={(value) => { setNotificationTitle(value); setNotificationError(''); }} placeholder="Nhập tiêu đề thông báo" maxLength={120} /><Field label="Nội dung" value={notificationContent} onChangeText={(value) => { setNotificationContent(value); setNotificationError(''); }} placeholder="Nhập nội dung thông báo" multiline maxLength={4000} />{notificationError ? <PopupError error={notificationError} /> : null}
+      </View>
+    </FullScreenFormModal>
     {importPreview && <Text style={styles.muted}>Tệp nhập đã sẵn sàng.</Text>}
   </View>;
 }

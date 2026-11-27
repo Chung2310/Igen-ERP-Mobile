@@ -1,4 +1,5 @@
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -890,323 +891,305 @@ export function HrTrainingPanel({
   function renderCourseFormModal() {
     return (
       <>
-      <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setFormOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>
-                {editingCourse ? 'Cập nhật khóa học' : 'Tạo khóa học mới'}
-              </Text>
-              <Pressable onPress={() => setFormOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
-              <View style={{ gap: 8, paddingBottom: 14 }}>
-                <Text style={styles.label}>Tên khóa học *</Text>
-                <TextInput
-                  value={formTitle}
-                  onChangeText={setFormTitle}
-                  placeholder="VD: Quy chế bảo mật & văn hóa công ty"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <Text style={styles.label}>Mô tả tóm tắt</Text>
-                <TextInput
-                  value={formDesc}
-                  onChangeText={setFormDesc}
-                  multiline
-                  placeholder="Nội dung chính khóa học..."
-                  placeholderTextColor={colors.muted}
-                  style={[styles.field, { minHeight: 62, textAlignVertical: 'top' }]}
-                />
-
-                <Text style={styles.label}>Danh mục đào tạo</Text>
-                <View style={styles.wrapRow}>
-                  {CATEGORIES.map((cat) => {
-                    const active = formCategory === cat;
-                    return (
-                      <Pressable
-                        key={cat}
-                        onPress={() => setFormCategory(cat)}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <Text style={styles.label}>Thời lượng học</Text>
-                <TextInput
-                  value={formDuration}
-                  onChangeText={setFormDuration}
-                  placeholder="VD: 2 giờ 30 phút"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <View style={styles.switchRow}>
-                  <Text style={styles.label}>Khóa học bắt buộc</Text>
-                  <Switch
-                    value={formRequired}
-                    onValueChange={setFormRequired}
-                    trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                  />
-                </View>
-                <View style={styles.switchRow}>
-                  <Text style={styles.label}>Tự động giao khi có nhân sự mới</Text>
-                  <Switch
-                    value={formAutoOnboarding}
-                    onValueChange={setFormAutoOnboarding}
-                    trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                  />
-                </View>
-
-                {/* Lessons builder */}
-                <View style={styles.builderHeader}>
-                  <Text style={styles.label}>Bài giảng ({formLessons.length})</Text>
-                  <Pressable
-                    onPress={() => openLessonEditor()}
-                    style={styles.addSmallBtn}
-                  >
-                    <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm bài</Text></View>
-                  </Pressable>
-                </View>
-                {formLessons.map((les, idx) => (
-                  <View key={`lesson-${idx}`} style={styles.builderEntry}>
-                    <Pressable onPress={() => openLessonEditor(idx)} style={[styles.builderCard, styles.builderEntryMain]}>
-                      <View style={styles.headRow}>
-                        <Text style={styles.codeBadge}>Bài {idx + 1}</Text>
-                        <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
-                      </View>
-                      <Text numberOfLines={1} style={styles.rowTitle}>{les.title || 'Chưa có tên bài giảng'}</Text>
-                      <Text numberOfLines={1} style={styles.muted}>
-                        {les.type === 'video' || les.type === 'youtube' ? 'Video' : 'Văn bản / Tài liệu'}
-                        {les.url ? ` · ${les.url}` : ''}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setFormLessons((prev) => prev.filter((_, i) => i !== idx))}
-                      style={styles.deleteEntryBtn}
-                    >
-                      <Text style={styles.smallDelBtnText}>Xóa</Text>
-                    </Pressable>
-                  </View>
-                ))}
-
-                {/* Quiz builder */}
-                <View style={styles.builderHeader}>
-                  <Text style={styles.label}>Trắc nghiệm MCQ ({formQuizzes.length})</Text>
-                  <Pressable
-                    onPress={() => openQuizEditor()}
-                    style={styles.addSmallBtn}
-                  >
-                    <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm câu hỏi</Text></View>
-                  </Pressable>
-                </View>
-                {formQuizzes.map((q, qIdx) => (
-                  <View key={`quiz-${qIdx}`} style={styles.builderEntry}>
-                    <Pressable onPress={() => openQuizEditor(qIdx)} style={[styles.builderCard, styles.builderEntryMain]}>
-                      <View style={styles.headRow}>
-                        <Text style={styles.codeBadge}>Câu {qIdx + 1}</Text>
-                        <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
-                      </View>
-                      <Text numberOfLines={2} style={styles.rowTitle}>{q.question || 'Chưa có nội dung câu hỏi'}</Text>
-                      <Text numberOfLines={1} style={styles.muted}>
-                        {q.options.filter((option) => option.trim()).length} đáp án
-                        {q.options[q.correctOptionIndex]?.trim() ? ` · Đúng: ${q.options[q.correctOptionIndex].trim()}` : ''}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx))}
-                      style={styles.deleteEntryBtn}
-                    >
-                      <Text style={styles.smallDelBtnText}>Xóa</Text>
-                    </Pressable>
-                  </View>
-                ))}
-
-                <Pressable
-                  disabled={savingCourse}
-                  onPress={() => void handleSaveCourse()}
-                  style={[styles.submitBtn, savingCourse && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {savingCourse
-                      ? 'Đang lưu...'
-                      : editingCourse
-                        ? 'Cập nhật khóa học'
-                        : 'Đăng tải khóa học'}
-                  </Text>
-                </Pressable>
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-      <Modal
-        visible={contentEditorOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setContentEditorOpen(false)}
+      <FullScreenFormModal
+        visible={formOpen}
+        title={editingCourse ? 'Cập nhật khóa học' : 'Tạo khóa học mới'}
+        cancelLabel="Hủy"
+        onSave={() => void handleSaveCourse()}
+        saving={savingCourse}
+        onClose={() => setFormOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setContentEditorOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>
-                {contentEditorKind === 'lesson'
-                  ? editingContentIndex == null ? 'Thêm bài giảng' : 'Cập nhật bài giảng'
-                  : editingContentIndex == null ? 'Thêm câu trắc nghiệm' : 'Cập nhật câu trắc nghiệm'}
-              </Text>
-              <Pressable onPress={() => setContentEditorOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
+        <View style={{ gap: 8, paddingBottom: 14 }}>
+          <Text style={styles.label}>Tên khóa học *</Text>
+          <TextInput
+            value={formTitle}
+            onChangeText={setFormTitle}
+            placeholder="VD: Quy chế bảo mật & văn hóa công ty"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Mô tả tóm tắt</Text>
+          <TextInput
+            value={formDesc}
+            onChangeText={setFormDesc}
+            multiline
+            placeholder="Nội dung chính khóa học..."
+            placeholderTextColor={colors.muted}
+            style={[styles.field, { minHeight: 62, textAlignVertical: 'top' }]}
+          />
+
+          <Text style={styles.label}>Danh mục đào tạo</Text>
+          <View style={styles.wrapRow}>
+            {CATEGORIES.map((cat) => {
+              const active = formCategory === cat;
+              return (
+                <Pressable
+                  key={cat}
+                  onPress={() => setFormCategory(cat)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.label}>Thời lượng học</Text>
+          <TextInput
+            value={formDuration}
+            onChangeText={setFormDuration}
+            placeholder="VD: 2 giờ 30 phút"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Khóa học bắt buộc</Text>
+            <Switch
+              value={formRequired}
+              onValueChange={setFormRequired}
+              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
+            />
+          </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Tự động giao khi có nhân sự mới</Text>
+            <Switch
+              value={formAutoOnboarding}
+              onValueChange={setFormAutoOnboarding}
+              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
+            />
+          </View>
+
+          {/* Lessons builder */}
+          <View style={styles.builderHeader}>
+            <Text style={styles.label}>Bài giảng ({formLessons.length})</Text>
+            <Pressable
+              onPress={() => openLessonEditor()}
+              style={styles.addSmallBtn}
+            >
+              <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm bài</Text></View>
+            </Pressable>
+          </View>
+          {formLessons.map((les, idx) => (
+            <View key={`lesson-${idx}`} style={styles.builderEntry}>
+              <Pressable onPress={() => openLessonEditor(idx)} style={[styles.builderCard, styles.builderEntryMain]}>
+                <View style={styles.headRow}>
+                  <Text style={styles.codeBadge}>Bài {idx + 1}</Text>
+                  <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
+                </View>
+                <Text numberOfLines={1} style={styles.rowTitle}>{les.title || 'Chưa có tên bài giảng'}</Text>
+                <Text numberOfLines={1} style={styles.muted}>
+                  {les.type === 'video' || les.type === 'youtube' ? 'Video' : 'Văn bản / Tài liệu'}
+                  {les.url ? ` · ${les.url}` : ''}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setFormLessons((prev) => prev.filter((_, i) => i !== idx))}
+                style={styles.deleteEntryBtn}
+              >
+                <Text style={styles.smallDelBtnText}>Xóa</Text>
               </Pressable>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
-              {contentEditorKind === 'lesson' ? (
-                <View style={styles.editorForm}>
-                  <Text style={styles.label}>Tên bài giảng *</Text>
-                  <TextInput
-                    value={lessonDraft.title}
-                    onChangeText={(title) => setLessonDraft((prev) => ({ ...prev, title }))}
-                    placeholder="Ví dụ: Quy trình an toàn lao động"
-                    placeholderTextColor={colors.muted}
-                    style={styles.field}
-                  />
+          ))}
 
-                  <Text style={styles.label}>Loại bài giảng</Text>
-                  <View style={styles.wrapRow}>
-                    {(['text', 'video'] as const).map((type) => {
-                      const active = type === 'video'
-                        ? lessonDraft.type === 'video' || lessonDraft.type === 'youtube'
-                        : lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube';
-                      return (
-                        <Pressable
-                          key={type}
-                          onPress={() => setLessonDraft((prev) => ({ ...prev, type }))}
-                          style={[styles.chip, active && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                            {type === 'video' ? 'Video' : 'Văn bản / Tài liệu'}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  <Text style={styles.label}>
-                    {lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link video' : 'Link tài liệu (tùy chọn)'}
-                  </Text>
-                  <TextInput
-                    value={lessonDraft.url || ''}
-                    onChangeText={(url) => setLessonDraft((prev) => ({ ...prev, url }))}
-                    placeholder={lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link YouTube / video...' : 'https://...'}
-                    placeholderTextColor={colors.muted}
-                    autoCapitalize="none"
-                    style={styles.field}
-                  />
-
-                  {lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube' ? (
-                    <>
-                      <Text style={styles.label}>Nội dung bài giảng</Text>
-                      <TextInput
-                        value={lessonDraft.content || ''}
-                        onChangeText={(content) => setLessonDraft((prev) => ({ ...prev, content }))}
-                        multiline
-                        placeholder="Nhập nội dung lý thuyết..."
-                        placeholderTextColor={colors.muted}
-                        style={[styles.field, styles.editorTextArea]}
-                      />
-                    </>
-                  ) : null}
-
-                  <View style={styles.editorActionRow}>
-                    <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
-                      <Text style={styles.cancelBtnText}>Hủy</Text>
-                    </Pressable>
-                    <Pressable onPress={saveLessonDraft} style={[styles.submitBtn, styles.editorAction]}>
-                      <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm bài giảng' : 'Lưu bài giảng'}</Text>
-                    </Pressable>
-                  </View>
+          {/* Quiz builder */}
+          <View style={styles.builderHeader}>
+            <Text style={styles.label}>Trắc nghiệm MCQ ({formQuizzes.length})</Text>
+            <Pressable
+              onPress={() => openQuizEditor()}
+              style={styles.addSmallBtn}
+            >
+              <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm câu hỏi</Text></View>
+            </Pressable>
+          </View>
+          {formQuizzes.map((q, qIdx) => (
+            <View key={`quiz-${qIdx}`} style={styles.builderEntry}>
+              <Pressable onPress={() => openQuizEditor(qIdx)} style={[styles.builderCard, styles.builderEntryMain]}>
+                <View style={styles.headRow}>
+                  <Text style={styles.codeBadge}>Câu {qIdx + 1}</Text>
+                  <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
                 </View>
-              ) : (
-                <View style={styles.editorForm}>
-                  <Text style={styles.label}>Nội dung câu hỏi *</Text>
-                  <TextInput
-                    value={quizDraft.question}
-                    onChangeText={(question) => setQuizDraft((prev) => ({ ...prev, question }))}
-                    multiline
-                    placeholder="Nhập câu hỏi trắc nghiệm..."
-                    placeholderTextColor={colors.muted}
-                    style={[styles.field, styles.editorTextArea]}
-                  />
+                <Text numberOfLines={2} style={styles.rowTitle}>{q.question || 'Chưa có nội dung câu hỏi'}</Text>
+                <Text numberOfLines={1} style={styles.muted}>
+                  {q.options.filter((option) => option.trim()).length} đáp án
+                  {q.options[q.correctOptionIndex]?.trim() ? ` · Đúng: ${q.options[q.correctOptionIndex].trim()}` : ''}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx))}
+                style={styles.deleteEntryBtn}
+              >
+                <Text style={styles.smallDelBtnText}>Xóa</Text>
+              </Pressable>
+            </View>
+          ))}
 
-                  <Text style={styles.label}>Các đáp án · Chọn nút tròn cạnh đáp án đúng</Text>
-                  {quizDraft.options.map((option, optionIndex) => {
-                    const isCorrect = quizDraft.correctOptionIndex === optionIndex;
-                    return (
-                      <View key={`option-${optionIndex}`} style={styles.quizEditorOptionRow}>
-                        <Pressable
-                          accessibilityRole="radio"
-                          accessibilityState={{ checked: isCorrect }}
-                          onPress={() => setQuizDraft((prev) => ({ ...prev, correctOptionIndex: optionIndex }))}
-                          style={[styles.radioOuter, isCorrect && styles.radioOuterActive]}
-                        >
-                          {isCorrect ? <View style={styles.radioInner} /> : null}
-                        </Pressable>
-                        <TextInput
-                          value={option}
-                          onChangeText={(value) => setQuizDraft((prev) => {
-                            const options = [...prev.options];
-                            options[optionIndex] = value;
-                            return { ...prev, options };
-                          })}
-                          placeholder={`Đáp án ${optionIndex + 1}`}
-                          placeholderTextColor={colors.muted}
-                          style={[styles.field, styles.quizEditorOptionField]}
-                        />
-                        {quizDraft.options.length > 2 ? (
-                          <Pressable
-                            onPress={() => setQuizDraft((prev) => {
-                              const options = prev.options.filter((_, index) => index !== optionIndex);
-                              const correctOptionIndex = prev.correctOptionIndex === optionIndex
-                                ? Math.min(optionIndex, options.length - 1)
-                                : prev.correctOptionIndex > optionIndex
-                                  ? prev.correctOptionIndex - 1
-                                  : prev.correctOptionIndex;
-                              return { ...prev, options, correctOptionIndex };
-                            })}
-                            hitSlop={8}
-                          >
-                            <Text style={styles.smallDelBtnText}>Xóa</Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    );
-                  })}
-                  <Pressable onPress={() => setQuizDraft((prev) => ({ ...prev, options: [...prev.options, ''] }))}>
-                    <View style={styles.iconButtonContent}>
-                      <Plus size={13} color={colors.primary} />
-                      <Text style={styles.addSmallBtnText}>Thêm đáp án</Text>
-                    </View>
-                  </Pressable>
-
-                  <View style={styles.editorActionRow}>
-                    <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
-                      <Text style={styles.cancelBtnText}>Hủy</Text>
-                    </Pressable>
-                    <Pressable onPress={saveQuizDraft} style={[styles.submitBtn, styles.editorAction]}>
-                      <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm câu hỏi' : 'Lưu câu hỏi'}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
-            </ScrollView>
+          <Pressable
+            disabled={savingCourse}
+            onPress={() => void handleSaveCourse()}
+            style={[styles.submitBtn, savingCourse && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingCourse
+                ? 'Đang lưu...'
+                : editingCourse
+                  ? 'Cập nhật khóa học'
+                  : 'Đăng tải khóa học'}
+            </Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
+      <FullScreenFormModal
+        visible={contentEditorOpen}
+        title={
+          contentEditorKind === 'lesson'
+            ? editingContentIndex == null ? 'Thêm bài giảng' : 'Cập nhật bài giảng'
+            : editingContentIndex == null ? 'Thêm câu trắc nghiệm' : 'Cập nhật câu trắc nghiệm'
+        }
+        cancelLabel="Hủy"
+        onSave={contentEditorKind === 'lesson' ? saveLessonDraft : saveQuizDraft}
+        onClose={() => setContentEditorOpen(false)}
+      >
+        {contentEditorKind === 'lesson' ? (
+          <View style={styles.editorForm}>
+            <Text style={styles.label}>Tên bài giảng *</Text>
+            <TextInput
+              value={lessonDraft.title}
+              onChangeText={(title) => setLessonDraft((prev) => ({ ...prev, title }))}
+              placeholder="Ví dụ: Quy trình an toàn lao động"
+              placeholderTextColor={colors.muted}
+              style={styles.field}
+            />
+
+            <Text style={styles.label}>Loại bài giảng</Text>
+            <View style={styles.wrapRow}>
+              {(['text', 'video'] as const).map((type) => {
+                const active = type === 'video'
+                  ? lessonDraft.type === 'video' || lessonDraft.type === 'youtube'
+                  : lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube';
+                return (
+                  <Pressable
+                    key={type}
+                    onPress={() => setLessonDraft((prev) => ({ ...prev, type }))}
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {type === 'video' ? 'Video' : 'Văn bản / Tài liệu'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.label}>
+              {lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link video' : 'Link tài liệu (tùy chọn)'}
+            </Text>
+            <TextInput
+              value={lessonDraft.url || ''}
+              onChangeText={(url) => setLessonDraft((prev) => ({ ...prev, url }))}
+              placeholder={lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link YouTube / video...' : 'https://...'}
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              style={styles.field}
+            />
+
+            {lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube' ? (
+              <>
+                <Text style={styles.label}>Nội dung bài giảng</Text>
+                <TextInput
+                  value={lessonDraft.content || ''}
+                  onChangeText={(content) => setLessonDraft((prev) => ({ ...prev, content }))}
+                  multiline
+                  placeholder="Nhập nội dung lý thuyết..."
+                  placeholderTextColor={colors.muted}
+                  style={[styles.field, styles.editorTextArea]}
+                />
+              </>
+            ) : null}
+
+            <View style={styles.editorActionRow}>
+              <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </Pressable>
+              <Pressable onPress={saveLessonDraft} style={[styles.submitBtn, styles.editorAction]}>
+                <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm bài giảng' : 'Lưu bài giảng'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.editorForm}>
+            <Text style={styles.label}>Nội dung câu hỏi *</Text>
+            <TextInput
+              value={quizDraft.question}
+              onChangeText={(question) => setQuizDraft((prev) => ({ ...prev, question }))}
+              multiline
+              placeholder="Nhập câu hỏi trắc nghiệm..."
+              placeholderTextColor={colors.muted}
+              style={[styles.field, styles.editorTextArea]}
+            />
+
+            <Text style={styles.label}>Các đáp án · Chọn nút tròn cạnh đáp án đúng</Text>
+            {quizDraft.options.map((option, optionIndex) => {
+              const isCorrect = quizDraft.correctOptionIndex === optionIndex;
+              return (
+                <View key={`option-${optionIndex}`} style={styles.quizEditorOptionRow}>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isCorrect }}
+                    onPress={() => setQuizDraft((prev) => ({ ...prev, correctOptionIndex: optionIndex }))}
+                    style={[styles.radioOuter, isCorrect && styles.radioOuterActive]}
+                  >
+                    {isCorrect ? <View style={styles.radioInner} /> : null}
+                  </Pressable>
+                  <TextInput
+                    value={option}
+                    onChangeText={(value) => setQuizDraft((prev) => {
+                      const options = [...prev.options];
+                      options[optionIndex] = value;
+                      return { ...prev, options };
+                    })}
+                    placeholder={`Đáp án ${optionIndex + 1}`}
+                    placeholderTextColor={colors.muted}
+                    style={[styles.field, styles.quizEditorOptionField]}
+                  />
+                  {quizDraft.options.length > 2 ? (
+                    <Pressable
+                      onPress={() => setQuizDraft((prev) => {
+                        const options = prev.options.filter((_, index) => index !== optionIndex);
+                        const correctOptionIndex = prev.correctOptionIndex === optionIndex
+                          ? Math.min(optionIndex, options.length - 1)
+                          : prev.correctOptionIndex > optionIndex
+                            ? prev.correctOptionIndex - 1
+                            : prev.correctOptionIndex;
+                        return { ...prev, options, correctOptionIndex };
+                      })}
+                      hitSlop={8}
+                    >
+                      <Text style={styles.smallDelBtnText}>Xóa</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
+            <Pressable onPress={() => setQuizDraft((prev) => ({ ...prev, options: [...prev.options, ''] }))}>
+              <View style={styles.iconButtonContent}>
+                <Plus size={13} color={colors.primary} />
+                <Text style={styles.addSmallBtnText}>Thêm đáp án</Text>
+              </View>
+            </Pressable>
+
+            <View style={styles.editorActionRow}>
+              <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </Pressable>
+              <Pressable onPress={saveQuizDraft} style={[styles.submitBtn, styles.editorAction]}>
+                <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm câu hỏi' : 'Lưu câu hỏi'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </FullScreenFormModal>
       </>
     );
   }

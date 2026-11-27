@@ -1,4 +1,5 @@
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -1415,512 +1416,458 @@ export function KanbanTasksPanel({
         </>
       )}
 
-      {/* Create / Edit Task Modal */}
-      <Modal
+      {/* Create / Edit Task Full-Screen Page */}
+      <FullScreenFormModal
         visible={taskModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
+        title={editingTask ? 'Chi tiết & sửa công việc' : 'Giao việc mới'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveTask()}
+        saving={savingTask || uploadingTaskAttachment || recordingTaskAudio}
+        onClose={() => {
           if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
         }}
       >
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => {
-            if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
-          }}
-        >
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>
-                {editingTask ? 'Chi tiết & sửa công việc' : 'Giao việc mới'}
+        <View style={styles.form}>
+          <Text style={styles.label}>Tên công việc *</Text>
+          <TextInput
+            value={taskTitle}
+            onChangeText={setTaskTitle}
+            placeholder="Nhập tiêu đề công việc..."
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Thuộc dự án</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 6, marginBottom: 4 }}
+          >
+            <Pressable
+              onPress={() => setTaskProjectId('')}
+              style={[styles.chip, !taskProjectId && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, !taskProjectId && styles.chipTextActive]}>
+                Không thuộc dự án
               </Text>
+            </Pressable>
+            {projects.map((p) => (
               <Pressable
-                onPress={() => {
-                  if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
-                }}
-                hitSlop={8}
+                key={p.id}
+                onPress={() => setTaskProjectId(p.id)}
+                style={[styles.chip, taskProjectId === p.id && styles.chipActive]}
               >
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
-              <View style={styles.form}>
-                <Text style={styles.label}>Tên công việc *</Text>
-                <TextInput
-                  value={taskTitle}
-                  onChangeText={setTaskTitle}
-                  placeholder="Nhập tiêu đề công việc..."
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <Text style={styles.label}>Thuộc dự án</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 6, marginBottom: 4 }}
-                >
-                  <Pressable
-                    onPress={() => setTaskProjectId('')}
-                    style={[styles.chip, !taskProjectId && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, !taskProjectId && styles.chipTextActive]}>
-                      Không thuộc dự án
-                    </Text>
-                  </Pressable>
-                  {projects.map((p) => (
-                    <Pressable
-                      key={p.id}
-                      onPress={() => setTaskProjectId(p.id)}
-                      style={[styles.chip, taskProjectId === p.id && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, taskProjectId === p.id && styles.chipTextActive]}>
-                        {p.name}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-
-                <Text style={styles.label}>Trạng thái</Text>
-                <View style={styles.wrapRow}>
-                  {STATUS_META.map((st) => (
-                    <Pressable
-                      key={st.key}
-                      onPress={() => setTaskStatus(st.key)}
-                      style={[styles.chip, taskStatus === st.key && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, taskStatus === st.key && styles.chipTextActive]}>
-                        {st.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.label}>Độ ưu tiên</Text>
-                <View style={styles.wrapRow}>
-                  {PRIORITY_OPTIONS.map((p) => (
-                    <Pressable
-                      key={p.key}
-                      onPress={() => setTaskPriority(p.key)}
-                      style={[styles.chip, taskPriority === p.key && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, taskPriority === p.key && styles.chipTextActive]}>
-                        {p.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.label}>Người thực hiện</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 6, marginBottom: 4 }}
-                >
-                  {employees.slice(0, 25).map((emp) => {
-                    const uid = emp.uid || emp._id || emp.id || '';
-                    const active = taskAssigneeUid === uid;
-                    return (
-                      <Pressable
-                        key={uid}
-                        onPress={() => setTaskAssigneeUid(uid)}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {emp.displayName}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-
-                <Text style={styles.label}>Phân loại</Text>
-                <View style={styles.wrapRow}>
-                  {TASK_CATEGORIES.map((cat) => (
-                    <Pressable
-                      key={cat}
-                      onPress={() => setTaskCategory(cat)}
-                      style={[styles.chip, taskCategory === cat && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, taskCategory === cat && styles.chipTextActive]}>
-                        {cat}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                {taskCategory === 'Bán hàng' ? (
-                  <>
-                    <Text style={styles.label}>Chỉ tiêu doanh số KPI (VNĐ)</Text>
-                    <TextInput
-                      value={taskSalesKpiTarget}
-                      onChangeText={setTaskSalesKpiTarget}
-                      keyboardType="numeric"
-                      placeholder="VD: 50000000"
-                      placeholderTextColor={colors.muted}
-                      style={styles.field}
-                    />
-                  </>
-                ) : null}
-
-                <Text style={styles.label}>Hạn chót *</Text>
-                <Pressable style={styles.dateTimeField} onPress={() => openDatePicker('taskDue')}>
-                  <CalendarDays size={16} color={colors.primary} />
-                  <Text numberOfLines={1} style={taskDueDate ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                    {taskDueDate ? formatTaskDateTime(taskDueDate) : 'Chọn ngày và giờ'}
-                  </Text>
-                  <ChevronRight size={16} color={colors.muted} />
-                </Pressable>
-
-                <Text style={styles.label}>Thời gian bắt đầu</Text>
-                <View style={styles.dateTimeInputRow}>
-                  <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('taskStart')}>
-                    <Clock3 size={16} color={colors.primary} />
-                    <Text numberOfLines={1} style={taskStartTime ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                      {taskStartTime ? formatTaskDateTime(taskStartTime) : 'Chọn ngày và giờ'}
-                    </Text>
-                    <ChevronRight size={16} color={colors.muted} />
-                  </Pressable>
-                  {taskStartTime ? (
-                    <Pressable onPress={() => setTaskStartTime('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa thời gian bắt đầu">
-                      <X size={15} color={colors.muted} />
-                    </Pressable>
-                  ) : null}
-                </View>
-
-                <Text style={styles.label}>Giờ dự tính</Text>
-                <TextInput
-                  value={taskEstTime}
-                  onChangeText={setTaskEstTime}
-                  keyboardType="numeric"
-                  placeholder="VD: 4"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <Text style={styles.label}>Link / Ghi chú</Text>
-                <TextInput
-                  value={taskLinkNote}
-                  onChangeText={setTaskLinkNote}
-                  placeholder="Link tài liệu hoặc ghi chú..."
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <Text style={styles.label}>Tệp đính kèm</Text>
-                {taskAttachments.map((attachment) => (
-                  <View key={attachment.id} style={styles.attachmentRow}>
-                    {attachment.type === 'audio' ? <Mic size={15} color="#7754C8" /> : null}
-                    {attachment.type === 'video' ? <Video size={15} color="#B42318" /> : null}
-                    {attachment.type === 'link' ? <Link2 size={15} color={colors.primary} /> : null}
-                    {attachment.type === 'file' || attachment.type === 'image' ? <FileText size={15} color={colors.primary} /> : null}
-                    <Pressable
-                      style={styles.attachmentNameButton}
-                      onPress={() => void Linking.openURL(attachment.url).catch(() => Alert.alert('Không mở được tệp', 'Hãy thử lại sau.'))}
-                    >
-                      <Text numberOfLines={1} style={styles.attachmentName}>{attachment.name}</Text>
-                      <Text style={styles.attachmentMeta}>
-                        {attachment.type.toUpperCase()}{attachment.size ? ` · ${(attachment.size / (1024 * 1024)).toFixed(1)} MB` : ''}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityLabel={`Gỡ ${attachment.name}`}
-                      hitSlop={8}
-                      onPress={() => setTaskAttachments((current) => current.filter((item) => item.id !== attachment.id))}
-                      style={styles.attachmentRemove}
-                    >
-                      <X size={15} color="#B42318" />
-                    </Pressable>
-                  </View>
-                ))}
-                <View style={styles.attachmentActions}>
-                  <Pressable
-                    onPress={() => void pickTaskAttachments()}
-                    disabled={uploadingTaskAttachment || recordingTaskAudio}
-                    style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-                  >
-                    <Paperclip size={14} color={colors.primary} />
-                    <Text style={styles.attachmentActionText}>Chọn tệp</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => void (recordingTaskAudio ? stopTaskAudioRecording() : recordTaskAudio())}
-                    disabled={uploadingTaskAttachment}
-                    style={[styles.attachmentAction, recordingTaskAudio && styles.recordingAction, uploadingTaskAttachment && styles.disabled]}
-                  >
-                    {recordingTaskAudio ? <Square size={13} color="#B42318" /> : <Mic size={14} color={colors.primary} />}
-                    <Text style={[styles.attachmentActionText, recordingTaskAudio && styles.recordingActionText]}>
-                      {recordingTaskAudio ? 'Dừng ghi âm' : 'Ghi âm'}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => void recordTaskVideo()}
-                    disabled={uploadingTaskAttachment || recordingTaskAudio}
-                    style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-                  >
-                    <Video size={14} color={colors.primary} />
-                    <Text style={styles.attachmentActionText}>Ghi hình</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.attachmentLinkRow}>
-                  <TextInput
-                    value={taskAttachmentLinkDraft}
-                    onChangeText={setTaskAttachmentLinkDraft}
-                    autoCapitalize="none"
-                    keyboardType="url"
-                    placeholder="Link tài liệu (https://...)"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.field, styles.attachmentLinkInput]}
-                  />
-                  <Pressable
-                    onPress={addTaskAttachmentLink}
-                    disabled={uploadingTaskAttachment || recordingTaskAudio}
-                    style={[styles.addAttachmentLink, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-                  >
-                    <Link2 size={14} color={colors.white} />
-                    <Text style={styles.addAttachmentLinkText}>Thêm</Text>
-                  </Pressable>
-                </View>
-                {uploadingTaskAttachment ? (
-                  <View style={styles.attachmentUploading}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={styles.attachmentMeta}>Đang tải tệp lên...</Text>
-                  </View>
-                ) : null}
-
-                <Pressable
-                  disabled={savingTask || uploadingTaskAttachment || recordingTaskAudio}
-                  onPress={() => void onSaveTask()}
-                  style={[styles.submitBtn, (savingTask || uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {savingTask ? 'Đang lưu...' : editingTask ? 'Lưu thay đổi' : 'Tạo công việc'}
-                  </Text>
-                </Pressable>
-
-                {editingTask && canManageTasks ? (
-                  <Pressable
-                    onPress={() => onDeleteTask(editingTask)}
-                    style={styles.deleteBtn}
-                  >
-                    <Text style={styles.deleteBtnText}>Xóa công việc</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Báo cáo tiến độ / yêu cầu trợ giúp */}
-      <Modal
-        visible={activityMode !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
-      >
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
-        >
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <View style={styles.activityModalHeading}>
-                {activityMode === 'progress' ? <Sliders size={18} color={colors.primary} /> : <LifeBuoy size={18} color="#B42318" />}
-                <Text style={styles.sheetTitle}>
-                  {activityMode === 'progress' ? 'Báo cáo tiến độ công việc' : 'Yêu cầu trợ giúp công việc'}
+                <Text style={[styles.chipText, taskProjectId === p.id && styles.chipTextActive]}>
+                  {p.name}
                 </Text>
-              </View>
-              <Pressable
-                onPress={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
-                hitSlop={8}
-              >
-                <Text style={styles.closeText}>Đóng</Text>
               </Pressable>
-            </View>
-            {activityTask ? <Text numberOfLines={2} style={styles.activityTaskTitle}>{activityTask.title}</Text> : null}
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-              <View style={styles.form}>
-                {activityMode === 'progress' ? (
-                  <>
-                    <View style={styles.progressEditorSummary}>
-                      <Text style={styles.label}>Tiến độ hoàn thành</Text>
-                      <Text style={styles.progressEditorPercent}>{activityProgress}%</Text>
-                    </View>
-                    <TextInput
-                      value={String(activityProgress)}
-                      onChangeText={(value) => {
-                        const digits = value.replace(/[^0-9]/g, '').slice(0, 3);
-                        if (!digits) { setActivityProgress(0); return; }
-                        setActivityProgress(Math.min(100, Number(digits)));
-                      }}
-                      keyboardType="number-pad"
-                      maxLength={3}
-                      selectTextOnFocus
-                      accessibilityLabel="Tiến độ phần trăm"
-                      style={styles.progressPercentInput}
-                    />
-                    <View style={styles.wrapRow}>
-                      {[0, 25, 50, 75, 100].map((value) => (
-                        <Pressable
-                          key={value}
-                          onPress={() => setActivityProgress(value)}
-                          style={[styles.chip, activityProgress === value && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, activityProgress === value && styles.chipTextActive]}>{value}%</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <Text style={styles.label}>Nội dung báo cáo *</Text>
-                    <TextInput
-                      value={activityNote}
-                      onChangeText={setActivityNote}
-                      multiline
-                      maxLength={2000}
-                      placeholder="Mô tả kết quả đã hoàn thành hoặc vướng mắc..."
-                      placeholderTextColor={colors.muted}
-                      style={[styles.field, styles.activityNoteField]}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.label}>Chọn người hỗ trợ</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
-                      <Pressable
-                        onPress={() => setActivityHelperUid('')}
-                        style={[styles.chip, !activityHelperUid && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, !activityHelperUid && styles.chipTextActive]}>Cả nhóm</Text>
-                      </Pressable>
-                      {employees
-                        .filter((employee) => {
-                          const uid = employee.id || employee._id || employee.uid || '';
-                          return uid && uid !== currentUid && uid !== activityTask?.assigneeUid;
-                        })
-                        .map((employee) => {
-                          const uid = employee.id || employee._id || employee.uid || '';
-                          const selected = activityHelperUid === uid;
-                          return (
-                            <Pressable
-                              key={uid}
-                              onPress={() => setActivityHelperUid(uid)}
-                              style={[styles.chip, selected && styles.chipActive]}
-                            >
-                              <Text style={[styles.chipText, selected && styles.chipTextActive]}>{employee.displayName}</Text>
-                            </Pressable>
-                          );
-                        })}
-                    </ScrollView>
-                    <Text style={styles.helpHint}>Để cả nhóm nhận thông báo hoặc chọn một người hỗ trợ cụ thể.</Text>
-                    <Text style={styles.label}>Nguyên nhân cần trợ giúp *</Text>
-                    <TextInput
-                      value={activityNote}
-                      onChangeText={setActivityNote}
-                      multiline
-                      maxLength={2000}
-                      placeholder="Mô tả vướng mắc hoặc hỗ trợ bạn cần..."
-                      placeholderTextColor={colors.muted}
-                      style={[styles.field, styles.activityNoteField]}
-                    />
-                  </>
-                )}
-                <Text style={styles.activityCharCount}>{activityNote.length}/2000 ký tự</Text>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.label}>Trạng thái</Text>
+          <View style={styles.wrapRow}>
+            {STATUS_META.map((st) => (
+              <Pressable
+                key={st.key}
+                onPress={() => setTaskStatus(st.key)}
+                style={[styles.chip, taskStatus === st.key && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, taskStatus === st.key && styles.chipTextActive]}>
+                  {st.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Độ ưu tiên</Text>
+          <View style={styles.wrapRow}>
+            {PRIORITY_OPTIONS.map((p) => (
+              <Pressable
+                key={p.key}
+                onPress={() => setTaskPriority(p.key)}
+                style={[styles.chip, taskPriority === p.key && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, taskPriority === p.key && styles.chipTextActive]}>
+                  {p.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Người thực hiện</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 6, marginBottom: 4 }}
+          >
+            {employees.slice(0, 25).map((emp) => {
+              const uid = emp.uid || emp._id || emp.id || '';
+              const active = taskAssigneeUid === uid;
+              return (
                 <Pressable
-                  onPress={() => void saveTaskActivity()}
-                  disabled={savingActivity || !activityNote.trim()}
-                  style={[styles.submitBtn, (savingActivity || !activityNote.trim()) && styles.disabled]}
+                  key={uid}
+                  onPress={() => setTaskAssigneeUid(uid)}
+                  style={[styles.chip, active && styles.chipActive]}
                 >
-                  <Text style={styles.submitBtnText}>
-                    {savingActivity ? 'Đang lưu...' : activityMode === 'progress' ? 'Lưu báo cáo tiến độ' : 'Gửi yêu cầu trợ giúp'}
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {emp.displayName}
                   </Text>
                 </Pressable>
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+              );
+            })}
+          </ScrollView>
 
-      {/* Create / Edit Project Modal */}
-      <Modal
-        visible={projectModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setProjectModalOpen(false)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setProjectModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>
-                {editingProject ? 'Chỉnh sửa dự án' : 'Tạo dự án mới'}
-              </Text>
-              <Pressable onPress={() => setProjectModalOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
+          <Text style={styles.label}>Phân loại</Text>
+          <View style={styles.wrapRow}>
+            {TASK_CATEGORIES.map((cat) => (
+              <Pressable
+                key={cat}
+                onPress={() => setTaskCategory(cat)}
+                style={[styles.chip, taskCategory === cat && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, taskCategory === cat && styles.chipTextActive]}>
+                  {cat}
+                </Text>
               </Pressable>
-            </View>
-            <View style={styles.form}>
-              <Text style={styles.label}>Tên dự án *</Text>
+            ))}
+          </View>
+
+          {taskCategory === 'Bán hàng' ? (
+            <>
+              <Text style={styles.label}>Chỉ tiêu doanh số KPI (VNĐ)</Text>
               <TextInput
-                value={projName}
-                onChangeText={setProjName}
-                placeholder="VD: Triển khai ERP Q4"
+                value={taskSalesKpiTarget}
+                onChangeText={setTaskSalesKpiTarget}
+                keyboardType="numeric"
+                placeholder="VD: 50000000"
                 placeholderTextColor={colors.muted}
                 style={styles.field}
               />
+            </>
+          ) : null}
 
-              <Text style={styles.label}>Độ ưu tiên</Text>
+          <Text style={styles.label}>Hạn chót *</Text>
+          <Pressable style={styles.dateTimeField} onPress={() => openDatePicker('taskDue')}>
+            <CalendarDays size={16} color={colors.primary} />
+            <Text numberOfLines={1} style={taskDueDate ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+              {taskDueDate ? formatTaskDateTime(taskDueDate) : 'Chọn ngày và giờ'}
+            </Text>
+            <ChevronRight size={16} color={colors.muted} />
+          </Pressable>
+
+          <Text style={styles.label}>Thời gian bắt đầu</Text>
+          <View style={styles.dateTimeInputRow}>
+            <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('taskStart')}>
+              <Clock3 size={16} color={colors.primary} />
+              <Text numberOfLines={1} style={taskStartTime ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+                {taskStartTime ? formatTaskDateTime(taskStartTime) : 'Chọn ngày và giờ'}
+              </Text>
+              <ChevronRight size={16} color={colors.muted} />
+            </Pressable>
+            {taskStartTime ? (
+              <Pressable onPress={() => setTaskStartTime('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa thời gian bắt đầu">
+                <X size={15} color={colors.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <Text style={styles.label}>Giờ dự tính</Text>
+          <TextInput
+            value={taskEstTime}
+            onChangeText={setTaskEstTime}
+            keyboardType="numeric"
+            placeholder="VD: 4"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Link / Ghi chú</Text>
+          <TextInput
+            value={taskLinkNote}
+            onChangeText={setTaskLinkNote}
+            placeholder="Link tài liệu hoặc ghi chú..."
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Tệp đính kèm</Text>
+          {taskAttachments.map((attachment) => (
+            <View key={attachment.id} style={styles.attachmentRow}>
+              {attachment.type === 'audio' ? <Mic size={15} color="#7754C8" /> : null}
+              {attachment.type === 'video' ? <Video size={15} color="#B42318" /> : null}
+              {attachment.type === 'link' ? <Link2 size={15} color={colors.primary} /> : null}
+              {attachment.type === 'file' || attachment.type === 'image' ? <FileText size={15} color={colors.primary} /> : null}
+              <Pressable
+                style={styles.attachmentNameButton}
+                onPress={() => void Linking.openURL(attachment.url).catch(() => Alert.alert('Không mở được tệp', 'Hãy thử lại sau.'))}
+              >
+                <Text numberOfLines={1} style={styles.attachmentName}>{attachment.name}</Text>
+                <Text style={styles.attachmentMeta}>
+                  {attachment.type.toUpperCase()}{attachment.size ? ` · ${(attachment.size / (1024 * 1024)).toFixed(1)} MB` : ''}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={`Gỡ ${attachment.name}`}
+                hitSlop={8}
+                onPress={() => setTaskAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                style={styles.attachmentRemove}
+              >
+                <X size={15} color="#B42318" />
+              </Pressable>
+            </View>
+          ))}
+          <View style={styles.attachmentActions}>
+            <Pressable
+              onPress={() => void pickTaskAttachments()}
+              disabled={uploadingTaskAttachment || recordingTaskAudio}
+              style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+            >
+              <Paperclip size={14} color={colors.primary} />
+              <Text style={styles.attachmentActionText}>Chọn tệp</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void (recordingTaskAudio ? stopTaskAudioRecording() : recordTaskAudio())}
+              disabled={uploadingTaskAttachment}
+              style={[styles.attachmentAction, recordingTaskAudio && styles.recordingAction, uploadingTaskAttachment && styles.disabled]}
+            >
+              {recordingTaskAudio ? <Square size={13} color="#B42318" /> : <Mic size={14} color={colors.primary} />}
+              <Text style={[styles.attachmentActionText, recordingTaskAudio && styles.recordingActionText]}>
+                {recordingTaskAudio ? 'Dừng ghi âm' : 'Ghi âm'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void recordTaskVideo()}
+              disabled={uploadingTaskAttachment || recordingTaskAudio}
+              style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+            >
+              <Video size={14} color={colors.primary} />
+              <Text style={styles.attachmentActionText}>Ghi hình</Text>
+            </Pressable>
+          </View>
+          <View style={styles.attachmentLinkRow}>
+            <TextInput
+              value={taskAttachmentLinkDraft}
+              onChangeText={setTaskAttachmentLinkDraft}
+              autoCapitalize="none"
+              keyboardType="url"
+              placeholder="Link tài liệu (https://...)"
+              placeholderTextColor={colors.muted}
+              style={[styles.field, styles.attachmentLinkInput]}
+            />
+            <Pressable
+              onPress={addTaskAttachmentLink}
+              disabled={uploadingTaskAttachment || recordingTaskAudio}
+              style={[styles.addAttachmentLink, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+            >
+              <Link2 size={14} color={colors.white} />
+              <Text style={styles.addAttachmentLinkText}>Thêm</Text>
+            </Pressable>
+          </View>
+          {uploadingTaskAttachment ? (
+            <View style={styles.attachmentUploading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.attachmentMeta}>Đang tải tệp lên...</Text>
+            </View>
+          ) : null}
+
+          <Pressable
+            disabled={savingTask || uploadingTaskAttachment || recordingTaskAudio}
+            onPress={() => void onSaveTask()}
+            style={[styles.submitBtn, (savingTask || uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingTask ? 'Đang lưu...' : editingTask ? 'Lưu thay đổi' : 'Tạo công việc'}
+            </Text>
+          </Pressable>
+
+          {editingTask && canManageTasks ? (
+            <Pressable
+              onPress={() => onDeleteTask(editingTask)}
+              style={styles.deleteBtn}
+            >
+              <Text style={styles.deleteBtnText}>Xóa công việc</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </FullScreenFormModal>
+
+      {/* Báo cáo tiến độ / yêu cầu trợ giúp */}
+      <FullScreenFormModal
+        visible={activityMode !== null}
+        title={activityMode === 'progress' ? 'Báo cáo tiến độ công việc' : 'Yêu cầu trợ giúp công việc'}
+        cancelLabel="Hủy"
+        onSave={() => void saveTaskActivity()}
+        saving={savingActivity}
+        onClose={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
+      >
+        <View style={styles.form}>
+          {activityTask ? <Text numberOfLines={2} style={styles.activityTaskTitle}>{activityTask.title}</Text> : null}
+          {activityMode === 'progress' ? (
+            <>
+              <View style={styles.progressEditorSummary}>
+                <Text style={styles.label}>Tiến độ hoàn thành</Text>
+                <Text style={styles.progressEditorPercent}>{activityProgress}%</Text>
+              </View>
+              <TextInput
+                value={String(activityProgress)}
+                onChangeText={(value) => {
+                  const digits = value.replace(/[^0-9]/g, '').slice(0, 3);
+                  if (!digits) { setActivityProgress(0); return; }
+                  setActivityProgress(Math.min(100, Number(digits)));
+                }}
+                keyboardType="number-pad"
+                maxLength={3}
+                selectTextOnFocus
+                accessibilityLabel="Tiến độ phần trăm"
+                style={styles.progressPercentInput}
+              />
               <View style={styles.wrapRow}>
-                {(['high', 'medium', 'low'] as const).map((p) => (
+                {[0, 25, 50, 75, 100].map((value) => (
                   <Pressable
-                    key={p}
-                    onPress={() => setProjPriority(p)}
-                    style={[styles.chip, projPriority === p && styles.chipActive]}
+                    key={value}
+                    onPress={() => setActivityProgress(value)}
+                    style={[styles.chip, activityProgress === value && styles.chipActive]}
                   >
-                    <Text style={[styles.chipText, projPriority === p && styles.chipTextActive]}>
-                      {p === 'high' ? 'Cao' : p === 'low' ? 'Thấp' : 'Trung bình'}
-                    </Text>
+                    <Text style={[styles.chipText, activityProgress === value && styles.chipTextActive]}>{value}%</Text>
                   </Pressable>
                 ))}
               </View>
-
-              <Text style={styles.label}>Hạn hoàn thành</Text>
-              <View style={styles.dateTimeInputRow}>
-                <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('projectDue')}>
-                  <CalendarDays size={16} color={colors.primary} />
-                  <Text numberOfLines={1} style={projDueAt ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                    {projDueAt ? formatProjectDate(projDueAt) : 'Chọn ngày'}
-                  </Text>
-                  <ChevronRight size={16} color={colors.muted} />
+              <Text style={styles.label}>Nội dung báo cáo *</Text>
+              <TextInput
+                value={activityNote}
+                onChangeText={setActivityNote}
+                multiline
+                maxLength={2000}
+                placeholder="Mô tả kết quả đã hoàn thành hoặc vướng mắc..."
+                placeholderTextColor={colors.muted}
+                style={[styles.field, styles.activityNoteField]}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>Chọn người hỗ trợ</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+                <Pressable
+                  onPress={() => setActivityHelperUid('')}
+                  style={[styles.chip, !activityHelperUid && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, !activityHelperUid && styles.chipTextActive]}>Cả nhóm</Text>
                 </Pressable>
-                {projDueAt ? (
-                  <Pressable onPress={() => setProjDueAt('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa hạn hoàn thành">
-                    <X size={15} color={colors.muted} />
-                  </Pressable>
-                ) : null}
-              </View>
+                {employees
+                  .filter((employee) => {
+                    const uid = employee.id || employee._id || employee.uid || '';
+                    return uid && uid !== currentUid && uid !== activityTask?.assigneeUid;
+                  })
+                  .map((employee) => {
+                    const uid = employee.id || employee._id || employee.uid || '';
+                    const selected = activityHelperUid === uid;
+                    return (
+                      <Pressable
+                        key={uid}
+                        onPress={() => setActivityHelperUid(uid)}
+                        style={[styles.chip, selected && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextActive]}>{employee.displayName}</Text>
+                      </Pressable>
+                    );
+                  })}
+              </ScrollView>
+              <Text style={styles.helpHint}>Để cả nhóm nhận thông báo hoặc chọn một người hỗ trợ cụ thể.</Text>
+              <Text style={styles.label}>Nguyên nhân cần trợ giúp *</Text>
+              <TextInput
+                value={activityNote}
+                onChangeText={setActivityNote}
+                multiline
+                maxLength={2000}
+                placeholder="Mô tả vướng mắc hoặc hỗ trợ bạn cần..."
+                placeholderTextColor={colors.muted}
+                style={[styles.field, styles.activityNoteField]}
+              />
+            </>
+          )}
+          <Text style={styles.activityCharCount}>{activityNote.length}/2000 ký tự</Text>
+          <Pressable
+            onPress={() => void saveTaskActivity()}
+            disabled={savingActivity || !activityNote.trim()}
+            style={[styles.submitBtn, (savingActivity || !activityNote.trim()) && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingActivity ? 'Đang lưu...' : activityMode === 'progress' ? 'Lưu báo cáo tiến độ' : 'Gửi yêu cầu trợ giúp'}
+            </Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
 
+      {/* Create / Edit Project Full-Screen Page */}
+      <FullScreenFormModal
+        visible={projectModalOpen}
+        title={editingProject ? 'Chỉnh sửa dự án' : 'Tạo dự án mới'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveProject()}
+        saving={savingProj}
+        onClose={() => setProjectModalOpen(false)}
+      >
+        <View style={styles.form}>
+          <Text style={styles.label}>Tên dự án *</Text>
+          <TextInput
+            value={projName}
+            onChangeText={setProjName}
+            placeholder="VD: Triển khai ERP Q4"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Độ ưu tiên</Text>
+          <View style={styles.wrapRow}>
+            {(['high', 'medium', 'low'] as const).map((p) => (
               <Pressable
-                disabled={savingProj}
-                onPress={() => void onSaveProject()}
-                style={[styles.submitBtn, savingProj && styles.disabled]}
+                key={p}
+                onPress={() => setProjPriority(p)}
+                style={[styles.chip, projPriority === p && styles.chipActive]}
               >
-                <Text style={styles.submitBtnText}>
-                  {savingProj ? 'Đang lưu...' : editingProject ? 'Cập nhật dự án' : 'Tạo dự án'}
+                <Text style={[styles.chipText, projPriority === p && styles.chipTextActive]}>
+                  {p === 'high' ? 'Cao' : p === 'low' ? 'Thấp' : 'Trung bình'}
                 </Text>
               </Pressable>
+            ))}
+          </View>
 
-              {editingProject && canManageTasks ? (
-                <Pressable
-                  onPress={() => onDeleteProject(editingProject)}
-                  style={styles.deleteBtn}
-                >
-                  <Text style={styles.deleteBtnText}>Xóa dự án</Text>
-                </Pressable>
-              ) : null}
-            </View>
+          <Text style={styles.label}>Hạn hoàn thành</Text>
+          <View style={styles.dateTimeInputRow}>
+            <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('projectDue')}>
+              <CalendarDays size={16} color={colors.primary} />
+              <Text numberOfLines={1} style={projDueAt ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+                {projDueAt ? formatProjectDate(projDueAt) : 'Chọn ngày'}
+              </Text>
+              <ChevronRight size={16} color={colors.muted} />
+            </Pressable>
+            {projDueAt ? (
+              <Pressable onPress={() => setProjDueAt('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa hạn hoàn thành">
+                <X size={15} color={colors.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <Pressable
+            disabled={savingProj}
+            onPress={() => void onSaveProject()}
+            style={[styles.submitBtn, savingProj && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingProj ? 'Đang lưu...' : editingProject ? 'Cập nhật dự án' : 'Tạo dự án'}
+            </Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+
+          {editingProject && canManageTasks ? (
+            <Pressable
+              onPress={() => onDeleteProject(editingProject)}
+              style={styles.deleteBtn}
+            >
+              <Text style={styles.deleteBtnText}>Xóa dự án</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS === 'ios' && activeDatePicker ? (
         <Modal

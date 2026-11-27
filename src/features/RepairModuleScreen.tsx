@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { fetchCompanyBranches, type ErpBranch } from '@/features/overview/overviewApi';
 import { DateTimeField } from '@/features/quotation/DateTimeField';
@@ -681,22 +682,15 @@ function CreateRepairTicketModal({
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={() => { if (!saving) onClose(); }}>
-      <View style={styles.backdrop}>
-        <View style={[styles.modalCard, { maxHeight: '90%' }]}>
-          <View style={styles.modalHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle}>Tạo phiếu sửa chữa</Text>
-              <Text numberOfLines={1} style={styles.mutedText}>
-                {device.product?.name || 'Thiết bị'}{serial ? ` · ${serial}` : ''}
-              </Text>
-            </View>
-            <Pressable disabled={saving} onPress={onClose} style={styles.closeIconBtn}>
-              <X size={17} color={colors.muted} />
-            </Pressable>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <FullScreenFormModal
+      visible
+      title="Tạo phiếu sửa chữa"
+      onClose={() => { if (!saving) onClose(); }}
+    >
+      <View style={styles.modalBody}>
+        <Text numberOfLines={1} style={styles.mutedText}>
+          {device.product?.name || 'Thiết bị'}{serial ? ` · ${serial}` : ''}
+        </Text>
             <View style={styles.infoGrid}>
               <InfoCell label="Khách hàng" value={`${customerLabel}${customerPhone ? ` · ${customerPhone}` : ''}`} />
               <InfoCell
@@ -781,10 +775,8 @@ function CreateRepairTicketModal({
                 )}
               </Pressable>
             </View>
-          </ScrollView>
-        </View>
       </View>
-    </Modal>
+    </FullScreenFormModal>
   );
 }
 
@@ -1108,23 +1100,18 @@ function TicketDetailModal({
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={[styles.modalCard, { maxHeight: '88%' }]}>
-          <View style={styles.modalHeader}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text numberOfLines={1} ellipsizeMode="middle" style={styles.modalTitle}>{ticket.ticketCode}</Text>
-              <Text numberOfLines={1} style={styles.mutedText}>{ticket.device.name}</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: tone.bg, flexShrink: 0 }]}>
-              <Text numberOfLines={1} style={[styles.badgeText, { color: tone.fg }]}>{statusLabels[ticket.status]}</Text>
-            </View>
-            <Pressable onPress={onClose} style={styles.closeIconBtn}>
-              <X size={17} color={colors.muted} />
-            </Pressable>
-          </View>
-
-          <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
+    <FullScreenFormModal
+      visible
+      title={ticket.ticketCode}
+      onClose={onClose}
+      rightAction={
+        <View style={[styles.badge, { backgroundColor: tone.bg, flexShrink: 0 }]}>
+          <Text numberOfLines={1} style={[styles.badgeText, { color: tone.fg }]}>{statusLabels[ticket.status]}</Text>
+        </View>
+      }
+    >
+      <View style={styles.modalBody}>
+        <Text numberOfLines={1} style={styles.mutedText}>{ticket.device.name}</Text>
             <View style={styles.infoGrid}>
               <InfoCell
                 label="Khách hàng"
@@ -1305,10 +1292,8 @@ function TicketDetailModal({
                 </View>
               </View>
             ) : null}
-          </ScrollView>
-        </View>
       </View>
-    </Modal>
+    </FullScreenFormModal>
   );
 }
 

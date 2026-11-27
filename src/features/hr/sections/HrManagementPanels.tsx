@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { ChevronRight, Plus } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import {
   createHrDepartment,
@@ -334,238 +335,221 @@ export function DepartmentsPanel({
         </View>
       )}
 
-      {/* Detail & Edit Department Modal */}
-      <Modal
+      {/* Detail & Edit Department Full-Screen Page */}
+      <FullScreenFormModal
         visible={Boolean(selectedDept)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedDept(null)}
+        title={isEditing ? 'Chỉnh sửa phòng ban' : selectedDept?.name || 'Chi tiết phòng ban'}
+        cancelLabel={isEditing ? 'Hủy' : undefined}
+        onSave={isEditing ? () => void onSaveEdit() : undefined}
+        saving={saving}
+        onClose={() => {
+          if (isEditing) setIsEditing(false);
+          else setSelectedDept(null);
+        }}
       >
-        <Pressable style={styles.backdrop} onPress={() => setSelectedDept(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            {selectedDept ? (
-              <>
-                <View style={styles.headRow}>
-                  <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>
-                    {isEditing ? 'Chỉnh sửa phòng ban' : selectedDept.name}
-                  </Text>
-                  <Pressable onPress={() => setSelectedDept(null)} hitSlop={8}>
-                    <Text style={styles.closeText}>Đóng</Text>
-                  </Pressable>
-                </View>
+        {selectedDept ? (
+          isEditing ? (
+            <View style={{ gap: 8, paddingBottom: 10 }}>
+              <Text style={styles.label}>Tên phòng ban *</Text>
+              <TextInput value={name} onChangeText={setName} style={styles.field} />
 
-                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
-                  {isEditing ? (
-                    <View style={{ gap: 8, paddingBottom: 10 }}>
-                      <Text style={styles.label}>Tên phòng ban *</Text>
-                      <TextInput value={name} onChangeText={setName} style={styles.field} />
+              <Text style={styles.label}>Mã phòng ban</Text>
+              <TextInput value={code} onChangeText={setCode} placeholder="VD: PB-KD" placeholderTextColor={colors.muted} style={styles.field} />
 
-                      <Text style={styles.label}>Mã phòng ban</Text>
-                      <TextInput value={code} onChangeText={setCode} placeholder="VD: PB-KD" placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Trưởng phòng</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
+                <Pressable
+                  onPress={() => setManagerUid('')}
+                  style={[styles.chip, !managerUid && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
+                </Pressable>
+                {employees.slice(0, 25).map((emp) => {
+                  const uid = emp.uid || emp._id || emp.id || '';
+                  const active = managerUid === uid;
+                  return (
+                    <Pressable
+                      key={uid}
+                      onPress={() => setManagerUid(uid)}
+                      style={[styles.chip, active && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {emp.displayName}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
-                      <Text style={styles.label}>Trưởng phòng</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
-                        <Pressable
-                          onPress={() => setManagerUid('')}
-                          style={[styles.chip, !managerUid && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
-                        </Pressable>
-                        {employees.slice(0, 25).map((emp) => {
-                          const uid = emp.uid || emp._id || emp.id || '';
-                          const active = managerUid === uid;
-                          return (
-                            <Pressable
-                              key={uid}
-                              onPress={() => setManagerUid(uid)}
-                              style={[styles.chip, active && styles.chipActive]}
-                            >
-                              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                                {emp.displayName}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </ScrollView>
+              <Text style={styles.label}>Mô tả chức năng</Text>
+              <TextInput
+                value={desc}
+                onChangeText={setDesc}
+                multiline
+                style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
+              />
 
-                      <Text style={styles.label}>Mô tả chức năng</Text>
-                      <TextInput
-                        value={desc}
-                        onChangeText={setDesc}
-                        multiline
-                        style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
-                      />
-
-                      <View style={styles.switchRow}>
-                        <Text style={styles.label}>Đang hoạt động</Text>
-                        <Switch
-                          value={isActive}
-                          onValueChange={setIsActive}
-                          trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                        />
-                      </View>
-
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                        <Pressable
-                          onPress={() => setIsEditing(false)}
-                          style={styles.cancelBtn}
-                        >
-                          <Text style={styles.cancelBtnText}>Hủy</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={saving}
-                          onPress={() => void onSaveEdit()}
-                          style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
-                        >
-                          <Text style={styles.submitBtnText}>
-                            {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={{ gap: 10, paddingBottom: 10 }}>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Mã phòng ban</Text>
-                        <Text style={styles.infoVal}>{selectedDept.code || '—'}</Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Trưởng phòng</Text>
-                        <Text style={styles.infoVal}>{selectedDept.managerName || 'Chưa chỉ định'}</Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Trạng thái</Text>
-                        <Text style={styles.infoVal}>
-                          {selectedDept.isActive === false ? 'Tạm ngưng' : 'Đang hoạt động'}
-                        </Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Sĩ số</Text>
-                        <Text style={styles.infoVal}>
-                          {selectedDept.employeeCount ?? selectedMembers.length} nhân sự
-                        </Text>
-                      </View>
-                      {selectedDept.description ? (
-                        <View style={{ gap: 4 }}>
-                          <Text style={styles.label}>Mô tả chức năng</Text>
-                          <Text style={styles.muted}>{selectedDept.description}</Text>
-                        </View>
-                      ) : null}
-
-                      <View style={{ gap: 6, marginTop: 4 }}>
-                        <Text style={styles.label}>
-                          Nhân sự trong phòng ({selectedMembers.length})
-                        </Text>
-                        {selectedMembers.length > 0 ? (
-                          selectedMembers.slice(0, 15).map((m, idx) => (
-                            <View key={m.uid || m._id || idx} style={styles.memberItem}>
-                              <Text style={styles.rowTitle}>{m.displayName}</Text>
-                              <Text style={styles.subMeta}>
-                                {m.jobTitle || m.position || m.role || 'Nhân viên'}
-                                {m.email ? ` · ${m.email}` : ''}
-                              </Text>
-                            </View>
-                          ))
-                        ) : (
-                          <Text style={styles.muted}>Chưa có nhân sự nào thuộc phòng ban này.</Text>
-                        )}
-                      </View>
-
-                      {canManage ? (
-                        <View style={{ gap: 8, marginTop: 8 }}>
-                          <Pressable onPress={startEdit} style={styles.submitBtn}>
-                            <Text style={styles.submitBtnText}>Chỉnh sửa phòng ban</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => onDelete(selectedDept)}
-                            style={styles.deleteBtn}
-                          >
-                            <Text style={styles.deleteBtnText}>Xóa phòng ban</Text>
-                          </Pressable>
-                        </View>
-                      ) : null}
-                    </View>
-                  )}
-                </ScrollView>
-              </>
-            ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Create Department Modal */}
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Thêm phòng ban mới</Text>
-              <Pressable onPress={() => setCreateOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-              <View style={{ gap: 8 }}>
-                <Text style={styles.label}>Tên phòng ban *</Text>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Tên phòng ban"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
+              <View style={styles.switchRow}>
+                <Text style={styles.label}>Đang hoạt động</Text>
+                <Switch
+                  value={isActive}
+                  onValueChange={setIsActive}
+                  trackColor={{ true: colors.primary, false: '#CBD5E1' }}
                 />
-                <Text style={styles.label}>Mã phòng ban</Text>
-                <TextInput
-                  value={code}
-                  onChangeText={setCode}
-                  placeholder="Mã phòng ban (tùy chọn)"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-                <Text style={styles.label}>Trưởng phòng</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
-                  <Pressable
-                    onPress={() => setManagerUid('')}
-                    style={[styles.chip, !managerUid && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
-                  </Pressable>
-                  {employees.slice(0, 25).map((emp) => {
-                    const uid = emp.uid || emp._id || emp.id || '';
-                    const active = managerUid === uid;
-                    return (
-                      <Pressable
-                        key={uid}
-                        onPress={() => setManagerUid(uid)}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {emp.displayName}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-                <Text style={styles.label}>Mô tả chức năng</Text>
-                <TextInput
-                  value={desc}
-                  onChangeText={setDesc}
-                  placeholder="Mô tả chức năng"
-                  placeholderTextColor={colors.muted}
-                  multiline
-                  style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
-                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                <Pressable
+                  onPress={() => setIsEditing(false)}
+                  style={styles.cancelBtn}
+                >
+                  <Text style={styles.cancelBtnText}>Hủy</Text>
+                </Pressable>
                 <Pressable
                   disabled={saving}
-                  onPress={() => void onCreate()}
-                  style={[styles.submitBtn, saving && styles.disabled]}
+                  onPress={() => void onSaveEdit()}
+                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
                 >
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Tạo phòng ban'}</Text>
+                  <Text style={styles.submitBtnText}>
+                    {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  </Text>
                 </Pressable>
               </View>
-            </ScrollView>
+            </View>
+          ) : (
+            <View style={{ gap: 10, paddingBottom: 10 }}>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Mã phòng ban</Text>
+                <Text style={styles.infoVal}>{selectedDept.code || '—'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Trưởng phòng</Text>
+                <Text style={styles.infoVal}>{selectedDept.managerName || 'Chưa chỉ định'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Trạng thái</Text>
+                <Text style={styles.infoVal}>
+                  {selectedDept.isActive === false ? 'Tạm ngưng' : 'Đang hoạt động'}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Sĩ số</Text>
+                <Text style={styles.infoVal}>
+                  {selectedDept.employeeCount ?? selectedMembers.length} nhân sự
+                </Text>
+              </View>
+              {selectedDept.description ? (
+                <View style={{ gap: 4 }}>
+                  <Text style={styles.label}>Mô tả chức năng</Text>
+                  <Text style={styles.muted}>{selectedDept.description}</Text>
+                </View>
+              ) : null}
+
+              <View style={{ gap: 6, marginTop: 4 }}>
+                <Text style={styles.label}>
+                  Nhân sự trong phòng ({selectedMembers.length})
+                </Text>
+                {selectedMembers.length > 0 ? (
+                  selectedMembers.slice(0, 15).map((m, idx) => (
+                    <View key={m.uid || m._id || idx} style={styles.memberItem}>
+                      <Text style={styles.rowTitle}>{m.displayName}</Text>
+                      <Text style={styles.subMeta}>
+                        {m.jobTitle || m.position || m.role || 'Nhân viên'}
+                        {m.email ? ` · ${m.email}` : ''}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.muted}>Chưa có nhân sự nào thuộc phòng ban này.</Text>
+                )}
+              </View>
+
+              {canManage ? (
+                <View style={{ gap: 8, marginTop: 8 }}>
+                  <Pressable onPress={startEdit} style={styles.submitBtn}>
+                    <Text style={styles.submitBtnText}>Chỉnh sửa phòng ban</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => onDelete(selectedDept)}
+                    style={styles.deleteBtn}
+                  >
+                    <Text style={styles.deleteBtnText}>Xóa phòng ban</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          )
+        ) : null}
+      </FullScreenFormModal>
+
+      {/* Create Department Full-Screen Page */}
+      <FullScreenFormModal
+        visible={createOpen}
+        title="Thêm phòng ban mới"
+        cancelLabel="Hủy"
+        onSave={() => void onCreate()}
+        saving={saving}
+        onClose={() => setCreateOpen(false)}
+      >
+        <View style={{ gap: 8 }}>
+          <Text style={styles.label}>Tên phòng ban *</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Tên phòng ban"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Mã phòng ban</Text>
+          <TextInput
+            value={code}
+            onChangeText={setCode}
+            placeholder="Mã phòng ban (tùy chọn)"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Trưởng phòng</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
+            <Pressable
+              onPress={() => setManagerUid('')}
+              style={[styles.chip, !managerUid && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
+            </Pressable>
+            {employees.slice(0, 25).map((emp) => {
+              const uid = emp.uid || emp._id || emp.id || '';
+              const active = managerUid === uid;
+              return (
+                <Pressable
+                  key={uid}
+                  onPress={() => setManagerUid(uid)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {emp.displayName}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.label}>Mô tả chức năng</Text>
+          <TextInput
+            value={desc}
+            onChangeText={setDesc}
+            placeholder="Mô tả chức năng"
+            placeholderTextColor={colors.muted}
+            multiline
+            style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
+          />
+          <Pressable
+            disabled={saving}
+            onPress={() => void onCreate()}
+            style={[styles.submitBtn, saving && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Tạo phòng ban'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
   );
 }

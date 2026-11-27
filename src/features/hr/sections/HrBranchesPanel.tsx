@@ -15,6 +15,7 @@ import {
 import * as Location from 'expo-location';
 import { AlertTriangle, CheckCircle2, ChevronRight, Info, LocateFixed, MapPin, Phone, Plus, Radio } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import {
   createHrBranch,
   createHrBranchOwner,
@@ -604,280 +605,255 @@ export function HrBranchesPanel({
         </View>
       )}
 
-      {/* Detail & Edit Branch Modal */}
-      <Modal
+      {/* Detail & Edit Branch Full-Screen Page */}
+      <FullScreenFormModal
         visible={Boolean(selectedBranch)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedBranch(null)}
+        title={isEditing ? 'Chỉnh sửa chi nhánh' : selectedBranch?.name || 'Chi tiết chi nhánh'}
+        cancelLabel={isEditing ? 'Hủy' : undefined}
+        onSave={isEditing ? () => void onSaveEdit() : undefined}
+        saving={saving}
+        onClose={() => {
+          if (isEditing) setIsEditing(false);
+          else setSelectedBranch(null);
+        }}
       >
-        <Pressable style={styles.backdrop} onPress={() => setSelectedBranch(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            {selectedBranch ? (
-              <>
-                <View style={styles.headRow}>
-                  <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>
-                    {isEditing ? 'Chỉnh sửa chi nhánh' : selectedBranch.name}
-                  </Text>
-                  <Pressable onPress={() => setSelectedBranch(null)} hitSlop={8}>
-                    <Text style={styles.closeText}>Đóng</Text>
-                  </Pressable>
-                </View>
+        {selectedBranch ? (
+          isEditing ? (
+            <View style={{ gap: 8, paddingBottom: 12 }}>
+              <Text style={styles.label}>Mã chi nhánh *</Text>
+              <TextInput
+                value={code}
+                editable={false}
+                autoCapitalize="characters"
+                style={[styles.field, styles.readonlyField]}
+              />
 
-                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-                  {isEditing ? (
-                    <View style={{ gap: 8, paddingBottom: 12 }}>
-                      <Text style={styles.label}>Mã chi nhánh *</Text>
-                      <TextInput
-                        value={code}
-                        editable={false}
-                        autoCapitalize="characters"
-                        style={[styles.field, styles.readonlyField]}
-                      />
+              <Text style={styles.label}>Tên chi nhánh *</Text>
+              <TextInput value={name} onChangeText={setName} style={styles.field} />
 
-                      <Text style={styles.label}>Tên chi nhánh *</Text>
-                      <TextInput value={name} onChangeText={setName} style={styles.field} />
+              <Text style={styles.label}>Địa chỉ</Text>
+              <TextInput value={address} onChangeText={setAddress} style={styles.field} />
 
-                      <Text style={styles.label}>Địa chỉ</Text>
-                      <TextInput value={address} onChangeText={setAddress} style={styles.field} />
+              <Text style={styles.label}>Số điện thoại</Text>
+              <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.field} />
 
-                      <Text style={styles.label}>Số điện thoại</Text>
-                      <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.field} />
+              <Text style={styles.label}>Quản lý chi nhánh</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
+                <Pressable
+                  onPress={() => setManagerId('')}
+                  style={[styles.chip, !managerId && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, !managerId && styles.chipTextActive]}>Chưa chỉ định</Text>
+                </Pressable>
+                {employees.slice(0, 25).map((emp) => {
+                  const uid = emp.uid || emp._id || emp.id || '';
+                  const active = managerId === uid;
+                  return (
+                    <Pressable
+                      key={uid}
+                      onPress={() => setManagerId(uid)}
+                      style={[styles.chip, active && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {emp.displayName}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
-                      <Text style={styles.label}>Quản lý chi nhánh</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
-                        <Pressable
-                          onPress={() => setManagerId('')}
-                          style={[styles.chip, !managerId && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, !managerId && styles.chipTextActive]}>Chưa chỉ định</Text>
-                        </Pressable>
-                        {employees.slice(0, 25).map((emp) => {
-                          const uid = emp.uid || emp._id || emp.id || '';
-                          const active = managerId === uid;
-                          return (
-                            <Pressable
-                              key={uid}
-                              onPress={() => setManagerId(uid)}
-                              style={[styles.chip, active && styles.chipActive]}
-                            >
-                              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                                {emp.displayName}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </ScrollView>
+              {renderLocationConfigEditor()}
 
-                      {renderLocationConfigEditor()}
-
-                      <View style={styles.switchRow}>
-                        <Text style={styles.label}>Đang hoạt động</Text>
-                        <Switch
-                          value={isActive}
-                          onValueChange={setIsActive}
-                          trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                        />
-                      </View>
-
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                        <Pressable onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
-                          <Text style={styles.cancelBtnText}>Hủy</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={saving}
-                          onPress={() => void onSaveEdit()}
-                          style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
-                        >
-                          <Text style={styles.submitBtnText}>
-                            {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={{ gap: 10, paddingBottom: 10 }}>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Mã chi nhánh</Text>
-                        <Text style={styles.infoVal}>{selectedBranch.code}</Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Trạng thái</Text>
-                        <Text style={styles.infoVal}>
-                          {selectedBranch.isActive === false ? 'Tạm ngưng' : 'Đang hoạt động'}
-                        </Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Điện thoại</Text>
-                        <Text style={styles.infoVal}>{selectedBranch.phone || 'Chưa cập nhật'}</Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Quản lý</Text>
-                        <Text style={styles.infoVal}>
-                          {(selectedBranch.managerId && employeeNameById.get(selectedBranch.managerId)) ||
-                            'Chưa chỉ định'}
-                        </Text>
-                      </View>
-                      <View style={{ gap: 4 }}>
-                        <Text style={styles.label}>Địa chỉ</Text>
-                        <Text style={styles.muted}>
-                          {selectedBranch.address || 'Chưa cập nhật địa chỉ.'}
-                        </Text>
-                      </View>
-
-                      <View style={styles.locationBox}>
-                        <Text style={styles.locationTitle}>Cấu hình chấm công</Text>
-                        {selectedBranch.locationConfig ? (
-                          <View style={{ gap: 6, marginTop: 4 }}>
-                            <View style={styles.infoRow}>
-                              <Text style={styles.muted}>Tọa độ (Vĩ độ, Kinh độ)</Text>
-                              <Text style={styles.infoVal}>
-                                {selectedBranch.locationConfig.latitude}, {selectedBranch.locationConfig.longitude}
-                              </Text>
-                            </View>
-                            <View style={styles.infoRow}>
-                              <Text style={styles.muted}>Bán kính cho phép</Text>
-                              <Text style={styles.infoVal}>{selectedBranch.locationConfig.allowedRadius} m</Text>
-                            </View>
-                            <View style={{ gap: 4 }}>
-                              <Text style={styles.muted}>IP công cộng được phép</Text>
-                              <View style={styles.ipChipWrap}>
-                                {(selectedBranch.locationConfig.allowedPublicIps || []).map((ip) => (
-                                  <Text key={ip} style={styles.ipChip}>
-                                    {ip}
-                                  </Text>
-                                ))}
-                              </View>
-                            </View>
-                          </View>
-                        ) : (
-                          <Text style={[styles.muted, { marginTop: 4 }]}>
-                            Chưa cấu hình vị trí GPS và IP mạng cho chi nhánh này.
-                          </Text>
-                        )}
-                      </View>
-
-                      {canManage ? (
-                        <View style={{ gap: 8, marginTop: 8 }}>
-                          <Pressable onPress={startEdit} style={styles.submitBtn}>
-                            <Text style={styles.submitBtnText}>Chỉnh sửa chi nhánh</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => setOwnerModalOpen(true)}
-                            style={styles.secondaryBtn}
-                          >
-                            <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.secondaryBtnText}>Tạo tài khoản Quản lý chi nhánh</Text></View>
-                          </Pressable>
-                        </View>
-                      ) : null}
-                    </View>
-                  )}
-                </ScrollView>
-              </>
-            ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Create Branch Modal */}
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Thêm chi nhánh mới</Text>
-              <Pressable onPress={() => setCreateOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-              <View style={{ gap: 8, paddingBottom: 12 }}>
-                <Text style={styles.label}>Mã chi nhánh *</Text>
-                <TextInput
-                  value={code}
-                  onChangeText={setCode}
-                  autoCapitalize="characters"
-                  placeholder="VD: CN_HN"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
+              <View style={styles.switchRow}>
+                <Text style={styles.label}>Đang hoạt động</Text>
+                <Switch
+                  value={isActive}
+                  onValueChange={setIsActive}
+                  trackColor={{ true: colors.primary, false: '#CBD5E1' }}
                 />
-                <Text style={styles.label}>Tên chi nhánh *</Text>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="VD: Chi nhánh Hà Nội"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-                <Text style={styles.label}>Địa chỉ</Text>
-                <TextInput
-                  value={address}
-                  onChangeText={setAddress}
-                  placeholder="Số nhà, đường, quận/huyện..."
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-                <Text style={styles.label}>Số điện thoại</Text>
-                <TextInput
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  placeholder="0987654321"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
+              </View>
 
-                {renderLocationConfigEditor()}
-
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                <Pressable onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
+                  <Text style={styles.cancelBtnText}>Hủy</Text>
+                </Pressable>
                 <Pressable
                   disabled={saving}
-                  onPress={() => void onCreate()}
-                  style={[styles.submitBtn, saving && styles.disabled]}
+                  onPress={() => void onSaveEdit()}
+                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
                 >
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo chi nhánh'}</Text>
+                  <Text style={styles.submitBtnText}>
+                    {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  </Text>
                 </Pressable>
               </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Create Branch Owner Modal */}
-      <Modal
-        visible={ownerModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setOwnerModalOpen(false)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setOwnerModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Tạo Quản lý chi nhánh</Text>
-              <Pressable onPress={() => setOwnerModalOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
             </View>
-            <View style={{ gap: 8 }}>
-              <Text style={styles.label}>Họ và tên *</Text>
-              <TextInput value={ownerName} onChangeText={setOwnerName} placeholder="Nguyễn Văn A" placeholderTextColor={colors.muted} style={styles.field} />
-              <Text style={styles.label}>Email đăng nhập *</Text>
-              <TextInput value={ownerEmail} onChangeText={setOwnerEmail} keyboardType="email-address" autoCapitalize="none" placeholder="quanly@congty.vn" placeholderTextColor={colors.muted} style={styles.field} />
-              <Text style={styles.label}>Mật khẩu (≥ 6 ký tự) *</Text>
-              <TextInput value={ownerPassword} onChangeText={setOwnerPassword} secureTextEntry placeholder="••••••" placeholderTextColor={colors.muted} style={styles.field} />
-              <Text style={styles.label}>Số điện thoại</Text>
-              <TextInput value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor={colors.muted} style={styles.field} />
-              <Pressable
-                disabled={savingOwner}
-                onPress={() => void onCreateOwner()}
-                style={[styles.submitBtn, savingOwner && styles.disabled]}
-              >
-                <Text style={styles.submitBtnText}>
-                  {savingOwner ? 'Đang tạo...' : 'Tạo tài khoản'}
+          ) : (
+            <View style={{ gap: 10, paddingBottom: 10 }}>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Mã chi nhánh</Text>
+                <Text style={styles.infoVal}>{selectedBranch.code}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Trạng thái</Text>
+                <Text style={styles.infoVal}>
+                  {selectedBranch.isActive === false ? 'Tạm ngưng' : 'Đang hoạt động'}
                 </Text>
-              </Pressable>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Điện thoại</Text>
+                <Text style={styles.infoVal}>{selectedBranch.phone || 'Chưa cập nhật'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Quản lý</Text>
+                <Text style={styles.infoVal}>
+                  {(selectedBranch.managerId && employeeNameById.get(selectedBranch.managerId)) ||
+                    'Chưa chỉ định'}
+                </Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={styles.label}>Địa chỉ</Text>
+                <Text style={styles.muted}>
+                  {selectedBranch.address || 'Chưa cập nhật địa chỉ.'}
+                </Text>
+              </View>
+
+              <View style={styles.locationBox}>
+                <Text style={styles.locationTitle}>Cấu hình chấm công</Text>
+                {selectedBranch.locationConfig ? (
+                  <View style={{ gap: 6, marginTop: 4 }}>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.muted}>Tọa độ (Vĩ độ, Kinh độ)</Text>
+                      <Text style={styles.infoVal}>
+                        {selectedBranch.locationConfig.latitude}, {selectedBranch.locationConfig.longitude}
+                      </Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                      <Text style={styles.muted}>Bán kính cho phép</Text>
+                      <Text style={styles.infoVal}>{selectedBranch.locationConfig.allowedRadius} m</Text>
+                    </View>
+                    <View style={{ gap: 4 }}>
+                      <Text style={styles.muted}>IP công cộng được phép</Text>
+                      <View style={styles.ipChipWrap}>
+                        {(selectedBranch.locationConfig.allowedPublicIps || []).map((ip) => (
+                          <Text key={ip} style={styles.ipChip}>
+                            {ip}
+                          </Text>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={[styles.muted, { marginTop: 4 }]}>
+                    Chưa cấu hình vị trí GPS và IP mạng cho chi nhánh này.
+                  </Text>
+                )}
+              </View>
+
+              {canManage ? (
+                <View style={{ gap: 8, marginTop: 8 }}>
+                  <Pressable onPress={startEdit} style={styles.submitBtn}>
+                    <Text style={styles.submitBtnText}>Chỉnh sửa chi nhánh</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setOwnerModalOpen(true)}
+                    style={styles.secondaryBtn}
+                  >
+                    <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.secondaryBtnText}>Tạo tài khoản Quản lý chi nhánh</Text></View>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
+          )
+        ) : null}
+      </FullScreenFormModal>
+
+      {/* Create Branch Full-Screen Page */}
+      <FullScreenFormModal
+        visible={createOpen}
+        title="Thêm chi nhánh mới"
+        cancelLabel="Hủy"
+        onSave={() => void onCreate()}
+        saving={saving}
+        onClose={() => setCreateOpen(false)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Mã chi nhánh *</Text>
+          <TextInput
+            value={code}
+            onChangeText={setCode}
+            autoCapitalize="characters"
+            placeholder="VD: CN_HN"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Tên chi nhánh *</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="VD: Chi nhánh Hà Nội"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Địa chỉ</Text>
+          <TextInput
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Số nhà, đường, quận/huyện..."
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Số điện thoại</Text>
+          <TextInput
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            placeholder="0987654321"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          {renderLocationConfigEditor()}
+
+          <Pressable
+            disabled={saving}
+            onPress={() => void onCreate()}
+            style={[styles.submitBtn, saving && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo chi nhánh'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
+
+      {/* Create Branch Owner Full-Screen Page */}
+      <FullScreenFormModal
+        visible={ownerModalOpen}
+        title="Tạo Quản lý chi nhánh"
+        cancelLabel="Hủy"
+        onSave={() => void onCreateOwner()}
+        saving={savingOwner}
+        onClose={() => setOwnerModalOpen(false)}
+      >
+        <View style={{ gap: 8 }}>
+          <Text style={styles.label}>Họ và tên *</Text>
+          <TextInput value={ownerName} onChangeText={setOwnerName} placeholder="Nguyễn Văn A" placeholderTextColor={colors.muted} style={styles.field} />
+          <Text style={styles.label}>Email đăng nhập *</Text>
+          <TextInput value={ownerEmail} onChangeText={setOwnerEmail} keyboardType="email-address" autoCapitalize="none" placeholder="quanly@congty.vn" placeholderTextColor={colors.muted} style={styles.field} />
+          <Text style={styles.label}>Mật khẩu (≥ 6 ký tự) *</Text>
+          <TextInput value={ownerPassword} onChangeText={setOwnerPassword} secureTextEntry placeholder="••••••" placeholderTextColor={colors.muted} style={styles.field} />
+          <Text style={styles.label}>Số điện thoại</Text>
+          <TextInput value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor={colors.muted} style={styles.field} />
+          <Pressable
+            disabled={savingOwner}
+            onPress={() => void onCreateOwner()}
+            style={[styles.submitBtn, savingOwner && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingOwner ? 'Đang tạo...' : 'Tạo tài khoản'}
+            </Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
 
       <Modal
         visible={locationPermissionPrompt}

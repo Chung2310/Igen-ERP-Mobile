@@ -31,6 +31,7 @@ import {
   XCircle,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -732,184 +733,180 @@ export function HrLeavesPanel({
         </View>
       )}
 
-      {/* Create Application Modal */}
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Nộp đơn từ mới</Text>
-              <Pressable onPress={() => setCreateOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Create Application Full-Screen Page */}
+      <FullScreenFormModal
+        visible={createOpen}
+        title="Nộp đơn từ mới"
+        cancelLabel="Hủy"
+        onSave={() => void onCreateApp()}
+        saveLabel="Gửi"
+        saving={saving}
+        onClose={() => setCreateOpen(false)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          {canApprove && employees.length > 0 ? (
+            <>
+              <Text style={styles.label}>Nhân viên đăng ký</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {employees.slice(0, 30).map((emp) => {
+                  const uid = emp.uid || emp._id || emp.id || '';
+                  const active = appEmployeeId === uid;
+                  return (
+                    <Pressable
+                      key={uid}
+                      onPress={() => handleSelectFormEmployee(uid)}
+                      style={[styles.chip, active && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {emp.displayName}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </>
+          ) : null}
+
+          {formBalance ? (
+            <View style={styles.inlineBalance}>
+              <Text style={styles.subMeta}>
+                Số dư phép năm: <Text style={{ color: colors.primary, fontWeight: '800' }}>{formBalance.remaining ?? 0}</Text> / {formBalance.entitlement ?? 0} ngày
+              </Text>
+            </View>
+          ) : null}
+
+          <Text style={styles.label}>Nhóm yêu cầu *</Text>
+          <View style={styles.wrapRow}>
+            {REQUEST_KINDS.map((k) => {
+              const active = appRequestKind === k.value;
+              return (
+                <Pressable
+                  key={k.value}
+                  onPress={() => setAppRequestKind(k.value)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {k.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.label}>Loại đơn / Biểu mẫu</Text>
+          <View style={styles.wrapRow}>
+            {templates.map((tpl) => {
+              const active = appType === tpl.name;
+              return (
+                <Pressable
+                  key={tpl.id}
+                  onPress={() => {
+                    setAppType(tpl.name);
+                    if (tpl.requestKind) setAppRequestKind(tpl.requestKind);
+                  }}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {tpl.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            <Pressable
+              onPress={() => setAppType('other')}
+              style={[styles.chip, appType === 'other' && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, appType === 'other' && styles.chipTextActive]}>
+                Đơn khác
+              </Text>
+            </Pressable>
+          </View>
+
+          {selectedTemplate?.fileUrl ? (
+            <Pressable
+              onPress={() => void Linking.openURL(selectedTemplate.fileUrl!)}
+              style={styles.attachChip}
+            >
+              <ExternalLink size={12} color={colors.primary} />
+              <Text style={styles.attachText}>
+                Mở biểu mẫu: {selectedTemplate.fileName || selectedTemplate.name}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Từ ngày *</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openApplicationDatePicker('startDate')}
+                style={styles.datePickerField}
+              >
+                <Text style={styles.datePickerText}>{formatViDate(startDate)}</Text>
+                <CalendarDays size={15} color={colors.primary} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-              <View style={{ gap: 8, paddingBottom: 12 }}>
-                {canApprove && employees.length > 0 ? (
-                  <>
-                    <Text style={styles.label}>Nhân viên đăng ký</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                      {employees.slice(0, 30).map((emp) => {
-                        const uid = emp.uid || emp._id || emp.id || '';
-                        const active = appEmployeeId === uid;
-                        return (
-                          <Pressable
-                            key={uid}
-                            onPress={() => handleSelectFormEmployee(uid)}
-                            style={[styles.chip, active && styles.chipActive]}
-                          >
-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                              {emp.displayName}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </ScrollView>
-                  </>
-                ) : null}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Đến ngày *</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openApplicationDatePicker('endDate')}
+                style={styles.datePickerField}
+              >
+                <Text style={styles.datePickerText}>{formatViDate(endDate)}</Text>
+                <CalendarDays size={15} color={colors.primary} />
+              </Pressable>
+            </View>
+          </View>
 
-                {formBalance ? (
-                  <View style={styles.inlineBalance}>
-                    <Text style={styles.subMeta}>
-                      Số dư phép năm: <Text style={{ color: colors.primary, fontWeight: '800' }}>{formBalance.remaining ?? 0}</Text> / {formBalance.entitlement ?? 0} ngày
-                    </Text>
-                  </View>
-                ) : null}
+          <Text style={styles.label}>Lý do / Nội dung chi tiết</Text>
+          <TextInput
+            value={reason}
+            onChangeText={setReason}
+            multiline
+            placeholder="Nhập lý do xin nghỉ, WFH hoặc đề xuất..."
+            placeholderTextColor={colors.muted}
+            style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+          />
 
-                <Text style={styles.label}>Nhóm yêu cầu *</Text>
-                <View style={styles.wrapRow}>
-                  {REQUEST_KINDS.map((k) => {
-                    const active = appRequestKind === k.value;
-                    return (
-                      <Pressable
-                        key={k.value}
-                        onPress={() => setAppRequestKind(k.value)}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {k.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <Text style={styles.label}>Loại đơn / Biểu mẫu</Text>
-                <View style={styles.wrapRow}>
-                  {templates.map((tpl) => {
-                    const active = appType === tpl.name;
-                    return (
-                      <Pressable
-                        key={tpl.id}
-                        onPress={() => {
-                          setAppType(tpl.name);
-                          if (tpl.requestKind) setAppRequestKind(tpl.requestKind);
-                        }}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {tpl.name}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                  <Pressable
-                    onPress={() => setAppType('other')}
-                    style={[styles.chip, appType === 'other' && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, appType === 'other' && styles.chipTextActive]}>
-                      Đơn khác
-                    </Text>
-                  </Pressable>
-                </View>
-
-                {selectedTemplate?.fileUrl ? (
-                  <Pressable
-                    onPress={() => void Linking.openURL(selectedTemplate.fileUrl!)}
-                    style={styles.attachChip}
-                  >
-                    <ExternalLink size={12} color={colors.primary} />
-                    <Text style={styles.attachText}>
-                      Mở biểu mẫu: {selectedTemplate.fileName || selectedTemplate.name}
-                    </Text>
-                  </Pressable>
-                ) : null}
-
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Từ ngày *</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openApplicationDatePicker('startDate')}
-                      style={styles.datePickerField}
-                    >
-                      <Text style={styles.datePickerText}>{formatViDate(startDate)}</Text>
-                      <CalendarDays size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Đến ngày *</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openApplicationDatePicker('endDate')}
-                      style={styles.datePickerField}
-                    >
-                      <Text style={styles.datePickerText}>{formatViDate(endDate)}</Text>
-                      <CalendarDays size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                </View>
-
-                <Text style={styles.label}>Lý do / Nội dung chi tiết</Text>
-                <TextInput
-                  value={reason}
-                  onChangeText={setReason}
-                  multiline
-                  placeholder="Nhập lý do xin nghỉ, WFH hoặc đề xuất..."
-                  placeholderTextColor={colors.muted}
-                  style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
-                />
-
-                <Text style={styles.label}>Tệp đính kèm (PDF, ảnh, Word...)</Text>
-                <Pressable onPress={() => void pickAppFiles()} style={styles.uploadBtn}>
-                  <Upload size={14} color={colors.primary} />
-                  <Text style={styles.uploadBtnText}>Chọn tệp từ thiết bị</Text>
-                </Pressable>
-                {appFiles.length > 0 ? (
-                  <View style={styles.attachWrap}>
-                    {appFiles.map((file, idx) => (
-                      <View key={`${file.uri}_${idx}`} style={styles.attachChip}>
-                        <Paperclip size={11} color={colors.primary} />
-                        <Text numberOfLines={1} style={[styles.attachText, { maxWidth: 180 }]}>
-                          {file.name}
-                        </Text>
-                        <Pressable
-                          onPress={() => setAppFiles((prev) => prev.filter((_, i) => i !== idx))}
-                          hitSlop={6}
-                        >
-                          <X size={12} color="#B91C1C" />
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-
-                <Pressable
-                  disabled={saving}
-                  onPress={() => void onCreateApp()}
-                  style={[styles.submitBtn, saving && styles.disabled]}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Send size={14} color={colors.white} />
-                    <Text style={styles.submitBtnText}>
-                      {saving ? 'Đang tải tệp & gửi...' : 'Gửi đơn ngay'}
-                    </Text>
-                  </View>
-                </Pressable>
-              </View>
-            </ScrollView>
+          <Text style={styles.label}>Tệp đính kèm (PDF, ảnh, Word...)</Text>
+          <Pressable onPress={() => void pickAppFiles()} style={styles.uploadBtn}>
+            <Upload size={14} color={colors.primary} />
+            <Text style={styles.uploadBtnText}>Chọn tệp từ thiết bị</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+          {appFiles.length > 0 ? (
+            <View style={styles.attachWrap}>
+              {appFiles.map((file, idx) => (
+                <View key={`${file.uri}_${idx}`} style={styles.attachChip}>
+                  <Paperclip size={11} color={colors.primary} />
+                  <Text numberOfLines={1} style={[styles.attachText, { maxWidth: 180 }]}>
+                    {file.name}
+                  </Text>
+                  <Pressable
+                    onPress={() => setAppFiles((prev) => prev.filter((_, i) => i !== idx))}
+                    hitSlop={6}
+                  >
+                    <X size={12} color="#B91C1C" />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <Pressable
+            disabled={saving}
+            onPress={() => void onCreateApp()}
+            style={[styles.submitBtn, saving && styles.disabled]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Send size={14} color={colors.white} />
+              <Text style={styles.submitBtnText}>
+                {saving ? 'Đang tải tệp & gửi...' : 'Gửi đơn ngay'}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS !== 'android' && activeApplicationDatePicker ? (
         <Modal
@@ -957,293 +954,251 @@ export function HrLeavesPanel({
         </Modal>
       ) : null}
 
-      {/* Reject Reason Modal */}
-      <Modal
+      {/* Reject Reason Full-Screen Page */}
+      <FullScreenFormModal
         visible={Boolean(rejectTarget)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setRejectTarget(null)}
+        title="Từ chối đơn từ"
+        cancelLabel="Hủy"
+        onSave={() => void onConfirmReject()}
+        saveLabel="Xác nhận"
+        saving={Boolean(decidingId)}
+        onClose={() => setRejectTarget(null)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setRejectTarget(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Từ chối đơn từ</Text>
-              <Pressable onPress={() => setRejectTarget(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.muted}>
-              Đơn của {rejectTarget?.employeeName || rejectTarget?.applicantName} (
-              {formatViDate(rejectTarget?.startDate)} → {formatViDate(rejectTarget?.endDate)})
-            </Text>
-            <Text style={styles.label}>Lý do từ chối *</Text>
-            <TextInput
-              value={rejectReason}
-              onChangeText={setRejectReason}
-              multiline
-              placeholder="Nhập lý do từ chối..."
-              placeholderTextColor={colors.muted}
-              style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
-            />
-            <Pressable
-              disabled={Boolean(decidingId)}
-              onPress={() => void onConfirmReject()}
-              style={[styles.submitBtn, { backgroundColor: '#B91C1C' }, Boolean(decidingId) && styles.disabled]}
-            >
-              <Text style={styles.submitBtnText}>Xác nhận từ chối</Text>
-            </Pressable>
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.muted}>
+            Đơn của {rejectTarget?.employeeName || rejectTarget?.applicantName} (
+            {formatViDate(rejectTarget?.startDate)} → {formatViDate(rejectTarget?.endDate)})
+          </Text>
+          <Text style={styles.label}>Lý do từ chối *</Text>
+          <TextInput
+            value={rejectReason}
+            onChangeText={setRejectReason}
+            multiline
+            placeholder="Nhập lý do từ chối..."
+            placeholderTextColor={colors.muted}
+            style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+          />
+          <Pressable
+            disabled={Boolean(decidingId)}
+            onPress={() => void onConfirmReject()}
+            style={[styles.submitBtn, { backgroundColor: '#B91C1C' }, Boolean(decidingId) && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>Xác nhận từ chối</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
-      {/* Templates Modal */}
-      <Modal
+      {/* Templates Full-Screen Page */}
+      <FullScreenFormModal
         visible={templatesModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setTemplatesModalOpen(false)}
+        title={`Biểu mẫu đơn từ (${templates.length})`}
+        onClose={() => setTemplatesModalOpen(false)}
+        rightAction={
+          canApprove ? (
+            <Pressable onPress={openTemplateEditor} style={styles.primaryBtn}>
+              <Plus size={13} color={colors.white} />
+              <Text style={styles.primaryBtnText}>Thêm</Text>
+            </Pressable>
+          ) : undefined
+        }
       >
-        <Pressable style={styles.backdrop} onPress={() => setTemplatesModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>Biểu mẫu đơn từ ({templates.length})</Text>
-              {canApprove ? (
-                <Pressable onPress={openTemplateEditor} style={styles.primaryBtn}>
-                  <Plus size={13} color={colors.white} />
-                  <Text style={styles.primaryBtnText}>Thêm</Text>
-                </Pressable>
-              ) : null}
-              <Pressable onPress={() => setTemplatesModalOpen(false)}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-              <View style={{ gap: 10, paddingBottom: 12 }}>
-                {!templates.length ? (
-                  <Text style={styles.muted}>Chưa có biểu mẫu nào được tải lên.</Text>
-                ) : (
-                  templates.map((tpl) => (
-                    <View key={tpl.id} style={styles.tplCard}>
-                      <View style={styles.headRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.rowTitle}>{tpl.name}</Text>
-                          <Text style={styles.subMeta}>{getKindLabel(tpl.requestKind)}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                          {tpl.fileUrl ? (
-                            <Pressable onPress={() => void Linking.openURL(tpl.fileUrl!)}>
-                              <ExternalLink size={15} color={colors.primary} />
-                            </Pressable>
-                          ) : null}
-                          {canApprove ? (
-                            <Pressable onPress={() => onDeleteTemplate(tpl)}>
-                              <Trash2 size={15} color="#B91C1C" />
-                            </Pressable>
-                          ) : null}
-                        </View>
-                      </View>
-                    </View>
-                  ))
-                )}
-
+        <View style={{ gap: 10, paddingBottom: 12 }}>
+          {!templates.length ? (
+            <Text style={styles.muted}>Chưa có biểu mẫu nào được tải lên.</Text>
+          ) : (
+            templates.map((tpl) => (
+              <View key={tpl.id} style={styles.tplCard}>
+                <View style={styles.headRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>{tpl.name}</Text>
+                    <Text style={styles.subMeta}>{getKindLabel(tpl.requestKind)}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    {tpl.fileUrl ? (
+                      <Pressable onPress={() => void Linking.openURL(tpl.fileUrl!)}>
+                        <ExternalLink size={15} color={colors.primary} />
+                      </Pressable>
+                    ) : null}
+                    {canApprove ? (
+                      <Pressable onPress={() => onDeleteTemplate(tpl)}>
+                        <Trash2 size={15} color="#B91C1C" />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
               </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+            ))
+          )}
+        </View>
+      </FullScreenFormModal>
 
-      {/* Add template in a dedicated modal. */}
-      <Modal
+      {/* Add template Full-Screen Page */}
+      <FullScreenFormModal
         visible={templateEditorOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={closeTemplateEditor}
+        title="Thêm biểu mẫu mới"
+        cancelLabel="Hủy"
+        onSave={() => void onCreateTemplate()}
+        saving={savingTpl}
+        onClose={closeTemplateEditor}
       >
-        <Pressable style={styles.backdrop} onPress={closeTemplateEditor}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Thêm biểu mẫu mới</Text>
-              <Pressable disabled={savingTpl} onPress={closeTemplateEditor}>
-                <Text style={styles.closeText}>Đóng</Text>
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Tên biểu mẫu *</Text>
+          <TextInput
+            value={tplName}
+            onChangeText={setTplName}
+            placeholder="VD: Đơn xin nghỉ phép năm"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Nhóm yêu cầu</Text>
+          <View style={styles.wrapRow}>
+            {REQUEST_KINDS.map((kind) => (
+              <Pressable
+                key={kind.value}
+                onPress={() => setTplKind(kind.value)}
+                style={[styles.chip, tplKind === kind.value && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, tplKind === kind.value && styles.chipTextActive]}>
+                  {kind.label}
+                </Text>
               </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-              <View style={{ gap: 8, paddingBottom: 12 }}>
-                <Text style={styles.label}>Tên biểu mẫu *</Text>
-                <TextInput
-                  value={tplName}
-                  onChangeText={setTplName}
-                  placeholder="VD: Đơn xin nghỉ phép năm"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-                <Text style={styles.label}>Nhóm yêu cầu</Text>
-                <View style={styles.wrapRow}>
-                  {REQUEST_KINDS.map((kind) => (
+            ))}
+          </View>
+          <Text style={styles.label}>Tệp biểu mẫu *</Text>
+          <Pressable onPress={() => void pickTplFile()} style={styles.uploadBtn}>
+            <Upload size={14} color={colors.primary} />
+            <Text style={styles.uploadBtnText}>
+              {tplFile ? `Đã chọn: ${tplFile.name}` : 'Chọn tệp biểu mẫu từ thiết bị'}
+            </Text>
+          </Pressable>
+          {tplFile ? (
+            <Pressable onPress={() => setTplFile(null)} style={{ alignSelf: 'flex-start' }}>
+              <Text style={{ color: '#B91C1C', fontSize: 10, fontWeight: '700' }}>
+                Bỏ tệp đã chọn
+              </Text>
+            </Pressable>
+          ) : null}
+          <Text style={styles.label}>Hoặc dán link tệp (tùy chọn)</Text>
+          <TextInput
+            value={tplUrl}
+            onChangeText={setTplUrl}
+            autoCapitalize="none"
+            placeholder="https://..."
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Pressable
+            disabled={savingTpl}
+            onPress={() => void onCreateTemplate()}
+            style={[styles.submitBtn, savingTpl && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingTpl ? 'Đang tải lên...' : 'Tải lên biểu mẫu'}
+            </Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
+
+      {/* Application Detail Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(detailApp)}
+        title="Chi tiết đơn từ"
+        onClose={() => setDetailApp(null)}
+      >
+        {detailApp ? (
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.rowTitle}>
+              {detailApp.employeeName || detailApp.applicantName || 'Nhân viên'}
+            </Text>
+            <Text style={styles.subMeta}>
+              Nhóm yêu cầu: {getKindLabel(detailApp.requestKind)} · Loại đơn:{' '}
+              {getTypeLabel(detailApp.type || detailApp.leaveType || detailApp.templateName)}
+            </Text>
+            <Text style={styles.subMeta}>
+              Thời gian: {formatViDate(detailApp.startDate)} → {formatViDate(detailApp.endDate)}
+            </Text>
+            <Text style={styles.subMeta}>
+              Trạng thái:{' '}
+              {detailApp.status === 'approved'
+                ? 'Đã duyệt'
+                : detailApp.status === 'rejected'
+                  ? 'Từ chối'
+                  : 'Chờ duyệt'}
+            </Text>
+            {detailApp.reason ? (
+              <>
+                <Text style={styles.label}>Lý do / Nội dung</Text>
+                <Text style={styles.muted}>{detailApp.reason}</Text>
+              </>
+            ) : null}
+            {detailApp.status === 'rejected' && detailApp.rejectReason ? (
+              <View style={styles.rejectBox}>
+                <Text style={styles.rejectBoxText}>
+                  Lý do từ chối: {detailApp.rejectReason}
+                </Text>
+              </View>
+            ) : null}
+            {((detailApp.attachments && detailApp.attachments.length > 0) ||
+              detailApp.uploadedFileUrl) ? (
+              <>
+                <Text style={styles.label}>Tệp đính kèm</Text>
+                <View style={styles.attachWrap}>
+                  {(detailApp.attachments?.length
+                    ? detailApp.attachments
+                    : [
+                        {
+                          url: detailApp.uploadedFileUrl!,
+                          name: detailApp.uploadedFileName || 'Tệp đính kèm',
+                        },
+                      ]
+                  ).map((att, idx) => (
                     <Pressable
-                      key={kind.value}
-                      onPress={() => setTplKind(kind.value)}
-                      style={[styles.chip, tplKind === kind.value && styles.chipActive]}
+                      key={idx}
+                      onPress={() => void Linking.openURL(att.url)}
+                      style={styles.attachChip}
                     >
-                      <Text style={[styles.chipText, tplKind === kind.value && styles.chipTextActive]}>
-                        {kind.label}
+                      <Paperclip size={11} color={colors.primary} />
+                      <Text style={styles.attachText}>
+                        {att.name || 'Xem tệp đính kèm'}
                       </Text>
                     </Pressable>
                   ))}
                 </View>
-                <Text style={styles.label}>Tệp biểu mẫu *</Text>
-                <Pressable onPress={() => void pickTplFile()} style={styles.uploadBtn}>
-                  <Upload size={14} color={colors.primary} />
-                  <Text style={styles.uploadBtnText}>
-                    {tplFile ? `Đã chọn: ${tplFile.name}` : 'Chọn tệp biểu mẫu từ thiết bị'}
-                  </Text>
-                </Pressable>
-                {tplFile ? (
-                  <Pressable onPress={() => setTplFile(null)} style={{ alignSelf: 'flex-start' }}>
-                    <Text style={{ color: '#B91C1C', fontSize: 10, fontWeight: '700' }}>
-                      Bỏ tệp đã chọn
-                    </Text>
-                  </Pressable>
-                ) : null}
-                <Text style={styles.label}>Hoặc dán link tệp (tùy chọn)</Text>
-                <TextInput
-                  value={tplUrl}
-                  onChangeText={setTplUrl}
-                  autoCapitalize="none"
-                  placeholder="https://..."
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-                <Pressable
-                  disabled={savingTpl}
-                  onPress={() => void onCreateTemplate()}
-                  style={[styles.submitBtn, savingTpl && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {savingTpl ? 'Đang tải lên...' : 'Tải lên biểu mẫu'}
-                  </Text>
-                </Pressable>
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Application Detail Modal */}
-      <Modal
-        visible={Boolean(detailApp)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDetailApp(null)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setDetailApp(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            {detailApp ? (
-              <>
-                <View style={styles.headRow}>
-                  <Text style={styles.sheetTitle}>Chi tiết đơn từ</Text>
-                  <Pressable onPress={() => setDetailApp(null)}>
-                    <Text style={styles.closeText}>Đóng</Text>
-                  </Pressable>
-                </View>
-                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-                  <View style={{ gap: 8, paddingBottom: 12 }}>
-                    <Text style={styles.rowTitle}>
-                      {detailApp.employeeName || detailApp.applicantName || 'Nhân viên'}
-                    </Text>
-                    <Text style={styles.subMeta}>
-                      Nhóm yêu cầu: {getKindLabel(detailApp.requestKind)} · Loại đơn:{' '}
-                      {getTypeLabel(detailApp.type || detailApp.leaveType || detailApp.templateName)}
-                    </Text>
-                    <Text style={styles.subMeta}>
-                      Thời gian: {formatViDate(detailApp.startDate)} → {formatViDate(detailApp.endDate)}
-                    </Text>
-                    <Text style={styles.subMeta}>
-                      Trạng thái:{' '}
-                      {detailApp.status === 'approved'
-                        ? 'Đã duyệt'
-                        : detailApp.status === 'rejected'
-                          ? 'Từ chối'
-                          : 'Chờ duyệt'}
-                    </Text>
-                    {detailApp.reason ? (
-                      <>
-                        <Text style={styles.label}>Lý do / Nội dung</Text>
-                        <Text style={styles.muted}>{detailApp.reason}</Text>
-                      </>
-                    ) : null}
-                    {detailApp.status === 'rejected' && detailApp.rejectReason ? (
-                      <View style={styles.rejectBox}>
-                        <Text style={styles.rejectBoxText}>
-                          Lý do từ chối: {detailApp.rejectReason}
-                        </Text>
-                      </View>
-                    ) : null}
-                    {((detailApp.attachments && detailApp.attachments.length > 0) ||
-                      detailApp.uploadedFileUrl) ? (
-                      <>
-                        <Text style={styles.label}>Tệp đính kèm</Text>
-                        <View style={styles.attachWrap}>
-                          {(detailApp.attachments?.length
-                            ? detailApp.attachments
-                            : [
-                                {
-                                  url: detailApp.uploadedFileUrl!,
-                                  name: detailApp.uploadedFileName || 'Tệp đính kèm',
-                                },
-                              ]
-                          ).map((att, idx) => (
-                            <Pressable
-                              key={idx}
-                              onPress={() => void Linking.openURL(att.url)}
-                              style={styles.attachChip}
-                            >
-                              <Paperclip size={11} color={colors.primary} />
-                              <Text style={styles.attachText}>
-                                {att.name || 'Xem tệp đính kèm'}
-                              </Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      </>
-                    ) : null}
-
-                    {canApprove && (detailApp.status || 'pending') === 'pending' ? (
-                      <View style={styles.decideRow}>
-                        <Pressable
-                          disabled={decidingId === detailApp.id}
-                          onPress={() => {
-                            const target = detailApp;
-                            setDetailApp(null);
-                            void onApprove(target);
-                          }}
-                          style={styles.approveBtn}
-                        >
-                          <Check size={14} color={colors.white} />
-                          <Text style={styles.decideBtnText}>Phê duyệt</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={decidingId === detailApp.id}
-                          onPress={() => {
-                            const target = detailApp;
-                            setDetailApp(null);
-                            setRejectTarget(target);
-                            setRejectReason('');
-                          }}
-                          style={styles.rejectBtn}
-                        >
-                          <XCircle size={14} color={colors.white} />
-                          <Text style={styles.decideBtnText}>Từ chối</Text>
-                        </Pressable>
-                      </View>
-                    ) : null}
-                  </View>
-                </ScrollView>
               </>
             ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
+
+            {canApprove && (detailApp.status || 'pending') === 'pending' ? (
+              <View style={styles.decideRow}>
+                <Pressable
+                  disabled={decidingId === detailApp.id}
+                  onPress={() => {
+                    const target = detailApp;
+                    setDetailApp(null);
+                    void onApprove(target);
+                  }}
+                  style={styles.approveBtn}
+                >
+                  <Check size={14} color={colors.white} />
+                  <Text style={styles.decideBtnText}>Phê duyệt</Text>
+                </Pressable>
+                <Pressable
+                  disabled={decidingId === detailApp.id}
+                  onPress={() => {
+                    const target = detailApp;
+                    setDetailApp(null);
+                    setRejectTarget(target);
+                    setRejectReason('');
+                  }}
+                  style={styles.rejectBtn}
+                >
+                  <XCircle size={14} color={colors.white} />
+                  <Text style={styles.decideBtnText}>Từ chối</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </FullScreenFormModal>
     </ScrollView>
   );
 }
