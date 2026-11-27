@@ -1,8 +1,25 @@
 import { Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LucideIcon } from 'lucide-react-native';
-import { Building2, CalendarDays, Check, ChevronDown, ClipboardList, FileText, GraduationCap, MapPinned, NotebookText, Target, Users, Wallet, Workflow } from 'lucide-react-native';
+import {
+  Building2,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  FileText,
+  GraduationCap,
+  MapPinned,
+  NotebookText,
+  Target,
+  Users,
+  Wallet,
+  Workflow,
+} from 'lucide-react-native';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { HrBranchesPanel } from '@/features/hr/sections/HrBranchesPanel';
 import { HrContractsPanel } from '@/features/hr/sections/HrContractsPanel';
@@ -21,27 +38,39 @@ import type { HrTabId } from '@/features/hr/types';
 import { fetchCompanyBranches, type ErpBranch } from '@/features/overview/overviewApi';
 import { colors } from '@/theme/colors';
 
-const HR_TABS: Array<{ key: HrTabId; label: string; icon: LucideIcon; readPermissions?: string[] }> = [
-  { key: 'employees', label: 'Danh sách nhân sự', icon: Users },
-  { key: 'departments', label: 'Phòng ban', icon: Building2, readPermissions: ['hr:read', 'access:read', 'hr:manage', 'access:manage'] },
-  { key: 'branches', label: 'Chi nhánh', icon: MapPinned, readPermissions: ['access:read', 'hr:read'] },
-  { key: 'training', label: 'Đào tạo', icon: GraduationCap, readPermissions: ['hr:read', 'hr:manage'] },
-  { key: 'workflows', label: 'Quy trình', icon: Workflow, readPermissions: ['hr:read', 'hr:manage'] },
-  { key: 'tasks', label: 'Giao việc', icon: ClipboardList },
-  { key: 'attendance', label: 'Lịch & Chấm công', icon: CalendarDays },
-  { key: 'leaves', label: 'Đơn từ', icon: NotebookText },
-  { key: 'contracts', label: 'Hợp đồng', icon: FileText },
-  { key: 'payroll', label: 'Bảng lương', icon: Wallet },
-  { key: 'recruitment', label: 'Tuyển dụng', icon: Target },
+type HrTabMeta = {
+  key: HrTabId;
+  label: string;
+  subtitle: string;
+  icon: LucideIcon;
+  accent: string;
+  tone: string;
+  readPermissions?: string[];
+};
+
+const HR_TABS: HrTabMeta[] = [
+  { key: 'employees', label: 'Danh sách nhân sự', subtitle: 'Danh bạ, hồ sơ & liên hệ nhân sự', icon: Users, accent: '#2563EB', tone: '#EAF2FF' },
+  { key: 'departments', label: 'Phòng ban', subtitle: 'Cơ cấu & quản lý các phòng ban', icon: Building2, accent: '#7C3AED', tone: '#F3E8FF', readPermissions: ['hr:read', 'access:read', 'hr:manage', 'access:manage'] },
+  { key: 'branches', label: 'Chi nhánh', subtitle: 'Danh sách trụ sở & chi nhánh', icon: MapPinned, accent: '#0EA5E9', tone: '#E0F2FE', readPermissions: ['access:read', 'hr:read'] },
+  { key: 'training', label: 'Đào tạo', subtitle: 'Khóa học & tiến độ đào tạo nội bộ', icon: GraduationCap, accent: '#10B981', tone: '#E9F8F1', readPermissions: ['hr:read', 'hr:manage'] },
+  { key: 'workflows', label: 'Quy trình', subtitle: 'Quy trình vận hành & biểu mẫu HR', icon: Workflow, accent: '#6366F1', tone: '#EEF2FF', readPermissions: ['hr:read', 'hr:manage'] },
+  { key: 'tasks', label: 'Giao việc', subtitle: 'Bảng công việc & theo dõi tiến độ', icon: ClipboardList, accent: '#F97316', tone: '#FFF3E5' },
+  { key: 'attendance', label: 'Lịch & Chấm công', subtitle: 'Lịch làm việc & dữ liệu chấm công', icon: CalendarDays, accent: '#0891B2', tone: '#E8F7FA' },
+  { key: 'leaves', label: 'Đơn từ', subtitle: 'Nghỉ phép, tăng ca & phê duyệt', icon: NotebookText, accent: '#D97706', tone: '#FEF3C7' },
+  { key: 'contracts', label: 'Hợp đồng', subtitle: 'Hợp đồng lao động & gia hạn', icon: FileText, accent: '#E11D48', tone: '#FFE4E6' },
+  { key: 'payroll', label: 'Bảng lương', subtitle: 'Kỳ lương, phiếu lương & thanh toán', icon: Wallet, accent: '#16A34A', tone: '#ECFDF3' },
+  { key: 'recruitment', label: 'Tuyển dụng', subtitle: 'Tin tuyển dụng & hồ sơ ứng viên', icon: Target, accent: '#EC4899', tone: '#FCE7F3' },
 ];
 
 export function HrModuleScreen() {
+  const insets = useSafeAreaInsets();
   const {
     user,
     activeBranchId: selectedBranchId,
     setActiveBranchId: setSelectedBranchId,
   } = useAuth();
   const [activeTab, setActiveTab] = useState<HrTabId>('employees');
+  const [tabPickerOpen, setTabPickerOpen] = useState(false);
 
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const isManager = isAdmin || user?.role === 'manager';
@@ -88,6 +117,24 @@ export function HrModuleScreen() {
   const activeVisibleTab = visibleTabs.some((tab) => tab.key === activeTab)
     ? activeTab
     : visibleTabs[0]?.key ?? activeTab;
+  const activeTabMeta = useMemo(
+    () => visibleTabs.find((t) => t.key === activeVisibleTab) ?? visibleTabs[0],
+    [activeVisibleTab, visibleTabs],
+  );
+  const currentTabIndex = useMemo(
+    () => Math.max(0, visibleTabs.findIndex((t) => t.key === activeVisibleTab)),
+    [activeVisibleTab, visibleTabs],
+  );
+  const onStepTab = useCallback(
+    (delta: -1 | 1) => {
+      if (visibleTabs.length <= 1) return;
+      const nextIndex = (currentTabIndex + delta + visibleTabs.length) % visibleTabs.length;
+      const target = visibleTabs[nextIndex];
+      if (target) setActiveTab(target.key);
+    },
+    [currentTabIndex, visibleTabs],
+  );
+  const ActiveTabIcon = activeTabMeta?.icon ?? Users;
 
   return (
     <View style={styles.root}>
@@ -107,30 +154,66 @@ export function HrModuleScreen() {
         }}
       />
 
-      {/* Horizontal HR sub-module navigation */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabsRow}
-        style={styles.tabsScroll}
-      >
-        {visibleTabs.map((tab) => {
-          const active = activeVisibleTab === tab.key;
-          const Icon = tab.icon;
-          return (
+      {/* Compact Overview-style HR sub-module switcher bar */}
+      {activeTabMeta ? (
+        <View style={styles.switcherWrap}>
+          <View style={styles.switcherBar}>
             <Pressable
-              key={tab.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              onPress={() => setActiveTab(tab.key)}
-              style={[styles.tabPill, active && styles.tabPillActive]}
+              accessibilityRole="button"
+              accessibilityLabel="Mục nhân sự trước"
+              disabled={visibleTabs.length <= 1}
+              onPress={() => onStepTab(-1)}
+              style={({ pressed }) => [
+                styles.switcherNavBtn,
+                visibleTabs.length <= 1 && styles.switcherNavBtnDisabled,
+                pressed && styles.switcherNavBtnPressed,
+              ]}
             >
-              <Icon size={15} color={active ? colors.primary : colors.muted} />
-              <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+              <ChevronLeft size={18} color={colors.ink} />
             </Pressable>
-          );
-        })}
-      </ScrollView>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Chọn mục nhân sự"
+              disabled={visibleTabs.length <= 1}
+              onPress={() => setTabPickerOpen(true)}
+              style={({ pressed }) => [
+                styles.switcherCenter,
+                pressed && visibleTabs.length > 1 && styles.switcherCenterPressed,
+              ]}
+            >
+              <View style={styles.switcherTitleRow}>
+                <View style={[styles.switcherIconBadge, { backgroundColor: activeTabMeta.tone }]}>
+                  <ActiveTabIcon size={14} strokeWidth={1.9} color={activeTabMeta.accent} />
+                </View>
+                <Text numberOfLines={1} style={styles.switcherTitle}>
+                  {activeTabMeta.label}
+                </Text>
+                {visibleTabs.length > 1 ? (
+                  <ChevronDown size={15} color={colors.muted} />
+                ) : null}
+              </View>
+              <Text numberOfLines={1} style={styles.switcherSubtitle}>
+                {activeTabMeta.subtitle}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mục nhân sự tiếp theo"
+              disabled={visibleTabs.length <= 1}
+              onPress={() => onStepTab(1)}
+              style={({ pressed }) => [
+                styles.switcherNavBtn,
+                visibleTabs.length <= 1 && styles.switcherNavBtnDisabled,
+                pressed && styles.switcherNavBtnPressed,
+              ]}
+            >
+              <ChevronRight size={18} color={colors.ink} />
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {/* Active panel */}
       <View style={styles.body}>
@@ -196,6 +279,57 @@ export function HrModuleScreen() {
         )}
       </View>
 
+      {/* Bottom sheet modal to choose among HR sub-modules */}
+      <Modal
+        visible={tabPickerOpen}
+        transparent
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => setTabPickerOpen(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setTabPickerOpen(false)}>
+          <Pressable
+            style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
+            onPress={() => {}}
+          >
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn nghiệp vụ nhân sự</Text>
+              <Pressable onPress={() => setTabPickerOpen(false)} hitSlop={8}>
+                <Text style={styles.modalClose}>Đóng</Text>
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
+              {visibleTabs.map((tab) => {
+                const active = tab.key === activeVisibleTab;
+                const Icon = tab.icon;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    onPress={() => {
+                      setActiveTab(tab.key);
+                      setTabPickerOpen(false);
+                    }}
+                    style={[styles.modalRow, active && styles.modalRowActive]}
+                  >
+                    <View style={[styles.modalIcon, { backgroundColor: tab.tone }]}>
+                      <Icon size={19} strokeWidth={1.8} color={tab.accent} />
+                    </View>
+                    <View style={styles.modalRowCopy}>
+                      <Text style={styles.modalRowTitle}>{tab.label}</Text>
+                      <Text numberOfLines={1} style={styles.modalRowSub}>
+                        {tab.subtitle}
+                      </Text>
+                    </View>
+                    {active ? <Check size={17} color={colors.primary} /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Branch picker modal */}
       <Modal
         visible={branchModalOpen}
@@ -244,22 +378,141 @@ const styles = StyleSheet.create({
   },
   branchBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   branchBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  tabsScroll: { flexGrow: 0, marginBottom: 10 },
-  tabsRow: { paddingHorizontal: 18, gap: 7 },
-  tabPill: {
+  switcherWrap: {
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  switcherBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
     backgroundColor: colors.white,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 99,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5EAF2',
+    paddingHorizontal: 6,
+    paddingVertical: 8,
   },
-  tabPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { color: colors.ink, fontSize: 11, fontWeight: '700' },
-  tabTextActive: { color: colors.white },
+  switcherNavBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F8FD',
+  },
+  switcherNavBtnDisabled: {
+    opacity: 0.35,
+  },
+  switcherNavBtnPressed: {
+    backgroundColor: '#E8F0FC',
+  },
+  switcherCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  switcherCenterPressed: {
+    opacity: 0.72,
+  },
+  switcherTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  switcherIconBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switcherTitle: {
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  switcherSubtitle: {
+    color: colors.muted,
+    fontSize: 10.5,
+    fontWeight: '400',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    maxHeight: '78%',
+  },
+  modalHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 99,
+    backgroundColor: '#D6DFEC',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    color: colors.ink,
+    fontSize: 15.5,
+    fontWeight: '600',
+  },
+  modalClose: {
+    color: colors.primary,
+    fontSize: 12.5,
+    fontWeight: '500',
+  },
+  modalList: {
+    flexGrow: 0,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 11,
+    borderRadius: 14,
+    gap: 12,
+    marginBottom: 6,
+  },
+  modalRowActive: {
+    backgroundColor: '#F0F6FF',
+  },
+  modalIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalRowCopy: {
+    flex: 1,
+  },
+  modalRowTitle: {
+    color: colors.ink,
+    fontSize: 13.5,
+    fontWeight: '500',
+  },
+  modalRowSub: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '400',
+    marginTop: 2,
+  },
   body: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
   sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 10 },
