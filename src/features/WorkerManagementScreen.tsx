@@ -30,8 +30,8 @@ import {
 type Tab = 'projects' | 'workers' | 'contracts' | 'notifications';
 
 const WORKER_TAB_PALETTES: Record<Tab, { from: string; to: string; accent: string }> = {
-  projects: { from: '#22CA7E', to: '#0DA361', accent: '#14B06B' },
-  workers: { from: '#28C4FF', to: '#0B8CE8', accent: '#1299EE' },
+  projects: { from: '#3E7EFF', to: '#1E54E8', accent: '#2860EE' },
+  workers: { from: '#86DA1C', to: '#4BB60B', accent: '#5DC210' },
   contracts: { from: '#8E63FA', to: '#5E38E8', accent: '#6C42EE' },
   notifications: { from: '#FF9E2C', to: '#EB6209', accent: '#F27814' },
 };
@@ -53,7 +53,7 @@ function WorkerTabIcon({ id, size = 24 }: { id: Tab; size?: number }) {
           <Path
             d="M22 18.8V16.8C22 15.1 23.4 13.8 25 13.8H31C32.6 13.8 34 15.1 34 16.8V18.8"
             stroke="#FFFFFF"
-            strokeOpacity={0.85}
+            strokeOpacity={0.82}
             strokeWidth="3"
             strokeLinecap="round"
             fill="none"
@@ -64,16 +64,19 @@ function WorkerTabIcon({ id, size = 24 }: { id: Tab; size?: number }) {
         </>
       ) : id === 'workers' ? (
         <>
-          <Circle cx="36.2" cy="22.8" r="4.1" fill="#FFFFFF" fillOpacity={0.72} />
           <Path
-            d="M32.4 37.8C32.7 33.2 35.5 30.2 39.2 30.2C42.1 30.2 44.3 32.1 45 35.2C45.3 36.6 44.3 37.8 42.9 37.8H32.4Z"
+            d="M16.5 28.5V26.2C16.5 20.1 21.4 15.2 27.5 15.2H28.5C34.6 15.2 39.5 20.1 39.5 26.2V28.5H16.5Z"
             fill="#FFFFFF"
-            fillOpacity={0.72}
           />
-          <Circle cx="23.5" cy="21.2" r="5.5" fill="#FFFFFF" />
+          <Rect x="26.1" y="13.5" width="3.8" height="10.5" rx="1.9" fill="#FFFFFF" />
+          <Rect x="13.2" y="27.2" width="29.6" height="4.1" rx="2.05" fill="#FFFFFF" />
           <Path
-            d="M12.5 38.5C12.5 32.6 17.2 28.8 23.5 28.8C29.8 28.8 34.5 32.6 34.5 38.5C34.5 39.7 33.5 40.7 32.3 40.7H14.7C13.5 40.7 12.5 39.7 12.5 38.5Z"
-            fill="#FFFFFF"
+            d="M18.2 34.8C20.5 38.4 24 40.3 28 40.3C32 40.3 35.5 38.4 37.8 34.8"
+            stroke="#FFFFFF"
+            strokeOpacity={0.88}
+            strokeWidth="3.6"
+            strokeLinecap="round"
+            fill="none"
           />
         </>
       ) : id === 'contracts' ? (
@@ -102,6 +105,8 @@ function WorkerTabIcon({ id, size = 24 }: { id: Tab; size?: number }) {
             fill="#FFFFFF"
             fillOpacity={0.86}
           />
+          <Circle cx="35.8" cy="18.2" r="3.4" fill={palette.accent} />
+          <Circle cx="35.8" cy="18.2" r="2.2" fill="#FFFFFF" />
         </>
       )}
     </Svg>
