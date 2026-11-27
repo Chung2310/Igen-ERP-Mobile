@@ -589,7 +589,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
                 accessibilityLabel="Mở thông báo"
                 style={({ pressed }) => [styles.notifBtn, pressed && styles.assistantBtnPressed]}
               >
-                <Bell size={19} strokeWidth={1.7} color={colors.ink} />
+                <Bell size={22} strokeWidth={1.85} color={colors.ink} />
                 {unreadNotifications > 0 ? (
                   <View style={styles.notifBadge}>
                     <Text style={styles.notifBadgeText}>
@@ -857,24 +857,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   notifBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#D4E4F7',
+    borderColor: '#CFE0F5',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   notifBadge: {
     position: 'absolute',
-    top: -2,
-    right: -3,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3.5,
+    top: -1,
+    right: -2,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 8.5,
+    paddingHorizontal: 4,
     backgroundColor: '#D92D20',
     borderWidth: 1.5,
     borderColor: colors.white,
@@ -883,8 +883,8 @@ const styles = StyleSheet.create({
   },
   notifBadgeText: {
     color: colors.white,
-    fontSize: 8.5,
-    lineHeight: 10,
+    fontSize: 9,
+    lineHeight: 10.5,
     fontWeight: '700',
   },
   assistantBtn: {
