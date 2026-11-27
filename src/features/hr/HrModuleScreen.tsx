@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { HrTabIcon } from '@/components/HrTabIcons';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { HrBranchesPanel } from '@/features/hr/sections/HrBranchesPanel';
@@ -120,6 +121,8 @@ export function HrModuleScreen() {
     <View style={[styles.root, activeVisibleTab === 'employees' && styles.rootWhite]}>
       <Stack.Screen
         options={{
+          headerStyle: { backgroundColor: '#D8EFFC' },
+          headerShadowVisible: false,
           headerRight:
             branches.length > 0 && canSwitchBranch
               ? () => (
@@ -133,6 +136,71 @@ export function HrModuleScreen() {
               : undefined,
         }}
       />
+
+      {/* Soft icy-sky pastel gradient background with subtle geometric motifs matching Overview */}
+      <View
+        pointerEvents="none"
+        style={activeVisibleTab === 'employees' ? styles.topZoneBackdrop : StyleSheet.absoluteFill}
+      >
+        <Svg
+          width="100%"
+          height="100%"
+          viewBox={activeVisibleTab === 'employees' ? '0 0 360 96' : '0 0 360 760'}
+          preserveAspectRatio="none"
+        >
+          <Defs>
+            <LinearGradient id="hrBg" x1="0" y1="0" x2="0.15" y2="1">
+              <Stop offset="0" stopColor="#D8EFFC" stopOpacity="1" />
+              <Stop offset="0.45" stopColor="#EAF3FC" stopOpacity="1" />
+              <Stop offset="1" stopColor={activeVisibleTab === 'employees' ? '#F5FAFE' : '#F5F7FC'} stopOpacity="1" />
+            </LinearGradient>
+            <RadialGradient id="hrGlowTopRight" cx="86%" cy="10%" rx="52%" ry="42%">
+              <Stop offset="0" stopColor="#8FD3FA" stopOpacity="0.48" />
+              <Stop offset="1" stopColor="#8FD3FA" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect
+            x="0"
+            y="0"
+            width="360"
+            height={activeVisibleTab === 'employees' ? '96' : '760'}
+            fill="url(#hrBg)"
+          />
+          <Rect
+            x="0"
+            y="0"
+            width="360"
+            height={activeVisibleTab === 'employees' ? '96' : '760'}
+            fill="url(#hrGlowTopRight)"
+          />
+          <Path
+            d="M 190 96 C 242 66, 298 58, 360 36 L 360 96 Z"
+            fill="#2463EB"
+            fillOpacity={0.04}
+          />
+          <Circle
+            cx="328"
+            cy="14"
+            r="54"
+            fill="none"
+            stroke="#2463EB"
+            strokeOpacity={0.075}
+            strokeWidth={1.2}
+          />
+          <Circle
+            cx="328"
+            cy="14"
+            r="32"
+            fill="none"
+            stroke="#2463EB"
+            strokeOpacity={0.065}
+            strokeWidth={1}
+          />
+          <Circle cx="246" cy="18" r="2.1" fill="#2463EB" fillOpacity={0.11} />
+          <Circle cx="260" cy="12" r="1.7" fill="#2463EB" fillOpacity={0.08} />
+          <Circle cx="258" cy="26" r="1.5" fill="#2463EB" fillOpacity={0.09} />
+        </Svg>
+      </View>
 
       {/* Compact Overview-style HR sub-module switcher bar */}
       {activeTabMeta ? (
@@ -341,11 +409,19 @@ export function HrModuleScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background, paddingTop: 8 },
+  root: { flex: 1, backgroundColor: '#D8EFFC' },
   rootWhite: { backgroundColor: colors.white },
+  topZoneBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 78,
+    overflow: 'hidden',
+  },
   headerBranchBtn: {
-    backgroundColor: '#EAF2FF',
-    borderColor: '#D6E5FF',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderColor: '#CBE0F6',
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -356,7 +432,8 @@ const styles = StyleSheet.create({
   branchBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
   switcherWrap: {
     paddingHorizontal: 14,
-    marginBottom: 12,
+    paddingTop: 4,
+    paddingBottom: 10,
   },
   switcherBar: {
     flexDirection: 'row',
