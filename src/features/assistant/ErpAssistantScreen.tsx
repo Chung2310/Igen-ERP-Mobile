@@ -325,11 +325,7 @@ export function ErpAssistantScreen({
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (event) => {
       const rawHeight = event.endCoordinates?.height ?? 0;
-      const adjusted =
-        Platform.OS === 'android'
-          ? Math.max(0, rawHeight - (chatOnly ? insets.bottom : 0))
-          : rawHeight;
-      setKeyboardHeight(adjusted);
+      setKeyboardHeight(rawHeight);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
