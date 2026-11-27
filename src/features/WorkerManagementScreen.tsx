@@ -1,6 +1,7 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { CenteredPageLoader } from '@/components/BrandLoader';
 import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
+import { BranchAppIcon } from '@/components/OverviewTabIcons';
 import { PASTEL_BACKDROP_TOP_COLOR, PastelBackdrop } from '@/components/PastelBackdrop';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -644,8 +645,18 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
       headerStyle: { backgroundColor: PASTEL_BACKDROP_TOP_COLOR },
       headerShadowVisible: false,
       headerRight: branches.length > 0 && canSwitchBranch ? () => (
-        <Pressable onPress={() => setBranchPickerOpen(true)} style={styles.headerBranchBtn} accessibilityRole="button" accessibilityLabel="Chọn chi nhánh để xem dữ liệu lao động">
-          <View style={styles.branchBtnContent}><Text numberOfLines={1} style={styles.branchBtnText}>{branchesLoading ? 'Đang tải…' : branchName}</Text><ChevronDown size={14} color={colors.primary} /></View>
+        <Pressable
+          disabled={branches.length <= 1}
+          onPress={() => setBranchPickerOpen(true)}
+          style={({ pressed }) => [styles.headerBranchBtn, pressed && branches.length > 1 && { opacity: 0.72 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Chọn chi nhánh để xem dữ liệu lao động"
+        >
+          <View style={styles.branchBtnContent}>
+            <BranchAppIcon size={22} />
+            <Text numberOfLines={1} style={styles.branchBtnText}>{branchesLoading ? 'Đang tải…' : branchName}</Text>
+            {branches.length > 1 ? <ChevronDown size={14} color={colors.ink} /> : null}
+          </View>
         </Pressable>
       ) : undefined,
     }} />
@@ -688,25 +699,37 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
       {!loading && !notifications.length && <Empty text="Chưa có thông báo." />}
     </ScrollView>}
     </Animated.View>
-    <Modal visible={branchPickerOpen} transparent animationType="fade" onRequestClose={() => setBranchPickerOpen(false)}>
-      <View style={styles.backdrop}><View style={styles.dialog}>
-        <ModalHeader title="Chọn chi nhánh" onClose={() => setBranchPickerOpen(false)} />
-        <ScrollView style={{ maxHeight: 420 }}>{branches.map((branch) => {
-          const selected = branch._id === branchId;
-          return <Pressable key={branch._id} onPress={() => {
-            if (!selected) {
-              setActiveBranchId(branch._id);
-              setWorkers([]); setProjects([]); setContracts([]); setNotifications([]); setAttendance([]);
-              setWorkerDetail(null); setProjectDetail(null); setAttendanceProject(null); setQrSession(null);
-              setError('');
-            }
-            setBranchPickerOpen(false);
-          }} style={[styles.branchOption, selected && styles.branchOptionSelected]}>
-            <View style={{ flex: 1 }}><Text style={styles.cardTitle}>{branch.name}</Text>{branch.code ? <Text style={styles.muted}>{branch.code}</Text> : null}</View>
-            {selected ? <Check size={17} color={colors.primary} /> : null}
-          </Pressable>;
-        })}</ScrollView>
-      </View></View>
+    <Modal visible={branchPickerOpen} transparent animationType="slide" onRequestClose={() => setBranchPickerOpen(false)}>
+      <Pressable style={styles.sheetBackdrop} onPress={() => setBranchPickerOpen(false)}>
+        <Pressable style={styles.sheetModal} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Chọn chi nhánh</Text>
+            <Pressable onPress={() => setBranchPickerOpen(false)} hitSlop={8}>
+              <Text style={styles.sheetClose}>Đóng</Text>
+            </Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>{branches.map((branch) => {
+            const selected = branch._id === branchId;
+            return <Pressable key={branch._id} onPress={() => {
+              if (!selected) {
+                setActiveBranchId(branch._id);
+                setWorkers([]); setProjects([]); setContracts([]); setNotifications([]); setAttendance([]);
+                setWorkerDetail(null); setProjectDetail(null); setAttendanceProject(null); setQrSession(null);
+                setError('');
+              }
+              setBranchPickerOpen(false);
+            }} style={[styles.sheetRow, selected && styles.sheetRowActive]}>
+              <BranchAppIcon size={38} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetRowTitle}>{branch.name}</Text>
+                {branch.code ? <Text numberOfLines={1} style={styles.sheetRowSub}>Mã chi nhánh: {branch.code}</Text> : null}
+              </View>
+              {selected ? <Check size={17} color={colors.primary} /> : null}
+            </Pressable>;
+          })}</ScrollView>
+        </Pressable>
+      </Pressable>
     </Modal>
     <Modal visible={companyPickerOpen} transparent animationType="fade" onRequestClose={() => setCompanyPickerOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Chọn cơ sở lao động" onClose={() => setCompanyPickerOpen(false)} /><ScrollView style={{ maxHeight: 420 }}>{companies.map((item) => <Pressable key={item.code} onPress={() => { setCompanyCode(item.code); setCompanyPickerOpen(false); }} style={styles.option}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.muted}>{item.code}</Text></Pressable>)}</ScrollView></View></View></Modal>
     <Modal visible={contractFiltersOpen} transparent animationType="fade" onRequestClose={() => setContractFiltersOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Bộ lọc" onClose={() => setContractFiltersOpen(false)} /><ScrollView style={{ maxHeight: 520 }} contentContainerStyle={{ gap: 8 }}>
@@ -815,9 +838,19 @@ function Loading() { return <CenteredPageLoader />; }
 function Empty({ text }: { text: string }) { return <View style={styles.center}><Text style={styles.muted}>{text}</Text></View>; }
 
 const styles = StyleSheet.create({
-  headerBranchBtn: { backgroundColor: '#EAF2FF', borderColor: '#D6E5FF', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, maxWidth: 155 },
-  branchBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  branchBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  headerBranchBtn: { paddingVertical: 4, paddingLeft: 4, maxWidth: 190 },
+  branchBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  branchBtnText: { color: colors.ink, fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.35)', justifyContent: 'flex-end' },
+  sheetModal: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 28, maxHeight: '78%' },
+  sheetHandle: { width: 38, height: 4, borderRadius: 99, backgroundColor: '#D6DFEC', alignSelf: 'center', marginBottom: 12 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  sheetClose: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 14, gap: 12, marginBottom: 6 },
+  sheetRowActive: { backgroundColor: '#F0F6FF' },
+  sheetRowTitle: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+  sheetRowSub: { color: colors.muted, fontSize: 10, marginTop: 2 },
   qrLinkBox: { alignSelf: 'stretch', gap: 5, padding: 10, borderWidth: 1, borderColor: '#C9D9FF', borderRadius: 10, backgroundColor: '#F4F8FF' },
   qrLinkLabel: { color: colors.primary, fontSize: 9, fontWeight: '800', textAlign: 'center' },
   qrLinkText: { color: colors.ink, fontSize: 10, lineHeight: 16, textAlign: 'center' },
