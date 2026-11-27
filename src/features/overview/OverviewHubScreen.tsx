@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import {
+  Bell,
   Calendar,
   CalendarClock,
   CalendarDays,
@@ -31,6 +32,10 @@ import {
   type PopoverAnchor,
 } from '@/components/SectionHeading';
 import { useAuth } from '@/core/auth/AuthProvider';
+import {
+  getUserNotifications,
+  subscribeUnreadNotificationCount,
+} from '@/features/notifications/notificationsApi';
 import {
   fetchCompanyBranches,
   fetchDashboardSummary,
@@ -106,6 +111,21 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   const [branchPickerOpen, setBranchPickerOpen] = useState(false);
   const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
   const [periodMenuAnchor, setPeriodMenuAnchor] = useState<PopoverAnchor | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    void getUserNotifications({ page: 1, limit: 1 })
+      .then((res) => {
+        if (active) setUnreadNotifications(res.unreadCount || 0);
+      })
+      .catch(() => {});
+    const sub = subscribeUnreadNotificationCount(setUnreadNotifications);
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, [user?.id, user?._id]);
 
   const openPeriodMenu = useCallback((anchor: PopoverAnchor) => {
     setPeriodMenuAnchor(anchor);
@@ -562,15 +582,33 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
               {branches.length > 1 ? <ChevronDown size={14} color={colors.ink} /> : null}
             </View>
           </Pressable>
-          <Link href="/assistant-chat" asChild>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Mở trợ lý iGen AI"
-              style={({ pressed }) => [styles.assistantBtn, pressed && styles.assistantBtnPressed]}
-            >
-              <IgenAssistantAvatarIcon size={38} />
-            </Pressable>
-          </Link>
+          <View style={styles.topRightActions}>
+            <Link href="/(tabs)/notifications" asChild>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Mở thông báo"
+                style={({ pressed }) => [styles.notifBtn, pressed && styles.assistantBtnPressed]}
+              >
+                <Bell size={19} strokeWidth={1.7} color={colors.ink} />
+                {unreadNotifications > 0 ? (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>
+                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            </Link>
+            <Link href="/assistant-chat" asChild>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Mở trợ lý iGen AI"
+                style={({ pressed }) => [styles.assistantBtn, pressed && styles.assistantBtnPressed]}
+              >
+                <IgenAssistantAvatarIcon size={38} />
+              </Pressable>
+            </Link>
+          </View>
         </View>
 
         {/* Top Overview Tab Switcher Bar: Left / Center Dropdown / Right */}
@@ -812,6 +850,42 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '700',
     flexShrink: 1,
+  },
+  topRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  notifBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#D4E4F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -3,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3.5,
+    backgroundColor: '#D92D20',
+    borderWidth: 1.5,
+    borderColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifBadgeText: {
+    color: colors.white,
+    fontSize: 8.5,
+    lineHeight: 10,
+    fontWeight: '700',
   },
   assistantBtn: {
     width: 40,

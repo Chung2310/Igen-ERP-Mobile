@@ -133,6 +133,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="notifications"
         options={{
+          href: null,
           title: 'Thông báo',
           tabBarLabel: 'Thông báo',
           tabBarIcon: ({ color, focused }) => (
