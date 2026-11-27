@@ -84,9 +84,10 @@ export type RetailReport = {
 };
 export type RetailWarrantyRow = { id: string; orderId?: string; productId?: string; orderCode: string; invoiceNo?: string; customerName?: string; customerPhone?: string; sku?: string; productName: string; quantity: number; soldAt?: string; warrantyStartAt?: string; warrantyEndAt?: string; warrantyMonths?: number; status: string; daysLeft?: number | null };
 export type RetailSettings = { companyCode: string; branchId: string; customerTiers: Array<{ code: string; name: string; minSpend: number }>; allowNegativeStock: boolean; maxDiscountPercent: number; defaultTaxRate: number; varianceReasonThreshold: number; orderPrefix: string; invoicePrefix: string; invoicePaperSize: 'A4' | 'A5' | '80mm' | '58mm'; invoiceTemplate: 'standard' };
-export type RetailCoupon = { _id: string; code: string; name: string; discountType: 'amount' | 'percent'; value: number; minSubtotal: number; maxDiscount: number | null; usageLimit: number | null; usedCount: number; startsAt: string; endsAt: string; active: boolean; version: number };
+export type RetailCouponTier = { code: string; name: string };
+export type RetailCoupon = { _id: string; code: string; name: string; discountType: 'amount' | 'percent'; value: number; minSubtotal: number; maxDiscount: number | null; usageLimit: number | null; usedCount: number; startsAt: string; endsAt: string; active: boolean; version: number; customerTierCodes?: string[]; customerId?: string | null; customerName?: string; customerCode?: string };
 export type RetailCustomerOption = { customerId: string; customerCode: string; name: string; phone: string; tier?: { code: string; name: string } };
-export type RetailCouponAutomation = { _id: string; name: string; trigger: 'birthday' | 'order_total'; orderMinTotal: number | null; enabled: boolean; discountType: 'amount' | 'percent'; value: number; minSubtotal: number; maxDiscount: number | null; validityDays: number; version?: number };
+export type RetailCouponAutomation = { _id: string; name: string; trigger: 'birthday' | 'order_total'; orderMinTotal: number | null; enabled: boolean; discountType: 'amount' | 'percent'; value: number; minSubtotal: number; maxDiscount: number | null; validityDays: number; version?: number; deliveryChannels?: Array<'email'>; legacy?: boolean };
 export type RetailPointPolicy = { enabled: boolean; earnVndPerPoint: number; redeemVndPerPoint: number; maxRedeemPercent: number; version: number };
 export type RetailPointCustomer = { _id: string; customerCode: string; name: string; phone: string; pointsBalance?: number };
 export type RetailPointLedger = { _id: string; type: string; points: number; balanceAfter: number; reason: string; createdAt: string };
@@ -178,6 +179,9 @@ export const retailApi = {
   },
   coupons(scope: RetailScope, page = 1) {
     return data<{ items: RetailCoupon[]; total: number }>(`/retail/coupons${query({ ...scopeQuery(scope), page })}`);
+  },
+  couponTiers(scope: RetailScope) {
+    return data<RetailCouponTier[]>(`/retail/coupons/tiers${query({ companyCode: scope.companyCode, branchId: scope.branchId })}`);
   },
   saveCoupon(scope: RetailScope, input: Record<string, unknown>, id?: string) {
     return data<RetailCoupon>(`/retail/coupons${id ? `/${encodeURIComponent(id)}` : ''}${query(scopeQuery(scope))}`, { method: id ? 'PUT' : 'POST', body: input });

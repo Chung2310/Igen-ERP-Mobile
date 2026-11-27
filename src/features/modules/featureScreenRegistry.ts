@@ -17,6 +17,7 @@ import { WorkerManagementScreen } from '@/features/WorkerManagementScreen';
 import { StudentManagementScreen } from '@/features/StudentManagementScreen';
 import { RepairModuleScreen } from '@/features/RepairModuleScreen';
 import { RetailModuleScreen } from '@/features/retail/RetailModuleScreen';
+import { CustomerManagementScreen } from '@/features/CustomerManagementScreen';
 
 export type FeatureScreenProps = { module: ModuleDefinition };
 
@@ -39,6 +40,7 @@ const featureScreens: Partial<Record<string, ComponentType<FeatureScreenProps>>>
   'student-management': StudentManagementScreen,
   'repair-warranty': RepairModuleScreen,
   'retail-sales': RetailModuleScreen,
+  'customer-management': CustomerManagementScreen,
 };
 
 export function getFeatureScreen(slug: string) {
