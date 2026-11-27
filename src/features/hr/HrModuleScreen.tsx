@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { HrTabIcon } from '@/components/HrTabIcons';
+import { BranchAppIcon } from '@/components/OverviewTabIcons';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { HrBranchesPanel } from '@/features/hr/sections/HrBranchesPanel';
 import { HrContractsPanel } from '@/features/hr/sections/HrContractsPanel';
@@ -126,10 +127,15 @@ export function HrModuleScreen() {
           headerRight:
             branches.length > 0 && canSwitchBranch
               ? () => (
-                  <Pressable onPress={() => setBranchModalOpen(true)} style={styles.headerBranchBtn}>
+                  <Pressable
+                    onPress={() => setBranchModalOpen(true)}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.headerBranchBtn, pressed && { opacity: 0.65 }]}
+                  >
                     <View style={styles.branchBtnContent}>
+                      <BranchAppIcon size={22} />
                       <Text numberOfLines={1} style={styles.branchBtnText}>{activeBranchName}</Text>
-                      <ChevronDown size={14} color={colors.primary} />
+                      <ChevronDown size={14} color={colors.ink} />
                     </View>
                   </Pressable>
                 )
@@ -373,17 +379,27 @@ export function HrModuleScreen() {
         </Pressable>
       </Modal>
 
-      {/* Branch picker modal */}
+      {/* Branch picker modal matching Overview style */}
       <Modal
         visible={branchModalOpen}
         transparent
+        statusBarTranslucent
         animationType="slide"
         onRequestClose={() => setBranchModalOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setBranchModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.sheetTitle}>Chọn chi nhánh</Text>
-            <ScrollView style={{ maxHeight: 320 }}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setBranchModalOpen(false)}>
+          <Pressable
+            style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
+            onPress={() => {}}
+          >
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn chi nhánh</Text>
+              <Pressable onPress={() => setBranchModalOpen(false)} hitSlop={8}>
+                <Text style={styles.modalClose}>Đóng</Text>
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {branches.map((branch) => {
                 const selected = branch._id === activeBranchId;
                 return (
@@ -393,9 +409,17 @@ export function HrModuleScreen() {
                       setSelectedBranchId(branch._id);
                       setBranchModalOpen(false);
                     }}
-                    style={[styles.branchRow, selected && styles.branchRowActive]}
+                    style={[styles.modalRow, selected && styles.modalRowActive]}
                   >
-                    <Text style={styles.branchRowTitle}>{branch.name}</Text>
+                    <BranchAppIcon size={38} />
+                    <View style={styles.modalRowCopy}>
+                      <Text style={styles.modalRowTitle}>{branch.name}</Text>
+                      {branch.code ? (
+                        <Text numberOfLines={1} style={styles.modalRowSub}>
+                          Mã chi nhánh: {branch.code}
+                        </Text>
+                      ) : null}
+                    </View>
                     {selected ? <Check size={17} color={colors.primary} /> : null}
                   </Pressable>
                 );
@@ -420,16 +444,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   headerBranchBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderColor: '#CBE0F6',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 99,
-    maxWidth: 155,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    maxWidth: 185,
   },
-  branchBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  branchBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  branchBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  branchBtnText: { color: colors.ink, fontSize: 13, fontWeight: '700', flexShrink: 1 },
   switcherWrap: {
     paddingHorizontal: 14,
     paddingTop: 4,
