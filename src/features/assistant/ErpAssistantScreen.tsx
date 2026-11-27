@@ -313,25 +313,31 @@ export function ErpAssistantScreen({
   const [conversations, setConversations] = useState<AssistantConversationSummary[]>([]);
   const [historyActionItem, setHistoryActionItem] = useState<AssistantConversationSummary | null>(null);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const keyboardVisible = keyboardHeight > 0;
 
   const listRef = useRef<FlatList<AssistantChatMessage>>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, () => {
-      setKeyboardVisible(true);
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      const rawHeight = event.endCoordinates?.height ?? 0;
+      const adjusted =
+        Platform.OS === 'android'
+          ? Math.max(0, rawHeight - (chatOnly ? insets.bottom : 0))
+          : rawHeight;
+      setKeyboardHeight(adjusted);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardVisible(false);
+      setKeyboardHeight(0);
     });
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [chatOnly, insets.bottom]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -557,8 +563,12 @@ export function ErpAssistantScreen({
 
   const body = (
     <KeyboardAvoidingView
-      style={[styles.root, isChatSurface && styles.rootChat]}
-      behavior="padding"
+      style={[
+        styles.root,
+        isChatSurface && styles.rootChat,
+        Platform.OS === 'android' && keyboardHeight > 0 ? { paddingBottom: keyboardHeight } : null,
+      ]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? (chatOnly ? 0 : 84) : 0}
     >
       {/* Header */}
