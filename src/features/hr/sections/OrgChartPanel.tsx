@@ -13,7 +13,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ChevronDown, ChevronRight, Crown, FileText, Phone, Plus } from 'lucide-react-native';
+import { Building2, Check, ChevronDown, ChevronRight, Crown, FileText, Phone, Plus, Search } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -193,6 +194,7 @@ export function OrgChartPanel({
   companyCode?: string;
   branchId?: string;
 }) {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const currentUserId = user?._id || user?.id || '';
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
@@ -208,6 +210,7 @@ export function OrgChartPanel({
   const [viewMode, setViewMode] = useState<'tree' | 'focus' | 'department' | 'list'>('tree');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('Tất cả');
+  const [deptFilterOpen, setDeptFilterOpen] = useState(false);
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const [collapsedTreeIds, setCollapsedTreeIds] = useState<Set<string>>(new Set());
   const [treeZoom, setTreeZoom] = useState<number>(0.85);
@@ -689,7 +692,11 @@ export function OrgChartPanel({
 
   return (
     <ScrollView
-      contentContainerStyle={styles.content}
+      style={styles.directoryScroll}
+      contentContainerStyle={[
+        styles.directoryContent,
+        { paddingBottom: Math.max(insets.bottom, 20) + 20 },
+      ]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -703,62 +710,64 @@ export function OrgChartPanel({
         />
       }
     >
-      {/* Search + Add button */}
-      <View style={styles.searchRow}>
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Tìm theo tên, chức danh, phòng ban..."
-          placeholderTextColor={colors.muted}
-          style={[styles.search, { flex: 1, marginBottom: 0 }]}
-        />
+      {/* Top toolbar matching MISA Danh bạ: [Dept dropdown] on left, [+ Thêm NS] text action on right */}
+      <View style={styles.directoryTopBar}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setDeptFilterOpen(true)}
+          style={({ pressed }) => [styles.deptTriggerBtn, pressed && { opacity: 0.65 }]}
+        >
+          <Building2 size={17} strokeWidth={1.6} color={colors.ink} />
+          <Text numberOfLines={1} style={styles.deptTriggerText}>
+            {filterDepartment === 'Tất cả' ? 'Tất cả phòng ban' : filterDepartment}
+          </Text>
+          <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
+        </Pressable>
+
         {isManager ? (
-          <Pressable onPress={openAddModal} style={styles.primaryBtn}>
-            <View style={styles.iconButtonContent}><Plus size={14} color={colors.white} /><Text style={styles.primaryBtnText}>Thêm NS</Text></View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={openAddModal}
+            hitSlop={8}
+            style={({ pressed }) => [styles.directoryAddLink, pressed && { opacity: 0.6 }]}
+          >
+            <Plus size={15} strokeWidth={2} color={colors.primary} />
+            <Text style={styles.directoryAddLinkText}>Thêm NS</Text>
           </Pressable>
         ) : null}
       </View>
 
-      {/* Department filter pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.deptRow}
-        style={styles.deptScroll}
-      >
-        {departmentOptions.map((dept) => {
-          const active = filterDepartment === dept;
-          return (
-            <Pressable
-              key={dept}
-              onPress={() => setFilterDepartment(dept)}
-              style={[styles.deptChip, active && styles.deptChipActive]}
-            >
-              <Text style={[styles.deptText, active && styles.deptTextActive]}>{dept}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      {/* Full-width rounded pill search bar */}
+      <View style={styles.directorySearchWrap}>
+        <Search size={17} strokeWidth={1.6} color="#94A3B8" />
+        <TextInput
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Tìm theo tên, chức danh, phòng ban..."
+          placeholderTextColor="#94A3B8"
+          style={styles.directorySearchInput}
+        />
+      </View>
 
-      {/* Content: Danh sách nhân sự (style Danh bạ gọn đẹp) */}
+      {/* Content: Danh sách nhân sự phẳng nền trắng (MISA Danh bạ style) */}
       {loading ? (
-        <Card style={styles.stateCard}>
+        <View style={styles.directoryStateWrap}>
           <ActivityIndicator size="small" color={colors.primary} />
           <Text style={styles.muted}>Đang tải danh sách nhân sự...</Text>
-        </Card>
+        </View>
       ) : error ? (
-        <Card style={styles.stateCard}>
+        <View style={styles.directoryStateWrap}>
           <PopupError error={error} />
           <Pressable onPress={() => void loadData()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
-        </Card>
+        </View>
       ) : !filteredNodes.length ? (
-        <Card style={styles.stateCard}>
+        <View style={styles.directoryStateWrap}>
           <Text style={styles.muted}>Không có nhân sự nào khớp điều kiện lọc.</Text>
-        </Card>
+        </View>
       ) : (
-        <View style={styles.directoryListCard}>
+        <View style={styles.directoryListFlat}>
           {filteredNodes
             .slice()
             .sort((a, b) => {
@@ -770,7 +779,7 @@ export function OrgChartPanel({
                 a.displayName.localeCompare(b.displayName, 'vi')
               );
             })
-            .map((node, idx) => {
+            .map((node) => {
               const roleLabel =
                 node.jobTitle || node.position || ROLE_LABELS[node.role || 'user'] || 'Nhân viên';
               const deptLabel = node.department || node.division || 'Chưa phân phòng ban';
@@ -782,16 +791,10 @@ export function OrgChartPanel({
                   onPress={() => openDetail(node)}
                   style={({ pressed }) => [
                     styles.directoryRow,
-                    idx > 0 && styles.directoryRowDivider,
                     pressed && styles.directoryRowPressed,
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.directoryAvatar,
-                      { backgroundColor: getAvatarBg(node.displayName || node.nodeId) },
-                    ]}
-                  >
+                  <View style={styles.directoryAvatar}>
                     <Text style={styles.directoryAvatarText}>{getInitials(node.displayName)}</Text>
                   </View>
 
@@ -827,13 +830,62 @@ export function OrgChartPanel({
                       pressed && cleanPhone && styles.directoryCallBtnPressed,
                     ]}
                   >
-                    <Phone size={16} strokeWidth={1.8} color={colors.primary} />
+                    <Phone
+                      size={15}
+                      strokeWidth={1.6}
+                      color={colors.primary}
+                      fill={colors.primary}
+                    />
                   </Pressable>
                 </Pressable>
               );
             })}
         </View>
       )}
+
+      {/* Department filter bottom sheet */}
+      <Modal
+        visible={deptFilterOpen}
+        transparent
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => setDeptFilterOpen(false)}
+      >
+        <Pressable style={styles.deptSheetBackdrop} onPress={() => setDeptFilterOpen(false)}>
+          <Pressable
+            style={[styles.deptSheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
+            onPress={() => {}}
+          >
+            <View style={styles.deptSheetHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.sheetTitle}>Lọc theo phòng ban</Text>
+              <Pressable onPress={() => setDeptFilterOpen(false)} hitSlop={8}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              {departmentOptions.map((dept) => {
+                const selected = filterDepartment === dept;
+                return (
+                  <Pressable
+                    key={dept}
+                    onPress={() => {
+                      setFilterDepartment(dept);
+                      setDeptFilterOpen(false);
+                    }}
+                    style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                  >
+                    <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                      {dept === 'Tất cả' ? 'Tất cả phòng ban' : dept}
+                    </Text>
+                    {selected ? <Check size={17} color={colors.primary} /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Employee Detail & Edit Modal */}
       <Modal
@@ -1326,40 +1378,100 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
   disabled: { opacity: 0.45 },
-  directoryListCard: {
+  directoryScroll: {
+    flex: 1,
     backgroundColor: colors.white,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E5EAF2',
-    overflow: 'hidden',
+  },
+  directoryContent: {
+    backgroundColor: colors.white,
+    flexGrow: 1,
+  },
+  directoryTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 12,
+    gap: 10,
+  },
+  deptTriggerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flex: 1,
+  },
+  deptTriggerText: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '400',
+    flexShrink: 1,
+  },
+  directoryAddLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 4,
+    paddingLeft: 8,
+  },
+  directoryAddLinkText: {
+    color: colors.primary,
+    fontSize: 14.5,
+    fontWeight: '500',
+  },
+  directorySearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 99,
+    backgroundColor: '#F6F8FC',
+    borderWidth: 1,
+    borderColor: '#DCE5F2',
+    gap: 10,
+  },
+  directorySearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.ink,
+    fontWeight: '400',
+    paddingVertical: 0,
+  },
+  directoryStateWrap: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  directoryListFlat: {
+    backgroundColor: colors.white,
   },
   directoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    gap: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 14,
     backgroundColor: colors.white,
-  },
-  directoryRowDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#EEF2F7',
   },
   directoryRowPressed: {
     backgroundColor: '#F5F8FD',
   },
   directoryAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1EA7E1',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   directoryAvatarText: {
     color: colors.white,
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     letterSpacing: 0.2,
   },
   directoryCopy: {
@@ -1372,35 +1484,76 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   directoryName: {
-    color: colors.ink,
-    fontSize: 15,
+    color: '#111827',
+    fontSize: 15.5,
     fontWeight: '500',
     flexShrink: 1,
   },
   directorySub: {
-    color: '#64748B',
-    fontSize: 12.5,
+    color: '#6B7280',
+    fontSize: 13,
     fontWeight: '400',
   },
   directoryDept: {
-    color: '#7C8BA1',
-    fontSize: 12.5,
+    color: '#6B7280',
+    fontSize: 13,
     fontWeight: '400',
   },
   directoryCallBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F1F5FD',
+    backgroundColor: '#F6F8FC',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   directoryCallBtnDisabled: {
-    opacity: 0.3,
+    opacity: 0.28,
   },
   directoryCallBtnPressed: {
-    backgroundColor: '#DCE8FC',
+    backgroundColor: '#E5EEFC',
+  },
+  deptSheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    justifyContent: 'flex-end',
+  },
+  deptSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+  },
+  deptSheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 99,
+    backgroundColor: '#D6DFEC',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  deptSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  deptSheetRowActive: {
+    backgroundColor: '#F0F6FF',
+  },
+  deptSheetRowText: {
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: '400',
+  },
+  deptSheetRowTextActive: {
+    color: colors.primary,
+    fontWeight: '500',
   },
 });
 

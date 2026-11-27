@@ -137,7 +137,7 @@ export function HrModuleScreen() {
   const ActiveTabIcon = activeTabMeta?.icon ?? Users;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, activeVisibleTab === 'employees' && styles.rootWhite]}>
       <Stack.Screen
         options={{
           headerRight:
@@ -367,6 +367,7 @@ export function HrModuleScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, paddingTop: 8 },
+  rootWhite: { backgroundColor: colors.white },
   headerBranchBtn: {
     backgroundColor: '#EAF2FF',
     borderColor: '#D6E5FF',
