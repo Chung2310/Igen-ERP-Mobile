@@ -8,14 +8,28 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import {
+  Calendar,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react-native';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { BrandLoadingOverlay } from '@/components/BrandLoader';
 import { Card } from '@/components/Card';
 import { BranchAppIcon, IgenAssistantAvatarIcon, OverviewTabIcon } from '@/components/OverviewTabIcons';
 import { Screen } from '@/components/Screen';
+import {
+  OverviewPeriodActionContext,
+  type PopoverAnchor,
+} from '@/components/SectionHeading';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   fetchCompanyBranches,
@@ -86,9 +100,17 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   const [selectedPageId, setSelectedPageId] = useState<OverviewPageId | null>(
     () => allowedPages[0]?.id ?? null,
   );
+  const { height: windowHeight } = useWindowDimensions();
   const [periodKey, setPeriodKey] = useState<OverviewPeriodKey>('month');
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [branchPickerOpen, setBranchPickerOpen] = useState(false);
+  const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
+  const [periodMenuAnchor, setPeriodMenuAnchor] = useState<PopoverAnchor | null>(null);
+
+  const openPeriodMenu = useCallback((anchor: PopoverAnchor) => {
+    setPeriodMenuAnchor(anchor);
+    setPeriodMenuOpen(true);
+  }, []);
 
   const canSwitchBranch = user?.role === 'admin' || user?.role === 'superadmin' || !user?.branchId;
   const [branches, setBranches] = useState<ErpBranch[]>([]);
@@ -412,29 +434,104 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     }
   };
 
+  const periodActionCtx = useMemo(
+    () => ({
+      rangeLabel: range.label,
+      openPeriodMenu,
+    }),
+    [openPeriodMenu, range.label],
+  );
+
+  const popoverTop = useMemo(() => {
+    const rawTop =
+      periodMenuAnchor && periodMenuAnchor.y > 0
+        ? periodMenuAnchor.y + periodMenuAnchor.height + 6
+        : 156;
+    const maxTop = Math.max(80, windowHeight - 290);
+    return Math.min(rawTop, maxTop);
+  }, [periodMenuAnchor, windowHeight]);
+
+  const renderPeriodIcon = (key: OverviewPeriodKey, color: string) => {
+    switch (key) {
+      case 'day':
+        return <CalendarClock size={17} strokeWidth={1.6} color={color} />;
+      case 'week':
+        return <CalendarDays size={17} strokeWidth={1.6} color={color} />;
+      case 'month':
+        return <Calendar size={17} strokeWidth={1.6} color={color} />;
+      case 'quarter':
+      case 'year':
+        return <CalendarRange size={17} strokeWidth={1.6} color={color} />;
+    }
+  };
+
   const content = (
     <View style={styles.backdropWrap}>
-      {/* Soft luminous icy-sky pastel gradient background matching the reference style */}
-      <Svg pointerEvents="none" width="100%" height="100%" style={StyleSheet.absoluteFill}>
+      {/* Soft luminous icy-sky pastel gradient background with subtle geometric motifs */}
+      <Svg
+        pointerEvents="none"
+        width="100%"
+        height="100%"
+        viewBox="0 0 360 760"
+        preserveAspectRatio="none"
+        style={StyleSheet.absoluteFill}
+      >
         <Defs>
           <LinearGradient id="overviewBg" x1="0" y1="0" x2="0.15" y2="1">
-            <Stop offset="0" stopColor="#DFF3FC" stopOpacity="1" />
+            <Stop offset="0" stopColor="#D8EFFC" stopOpacity="1" />
             <Stop offset="0.32" stopColor="#EAF2FB" stopOpacity="1" />
             <Stop offset="0.7" stopColor="#F1F5FB" stopOpacity="1" />
             <Stop offset="1" stopColor="#F5F7FC" stopOpacity="1" />
           </LinearGradient>
-          <RadialGradient id="overviewGlowTopRight" cx="85%" cy="8%" rx="55%" ry="28%">
-            <Stop offset="0" stopColor="#BCEAFB" stopOpacity="0.6" />
-            <Stop offset="1" stopColor="#BCEAFB" stopOpacity="0" />
+          <RadialGradient id="overviewGlowTopRight" cx="86%" cy="7%" rx="52%" ry="24%">
+            <Stop offset="0" stopColor="#8FD3FA" stopOpacity="0.48" />
+            <Stop offset="1" stopColor="#8FD3FA" stopOpacity="0" />
           </RadialGradient>
           <RadialGradient id="overviewGlowMidLeft" cx="10%" cy="42%" rx="48%" ry="26%">
-            <Stop offset="0" stopColor="#E4DCFF" stopOpacity="0.35" />
+            <Stop offset="0" stopColor="#E4DCFF" stopOpacity="0.32" />
             <Stop offset="1" stopColor="#E4DCFF" stopOpacity="0" />
           </RadialGradient>
         </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#overviewBg)" />
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#overviewGlowTopRight)" />
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#overviewGlowMidLeft)" />
+        <Rect x="0" y="0" width="360" height="760" fill="url(#overviewBg)" />
+        <Rect x="0" y="0" width="360" height="760" fill="url(#overviewGlowTopRight)" />
+        <Rect x="0" y="0" width="360" height="760" fill="url(#overviewGlowMidLeft)" />
+        {/* Subtle geometric wave, concentric ring arcs & dot accents */}
+        <Path
+          d="M 180 155 C 235 112, 294 102, 360 74 L 360 155 Z"
+          fill="#2463EB"
+          fillOpacity={0.04}
+        />
+        <Circle
+          cx="328"
+          cy="22"
+          r="62"
+          fill="none"
+          stroke="#2463EB"
+          strokeOpacity={0.075}
+          strokeWidth={1.2}
+        />
+        <Circle
+          cx="328"
+          cy="22"
+          r="38"
+          fill="none"
+          stroke="#2463EB"
+          strokeOpacity={0.065}
+          strokeWidth={1}
+        />
+        <Circle cx="242" cy="26" r="2.2" fill="#2463EB" fillOpacity={0.11} />
+        <Circle cx="256" cy="18" r="1.8" fill="#2463EB" fillOpacity={0.08} />
+        <Circle cx="254" cy="34" r="1.6" fill="#2463EB" fillOpacity={0.09} />
+        <Circle cx="268" cy="28" r="2" fill="#2463EB" fillOpacity={0.07} />
+        <Circle
+          cx="22"
+          cy="318"
+          r="52"
+          fill="none"
+          stroke="#7C3AED"
+          strokeOpacity={0.045}
+          strokeWidth={1.1}
+        />
       </Svg>
 
       <ScrollView
@@ -535,49 +632,64 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
           </View>
         ) : null}
 
-        {/* Period filter bar */}
-        <View style={styles.periodCard}>
-          <View style={styles.periodHeader}>
-            <Text style={styles.periodLabel}>Kỳ thống kê</Text>
-            <Text style={styles.periodRange}>
-              {formatDisplayDate(range.from)} – {formatDisplayDate(range.to)}
-            </Text>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.periodChipsRow}
+        {/* Active overview page body */}
+        <OverviewPeriodActionContext.Provider value={periodActionCtx}>
+          <Animated.View
+            style={{
+              opacity: sectionOpacity,
+              transform: [{ translateX: sectionTranslateX }],
+            }}
           >
+            {renderSection()}
+          </Animated.View>
+        </OverviewPeriodActionContext.Provider>
+      </ScrollView>
+
+      {/* Floating dropdown popover to pick period filter */}
+      <Modal
+        visible={periodMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPeriodMenuOpen(false)}
+      >
+        <Pressable style={styles.popoverBackdrop} onPress={() => setPeriodMenuOpen(false)}>
+          <Pressable
+            style={[styles.popoverCard, { top: popoverTop }]}
+            onPress={() => {}}
+          >
+            <View style={styles.popoverHeader}>
+              <Text style={styles.popoverDateRange}>
+                {formatDisplayDate(range.from)} – {formatDisplayDate(range.to)}
+              </Text>
+              <Text style={styles.popoverCompare}>{range.comparisonLabel}</Text>
+            </View>
             {OVERVIEW_PERIOD_OPTIONS.map((opt) => {
               const active = opt.key === periodKey;
               return (
                 <Pressable
                   key={opt.key}
                   accessibilityRole="button"
-                  onPress={() => setPeriodKey(opt.key)}
-                  style={[styles.periodChip, active && styles.periodChipActive]}
+                  onPress={() => {
+                    setPeriodKey(opt.key);
+                    setPeriodMenuOpen(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.popoverItem,
+                    active && styles.popoverItemActive,
+                    pressed && styles.popoverItemPressed,
+                  ]}
                 >
-                  <Text style={[styles.periodChipText, active && styles.periodChipTextActive]}>
+                  {renderPeriodIcon(opt.key, active ? colors.primary : colors.muted)}
+                  <Text style={[styles.popoverItemText, active && styles.popoverItemTextActive]}>
                     {opt.label}
                   </Text>
-                  {active ? <View style={styles.periodChipUnderline} /> : null}
+                  {active ? <Check size={15} strokeWidth={2} color={colors.primary} /> : null}
                 </Pressable>
               );
             })}
-          </ScrollView>
-          <Text style={styles.comparisonText}>{range.comparisonLabel}</Text>
-        </View>
-
-        {/* Active overview page body */}
-        <Animated.View
-          style={{
-            opacity: sectionOpacity,
-            transform: [{ translateX: sectionTranslateX }],
-          }}
-        >
-          {renderSection()}
-        </Animated.View>
-      </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Bottom sheet modal to choose among all overview pages */}
       <Modal
@@ -668,7 +780,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     </View>
   );
 
-  return embedded ? content : <Screen backgroundColor="#DFF3FC">{content}</Screen>;
+  return embedded ? content : <Screen backgroundColor="#D8EFFC">{content}</Screen>;
 }
 
 export function EmbeddedOverviewScreen() {
@@ -777,65 +889,66 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
-  periodCard: {
+  popoverBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.14)',
+  },
+  popoverCard: {
+    position: 'absolute',
+    right: 14,
+    width: 224,
     backgroundColor: colors.white,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5EAF2',
+    paddingVertical: 6,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  popoverHeader: {
     paddingHorizontal: 14,
-    paddingTop: 11,
-    paddingBottom: 10,
-    marginBottom: 16,
-    gap: 8,
-  },
-  periodHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  periodLabel: {
-    color: colors.ink,
-    fontSize: 11.5,
-    fontWeight: '700',
-  },
-  periodRange: {
-    color: colors.primary,
-    fontSize: 10.5,
-    fontWeight: '600',
-  },
-  periodChipsRow: {
-    gap: 16,
+    paddingTop: 6,
+    paddingBottom: 9,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E9EFF7',
+    borderBottomColor: '#EDF2F8',
+    marginBottom: 4,
   },
-  periodChip: {
-    paddingHorizontal: 2,
-    paddingTop: 4,
-    paddingBottom: 8,
-    position: 'relative',
-  },
-  periodChipActive: {},
-  periodChipText: {
-    color: '#6C788C',
+  popoverDateRange: {
+    color: colors.ink,
     fontSize: 11.5,
     fontWeight: '500',
   },
-  periodChipTextActive: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  periodChipUnderline: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 2,
-    borderRadius: 2,
-    backgroundColor: colors.primary,
-  },
-  comparisonText: {
+  popoverCompare: {
     color: colors.muted,
-    fontSize: 9,
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 2,
+  },
+  popoverItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    gap: 12,
+  },
+  popoverItemActive: {
+    backgroundColor: '#F4F8FF',
+  },
+  popoverItemPressed: {
+    backgroundColor: '#EFF4FA',
+  },
+  popoverItemText: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 13.5,
+    fontWeight: '400',
+  },
+  popoverItemTextActive: {
+    color: colors.primary,
+    fontWeight: '500',
   },
   modalBackdrop: {
     flex: 1,

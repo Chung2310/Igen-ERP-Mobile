@@ -188,12 +188,12 @@ const styles = StyleSheet.create({
   },
   attValue: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   attLabel: {
     color: colors.ink,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '400',
     flex: 1,
   },
 });

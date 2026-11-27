@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import { ArrowLeft, Check, Hand, Heart, Paperclip, Pin, Plus, Search, Smile, ThumbsUp, X } from 'lucide-react-native';
-import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -655,22 +655,49 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
   // --- Room List View ---
   const listView = (
     <View style={styles.listRoot}>
-      {/* Top pastel icy-aqua gradient backdrop matching the reference style */}
+      {/* Top pastel icy-aqua gradient backdrop with subtle geometric motifs */}
       <View pointerEvents="none" style={styles.topBackdrop}>
-        <Svg width="100%" height="100%">
+        <Svg width="100%" height="100%" viewBox="0 0 360 150" preserveAspectRatio="none">
           <Defs>
-            <LinearGradient id="chatTopBg" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#DFF3FC" />
-              <Stop offset="55%" stopColor="#E9F3FC" />
-              <Stop offset="100%" stopColor="#DCEEFB" />
+            <LinearGradient id="chatTopBg" x1="0" y1="0" x2="0.2" y2="1">
+              <Stop offset="0%" stopColor="#D8EFFC" />
+              <Stop offset="58%" stopColor="#E9F4FD" />
+              <Stop offset="100%" stopColor="#F5FAFE" />
             </LinearGradient>
-            <RadialGradient id="chatTopGlow" cx="85%" cy="18%" rx="55%" ry="60%">
-              <Stop offset="0%" stopColor="#B8E9FB" stopOpacity="0.65" />
-              <Stop offset="100%" stopColor="#B8E9FB" stopOpacity="0" />
+            <RadialGradient id="chatTopGlow" cx="88%" cy="14%" rx="50%" ry="68%">
+              <Stop offset="0%" stopColor="#8FD3FA" stopOpacity="0.45" />
+              <Stop offset="100%" stopColor="#8FD3FA" stopOpacity="0" />
             </RadialGradient>
           </Defs>
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#chatTopBg)" />
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#chatTopGlow)" />
+          <Rect x="0" y="0" width="360" height="150" fill="url(#chatTopBg)" />
+          <Rect x="0" y="0" width="360" height="150" fill="url(#chatTopGlow)" />
+          <Path
+            d="M 185 150 C 235 106, 294 98, 360 72 L 360 150 Z"
+            fill="#2463EB"
+            fillOpacity={0.045}
+          />
+          <Circle
+            cx="326"
+            cy="20"
+            r="60"
+            fill="none"
+            stroke="#2463EB"
+            strokeOpacity={0.08}
+            strokeWidth={1.2}
+          />
+          <Circle
+            cx="326"
+            cy="20"
+            r="36"
+            fill="none"
+            stroke="#2463EB"
+            strokeOpacity={0.07}
+            strokeWidth={1}
+          />
+          <Circle cx="244" cy="24" r="2.2" fill="#2463EB" fillOpacity={0.12} />
+          <Circle cx="258" cy="16" r="1.8" fill="#2463EB" fillOpacity={0.09} />
+          <Circle cx="256" cy="32" r="1.6" fill="#2463EB" fillOpacity={0.1} />
+          <Circle cx="270" cy="26" r="2" fill="#2463EB" fillOpacity={0.08} />
         </Svg>
       </View>
 
@@ -928,7 +955,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
     </View>
   );
 
-  return embedded ? listView : <Screen backgroundColor="#DFF3FC">{listView}</Screen>;
+  return embedded ? listView : <Screen backgroundColor="#D8EFFC">{listView}</Screen>;
 }
 
 export function EmbeddedInternalChatScreen() {
@@ -936,7 +963,7 @@ export function EmbeddedInternalChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  listRoot: { flex: 1, backgroundColor: '#DFF3FC' },
+  listRoot: { flex: 1, backgroundColor: '#D8EFFC' },
   topBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, height: 150 },
   topZone: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
