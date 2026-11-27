@@ -1,6 +1,5 @@
 import type { DocumentPickerAsset } from 'expo-document-picker';
 import { File as ExpoFile } from 'expo-file-system';
-import * as LegacyFileSystem from 'expo-file-system/legacy';
 import { ApiError, apiRequest } from '@/core/network/apiClient';
 import type {
   HrAttendanceRecord,
@@ -800,9 +799,7 @@ export async function uploadHrMediaFile(
 }
 
 async function localFileAsDataUrl(uri: string, mimeType: string): Promise<string> {
-  const base64 = await LegacyFileSystem.readAsStringAsync(uri, {
-    encoding: LegacyFileSystem.EncodingType.Base64,
-  });
+  const base64 = await new ExpoFile(uri).base64();
   if (!base64) throw new Error('Tệp ghi âm hoặc video không có dữ liệu.');
   return `data:${mimeType};base64,${base64}`;
 }
