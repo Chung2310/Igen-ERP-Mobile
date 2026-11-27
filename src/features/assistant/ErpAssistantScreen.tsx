@@ -43,6 +43,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  Square,
   SquarePen,
   Trash2,
   WandSparkles,
@@ -317,6 +318,7 @@ export function ErpAssistantScreen({
   const keyboardVisible = keyboardHeight > 0;
 
   const listRef = useRef<FlatList<AssistantChatMessage>>(null);
+  const activeTurnAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -438,11 +440,22 @@ export function ErpAssistantScreen({
     [branchId, conversationId, startNewConversation],
   );
 
+  const stopCurrentTurn = useCallback(() => {
+    if (!activeTurnAbortRef.current) return;
+    activeTurnAbortRef.current.abort();
+    activeTurnAbortRef.current = null;
+    setSending(false);
+  }, []);
+
   const executeTurn = useCallback(
     async (payload: Omit<AssistantTurnInput, 'conversationId' | 'requestId' | 'mode'>, optimisticUserText?: string) => {
       if (sending) return;
+      const controller = new AbortController();
+      activeTurnAbortRef.current = controller;
       setSending(true);
       setErrorBanner(null);
+      setDraft('');
+      Keyboard.dismiss();
 
       if (optimisticUserText) {
         setMessages((prev) => [
@@ -461,8 +474,10 @@ export function ErpAssistantScreen({
             ...(activeProject ? { projectId: activeProject.id } : {}),
             ...payload,
           },
-          { branchId },
+          { branchId, signal: controller.signal },
         );
+
+        if (controller.signal.aborted) return;
 
         setLastReply(reply);
         setSelectedRefs({});
@@ -479,11 +494,15 @@ export function ErpAssistantScreen({
         ]);
         scrollToBottom();
       } catch (err) {
+        if (controller.signal.aborted) return;
         const msg =
           err instanceof Error ? err.message : 'Không thể kết nối Trợ lý ERP. Vui lòng thử lại.';
         setErrorBanner(msg);
       } finally {
-        setSending(false);
+        if (activeTurnAbortRef.current === controller) {
+          activeTurnAbortRef.current = null;
+          setSending(false);
+        }
       }
     },
     [activeProject, branchId, conversationId, mode, scrollToBottom, sending],
@@ -910,8 +929,8 @@ export function ErpAssistantScreen({
           <Rect x="0" y="0" width="360" height="140" fill="url(#geminiBottomGlow)" />
         </Svg>
 
-        {/* Centered 2-mode toggle: Trò chuyện | Thao tác (hidden while typing like Gemini) */}
-        {!keyboardVisible ? (
+        {/* Centered 2-mode toggle: Trò chuyện | Thao tác (hidden while typing or sending like Gemini) */}
+        {!keyboardVisible && !sending ? (
           <View style={styles.modeToggleRow}>
             <Pressable
               accessibilityRole="tab"
@@ -964,26 +983,33 @@ export function ErpAssistantScreen({
             editable={!sending}
             style={styles.geminiInput}
           />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Gửi tin nhắn"
-            disabled={sending || !draft.trim()}
-            onPress={() => onSendText()}
-            style={[
-              styles.geminiSendBtn,
-              draft.trim() && !sending ? styles.geminiSendBtnReady : styles.geminiSendBtnIdle,
-            ]}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
+          {sending ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Dừng phản hồi"
+              onPress={stopCurrentTurn}
+              style={({ pressed }) => [styles.geminiStopBtn, pressed && styles.geminiBtnPressed]}
+            >
+              <Square size={14} strokeWidth={1.9} color="#1F2937" />
+            </Pressable>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Gửi tin nhắn"
+              disabled={!draft.trim()}
+              onPress={() => onSendText()}
+              style={[
+                styles.geminiSendBtn,
+                draft.trim() ? styles.geminiSendBtnReady : styles.geminiSendBtnIdle,
+              ]}
+            >
               <ArrowUp
                 size={19}
                 strokeWidth={2}
                 color={draft.trim() ? colors.white : colors.primary}
               />
-            )}
-          </Pressable>
+            </Pressable>
+          )}
         </View>
       </View>
         </>
@@ -1457,6 +1483,14 @@ const styles = StyleSheet.create({
   },
   geminiSendBtnReady: {
     backgroundColor: colors.primary,
+  },
+  geminiStopBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F1F3F5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modePopoverBackdrop: {
     flex: 1,
