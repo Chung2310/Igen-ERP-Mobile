@@ -48,6 +48,7 @@ import {
   WandSparkles,
   X,
 } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
@@ -260,6 +261,7 @@ export function ErpAssistantScreen({
   chatOnly?: boolean;
   onClose?: () => void;
 } = {}) {
+  const insets = useSafeAreaInsets();
   const {
     user,
     activeBranchId: branchId,
@@ -1089,7 +1091,7 @@ export function ErpAssistantScreen({
                     }}
                     style={({ pressed }) => [styles.historyIconBtn, pressed && styles.geminiBtnPressed]}
                   >
-                    <Search size={21} strokeWidth={1.6} color={colors.ink} />
+                    <Search size={20} strokeWidth={1.4} color="#334155" />
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
@@ -1102,7 +1104,7 @@ export function ErpAssistantScreen({
                     }}
                     style={({ pressed }) => [styles.historyIconBtn, pressed && styles.geminiBtnPressed]}
                   >
-                    <X size={23} strokeWidth={1.6} color={colors.ink} />
+                    <X size={21} strokeWidth={1.4} color="#334155" />
                   </Pressable>
                 </View>
               </View>
@@ -1155,8 +1157,13 @@ export function ErpAssistantScreen({
                 </ScrollView>
               )}
 
-              {/* Bottom user profile footer (Gemini style) */}
-              <View style={styles.historyFooter}>
+              {/* Bottom user profile footer (respects safe-area above Android nav bar) */}
+              <View
+                style={[
+                  styles.historyFooter,
+                  { paddingBottom: Math.max(insets.bottom, 12) + 8 },
+                ]}
+              >
                 <View style={styles.historyUserRow}>
                   <View style={styles.historyAvatarRing}>
                     <View style={styles.historyAvatarInner}>
@@ -1199,7 +1206,13 @@ export function ErpAssistantScreen({
               style={styles.historySheetOverlay}
               onPress={() => setHistoryActionItem(null)}
             >
-              <Pressable style={styles.historyActionSheet} onPress={() => {}}>
+              <Pressable
+                style={[
+                  styles.historyActionSheet,
+                  { paddingBottom: Math.max(insets.bottom, 14) + 10 },
+                ]}
+                onPress={() => {}}
+              >
                 <View style={styles.historySheetHandle} />
                 <Pressable
                   accessibilityRole="button"
@@ -1770,8 +1783,8 @@ const styles = StyleSheet.create({
   },
   historyBrand: {
     color: colors.ink,
-    fontSize: 20,
-    fontWeight: '500',
+    fontSize: 19,
+    fontWeight: '400',
     letterSpacing: -0.2,
   },
   historyInlineSearchWrap: {
@@ -1815,26 +1828,26 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   historyItemRow: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 12,
-    marginHorizontal: 6,
+    borderRadius: 10,
+    marginHorizontal: 8,
   },
   historyItemRowActive: {
-    backgroundColor: '#EFF5FF',
+    backgroundColor: '#F3F5F8',
   },
   historyItemRowPressed: {
     backgroundColor: '#F4F7FB',
   },
   historyItemTitle: {
-    color: '#111827',
-    fontSize: 15.5,
-    lineHeight: 22,
+    color: '#2B3445',
+    fontSize: 14.5,
+    lineHeight: 21,
     fontWeight: '400',
   },
   historyItemTitleActive: {
-    color: colors.primary,
-    fontWeight: '500',
+    color: '#111827',
+    fontWeight: '400',
   },
   emptyHistoryText: {
     color: colors.muted,
@@ -1849,9 +1862,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 18,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#EDF2F7',
+    borderTopColor: '#F0F3F7',
     backgroundColor: colors.white,
   },
   historyUserRow: {
@@ -1861,11 +1873,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   historyAvatarRing: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#3B82F6',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
     padding: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1873,15 +1885,15 @@ const styles = StyleSheet.create({
   historyAvatarInner: {
     width: '100%',
     height: '100%',
-    borderRadius: 18,
-    backgroundColor: '#EBF3FF',
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   historyAvatarInitial: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: '600',
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '400',
   },
   historyUserCopy: {
     flex: 1,
@@ -1909,10 +1921,9 @@ const styles = StyleSheet.create({
   },
   historyActionSheet: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingTop: 10,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
     paddingHorizontal: 10,
   },
   historySheetHandle: {
