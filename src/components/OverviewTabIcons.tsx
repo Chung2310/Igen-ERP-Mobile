@@ -201,43 +201,57 @@ export function OverviewTabIcon({ id, size = 34 }: OverviewTabIconProps) {
 }
 
 /**
- * Chi nhánh — Gradient squircle office building icon matching ModuleAppIcons / OverviewTabIcons.
+ * Chi nhánh — Minimalist hollow outline office building icon (no background fill, stroke-only).
  */
-export function BranchAppIcon({ size = 34 }: { size?: number }) {
-  const accent = '#2860EE';
-
+export function BranchAppIcon({ size = 24, color = '#1E293B' }: { size?: number; color?: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 56 56" fill="none">
-      <Defs>
-        <LinearGradient id="ov_bg_branch" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0%" stopColor="#3E7EFF" />
-          <Stop offset="100%" stopColor="#1E54E8" />
-        </LinearGradient>
-      </Defs>
-
-      <Rect x="0" y="0" width="56" height="56" rx="15.5" fill="url(#ov_bg_branch)" />
-
-      {/* Secondary wing */}
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Ground line */}
       <Path
-        d="M32 23.5H39.8C41.5 23.5 42.8 24.8 42.8 26.5V41.5H32V23.5Z"
-        fill="#FFFFFF"
-        fillOpacity={0.74}
+        d="M2.5 20.5H21.5"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
       {/* Main building tower */}
       <Path
-        d="M14.2 17.2C14.2 15.2 15.8 13.6 17.8 13.6H30.4C32.4 13.6 34 15.2 34 17.2V41.5H14.2V17.2Z"
-        fill="#FFFFFF"
+        d="M4.5 20.5V5.5C4.5 4.67 5.17 4 6 4H13.5C14.33 4 15 4.67 15 5.5V20.5"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      {/* Windows */}
-      <Rect x="18.5" y="18.6" width="3.8" height="3.8" rx="1.1" fill={accent} />
-      <Rect x="25.9" y="18.6" width="3.8" height="3.8" rx="1.1" fill={accent} />
-      <Rect x="18.5" y="25.4" width="3.8" height="3.8" rx="1.1" fill={accent} fillOpacity={0.78} />
-      <Rect x="25.9" y="25.4" width="3.8" height="3.8" rx="1.1" fill={accent} fillOpacity={0.78} />
+      {/* Secondary side wing */}
+      <Path
+        d="M15 10H18C18.83 10 19.5 10.67 19.5 11.5V20.5"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       {/* Entrance door */}
-      <Rect x="21.5" y="33.2" width="5.2" height="8.3" rx="1.6" fill={accent} />
+      <Path
+        d="M8.25 20.5V16.75C8.25 16.2 8.7 15.75 9.25 15.75H10.25C10.8 15.75 11.25 16.2 11.25 16.75V20.5"
+        stroke={color}
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Main tower windows */}
+      <Path
+        d="M7.75 8H9M10.75 8H12M7.75 11.75H9M10.75 11.75H12"
+        stroke={color}
+        strokeWidth="1.65"
+        strokeLinecap="round"
+      />
       {/* Side wing windows */}
-      <Rect x="36.2" y="28.2" width="3.2" height="3.2" rx="1" fill={accent} fillOpacity={0.75} />
-      <Rect x="36.2" y="34.2" width="3.2" height="3.2" rx="1" fill={accent} fillOpacity={0.75} />
+      <Path
+        d="M17.25 13.75H17.5M17.25 17H17.5"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
     </Svg>
   );
 }
