@@ -12,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import {
-  Bell,
   Calendar,
   CalendarClock,
   CalendarDays,
@@ -25,7 +24,12 @@ import {
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { BrandLoadingOverlay } from '@/components/BrandLoader';
 import { Card } from '@/components/Card';
-import { BranchAppIcon, IgenAssistantAvatarIcon, OverviewTabIcon } from '@/components/OverviewTabIcons';
+import {
+  BranchAppIcon,
+  IgenAssistantAvatarIcon,
+  OverviewNotificationAvatarIcon,
+  OverviewTabIcon,
+} from '@/components/OverviewTabIcons';
 import { Screen } from '@/components/Screen';
 import {
   OverviewPeriodActionContext,
@@ -583,22 +587,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
             </View>
           </Pressable>
           <View style={styles.topRightActions}>
-            <Link href="/(tabs)/notifications" asChild>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Mở thông báo"
-                style={({ pressed }) => [styles.notifBtn, pressed && styles.assistantBtnPressed]}
-              >
-                <Bell size={22} strokeWidth={1.85} color={colors.ink} />
-                {unreadNotifications > 0 ? (
-                  <View style={styles.notifBadge}>
-                    <Text style={styles.notifBadgeText}>
-                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            </Link>
             <Link href="/assistant-chat" asChild>
               <Pressable
                 accessibilityRole="button"
@@ -606,6 +594,22 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
                 style={({ pressed }) => [styles.assistantBtn, pressed && styles.assistantBtnPressed]}
               >
                 <IgenAssistantAvatarIcon size={38} />
+              </Pressable>
+            </Link>
+            <Link href="/(tabs)/notifications" asChild>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Mở thông báo"
+                style={({ pressed }) => [styles.notifBtn, pressed && styles.assistantBtnPressed]}
+              >
+                <OverviewNotificationAvatarIcon size={38} />
+                {unreadNotifications > 0 ? (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>
+                      {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                    </Text>
+                  </View>
+                ) : null}
               </Pressable>
             </Link>
           </View>
@@ -860,9 +864,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#CFE0F5',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',

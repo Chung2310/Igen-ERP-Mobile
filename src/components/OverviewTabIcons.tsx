@@ -331,3 +331,59 @@ export function IgenAssistantAvatarIcon({ size = 38 }: { size?: number }) {
     </Svg>
   );
 }
+
+/**
+ * Icon Thông báo đồng bộ phong cách glassmorphic tròn cạnh IgenAssistantAvatarIcon.
+ * Nền vòng tròn trắng mờ có hào quang nhẹ, bên trong là chuông xanh hai lớp 3D.
+ */
+export function OverviewNotificationAvatarIcon({ size = 38 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      <Defs>
+        <LinearGradient id="ov_notif_surface" x1="0.15" y1="0" x2="0.85" y2="1">
+          <Stop offset="0%" stopColor="#FFFFFF" />
+          <Stop offset="65%" stopColor="#F4F9FF" />
+          <Stop offset="100%" stopColor="#E4F0FF" />
+        </LinearGradient>
+        <LinearGradient id="ov_notif_bell_back" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0%" stopColor="#93C5FD" />
+          <Stop offset="100%" stopColor="#60A5FA" />
+        </LinearGradient>
+        <LinearGradient id="ov_notif_bell_front" x1="0.2" y1="0" x2="0.85" y2="1">
+          <Stop offset="0%" stopColor="#3B82F6" />
+          <Stop offset="60%" stopColor="#2563EB" />
+          <Stop offset="100%" stopColor="#1D4ED8" />
+        </LinearGradient>
+      </Defs>
+
+      {/* Soft white-icy outer halo matching IgenAssistantAvatarIcon */}
+      <Circle cx="28" cy="28" r="27.5" fill="#FFFFFF" fillOpacity={0.55} />
+      {/* Main frosted white circular badge */}
+      <Circle cx="28" cy="28" r="24.5" fill="url(#ov_notif_surface)" />
+
+      {/* Back soft translucent blue glow accent (layered dual-tone depth) */}
+      <Circle cx="32.5" cy="24.5" r="8.2" fill="url(#ov_notif_bell_back)" fillOpacity={0.48} />
+
+      {/* Main glossy royal-blue notification bell */}
+      <Circle cx="27.2" cy="15.8" r="2.2" fill="#3B82F6" />
+      <Path
+        d="M17.8 27.6C17.8 22.1 21.8 17.8 27.2 17.8C32.6 17.8 36.6 22.1 36.6 27.6V31C36.6 32.5 37.3 33.7 38.4 34.4C39 34.8 39.2 35.5 39 36.1C38.8 36.7 38.2 37.1 37.5 37.1H16.9C16.2 37.1 15.6 36.7 15.4 36.1C15.2 35.5 15.4 34.8 16 34.4C17.1 33.7 17.8 32.5 17.8 31V27.6Z"
+        fill="url(#ov_notif_bell_front)"
+      />
+      {/* Subtle glossy highlight on bell crown */}
+      <Path
+        d="M21.8 23.2C22.8 21.1 24.7 19.9 27 19.8"
+        stroke="#FFFFFF"
+        strokeOpacity={0.45}
+        strokeWidth="2"
+        strokeLinecap="round"
+        fill="none"
+      />
+      {/* Clapper */}
+      <Path
+        d="M23.8 38.6C24.3 40.3 25.6 41.4 27.2 41.4C28.8 41.4 30.1 40.3 30.6 38.6H23.8Z"
+        fill="#1E40AF"
+      />
+    </Svg>
+  );
+}
