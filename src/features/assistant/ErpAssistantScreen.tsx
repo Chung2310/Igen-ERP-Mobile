@@ -50,7 +50,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -195,52 +195,78 @@ function AiThinkingBubble() {
   });
 
   return (
-    <View style={styles.thinkingBubbleOuter}>
+    <View style={styles.thinkingGlowStage}>
+      {/* Soft outer diffused light bloom radiating outside the bubble */}
       <Animated.View
         pointerEvents="none"
         renderToHardwareTextureAndroid
         shouldRasterizeIOS
-        style={[styles.thinkingSpinnerWrap, { transform: [{ rotate }] }]}
+        style={[styles.thinkingOuterHaloWrap, { transform: [{ rotate }] }]}
       >
-        <Svg width={104} height={104} viewBox="0 0 104 104" fill="none">
+        <Svg width={96} height={96} viewBox="0 0 96 96" fill="none">
           <Defs>
-            <LinearGradient id="thinkingStreakGrad" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#38BDF8" stopOpacity="0.1" />
-              <Stop offset="35%" stopColor="#38BDF8" stopOpacity="0.95" />
-              <Stop offset="70%" stopColor="#2463EB" stopOpacity="1" />
-              <Stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.95" />
-            </LinearGradient>
+            <RadialGradient id="thinkingOuterBloomA" cx="72%" cy="32%" r="36%">
+              <Stop offset="0%" stopColor="#60A5FA" stopOpacity="0.46" />
+              <Stop offset="55%" stopColor="#93C5FD" stopOpacity="0.18" />
+              <Stop offset="100%" stopColor="#93C5FD" stopOpacity="0" />
+            </RadialGradient>
+            <RadialGradient id="thinkingOuterBloomB" cx="56%" cy="22%" r="32%">
+              <Stop offset="0%" stopColor="#A78BFA" stopOpacity="0.32" />
+              <Stop offset="60%" stopColor="#C4B5FD" stopOpacity="0.12" />
+              <Stop offset="100%" stopColor="#C4B5FD" stopOpacity="0" />
+            </RadialGradient>
           </Defs>
-          {/* Soft wide halo tail */}
-          <Circle
-            cx="52"
-            cy="52"
-            r="34"
-            stroke="#60A5FA"
-            strokeOpacity={0.32}
-            strokeWidth={34}
-            strokeDasharray="125 220"
-            strokeLinecap="round"
-            fill="none"
-          />
-          {/* Crisp luminous comet streak */}
-          <Circle
-            cx="52"
-            cy="52"
-            r="34"
-            stroke="url(#thinkingStreakGrad)"
-            strokeWidth={32}
-            strokeDasharray="96 220"
-            strokeLinecap="round"
-            fill="none"
-          />
+          <Rect x="0" y="0" width="96" height="96" fill="url(#thinkingOuterBloomA)" />
+          <Rect x="0" y="0" width="96" height="96" fill="url(#thinkingOuterBloomB)" />
         </Svg>
       </Animated.View>
 
-      <View style={styles.thinkingBubbleInner}>
-        <Animated.View style={[styles.thinkingDot, { opacity: dot1 }]} />
-        <Animated.View style={[styles.thinkingDot, { opacity: dot2 }]} />
-        <Animated.View style={[styles.thinkingDot, { opacity: dot3 }]} />
+      {/* Delicate luminous gradient rim around the white bubble */}
+      <View style={styles.thinkingBubbleOuter}>
+        <Animated.View
+          pointerEvents="none"
+          renderToHardwareTextureAndroid
+          shouldRasterizeIOS
+          style={[styles.thinkingSpinnerWrap, { transform: [{ rotate }] }]}
+        >
+          <Svg width={104} height={104} viewBox="0 0 104 104" fill="none">
+            <Defs>
+              <LinearGradient id="thinkingStreakGrad" x1="0" y1="0" x2="1" y2="1">
+                <Stop offset="0%" stopColor="#BAE6FD" stopOpacity="0.06" />
+                <Stop offset="32%" stopColor="#7DD3FC" stopOpacity="0.72" />
+                <Stop offset="66%" stopColor="#60A5FA" stopOpacity="0.82" />
+                <Stop offset="100%" stopColor="#A78BFA" stopOpacity="0.62" />
+              </LinearGradient>
+            </Defs>
+            <Circle
+              cx="52"
+              cy="52"
+              r="34"
+              stroke="#93C5FD"
+              strokeOpacity={0.22}
+              strokeWidth={34}
+              strokeDasharray="138 220"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <Circle
+              cx="52"
+              cy="52"
+              r="34"
+              stroke="url(#thinkingStreakGrad)"
+              strokeWidth={32}
+              strokeDasharray="102 220"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </Svg>
+        </Animated.View>
+
+        <View style={styles.thinkingBubbleInner}>
+          <Animated.View style={[styles.thinkingDot, { opacity: dot1 }]} />
+          <Animated.View style={[styles.thinkingDot, { opacity: dot2 }]} />
+          <Animated.View style={[styles.thinkingDot, { opacity: dot3 }]} />
+        </View>
       </View>
     </View>
   );
@@ -1669,22 +1695,32 @@ const styles = StyleSheet.create({
   metaLink: { flex: 1, color: colors.primary, fontSize: 11, fontWeight: '700' },
   metaSource: { color: colors.muted, fontSize: 10 },
   footerWrap: { gap: 10, marginTop: 8 },
+  thinkingGlowStage: {
+    width: 84,
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -6,
+    marginTop: -2,
+    overflow: 'visible',
+  },
+  thinkingOuterHaloWrap: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   thinkingBubbleOuter: {
     width: 68,
     height: 38,
     borderRadius: 18,
     borderTopLeftRadius: 6,
-    padding: 2.2,
-    backgroundColor: '#F1F5FB',
+    padding: 1.5,
+    backgroundColor: 'rgba(241, 245, 251, 0.7)',
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
-    shadowColor: '#2463EB',
-    shadowOpacity: 0.14,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
   thinkingSpinnerWrap: {
     position: 'absolute',
@@ -1696,8 +1732,8 @@ const styles = StyleSheet.create({
   thinkingBubbleInner: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
-    borderTopLeftRadius: 4,
+    borderRadius: 16.5,
+    borderTopLeftRadius: 4.5,
     backgroundColor: colors.white,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1705,10 +1741,10 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   thinkingDot: {
-    width: 4.8,
-    height: 4.8,
-    borderRadius: 2.4,
-    backgroundColor: '#475569',
+    width: 4.5,
+    height: 4.5,
+    borderRadius: 2.25,
+    backgroundColor: '#64748B',
   },
   actionCard: {
     padding: 14,
