@@ -196,32 +196,26 @@ function AiThinkingBubble() {
 
   return (
     <View style={styles.thinkingGlowStage}>
-      {/* Soft outer diffused light bloom radiating outside the bubble */}
+      {/* Tight soft outer blue glow hugging the pill rim */}
       <Animated.View
         pointerEvents="none"
         renderToHardwareTextureAndroid
         shouldRasterizeIOS
         style={[styles.thinkingOuterHaloWrap, { transform: [{ rotate }] }]}
       >
-        <Svg width={96} height={96} viewBox="0 0 96 96" fill="none">
+        <Svg width={84} height={84} viewBox="0 0 84 84" fill="none">
           <Defs>
-            <RadialGradient id="thinkingOuterBloomA" cx="72%" cy="32%" r="36%">
-              <Stop offset="0%" stopColor="#60A5FA" stopOpacity="0.46" />
-              <Stop offset="55%" stopColor="#93C5FD" stopOpacity="0.18" />
+            <RadialGradient id="thinkingOuterBloomA" cx="72%" cy="46%" r="24%">
+              <Stop offset="0%" stopColor="#60A5FA" stopOpacity="0.34" />
+              <Stop offset="55%" stopColor="#93C5FD" stopOpacity="0.12" />
               <Stop offset="100%" stopColor="#93C5FD" stopOpacity="0" />
             </RadialGradient>
-            <RadialGradient id="thinkingOuterBloomB" cx="56%" cy="22%" r="32%">
-              <Stop offset="0%" stopColor="#A78BFA" stopOpacity="0.32" />
-              <Stop offset="60%" stopColor="#C4B5FD" stopOpacity="0.12" />
-              <Stop offset="100%" stopColor="#C4B5FD" stopOpacity="0" />
-            </RadialGradient>
           </Defs>
-          <Rect x="0" y="0" width="96" height="96" fill="url(#thinkingOuterBloomA)" />
-          <Rect x="0" y="0" width="96" height="96" fill="url(#thinkingOuterBloomB)" />
+          <Rect x="0" y="0" width="84" height="84" fill="url(#thinkingOuterBloomA)" />
         </Svg>
       </Animated.View>
 
-      {/* Delicate luminous gradient rim around the white bubble */}
+      {/* Pure-white bubble where only the glowing blue arc is visible */}
       <View style={styles.thinkingBubbleOuter}>
         <Animated.View
           pointerEvents="none"
@@ -229,33 +223,22 @@ function AiThinkingBubble() {
           shouldRasterizeIOS
           style={[styles.thinkingSpinnerWrap, { transform: [{ rotate }] }]}
         >
-          <Svg width={104} height={104} viewBox="0 0 104 104" fill="none">
+          <Svg width={96} height={96} viewBox="0 0 96 96" fill="none">
             <Defs>
-              <LinearGradient id="thinkingStreakGrad" x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0%" stopColor="#BAE6FD" stopOpacity="0.06" />
-                <Stop offset="32%" stopColor="#7DD3FC" stopOpacity="0.72" />
-                <Stop offset="66%" stopColor="#60A5FA" stopOpacity="0.82" />
-                <Stop offset="100%" stopColor="#A78BFA" stopOpacity="0.62" />
+              <LinearGradient id="thinkingStreakGrad" x1="0.2" y1="0" x2="1" y2="0.9">
+                <Stop offset="0%" stopColor="#93C5FD" stopOpacity="0" />
+                <Stop offset="45%" stopColor="#60A5FA" stopOpacity="0.85" />
+                <Stop offset="80%" stopColor="#3B82F6" stopOpacity="0.92" />
+                <Stop offset="100%" stopColor="#93C5FD" stopOpacity="0" />
               </LinearGradient>
             </Defs>
             <Circle
-              cx="52"
-              cy="52"
-              r="34"
-              stroke="#93C5FD"
-              strokeOpacity={0.22}
-              strokeWidth={34}
-              strokeDasharray="138 220"
-              strokeLinecap="round"
-              fill="none"
-            />
-            <Circle
-              cx="52"
-              cy="52"
-              r="34"
+              cx="48"
+              cy="48"
+              r="31"
               stroke="url(#thinkingStreakGrad)"
-              strokeWidth={32}
-              strokeDasharray="102 220"
+              strokeWidth={28}
+              strokeDasharray="66 200"
               strokeLinecap="round"
               fill="none"
             />
@@ -931,25 +914,27 @@ export function ErpAssistantScreen({
         />
       )}
 
-      {/* Gemini-style bottom aura + 2-mode pill toggle + floating rounded pill composer */}
+      {/* Gemini-style bottom aura (welcome only) + 2-mode pill toggle + floating rounded pill composer */}
       <View style={[styles.geminiBottomDock, keyboardVisible && styles.geminiBottomDockKeyboard]}>
-        <Svg
-          pointerEvents="none"
-          width="100%"
-          height="100%"
-          viewBox="0 0 360 140"
-          preserveAspectRatio="none"
-          style={StyleSheet.absoluteFill}
-        >
-          <Defs>
-            <LinearGradient id="geminiBottomGlow" x1="0.5" y1="0" x2="0.5" y2="1">
-              <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
-              <Stop offset="42%" stopColor="#EAF3FF" stopOpacity="0.88" />
-              <Stop offset="100%" stopColor="#DCEBFF" stopOpacity="1" />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="360" height="140" fill="url(#geminiBottomGlow)" />
-        </Svg>
+        {messages.length === 0 ? (
+          <Svg
+            pointerEvents="none"
+            width="100%"
+            height="100%"
+            viewBox="0 0 360 140"
+            preserveAspectRatio="none"
+            style={StyleSheet.absoluteFill}
+          >
+            <Defs>
+              <LinearGradient id="geminiBottomGlow" x1="0.5" y1="0" x2="0.5" y2="1">
+                <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
+                <Stop offset="42%" stopColor="#EAF3FF" stopOpacity="0.88" />
+                <Stop offset="100%" stopColor="#DCEBFF" stopOpacity="1" />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="360" height="140" fill="url(#geminiBottomGlow)" />
+          </Svg>
+        ) : null}
 
         {/* Centered 2-mode toggle: Trò chuyện | Thao tác (hidden while typing or sending like Gemini) */}
         {!keyboardVisible && !sending ? (
@@ -1696,36 +1681,36 @@ const styles = StyleSheet.create({
   metaSource: { color: colors.muted, fontSize: 10 },
   footerWrap: { gap: 10, marginTop: 8 },
   thinkingGlowStage: {
-    width: 84,
-    height: 54,
+    width: 78,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: -6,
+    marginLeft: -5,
     marginTop: -2,
     overflow: 'visible',
   },
   thinkingOuterHaloWrap: {
     position: 'absolute',
-    width: 96,
-    height: 96,
+    width: 84,
+    height: 84,
     alignItems: 'center',
     justifyContent: 'center',
   },
   thinkingBubbleOuter: {
-    width: 68,
-    height: 38,
+    width: 64,
+    height: 36,
     borderRadius: 18,
     borderTopLeftRadius: 6,
     padding: 1.5,
-    backgroundColor: 'rgba(241, 245, 251, 0.7)',
+    backgroundColor: colors.white,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
   thinkingSpinnerWrap: {
     position: 'absolute',
-    width: 104,
-    height: 104,
+    width: 96,
+    height: 96,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1738,13 +1723,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4.5,
   },
   thinkingDot: {
-    width: 4.5,
-    height: 4.5,
-    borderRadius: 2.25,
-    backgroundColor: '#64748B',
+    width: 4.2,
+    height: 4.2,
+    borderRadius: 2.1,
+    backgroundColor: '#1F2937',
   },
   actionCard: {
     padding: 14,
