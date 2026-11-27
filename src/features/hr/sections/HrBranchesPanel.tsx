@@ -16,6 +16,7 @@ import * as Location from 'expo-location';
 import { AlertTriangle, CheckCircle2, ChevronRight, Info, LocateFixed, MapPin, Phone, Plus, Radio } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import {
   createHrBranch,
   createHrBranchOwner,
@@ -517,8 +518,9 @@ export function HrBranchesPanel({
   const noticeIconBackground = notice?.tone === 'success' ? '#E9F8F1' : notice?.tone === 'error' ? '#FEF2F2' : '#EAF2FF';
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -537,14 +539,9 @@ export function HrBranchesPanel({
           value={search}
           onChangeText={setSearch}
           placeholder="Tìm theo tên, mã chi nhánh, địa chỉ..."
-          placeholderTextColor={colors.muted}
-          style={[styles.field, { flex: 1 }]}
+          placeholderTextColor="#94A3B8"
+          style={styles.searchField}
         />
-        {canManage ? (
-          <Pressable onPress={openCreate} style={styles.primaryBtn}>
-            <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Chi nhánh</Text></View>
-          </Pressable>
-        ) : null}
       </View>
 
       {loading ? (
@@ -903,74 +900,108 @@ export function HrBranchesPanel({
         </Pressable>
       </Modal>
     </ScrollView>
+    {canManage ? <HrFab label="Thêm chi nhánh" onPress={openCreate} /> : null}
+    </View>
   );
 }
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
+} as const;
+
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 18, paddingBottom: 28 },
+  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  primaryBtn: { backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
-  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  searchField: { flex: 1, backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, height: 40, fontSize: 13.5, color: '#111827' },
+  primaryBtn: { backgroundColor: colors.primary, minHeight: 40, paddingHorizontal: 13, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   iconButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
-  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
-  list: { gap: 10 },
-  card: { padding: 13, gap: 5 },
+  stateCard: { ...HAIRLINE_CARD, padding: 22, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
+  list: {
+    marginHorizontal: -14,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+    gap: 0,
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 4,
+  },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  codeBadge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  mainBadge: { color: '#B45309', backgroundColor: '#FFF3E5', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  statusBadge: { color: '#16885A', backgroundColor: '#E9F8F1', fontSize: 9, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
+  codeBadge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
+  mainBadge: { color: '#B45309', backgroundColor: '#FFF3E5', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
+  statusBadge: { color: '#16885A', backgroundColor: '#E9F8F1', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
   statusInactive: { color: '#64748B', backgroundColor: '#F1F5F9' },
-  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  subMeta: { color: colors.muted, fontSize: 10, marginTop: 2 },
-  configOk: { color: '#16885A', fontWeight: '600' },
-  configMissing: { color: '#B45309', fontWeight: '600' },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
+  subMeta: { color: '#6B7280', fontSize: 11.5, fontWeight: '400', marginTop: 2 },
+  configOk: { color: '#16885A', fontWeight: '500' },
+  configMissing: { color: '#B45309', fontWeight: '500' },
   chevron: { color: colors.muted, fontSize: 20 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
-  dialogBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.48)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  dialogCard: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 22, alignItems: 'center', gap: 10 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 16 },
+  dialogBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  dialogCard: { width: '100%', maxWidth: 360, backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 22, alignItems: 'center', gap: 10 },
   dialogIconWrap: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  dialogTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  dialogMessage: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  dialogTitle: { color: '#111827', fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  dialogMessage: { color: '#6B7280', fontSize: 13, lineHeight: 19, textAlign: 'center' },
   dialogActions: { flexDirection: 'row', gap: 10, width: '100%', marginTop: 8 },
-  dialogSecondaryBtn: { flex: 1, minHeight: 44, borderRadius: 14, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  dialogSecondaryText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  dialogPrimaryBtn: { width: '100%', minHeight: 44, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  dialogPrimaryText: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 10, maxHeight: '90%' },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
-  smallLabel: { color: colors.ink, fontSize: 10, fontWeight: '700', marginBottom: 4 },
-  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
-  readonlyField: { backgroundColor: '#F1F5F9', color: colors.muted },
-  locationBox: { backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 13, padding: 12, marginTop: 6 },
+  dialogSecondaryBtn: { flex: 1, minHeight: 44, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  dialogSecondaryText: { color: '#374151', fontSize: 13, fontWeight: '600' },
+  dialogPrimaryBtn: { width: '100%', minHeight: 44, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  dialogPrimaryText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  sheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 18, gap: 10, maxHeight: '90%' },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  closeText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
+  smallLabel: { color: '#374151', fontSize: 11.5, fontWeight: '500', marginBottom: 4 },
+  field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
+  readonlyField: { backgroundColor: '#F1F5F9', color: '#6B7280' },
+  locationBox: { backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, marginTop: 6 },
   locationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 },
-  locationTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' },
-  locationHint: { color: colors.muted, fontSize: 10, marginTop: 2 },
-  locateBtn: { backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9 },
-  locateBtnText: { color: colors.white, fontSize: 10, fontWeight: '700' },
+  locationTitle: { color: '#111827', fontSize: 13, fontWeight: '600' },
+  locationHint: { color: '#6B7280', fontSize: 11, marginTop: 2 },
+  locateBtn: { backgroundColor: colors.primary, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 8 },
+  locateBtnText: { color: colors.white, fontSize: 11.5, fontWeight: '600' },
   coordRow: { flexDirection: 'row', gap: 8 },
-  locationField: { backgroundColor: colors.white, borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 7, fontSize: 11, color: colors.ink },
+  locationField: { backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8, fontSize: 12.5, color: '#111827' },
   ipInput: { minHeight: 68, textAlignVertical: 'top', fontFamily: 'monospace' },
-  ipHint: { color: colors.muted, fontSize: 10, lineHeight: 14, marginTop: 5 },
+  ipHint: { color: '#6B7280', fontSize: 11, lineHeight: 16, marginTop: 5 },
   ipChipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
-  ipChip: { backgroundColor: colors.white, borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3, fontSize: 10, color: colors.ink, fontWeight: '600' },
-  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  ipChip: { backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, fontSize: 11, color: '#111827', fontWeight: '500' },
+  chip: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  chipTextActive: { color: colors.white },
+  chipText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingBottom: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  infoVal: { color: colors.ink, fontSize: 12, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  secondaryBtn: { backgroundColor: '#EAF2FF', minHeight: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  secondaryBtnText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  cancelBtn: { backgroundColor: '#F1F5F9', minHeight: 44, paddingHorizontal: 18, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  cancelBtnText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  infoVal: { color: '#111827', fontSize: 13.5, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
+  secondaryBtn: { backgroundColor: '#EAF2FF', minHeight: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  secondaryBtnText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  cancelBtn: { backgroundColor: '#F1F5F9', minHeight: 44, paddingHorizontal: 18, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText: { color: '#374151', fontSize: 13, fontWeight: '600' },
   disabled: { opacity: 0.45 },
 });

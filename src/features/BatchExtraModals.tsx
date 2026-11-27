@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import {
   BarChart2,
@@ -20,7 +21,9 @@ import {
   ChevronRight,
   ClipboardList,
   Paperclip,
+  Pencil,
   Plus,
+  Route,
   Trash2,
   UsersRound,
   X,
@@ -106,6 +109,9 @@ export function BatchDetailModal({
   onOpenAttendance,
   onOpenHistory,
   onOpenAssignments,
+  onOpenProgression,
+  onEdit,
+  onDelete,
 }: {
   batch: BatchRecord | null;
   roadmapName?: string;
@@ -115,6 +121,9 @@ export function BatchDetailModal({
   onOpenAttendance: (batch: BatchRecord) => void;
   onOpenHistory: (batch: BatchRecord) => void;
   onOpenAssignments: (batch: BatchRecord) => void;
+  onOpenProgression?: (batch: BatchRecord) => void;
+  onEdit?: (batch: BatchRecord) => void;
+  onDelete?: (batch: BatchRecord) => void;
 }) {
   if (!batch) return null;
   const done = batch.progress?.doneSessions || 0;
@@ -172,6 +181,24 @@ export function BatchDetailModal({
             <ClipboardList size={15} color={colors.primary} />
             <Text style={styles.quickBtnText}>Bài tập</Text>
           </Pressable>
+          {batch.roadmapId && onOpenProgression ? (
+            <Pressable onPress={() => { onClose(); onOpenProgression(batch); }} style={styles.quickBtn}>
+              <Route size={15} color={colors.primary} />
+              <Text style={styles.quickBtnText}>Mở lớp lộ trình</Text>
+            </Pressable>
+          ) : null}
+          {canManage && onEdit ? (
+            <Pressable onPress={() => { onClose(); onEdit(batch); }} style={styles.quickBtn}>
+              <Pencil size={15} color={colors.primary} />
+              <Text style={styles.quickBtnText}>Sửa lớp</Text>
+            </Pressable>
+          ) : null}
+          {canManage && onDelete ? (
+            <Pressable onPress={() => { onClose(); onDelete(batch); }} style={[styles.quickBtn, styles.quickBtnDanger]}>
+              <Trash2 size={15} color="#B42318" />
+              <Text style={[styles.quickBtnText, { color: '#B42318' }]}>Xóa lớp</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </FullScreenFormModal>
@@ -308,6 +335,7 @@ export function BatchAssignmentsModal({
   canManage: boolean;
   onClose: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [assignments, setAssignments] = useState<BatchAssignmentRecord[]>([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -456,8 +484,13 @@ export function BatchAssignmentsModal({
   if (!batch) return null;
 
   return (
-    <FullScreenFormModal visible title={`Bài tập · ${batch.code}`} onClose={onClose}>
-      <View style={{ gap: 10 }}>
+    <FullScreenFormModal visible scrollable={false} title={`Bài tập · ${batch.code}`} onClose={onClose}>
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 84 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         {selected ? (
           <>
             <Pressable onPress={() => setSelected(null)} style={styles.backBtn}>
@@ -549,15 +582,14 @@ export function BatchAssignmentsModal({
           </>
         ) : (
           <>
-            {canManage ? (
-              <Pressable onPress={() => setShowCreate((prev) => !prev)} style={styles.primaryBtn}>
-                <Plus size={15} color={colors.white} />
-                <Text style={styles.primaryBtnText}>{showCreate ? 'Đóng form giao bài' : 'Giao bài tập mới'}</Text>
-              </Pressable>
-            ) : null}
-
             {showCreate ? (
               <View style={styles.infoCard}>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.sectionTitle}>Giao bài tập mới</Text>
+                  <Pressable onPress={() => setShowCreate(false)} hitSlop={8}>
+                    <X size={18} color={colors.muted} />
+                  </Pressable>
+                </View>
                 <Text style={styles.fieldLabel}>Tiêu đề bài tập *</Text>
                 <TextInput value={title} onChangeText={setTitle} placeholder="VD: Bài tập buổi 3" placeholderTextColor={colors.muted} style={styles.input} />
                 <Text style={styles.fieldLabel}>Mô tả / Yêu cầu</Text>
@@ -620,60 +652,81 @@ export function BatchAssignmentsModal({
             )}
           </>
         )}
+        </ScrollView>
+        {!selected && canManage ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={showCreate ? 'Đóng form giao bài' : 'Giao bài tập mới'}
+            onPress={() => setShowCreate((prev) => !prev)}
+            style={({ pressed }) => [styles.fab, { bottom: Math.max(insets.bottom, 16) + 12 }, pressed && styles.fabPressed]}
+          >
+            {showCreate ? <X size={23} strokeWidth={2.2} color={colors.white} /> : <Plus size={25} strokeWidth={2.3} color={colors.white} />}
+          </Pressable>
+        ) : null}
       </View>
     </FullScreenFormModal>
   );
 }
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+} as const;
+
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'center', padding: 14, backgroundColor: 'rgba(19,30,48,0.48)' },
-  dialog: { borderWidth: 1, borderColor: colors.border, borderRadius: 24, backgroundColor: colors.background, overflow: 'hidden' },
+  backdrop: { flex: 1, justifyContent: 'center', padding: 14, backgroundColor: 'rgba(15,23,42,0.35)' },
+  dialog: { borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 20, backgroundColor: colors.white, overflow: 'hidden' },
   tallDialog: { height: '90%' },
-  modalHeader: { minHeight: 53, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 16, borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
-  modalTitle: { flex: 1, color: colors.ink, fontSize: 14, fontWeight: '800' },
-  closeButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#F1F3F7' },
+  modalHeader: { minHeight: 53, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#E8EDF4', backgroundColor: colors.white },
+  modalTitle: { flex: 1, color: '#111827', fontSize: 15.5, fontWeight: '600' },
+  closeButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#F3F6FA' },
   content: { padding: 14, gap: 10, paddingBottom: 24 },
-  infoCard: { padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, gap: 6 },
-  title: { color: colors.ink, fontSize: 14, fontWeight: '800' },
-  meta: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  roadmapTag: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  infoCard: { ...HAIRLINE_CARD, padding: 14, gap: 6 },
+  title: { color: '#111827', fontSize: 15, fontWeight: '600' },
+  meta: { color: '#6B7280', fontSize: 12.5, lineHeight: 18 },
+  roadmapTag: { color: colors.primary, fontSize: 12, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  cell: { width: '48%', padding: 10, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
-  cellLabel: { color: colors.muted, fontSize: 9, fontWeight: '600' },
-  cellValue: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 3 },
+  cell: { width: '48%', padding: 11, borderRadius: 10, backgroundColor: '#F6F8FC', borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2' },
+  cellLabel: { color: '#6B7280', fontSize: 11, fontWeight: '400' },
+  cellValue: { color: '#111827', fontSize: 13, fontWeight: '600', marginTop: 4 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  sectionTitle: { color: colors.ink, fontSize: 12, fontWeight: '800', marginTop: 4 },
-  progressCount: { color: colors.primary, fontSize: 11, fontWeight: '800' },
+  sectionTitle: { color: '#111827', fontSize: 13.5, fontWeight: '600', marginTop: 4 },
+  progressCount: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
   progressTrack: { height: 7, borderRadius: 999, backgroundColor: '#E9EEF6', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: colors.primary },
-  warnText: { color: '#C27617', fontSize: 10, fontWeight: '600' },
+  warnText: { color: '#B45309', fontSize: 12, fontWeight: '500' },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
-  quickBtn: { width: '48%', minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, backgroundColor: '#EAF2FF', borderWidth: 1, borderColor: '#CFE0FF' },
-  quickBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  quickBtn: { width: '48%', minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, backgroundColor: '#EAF2FF', borderWidth: StyleSheet.hairlineWidth, borderColor: '#CFE0FF' },
+  quickBtnDanger: { backgroundColor: '#FFF1F0', borderColor: '#F4C9C5' },
+  quickBtnText: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
   statRow: { flexDirection: 'row', gap: 8 },
-  statBox: { flex: 1, padding: 12, borderRadius: 14, alignItems: 'center' },
-  statVal: { fontSize: 16, fontWeight: '800' },
-  statLabel: { color: colors.muted, fontSize: 10, fontWeight: '600', marginTop: 2 },
-  sessionCard: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, gap: 6 },
-  listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5, borderTopWidth: 1, borderTopColor: '#F0F3F8' },
+  statBox: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
+  statVal: { fontSize: 16, fontWeight: '700' },
+  statLabel: { color: '#6B7280', fontSize: 11.5, fontWeight: '500', marginTop: 2 },
+  sessionCard: { ...HAIRLINE_CARD, padding: 13, gap: 6 },
+  listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EEF2F7' },
   subList: { marginTop: 6, gap: 2 },
-  rowTitle: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  badgeText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  emptyText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 16 },
+  rowTitle: { color: '#111827', fontSize: 13.5, fontWeight: '600' },
+  badgeText: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
+  emptyText: { color: '#6B7280', fontSize: 12.5, textAlign: 'center', paddingVertical: 16 },
   backBtn: { alignSelf: 'flex-start', paddingVertical: 4 },
-  backBtnText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  miniAction: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#EAF2FF' },
-  miniActionText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  gradeForm: { marginTop: 8, gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#EEF2F7' },
-  fieldLabel: { color: colors.ink, fontSize: 10, fontWeight: '700', marginTop: 4 },
-  input: { minHeight: 40, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: '#F8FAFD', color: colors.ink, fontSize: 12 },
+  backBtnText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  miniAction: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 8, backgroundColor: '#EAF2FF' },
+  miniActionText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  gradeForm: { marginTop: 8, gap: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EEF2F7' },
+  fieldLabel: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
+  input: { minHeight: 42, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: colors.white, color: '#111827', fontSize: 13.5 },
   twoCols: { flexDirection: 'row', gap: 8 },
-  primaryBtn: { minHeight: 40, borderRadius: 11, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14 },
-  primaryBtnText: { color: colors.white, fontSize: 12, fontWeight: '800' },
-  attachBtn: { minHeight: 38, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, backgroundColor: '#F4F8FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
-  attachBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9, backgroundColor: '#F6F8FC', borderWidth: 1, borderColor: colors.border },
-  attachmentLink: { flex: 1, color: colors.primary, fontSize: 11, fontWeight: '600' },
-  disabled: { opacity: 0.6 },
+  primaryBtn: { minHeight: 42, borderRadius: 10, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14 },
+  primaryBtnText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  attachBtn: { minHeight: 40, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.primary, backgroundColor: '#F4F8FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
+  attachBtnText: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
+  attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10, backgroundColor: '#F6F8FC', borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2' },
+  attachmentLink: { flex: 1, color: colors.primary, fontSize: 12.5, fontWeight: '500' },
+  disabled: { opacity: 0.45 },
+  fab: { position: 'absolute', right: 18, bottom: 20, width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#1D4ED8', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 10, elevation: 6 },
+  fabPressed: { opacity: 0.88, transform: [{ scale: 0.96 }] },
 });
 

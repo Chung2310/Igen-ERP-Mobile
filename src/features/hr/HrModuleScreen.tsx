@@ -119,7 +119,7 @@ export function HrModuleScreen() {
   );
 
   return (
-    <View style={[styles.root, activeVisibleTab === 'employees' && styles.rootWhite]}>
+    <View style={[styles.root, styles.rootWhite]}>
       <Stack.Screen
         options={{
           headerStyle: { backgroundColor: '#D8EFFC' },
@@ -143,42 +143,22 @@ export function HrModuleScreen() {
         }}
       />
 
-      {/* Soft icy-sky pastel gradient background with subtle geometric motifs matching Overview */}
-      <View
-        pointerEvents="none"
-        style={activeVisibleTab === 'employees' ? styles.topZoneBackdrop : StyleSheet.absoluteFill}
-      >
-        <Svg
-          width="100%"
-          height="100%"
-          viewBox={activeVisibleTab === 'employees' ? '0 0 360 96' : '0 0 360 760'}
-          preserveAspectRatio="none"
-        >
+      {/* Soft icy-sky pastel top-zone gradient matching Overview & Employee Directory */}
+      <View pointerEvents="none" style={styles.topZoneBackdrop}>
+        <Svg width="100%" height="100%" viewBox="0 0 360 96" preserveAspectRatio="none">
           <Defs>
             <LinearGradient id="hrBg" x1="0" y1="0" x2="0.15" y2="1">
               <Stop offset="0" stopColor="#D8EFFC" stopOpacity="1" />
               <Stop offset="0.45" stopColor="#EAF3FC" stopOpacity="1" />
-              <Stop offset="1" stopColor={activeVisibleTab === 'employees' ? '#F5FAFE' : '#F5F7FC'} stopOpacity="1" />
+              <Stop offset="1" stopColor="#F5FAFE" stopOpacity="1" />
             </LinearGradient>
             <RadialGradient id="hrGlowTopRight" cx="86%" cy="10%" rx="52%" ry="42%">
               <Stop offset="0" stopColor="#8FD3FA" stopOpacity="0.48" />
               <Stop offset="1" stopColor="#8FD3FA" stopOpacity="0" />
             </RadialGradient>
           </Defs>
-          <Rect
-            x="0"
-            y="0"
-            width="360"
-            height={activeVisibleTab === 'employees' ? '96' : '760'}
-            fill="url(#hrBg)"
-          />
-          <Rect
-            x="0"
-            y="0"
-            width="360"
-            height={activeVisibleTab === 'employees' ? '96' : '760'}
-            fill="url(#hrGlowTopRight)"
-          />
+          <Rect x="0" y="0" width="360" height="96" fill="url(#hrBg)" />
+          <Rect x="0" y="0" width="360" height="96" fill="url(#hrGlowTopRight)" />
           <Path
             d="M 190 96 C 242 66, 298 58, 360 36 L 360 96 Z"
             fill="#2463EB"

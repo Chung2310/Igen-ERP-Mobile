@@ -1349,8 +1349,8 @@ const styles = StyleSheet.create({
   shiftMeta: { color: '#065F46', fontSize: 12, marginTop: 3 },
   closeShiftButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#FECACA' },
   closeShiftText: { color: '#B42318', fontSize: 12, fontWeight: '800' },
-  searchBox: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 14, backgroundColor: colors.white },
-  searchInput: { flex: 1, minWidth: 0, minHeight: 42, color: colors.ink, fontSize: 13.5, paddingVertical: 0 },
+  searchBox: { height: 40, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 99, backgroundColor: colors.white },
+  searchInput: { flex: 1, minWidth: 0, color: '#111827', fontSize: 13.5, paddingVertical: 0 },
   clearIconBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
   productCard: {

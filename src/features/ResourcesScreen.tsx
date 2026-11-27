@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
   secondaryAction: { minHeight: 40, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#EAF2FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   secondaryActionText: { color: colors.primary, fontSize: 9, fontWeight: '800' },
   refreshButton: { width: 40, height: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
-  search: { minHeight: 41, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, color: colors.ink, fontSize: 10, marginBottom: 11 },
+  search: { height: 40, paddingHorizontal: 14, borderRadius: 99, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DCE5F2', color: '#111827', fontSize: 13.5, marginBottom: 12 },
   countRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
   listHeading: { color: colors.ink, fontSize: 12, fontWeight: '800' },
   countText: { color: colors.muted, fontSize: 8 },

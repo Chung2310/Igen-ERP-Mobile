@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Card } from '@/components/Card';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   deleteHrEmployee,
@@ -692,11 +693,12 @@ export function OrgChartPanel({
   );
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
       style={styles.directoryScroll}
       contentContainerStyle={[
         styles.directoryContent,
-        { paddingBottom: Math.max(insets.bottom, 20) + 20 },
+        { paddingBottom: Math.max(insets.bottom, 20) + 84 },
       ]}
       showsVerticalScrollIndicator={false}
       refreshControl={
@@ -724,18 +726,6 @@ export function OrgChartPanel({
           </Text>
           <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
         </Pressable>
-
-        {isManager ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={openAddModal}
-            hitSlop={8}
-            style={({ pressed }) => [styles.directoryAddLink, pressed && { opacity: 0.6 }]}
-          >
-            <Plus size={15} strokeWidth={2} color={colors.primary} />
-            <Text style={styles.directoryAddLinkText}>Thêm NS</Text>
-          </Pressable>
-        ) : null}
       </View>
 
       {/* Full-width rounded pill search bar */}
@@ -1193,6 +1183,8 @@ export function OrgChartPanel({
         </View>
       </FullScreenFormModal>
     </ScrollView>
+    {isManager ? <HrFab label="Thêm nhân sự" onPress={openAddModal} /> : null}
+    </View>
   );
 }
 
@@ -1428,10 +1420,10 @@ const styles = StyleSheet.create({
   directorySearchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 16,
+    marginHorizontal: 14,
     marginBottom: 12,
     paddingHorizontal: 14,
-    height: 44,
+    height: 40,
     borderRadius: 99,
     backgroundColor: '#F6F8FC',
     borderWidth: 1,
@@ -1440,8 +1432,8 @@ const styles = StyleSheet.create({
   },
   directorySearchInput: {
     flex: 1,
-    fontSize: 14,
-    color: colors.ink,
+    fontSize: 13.5,
+    color: '#111827',
     fontWeight: '400',
     paddingVertical: 0,
   },

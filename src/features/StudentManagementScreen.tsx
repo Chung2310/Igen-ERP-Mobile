@@ -1,11 +1,16 @@
 import { BrandLoader, CenteredPageLoader } from '@/components/BrandLoader';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ComponentProps } from 'react';
+import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
+import { BranchAppIcon } from '@/components/OverviewTabIcons';
+import { PASTEL_BACKDROP_TOP_COLOR, PastelBackdrop } from '@/components/PastelBackdrop';
+import { StudentTabIcon } from '@/components/StudentTabIcons';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { Stack } from 'expo-router';
-import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Animated, Modal, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { Banknote, BarChart2, Bell, BookOpen, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, ClipboardCheck, ClipboardList, Download, Eye, GraduationCap, PauseCircle, Pencil, Plus, QrCode, RefreshCw, Route, Search, Share2, SlidersHorizontal, Tag, Trash2, UsersRound, Wrench, X } from 'lucide-react-native';
+import { Banknote, BarChart2, Bell, BookOpen, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, ChevronRight, ClipboardCheck, ClipboardList, Download, Eye, GraduationCap, PauseCircle, Pencil, Plus, QrCode, RefreshCw, Route, Search, Share2, SlidersHorizontal, Tag, Trash2, UsersRound, Wrench, X } from 'lucide-react-native';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { getErpWebUrl } from '@/core/network/erpWebLinks';
 import { ApiError } from '@/core/network/apiClient';
@@ -37,19 +42,35 @@ import {
 } from '@/features/studentManagementApi';
 
 type Area = 'students' | 'courses' | 'batches' | 'quality' | 'exams' | 'fees' | 'retention' | 'roadmap' | 'notifications' | 'classrooms' | 'resources';
-const NAV: Array<{ key: Area; label: string; Icon: typeof UsersRound }> = [
-  { key: 'students', label: 'Học viên', Icon: UsersRound },
-  { key: 'courses', label: 'Khóa học', Icon: BookOpen },
-  { key: 'batches', label: 'Lớp học', Icon: GraduationCap },
-  { key: 'quality', label: 'Chất lượng', Icon: ClipboardCheck },
-  { key: 'exams', label: 'Lịch thi', Icon: CalendarCheck },
-  { key: 'fees', label: 'Học phí', Icon: Banknote },
-  { key: 'retention', label: 'Bảo lưu & học lại', Icon: PauseCircle },
-  { key: 'roadmap', label: 'Lộ trình & chờ lớp', Icon: Route },
-  { key: 'notifications', label: 'Thông báo', Icon: Bell },
-  { key: 'classrooms', label: 'Phòng học', Icon: Building2 },
-  { key: 'resources', label: 'Thiết bị', Icon: Wrench },
+const NAV: Array<{ key: Area; label: string; subtitle: string; Icon: typeof UsersRound }> = [
+  { key: 'students', label: 'Học viên', subtitle: 'Hồ sơ, trạng thái & lịch sử đào tạo', Icon: UsersRound },
+  { key: 'courses', label: 'Khóa học', subtitle: 'Danh mục, thời lượng & học phí', Icon: BookOpen },
+  { key: 'batches', label: 'Lớp học', subtitle: 'Lịch học, điểm danh & bài tập', Icon: GraduationCap },
+  { key: 'quality', label: 'Chất lượng', subtitle: 'Chuyên cần, bài tập & đánh giá', Icon: ClipboardCheck },
+  { key: 'exams', label: 'Lịch thi', subtitle: 'Kỳ thi, xếp thí sinh & kết quả', Icon: CalendarCheck },
+  { key: 'fees', label: 'Học phí', subtitle: 'Công nợ, đợt thu & giao dịch', Icon: Banknote },
+  { key: 'retention', label: 'Bảo lưu & học lại', subtitle: 'Theo dõi bảo lưu & xếp lớp lại', Icon: PauseCircle },
+  { key: 'roadmap', label: 'Lộ trình & chờ lớp', subtitle: 'Chặng học tập & hàng chờ xếp lớp', Icon: Route },
+  { key: 'notifications', label: 'Thông báo', subtitle: 'Gửi email & nhắc đợt học phí', Icon: Bell },
+  { key: 'classrooms', label: 'Phòng học', subtitle: 'Quản lý phòng & lịch sử dụng', Icon: Building2 },
+  { key: 'resources', label: 'Thiết bị', subtitle: 'Thiết bị đào tạo & bảo trì', Icon: Wrench },
 ];
+const STUDENT_SECTIONS: ReadonlyArray<ModuleSectionItem<Area>> = NAV.map(({ key, label, subtitle }) => ({
+  key,
+  label,
+  subtitle,
+  renderIcon: (size) => <StudentTabIcon id={key} size={size} />,
+}));
+function getInitials(name?: string) {
+  return (
+    name
+      ?.trim()
+      .split(/\s+/)
+      .slice(-2)
+      .map((part) => part[0]?.toLocaleUpperCase('vi'))
+      .join('') || 'HV'
+  );
+}
 const WEEKDAY_OPTIONS = [
   { value: 1, label: 'Thứ 2' },
   { value: 2, label: 'Thứ 3' },
@@ -114,6 +135,7 @@ const emptyDraft = () => ({
 type Draft = ReturnType<typeof emptyDraft>;
 
 export function StudentManagementScreen(_props: FeatureScreenProps) {
+  const insets = useSafeAreaInsets();
   const { user, activeBranchId, setActiveBranchId } = useAuth();
   const permissions = user?.permissions || [];
   const canManage = Boolean(user?.role === 'admin' || user?.role === 'superadmin' || permissions.includes('*') || permissions.includes('people:manage'));
@@ -134,6 +156,26 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
   const branchName = branches.find((branch) => branch._id === branchId)?.name || user?.branchName || 'Chọn chi nhánh';
 
   const [area, setArea] = useState<Area>('students');
+  const sectionOpacity = useRef(new Animated.Value(1)).current;
+  const sectionTranslateX = useRef(new Animated.Value(0)).current;
+  const transitionDirRef = useRef<number>(0);
+  useEffect(() => {
+    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 18;
+    sectionOpacity.setValue(0.35);
+    sectionTranslateX.setValue(startX);
+    Animated.parallel([
+      Animated.timing(sectionOpacity, {
+        toValue: 1,
+        duration: 210,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sectionTranslateX, {
+        toValue: 0,
+        duration: 210,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [area, sectionOpacity, sectionTranslateX]);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [partners, setPartners] = useState<StudentPartner[]>([]);
   const [courses, setCourses] = useState<CourseRecord[]>([]);
@@ -1058,21 +1100,51 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
   if (!canRead) return <View style={styles.emptyState}><UsersRound size={28} color={colors.primary} /><Text style={styles.emptyTitle}>Chưa có quyền xem phân hệ Học viên</Text><Text style={styles.emptyText}>Cần quyền people:read để truy cập hồ sơ và nghiệp vụ đào tạo.</Text></View>;
 
   return <View style={styles.container}>
-    <Stack.Screen options={{ headerRight: canSwitchBranch ? () => <Pressable onPress={() => setBranchPickerOpen(true)} style={styles.branchButton}><Text numberOfLines={1} style={styles.branchButtonText}>{branchesLoading ? 'Đang tải…' : branchName}</Text><ChevronDown size={14} color={colors.primary} /></Pressable> : undefined }} />
-    {isSuperAdmin ? <View style={styles.companyScopeRow}><Text style={styles.scopeLabel}>Cơ sở</Text><Pressable onPress={() => setCompanyPickerOpen(true)} style={styles.companyScopeButton}><Building2 size={14} color={colors.primary} /><Text numberOfLines={1} style={styles.companyScopeText}>{companyName}</Text><ChevronDown size={13} color={colors.primary} /></Pressable></View> : null}
-    <ScrollView horizontal style={styles.navScroll} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navContent}>
-      {NAV.map(({ key, label, Icon }) => <Pressable key={key} onPress={() => { setArea(key); setSearch(''); resetFilters(); }} style={[styles.navChip, area === key && styles.navChipActive]}><Icon size={14} color={area === key ? colors.white : colors.muted} /><Text style={[styles.navText, area === key && styles.navTextActive]}>{label}</Text></Pressable>)}
-    </ScrollView>
+    <PastelBackdrop idPrefix="student" />
+    <Stack.Screen
+      options={{
+        headerStyle: { backgroundColor: PASTEL_BACKDROP_TOP_COLOR },
+        headerShadowVisible: false,
+        headerRight: canSwitchBranch
+          ? () => (
+              <Pressable
+                onPress={() => setBranchPickerOpen(true)}
+                hitSlop={8}
+                style={({ pressed }) => [styles.headerBranchBtn, pressed && { opacity: 0.65 }]}
+              >
+                <View style={styles.branchBtnContent}>
+                  <BranchAppIcon size={22} />
+                  <Text numberOfLines={1} style={styles.branchBtnText}>{branchesLoading ? 'Đang tải…' : branchName}</Text>
+                  <ChevronDown size={14} color={colors.ink} />
+                </View>
+              </Pressable>
+            )
+          : undefined,
+      }}
+    />
+    {isSuperAdmin ? <View style={styles.companyScopeRow}><Text style={styles.scopeLabel}>Cơ sở</Text><Pressable onPress={() => setCompanyPickerOpen(true)} style={styles.companyScopeButton}><Building2 size={15} color={colors.primary} /><Text numberOfLines={1} style={styles.companyScopeText}>{companyName}</Text><ChevronDown size={14} color={colors.ink} /></Pressable></View> : null}
+    <ModuleSectionSwitcher
+      items={STUDENT_SECTIONS}
+      activeKey={area}
+      onChange={(nextArea, direction) => {
+        transitionDirRef.current = direction;
+        setArea(nextArea);
+        setSearch('');
+        resetFilters();
+      }}
+      modalTitle="Chọn mục học viên & đào tạo"
+      style={styles.switcherBarWrap}
+    />
 
+    <Animated.View style={{ flex: 1, opacity: sectionOpacity, transform: [{ translateX: sectionTranslateX }] }}>
     <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor={colors.primary} />} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={styles.toolbar}>
-        <View style={styles.searchBox}><Search size={15} color={colors.muted} /><TextInput value={search} onChangeText={setSearch} placeholder={placeholderForArea(area)} placeholderTextColor={colors.muted} style={styles.searchInput} />{search ? <Pressable onPress={() => setSearch('')}><X size={15} color={colors.muted} /></Pressable> : null}</View>
+        <View style={styles.searchBox}><Search size={16} strokeWidth={1.7} color="#94A3B8" /><TextInput value={search} onChangeText={setSearch} placeholder={placeholderForArea(area)} placeholderTextColor="#94A3B8" style={styles.searchInput} />{search ? <Pressable onPress={() => setSearch('')} hitSlop={8}><X size={16} color="#94A3B8" /></Pressable> : null}</View>
         {area !== 'students' && area !== 'fees' && area !== 'classrooms' && area !== 'resources' && area !== 'roadmap' && area !== 'notifications' && filterOptions(area).length > 0 && <Pressable onPress={() => setFilterOpen(true)} style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]}><SlidersHorizontal size={14} color={colors.primary} /><Text style={styles.filterButtonText}>{activeFilterCount ? `Bộ lọc (${activeFilterCount})` : 'Bộ lọc'}</Text><ChevronDown size={13} color={colors.primary} /></Pressable>}
         {area !== 'students' && area !== 'courses' && area !== 'batches' && area !== 'fees' && area !== 'classrooms' && area !== 'resources' && area !== 'roadmap' && area !== 'notifications' ? <Pressable onPress={() => void exportCurrentArea()} style={styles.filterButton}><Download size={14} color={colors.primary} /><Text style={styles.filterButtonText}>Xuất CSV</Text></Pressable> : null}
         {area === 'quality' && canManage ? <Pressable onPress={() => void openQualityThresholdSettings()} style={styles.filterButton}><SlidersHorizontal size={14} color={colors.primary} /><Text style={styles.filterButtonText}>Ngưỡng</Text></Pressable> : null}
         {area === 'students' && canManage ? <Pressable accessibilityRole="button" accessibilityLabel="QR đăng ký học viên" onPress={() => void openRegisterQr()} style={styles.filterButton}><QrCode size={15} color={colors.primary} /><Text style={styles.filterButtonText}>QR</Text></Pressable> : null}
         {area === 'courses' && canManage ? <Pressable accessibilityRole="button" accessibilityLabel="Quản lý danh mục khóa học" onPress={() => setCategoryModalOpen(true)} style={styles.filterButton}><Tag size={14} color={colors.primary} /><Text style={styles.filterButtonText}>Danh mục</Text></Pressable> : null}
-        {showAdd && area !== 'fees' && <Pressable onPress={openCreate} style={styles.addButton}><Plus size={16} color={colors.white} /><Text style={styles.addText}>{area === 'students' ? 'Thêm học viên' : area === 'courses' ? 'Thêm khóa học' : area === 'batches' ? 'Thêm lớp' : area === 'exams' ? 'Thêm kỳ thi' : area === 'notifications' ? 'Gửi thông báo' : area === 'roadmap' ? 'Tạo lộ trình' : area === 'classrooms' ? 'Thêm phòng học' : 'Thêm thiết bị'}</Text></Pressable>}
       </View>
       {(area === 'classrooms' || area === 'resources' || area === 'roadmap' || area === 'notifications') ? (
         <View style={styles.feesActionRow}>
@@ -1106,12 +1178,6 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
             <Download size={13} color={colors.primary} />
             <Text numberOfLines={1} style={styles.filterButtonText}>Xuất CSV</Text>
           </Pressable>
-          {showAdd ? (
-            <Pressable onPress={openCreate} style={[styles.addButton, styles.feesActionBtn]}>
-              <Plus size={15} color={colors.white} />
-              <Text numberOfLines={1} style={styles.addText}>Thu học phí</Text>
-            </Pressable>
-          ) : null}
         </View>
       ) : null}
       {area === 'students' && canManage ? <StudentDataTransfer students={visibleStudents} batches={batches} scope={scope} onImported={() => { void load(true); }} filterLabel={activeFilterCount ? `Bộ lọc (${activeFilterCount})` : 'Bộ lọc'} hasActiveFilter={activeFilterCount > 0} onFilterPress={() => setFilterOpen(true)} /> : null}
@@ -1126,6 +1192,18 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       {resultCount > pageSize ? <View style={styles.pagination}><Text style={styles.paginationText}>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, resultCount)} / {resultCount}</Text><Pressable disabled={page <= 1} onPress={() => setPage((value) => Math.max(1, value - 1))} style={[styles.pageButton, page <= 1 && styles.disabled]}><Text style={styles.pageButtonText}>Trước</Text></Pressable><Text style={styles.paginationText}>{page}/{pageCount}</Text><Pressable disabled={page >= pageCount} onPress={() => setPage((value) => Math.min(pageCount, value + 1))} style={[styles.pageButton, page >= pageCount && styles.disabled]}><Text style={styles.pageButtonText}>Sau</Text></Pressable></View> : null}
       </>}
     </ScrollView>
+    </Animated.View>
+
+    {showAdd ? (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={area === 'students' ? 'Thêm học viên' : area === 'courses' ? 'Thêm khóa học' : area === 'batches' ? 'Thêm lớp' : area === 'exams' ? 'Thêm kỳ thi' : area === 'fees' ? 'Thu học phí' : area === 'notifications' ? 'Gửi thông báo' : area === 'roadmap' ? 'Tạo lộ trình' : area === 'classrooms' ? 'Thêm phòng học' : 'Thêm thiết bị'}
+        onPress={openCreate}
+        style={({ pressed }) => [styles.fab, { bottom: Math.max(insets.bottom, 16) + 12 }, pressed && styles.fabPressed]}
+      >
+        <Plus size={25} strokeWidth={2.3} color={colors.white} />
+      </Pressable>
+    ) : null}
 
     <FullScreenFormModal
       visible={formOpen}
@@ -1166,7 +1244,36 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       </View>
     </FullScreenFormModal>
 
-    <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}><View style={styles.backdrop}><View style={[styles.dialog, styles.pickerDialog]}><ModalHeader title="Chọn thông tin" onClose={() => setPickerOpen(false)} /><View style={styles.searchBox}><Search size={15} color={colors.muted} /><TextInput value={pickerSearch} onChangeText={setPickerSearch} placeholder="Tìm kiếm" placeholderTextColor={colors.muted} style={styles.searchInput} /></View><ScrollView style={{ maxHeight: 440 }} keyboardShouldPersistTaps="handled">{optionsForPicker().map((option) => <Pressable key={option.value} onPress={() => { if (pickerField?.startsWith('roadmap-course-')) { const selectedIndex = Number(pickerField.slice('roadmap-course-'.length)); setRoadmapCourseIds((current) => current.map((value, index) => index === selectedIndex ? option.value : value)); } else if (pickerField) setValue(pickerField, option.value); setPickerOpen(false); }} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{option.label}</Text>{option.detail ? <Text style={styles.optionDetail}>{option.detail}</Text> : null}</View>{pickerField?.startsWith('roadmap-course-') ? <Check size={17} color={colors.primary} /> : pickerField && draft[pickerField as keyof Draft] === option.value ? <Check size={17} color={colors.primary} /> : null}</Pressable>)}{optionsForPicker().length === 0 ? <Text style={styles.helperText}>Không tìm thấy lựa chọn phù hợp.</Text> : null}</ScrollView></View></View></Modal>
+    <Modal visible={pickerOpen} transparent statusBarTranslucent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
+      <Pressable style={styles.sheetBackdrop} onPress={() => setPickerOpen(false)}>
+        <Pressable style={styles.sheetModal} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Chọn thông tin</Text>
+            <Pressable onPress={() => setPickerOpen(false)} hitSlop={8}><Text style={styles.sheetClose}>Đóng</Text></Pressable>
+          </View>
+          <View style={[styles.searchBox, { flex: 0, marginBottom: 10 }]}>
+            <Search size={16} strokeWidth={1.7} color="#94A3B8" />
+            <TextInput value={pickerSearch} onChangeText={setPickerSearch} placeholder="Tìm kiếm..." placeholderTextColor="#94A3B8" style={styles.searchInput} />
+          </View>
+          <ScrollView style={{ flexGrow: 0, maxHeight: 420 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {optionsForPicker().map((option) => {
+              const selected = !pickerField?.startsWith('roadmap-course-') && Boolean(pickerField && draft[pickerField as keyof Draft] === option.value);
+              return (
+                <Pressable key={option.value} onPress={() => { if (pickerField?.startsWith('roadmap-course-')) { const selectedIndex = Number(pickerField.slice('roadmap-course-'.length)); setRoadmapCourseIds((current) => current.map((value, index) => index === selectedIndex ? option.value : value)); } else if (pickerField) setValue(pickerField, option.value); setPickerOpen(false); }} style={[styles.sheetRow, selected && styles.sheetRowActive]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sheetRowTitle}>{option.label}</Text>
+                    {option.detail ? <Text style={styles.sheetRowSub}>{option.detail}</Text> : null}
+                  </View>
+                  {pickerField?.startsWith('roadmap-course-') || selected ? <Check size={17} color={colors.primary} /> : null}
+                </Pressable>
+              );
+            })}
+            {optionsForPicker().length === 0 ? <Text style={styles.helperText}>Không tìm thấy lựa chọn phù hợp.</Text> : null}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
 
     <FullScreenFormModal
       visible={Boolean(studentDetail)}
@@ -1174,7 +1281,7 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       onClose={() => setStudentDetail(null)}
     >
       {detailLoading ? <LoadState title="Đang tải hồ sơ" detail="Đang lấy học phí và lịch sử đào tạo…" busy /> : studentDetail ? <View style={{ gap: 12 }}>
-        <View style={styles.studentIdentity}><View style={styles.studentAvatar}><UsersRound size={20} color={colors.primary} /></View><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{studentDetail.fullName}</Text><Text style={styles.cardMeta}>{studentDetail.phone} · {studentDetail.email || 'Chưa có email'}</Text></View></View>
+        <View style={styles.studentIdentity}><View style={styles.studentAvatar}><Text style={styles.studentAvatarText}>{getInitials(studentDetail.fullName)}</Text></View><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{studentDetail.fullName}</Text><Text style={styles.cardMeta}>{studentDetail.phone} · {studentDetail.email || 'Chưa có email'}</Text></View></View>
         <View style={styles.detailGrid}><Detail label="Ngày sinh" value={studentDetail.birthday || '—'} /><Detail label="CCCD" value={studentDetail.idCard || '—'} /><Detail label="Ngày đăng ký" value={studentDetail.registrationDate || '—'} /><Detail label="Địa chỉ" value={studentDetail.address || '—'} /></View>
         <View style={styles.detailSection}><Text style={styles.detailSectionTitle}>Học phí</Text><View style={styles.detailGrid}><Detail label="Đã thu" value={money(studentDetail.paidAmount)} /><Detail label="Còn nợ" value={money(studentDue(studentDetail))} /></View>
           {installments.map((item, index) => <View key={`${item.no || index}`} style={styles.installmentRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>Đợt {item.no || index + 1} · {money(item.amountDue)}</Text><Text style={styles.optionDetail}>{item.dueDate || 'Chưa có hạn'} · {item.status || 'Chưa thanh toán'}</Text></View>{item.status !== 'Đã thanh toán' ? <Pressable onPress={() => void markStudentInstallmentPaid(studentDetail.id, Number(item.no || index + 1), scope).then(() => openStudentDetail(studentDetail)).catch((cause) => Alert.alert('Không cập nhật được', cause instanceof Error ? cause.message : 'Lỗi cập nhật.'))} style={styles.miniAction}><Check size={13} color={colors.primary} /><Text style={styles.miniActionText}>Đã thu</Text></Pressable> : null}</View>)}
@@ -1397,14 +1504,22 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       onOpenAttendance={(item) => void openAttendance(item)}
       onOpenHistory={(item) => setHistoryBatch(item)}
       onOpenAssignments={(item) => setAssignmentsBatch(item)}
+      onOpenProgression={(item) => void openBatchProgression(item)}
+      onEdit={(item) => openEdit(item)}
+      onDelete={(item) => confirmDelete('lớp học', () => deleteBatch(item.id, scope))}
     />
     <BatchAttendanceHistoryModal batch={historyBatch} students={students} onClose={() => setHistoryBatch(null)} />
     <BatchAssignmentsModal batch={assignmentsBatch} students={students} scope={scope} canManage={canManage} onClose={() => setAssignmentsBatch(null)} />
 
-    <Modal visible={filterOpen} transparent animationType="fade" onRequestClose={() => setFilterOpen(false)}>
-      <View style={styles.backdrop}><View style={styles.dialog}>
-        <ModalHeader title="Bộ lọc" onClose={() => setFilterOpen(false)} />
-        <ScrollView style={{ maxHeight: 500 }} contentContainerStyle={styles.filterModalContent} keyboardShouldPersistTaps="handled">
+    <Modal visible={filterOpen} transparent statusBarTranslucent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
+      <Pressable style={styles.sheetBackdrop} onPress={() => setFilterOpen(false)}>
+        <Pressable style={[styles.sheetModal, { maxHeight: '86%', paddingHorizontal: 0 }]} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <View style={[styles.sheetHeader, { paddingHorizontal: 18 }]}>
+            <Text style={styles.sheetTitle}>Bộ lọc</Text>
+            <Pressable onPress={() => setFilterOpen(false)} hitSlop={8}><Text style={styles.sheetClose}>Đóng</Text></Pressable>
+          </View>
+          <ScrollView style={{ maxHeight: 500 }} contentContainerStyle={styles.filterModalContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {filterOptions(area).length ? <FilterChoice title="Trạng thái" value={statusFilter} options={filterOptions(area)} onChange={setStatusFilter} /> : null}
           {area === 'students' ? <>
             <FilterChoice title="Khóa học" value={courseFilter} options={[{ value: 'Tất cả', label: 'Tất cả khóa học' }, ...courses.map((item) => ({ value: item.id, label: `${item.code} · ${item.title}` }))]} onChange={setCourseFilter} />
@@ -1428,13 +1543,64 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
           </> : null}
           {area === 'classrooms' || area === 'resources' ? <FilterChoice title={area === 'classrooms' ? 'Loại phòng học' : 'Loại thiết bị'} value={resourceTypeFilter} options={[{ value: 'Tất cả', label: 'Tất cả loại' }, ...Array.from(new Set(resources.filter((item) => area === 'classrooms' ? normalize(item.type).includes('phong hoc') : !normalize(item.type).includes('phong hoc')).map((item) => item.type))).map((value) => ({ value, label: value }))]} onChange={setResourceTypeFilter} /> : null}
           {area === 'classrooms' ? <View style={styles.filterDateRow}><DateTimeField label="Ngày xem lịch phòng" mode="date" value={dateFromFilter} onChange={setDateFromFilter} allowClear /></View> : null}
-        </ScrollView>
-        <View style={styles.filterModalFooter}><Text style={styles.filterModalHint}>{activeFilterCount ? `Đang áp dụng ${activeFilterCount} điều kiện lọc.` : 'Chưa áp dụng bộ lọc.'}</Text><Pressable onPress={() => resetFilters()} style={styles.clearFilterButton}><Text style={styles.clearFilterText}>Xóa lọc</Text></Pressable><Pressable onPress={() => { if (dateFromFilter && dateToFilter && dateFromFilter > dateToFilter) { Alert.alert('Khoảng ngày chưa hợp lệ', 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.'); return; } setFilterOpen(false); }} style={[styles.saveButton, { minHeight: 33, paddingHorizontal: 12 }]}><Text style={styles.saveText}>Áp dụng</Text></Pressable></View>
-      </View></View>
+          </ScrollView>
+          <View style={styles.filterModalFooter}><Text style={styles.filterModalHint}>{activeFilterCount ? `Đang áp dụng ${activeFilterCount} điều kiện lọc.` : 'Chưa áp dụng bộ lọc.'}</Text><Pressable onPress={() => resetFilters()} style={styles.clearFilterButton}><Text style={styles.clearFilterText}>Xóa lọc</Text></Pressable><Pressable onPress={() => { if (dateFromFilter && dateToFilter && dateFromFilter > dateToFilter) { Alert.alert('Khoảng ngày chưa hợp lệ', 'Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.'); return; } setFilterOpen(false); }} style={[styles.saveButton, { minHeight: 36, paddingHorizontal: 14 }]}><Text style={styles.saveText}>Áp dụng</Text></Pressable></View>
+        </Pressable>
+      </Pressable>
     </Modal>
 
-    <Modal visible={companyPickerOpen} transparent animationType="fade" onRequestClose={() => setCompanyPickerOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Chọn cơ sở đào tạo" onClose={() => setCompanyPickerOpen(false)} /><ScrollView style={{ maxHeight: 430 }}>{companies.map((company) => <Pressable key={company.code} onPress={() => { if (company.code !== companyCode) { setCompanyCode(company.code); setActiveBranchId(undefined); setBranches([]); } setCompanyPickerOpen(false); }} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{company.name}</Text><Text style={styles.optionDetail}>{company.code}</Text></View>{company.code === companyCode ? <Check size={17} color={colors.primary} /> : null}</Pressable>)}</ScrollView></View></View></Modal>
-    <Modal visible={branchPickerOpen} transparent animationType="fade" onRequestClose={() => setBranchPickerOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Chọn chi nhánh" onClose={() => setBranchPickerOpen(false)} /><ScrollView style={{ maxHeight: 430 }}>{branches.map((branch) => <Pressable key={branch._id} onPress={() => { setActiveBranchId(branch._id); setBranchPickerOpen(false); }} style={styles.optionRow}><View style={{ flex: 1 }}><Text style={styles.optionTitle}>{branch.name}</Text>{branch.code ? <Text style={styles.optionDetail}>{branch.code}</Text> : null}</View>{branch._id === branchId ? <Check size={17} color={colors.primary} /> : null}</Pressable>)}</ScrollView></View></View></Modal>
+    <Modal visible={companyPickerOpen} transparent statusBarTranslucent animationType="slide" onRequestClose={() => setCompanyPickerOpen(false)}>
+      <Pressable style={styles.sheetBackdrop} onPress={() => setCompanyPickerOpen(false)}>
+        <Pressable style={styles.sheetModal} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Chọn cơ sở đào tạo</Text>
+            <Pressable onPress={() => setCompanyPickerOpen(false)} hitSlop={8}><Text style={styles.sheetClose}>Đóng</Text></Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+            {companies.map((company) => {
+              const selected = company.code === companyCode;
+              return (
+                <Pressable key={company.code} onPress={() => { if (!selected) { setCompanyCode(company.code); setActiveBranchId(undefined); setBranches([]); } setCompanyPickerOpen(false); }} style={[styles.sheetRow, selected && styles.sheetRowActive]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sheetRowTitle}>{company.name}</Text>
+                    <Text numberOfLines={1} style={styles.sheetRowSub}>{company.code}</Text>
+                  </View>
+                  {selected ? <Check size={17} color={colors.primary} /> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+
+    <Modal visible={branchPickerOpen} transparent statusBarTranslucent animationType="slide" onRequestClose={() => setBranchPickerOpen(false)}>
+      <Pressable style={styles.sheetBackdrop} onPress={() => setBranchPickerOpen(false)}>
+        <Pressable style={styles.sheetModal} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Chọn chi nhánh</Text>
+            <Pressable onPress={() => setBranchPickerOpen(false)} hitSlop={8}><Text style={styles.sheetClose}>Đóng</Text></Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+            {branches.map((branch) => {
+              const selected = branch._id === branchId;
+              return (
+                <Pressable key={branch._id} onPress={() => { setActiveBranchId(branch._id); setBranchPickerOpen(false); }} style={[styles.sheetRow, selected && styles.sheetRowActive]}>
+                  <BranchAppIcon size={38} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sheetRowTitle}>{branch.name}</Text>
+                    {branch.code ? <Text numberOfLines={1} style={styles.sheetRowSub}>Mã chi nhánh: {branch.code}</Text> : null}
+                  </View>
+                  {selected ? <Check size={17} color={colors.primary} /> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
   </View>;
 }
 
@@ -1450,21 +1616,301 @@ type Actions = {
 function renderArea(area: Area, lists: Lists, actions: Actions) {
   const { canManage } = actions;
   const pageRows = <T,>(items: T[]) => items.slice((actions.page - 1) * actions.pageSize, actions.page * actions.pageSize);
-  if (area === 'students') return <View style={styles.cardList}>{pageRows(lists.students).map((item) => <EntityCard key={item.id} title={item.fullName} subtitle={`${item.phone} · ${item.email || 'Chưa có email'}`} badge={statusOf(item)} details={[`Khóa: ${lists.courses.find((course) => course.id === item.courseId)?.title || 'Chưa xếp khóa'}`, `Học phí còn: ${money(studentDue(item))}`, `Đăng ký: ${item.registrationDate || '—'}`]} actions={[{ label: 'Hồ sơ', Icon: UsersRound, onPress: () => actions.openStudentDetail(item), primary: true }, ...(canManage ? [{ label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item) }, { label: 'Xóa', Icon: Trash2, onPress: () => actions.confirmDelete('hồ sơ học viên', () => actions.deleteStudentRecord(item.id)) }] : [])]} />)}{empty(lists.students, 'Chưa có hồ sơ học viên.')}</View>;
-  if (area === 'courses') return <View style={styles.cardList}>{pageRows(lists.courses).map((item) => <EntityCard key={item.id} title={`${item.code} · ${item.title}`} subtitle={item.category} badge={item.status || 'Hoạt động'} details={[`Thời lượng: ${item.duration}`, `Học phí: ${item.fee ? money(String(item.fee).replace(/\D/g, '')) : 'Chưa cấu hình'}`, `Sĩ số tối đa: ${item.maxLearners || '—'} · Lớp đang mở: ${item.activeBatches || 0}`]} actions={canManage ? [{ label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item), primary: true }, { label: 'Xóa', Icon: Trash2, onPress: () => actions.confirmDelete('khóa học', () => actions.deleteCourseRecord(item.id)) }] : []} />)}{empty(lists.courses, 'Chưa có khóa học.')}</View>;
-  if (area === 'batches') return <View style={styles.cardList}>{pageRows(lists.batches).map((item) => { const linkedRoadmap = item.roadmapId ? lists.roadmaps.find((rm) => String(rm.id || rm._id || '') === item.roadmapId) : undefined; const cap = item.quota ?? item.maxLearners; return <EntityCard key={item.id} title={`${item.code}${item.name ? ` · ${item.name}` : ''}`} subtitle={`${item.courseCode || ''} ${item.courseTitle || ''}`} badge={item.status || 'Sắp khai giảng'} details={[...(linkedRoadmap ? [`Lộ trình: ${linkedRoadmap.name || linkedRoadmap.code || ''}`] : []), `Lịch: ${(item.daysOfWeek || []).map((day) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][day]).join(', ') || '—'} · ${item.startTime || ''}-${item.endTime || ''}`, `Thời gian: ${item.startDate || '—'} → ${item.endDate || '—'}`, `Học viên: ${item.learnerIds?.length || 0}${cap ? `/${cap}` : ''} · Giảng viên: ${item.instructorName || 'Chưa phân công'}`, `Tiến độ: ${item.progress?.doneSessions || 0}/${item.progress?.totalSessions || 0} buổi`]} actions={[{ label: 'Chi tiết', Icon: Eye, onPress: () => actions.openBatchDetail(item) }, { label: 'Học viên', Icon: UsersRound, onPress: () => actions.openBatchManager(item), primary: true }, ...(canManage ? [{ label: 'Điểm danh', Icon: CalendarCheck, onPress: () => actions.openAttendance(item) }] : []), { label: 'Lịch sử', Icon: BarChart2, onPress: () => actions.openBatchHistory(item) }, { label: 'Bài tập', Icon: ClipboardList, onPress: () => actions.openBatchAssignments(item) }, ...(item.roadmapId ? [{ label: 'Mở lớp theo lộ trình', Icon: Route, onPress: () => actions.openBatchProgression(item) }] : []), ...(canManage ? [{ label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item) }, { label: 'Xóa', Icon: Trash2, onPress: () => actions.confirmDelete('lớp học', () => actions.deleteBatchRecord(item.id)) }] : [])]} />; })}{empty(lists.batches, 'Chưa có lớp học.')}</View>;
-  if (area === 'quality') return <View style={styles.cardList}>{pageRows(lists.quality).map((item) => <EntityCard key={item.id} title={item.studentName} subtitle={`${item.batchCode} · ${item.courseTitle}`} badge={item.warningLevel === 'risk' ? 'Cần can thiệp' : item.warningLevel === 'watch' ? 'Cần theo dõi' : item.warningLevel === 'good' ? 'Ổn định' : 'Chưa đánh giá'} details={[`Chuyên cần: ${item.attendance.attended}/${item.attendance.total} · ${item.attendance.rate ?? '—'}%`, `Bài tập: ${item.assignments.completed}/${item.assignments.total} · ${item.assignments.rate ?? '—'}%`, `Bài kiểm tra gần nhất: ${item.latestMiniTest?.title || 'Chưa có'}`]} actions={canManage ? [{ label: 'Đánh giá', Icon: ClipboardCheck, onPress: () => actions.setQualityDetail(item), primary: true }] : []} />)}{empty(lists.quality, 'Chưa có dữ liệu đánh giá theo lớp.')}</View>;
-  if (area === 'exams') return <View style={styles.cardList}>{pageRows(lists.exams).map((item) => <EntityCard key={item.id} title={item.name} subtitle={`${item.batchCode || 'Chưa có lớp'} · ${item.location || 'Chưa có địa điểm'}`} badge={item.status} details={[`Dự kiến: ${item.tentativeDate || '—'} · Chính thức: ${item.officialDate || '—'}`, `Thí sinh: ${item.studentCount || 0} · Đậu: ${item.passCount || 0} · Trượt: ${item.failCount || 0}`, `Thang điểm: ${item.maxScore || 100} · Điểm đạt: ${item.passScore ?? '—'}`]} actions={[...(canManage ? [{ label: 'Xếp thí sinh', Icon: UsersRound, onPress: () => actions.openExamAssignment(item), primary: true }, { label: 'Nhập điểm', Icon: ClipboardCheck, onPress: () => actions.openExamScores(item) }, { label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item) }, { label: 'Xóa', Icon: Trash2, onPress: () => actions.confirmDelete('kỳ thi', () => actions.deleteExamRecord(item.id)) }] : [])]} />)}{empty(lists.exams, 'Chưa có kỳ thi.')}</View>;
-  if (area === 'fees') return <View style={styles.cardList}><Text style={styles.detailSectionTitle}>Tình trạng học phí học viên</Text>{pageRows(lists.students).map((student) => <EntityCard key={student.id} title={student.fullName} subtitle={`${student.phone} · ${statusOf(student)}`} badge={studentDue(student) > 0 ? 'Còn nợ' : studentFee(student) > 0 ? 'Đã hoàn thành' : 'Miễn phí'} details={[`Tổng học phí: ${money(studentFee(student))}`, `Đã thu: ${money(student.paidAmount)}`, `Còn nợ: ${money(studentDue(student))}`]} actions={[{ label: 'Hồ sơ phí', Icon: Eye, onPress: () => actions.openStudentDetail(student) }, ...(canManage ? [{ label: 'Ghi nhận thu', Icon: Banknote, onPress: () => actions.openStudentPayment(student), primary: true }] : [])]} />)}{empty(lists.students, 'Chưa có học viên phù hợp với bộ lọc học phí.')}<Text style={styles.detailSectionTitle}>Giao dịch gần đây</Text>{pageRows(lists.payments.slice().sort((a, b) => String(b.paidOn || b.date || '').localeCompare(String(a.paidOn || a.date || '')))).map((item, index) => <EntityCard key={item.id || item._id || index} title={item.studentName || lists.students.find((student) => student.id === item.studentId)?.fullName || 'Học viên'} subtitle={`${item.date || item.paidOn || '—'} · ${item.method || '—'}`} details={[`Số tiền: ${money(item.amount)}`, item.note || 'Không có ghi chú']} actions={canManage ? [{ label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item), primary: true }, { label: 'Xóa', Icon: Trash2, onPress: () => actions.deletePayment(item) }] : []} />)}{empty(lists.payments, 'Chưa có giao dịch học phí.')}</View>;
-  if (area === 'notifications') return <View style={styles.cardList}>{pageRows(lists.notifications).map((item, index) => <EntityCard key={item.id || item._id || index} title={item.title} subtitle={`${item.createdAt ? new Date(item.createdAt).toLocaleString('vi-VN') : 'Chưa có thời gian'} · ${item.status || '—'}`} badge={item.status || '—'} details={[item.content, `Đối tượng: ${item.recipients || '—'} · Gửi thành công: ${item.recipientCount || 0}`, `Kênh: ${(item.channels || []).join(', ') || '—'}`, ...(item.installmentPlan ? [`Đợt thu: ${item.installmentPlan.label || `Đợt ${item.installmentPlan.installmentNo}`} · ${item.installmentPlan.percent}%${item.installmentPlan.dueDate ? ` · Hạn ${toDisplayDate(item.installmentPlan.dueDate)}` : ''}`] : [])]} actions={canManage ? [...(item.installmentPlan && item.studentIds?.length ? [{ label: 'Đánh dấu đã thu', Icon: Check, onPress: () => actions.markNotificationInstallmentPaid(item), primary: true }] : []), { label: 'Xóa lịch sử', Icon: Trash2, onPress: () => actions.deleteNotification(item) }] : []} />)}{empty(lists.notifications, 'Chưa có lịch sử gửi thông báo.')}</View>;
-  if (area === 'classrooms' || area === 'resources') return <View style={styles.cardList}>{pageRows(lists.resources).map((item) => <EntityCard key={item.id} title={`${item.name} · ${item.identifier}`} subtitle={`${item.type} · Sức chứa ${item.capacity}`} badge={resourceStatusLabel(item.status)} details={[...(area === 'classrooms' ? classroomScheduleDetails(item, lists.allBatches || lists.batches, actions.scheduleDate) : []), `Lịch sử đặt: ${item.bookings?.length || 0}`, ...(item.bookings || []).slice(0, 2).map((booking) => `${booking.date} ${booking.startTime}-${booking.endTime} · ${booking.purpose}`)]} actions={[{ label: 'Đặt lịch', Icon: CalendarDays, onPress: () => actions.openBooking(item), primary: true }, ...(canManage ? [{ label: item.status === 'MAINTENANCE' ? 'Đánh dấu sẵn sàng' : 'Chuyển bảo trì', Icon: RefreshCw, onPress: () => actions.toggleResourceMaintenance(item) }] : []), ...(canManage && item.bookings?.[0]?.id ? [{ label: 'Hủy lịch gần nhất', Icon: X, onPress: () => actions.cancelBooking(item, item.bookings![0].id!) }] : []), ...(canManage ? [{ label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item) }, { label: 'Xóa', Icon: Trash2, onPress: () => actions.confirmDelete(area === 'classrooms' ? 'phòng học' : 'thiết bị', () => actions.deleteResourceRecord(item.id)) }] : [])]} />)}{empty(lists.resources, area === 'classrooms' ? 'Chưa có phòng học.' : 'Chưa có thiết bị.')}</View>;
-  if (area === 'retention') return <View style={styles.cardList}>{pageRows(lists.enrollments).map((item, index) => { const batch = lists.batches.find((row) => row.id === String(item.batchId || '')); const student = lists.students.find((row) => row.id === item.studentId); return <EntityCard key={`${item.studentId}-${item.batchId}-${index}`} title={student?.fullName || 'Học viên'} subtitle={`${batch?.code || ''} · ${item.status || ''}`} badge={item.status || '—'} details={[`Số điện thoại: ${student?.phone || '—'}`, `Lý do: ${item.suspensionReason || 'Chưa ghi nhận'}`, `Dự kiến quay lại: ${item.expectedReturnAt || '—'}`, `Số buổi: ${item.attendedSessions || 0}/${item.allowedSessions || 0}`]} actions={canManage && batch ? [{ label: item.status === 'Bảo lưu' ? 'Cho học lại' : item.status === 'Chờ xếp học lại' ? 'Xếp học lại' : 'Bảo lưu', Icon: PauseCircle, onPress: () => actions.setEnrollmentAction(batch, item, student), primary: true }] : []} />; })}{empty(lists.enrollments, 'Không có học viên đang bảo lưu hoặc chờ xếp học lại.')}</View>;
-  if (area === 'roadmap') return <View style={styles.cardList}><Text style={styles.detailSectionTitle}>Lộ trình đào tạo</Text>{lists.roadmaps.map((item, index) => <EntityCard key={String(item.id || item._id || index)} title={`${item.code || ''} · ${item.name || 'Lộ trình'}`} subtitle={String(item.description || 'Không có mô tả')} badge={item.status === 'active' ? 'Đang áp dụng' : 'Tạm dừng'} details={(item.steps || []).map((step, stepIndex) => { const course = lists.courses.find((row) => row.id === String(step.courseId || '')); return `Chặng ${step.order || stepIndex + 1}: ${course?.title || step.courseId || 'Khóa học'}`; })} actions={canManage ? [{ label: 'Sửa thông tin', Icon: Pencil, onPress: () => actions.openEdit(item) }, { label: 'Tạm dừng / kích hoạt', Icon: PauseCircle, onPress: () => { void actions.updateRoadmap(String(item.id || item._id), { status: item.status === 'active' ? 'inactive' : 'active' }).then(() => actions.load(true)).catch((cause) => Alert.alert('Không cập nhật được', cause instanceof Error ? cause.message : 'Lỗi cập nhật.')); } }] : []} />)}{empty(lists.roadmaps, 'Chưa cấu hình lộ trình đào tạo.')}<Text style={styles.detailSectionTitle}>Học viên chờ xếp lớp ({lists.waitlist.length})</Text>{lists.waitlist.map((item, index) => <EntityCard key={String(item.id || item._id || `${item.studentId}-${index}`)} title={item.studentName || 'Học viên'} subtitle={`${item.studentPhone || ''} · ${item.sourceBatchCode || 'Chưa có lớp nguồn'}`} details={[`${item.roadmapName || 'Lộ trình'} · Chờ ${String(item.waitingDays || 0)} ngày`]} actions={canManage ? [{ label: 'Xếp vào lớp phù hợp', Icon: UsersRound, onPress: () => actions.placeWaitlistRow(item), primary: true }] : []} />)}</View>;
+  const renderGrouped = (nodes: ReactNode[]) => (nodes.length ? <View style={styles.listGroup}>{nodes}</View> : null);
+
+  if (area === 'students') {
+    const rows = pageRows(lists.students);
+    return <View style={styles.cardList}>{renderGrouped(rows.map((item, idx) => {
+      const courseTitle = lists.courses.find((course) => course.id === item.courseId)?.title;
+      return (
+        <EntityCard
+          key={item.id}
+          isFirst={idx === 0}
+          avatarInitials={getInitials(item.fullName)}
+          title={item.fullName}
+          subtitle={`${item.phone}${courseTitle ? ` · ${courseTitle}` : ''}`}
+          badge={statusOf(item)}
+          details={[]}
+          onPress={() => actions.openStudentDetail(item)}
+        />
+      );
+    }))}{empty(lists.students, 'Chưa có hồ sơ học viên.')}</View>;
+  }
+  if (area === 'courses') {
+    const rows = pageRows(lists.courses);
+    return <View style={styles.cardList}>{renderGrouped(rows.map((item, idx) => (
+      <EntityCard
+        key={item.id}
+        isFirst={idx === 0}
+        title={`${item.code} · ${item.title}`}
+        subtitle={`${item.category} · ${item.duration}${item.fee ? ` · ${money(String(item.fee).replace(/\D/g, ''))}` : ''}`}
+        badge={item.status || 'Hoạt động'}
+        details={[]}
+        onPress={canManage ? () => actions.openEdit(item) : undefined}
+        iconActions={canManage ? [
+          { label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item) },
+          { label: 'Xóa', Icon: Trash2, onPress: () => actions.confirmDelete('khóa học', () => actions.deleteCourseRecord(item.id)), danger: true },
+        ] : []}
+      />
+    )))}{empty(lists.courses, 'Chưa có khóa học.')}</View>;
+  }
+  if (area === 'batches') {
+    const rows = pageRows(lists.batches);
+    return <View style={styles.cardList}>{renderGrouped(rows.map((item, idx) => {
+      const cap = item.quota ?? item.maxLearners;
+      const days = (item.daysOfWeek || []).map((day) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][day]).join(', ');
+      return (
+        <EntityCard
+          key={item.id}
+          isFirst={idx === 0}
+          title={`${item.code}${item.name ? ` · ${item.name}` : ''}`}
+          subtitle={`${item.learnerIds?.length || 0}${cap ? `/${cap}` : ''} HV · ${item.progress?.doneSessions || 0}/${item.progress?.totalSessions || 0} buổi${days ? ` · ${days}` : ''}`}
+          badge={item.status || 'Sắp khai giảng'}
+          details={[]}
+          onPress={() => actions.openBatchDetail(item)}
+        />
+      );
+    }))}{empty(lists.batches, 'Chưa có lớp học.')}</View>;
+  }
+  if (area === 'quality') {
+    const rows = pageRows(lists.quality);
+    return <View style={styles.cardList}>{renderGrouped(rows.map((item, idx) => (
+      <EntityCard
+        key={item.id}
+        isFirst={idx === 0}
+        avatarInitials={getInitials(item.studentName)}
+        title={item.studentName}
+        subtitle={`${item.batchCode} · CC ${item.attendance.rate ?? '—'}% · BT ${item.assignments.rate ?? '—'}%`}
+        badge={item.warningLevel === 'risk' ? 'Cần can thiệp' : item.warningLevel === 'watch' ? 'Cần theo dõi' : item.warningLevel === 'good' ? 'Ổn định' : 'Chưa đánh giá'}
+        details={[]}
+        onPress={canManage ? () => actions.setQualityDetail(item) : undefined}
+      />
+    )))}{empty(lists.quality, 'Chưa có dữ liệu đánh giá theo lớp.')}</View>;
+  }
+  if (area === 'exams') {
+    const rows = pageRows(lists.exams);
+    return <View style={styles.cardList}>{renderGrouped(rows.map((item, idx) => (
+      <EntityCard
+        key={item.id}
+        isFirst={idx === 0}
+        title={item.name}
+        subtitle={`${item.batchCode || 'Chưa có lớp'} · ${item.officialDate || item.tentativeDate || '—'} · ${item.studentCount || 0} TS`}
+        badge={item.status}
+        details={[]}
+        iconActions={canManage ? [
+          { label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item) },
+          { label: 'Xóa', Icon: Trash2, onPress: () => actions.confirmDelete('kỳ thi', () => actions.deleteExamRecord(item.id)), danger: true },
+        ] : []}
+        actions={canManage ? [
+          { label: 'Xếp thí sinh', Icon: UsersRound, onPress: () => actions.openExamAssignment(item), primary: true },
+          { label: 'Nhập điểm', Icon: ClipboardCheck, onPress: () => actions.openExamScores(item) },
+        ] : []}
+      />
+    )))}{empty(lists.exams, 'Chưa có kỳ thi.')}</View>;
+  }
+  if (area === 'fees') {
+    const feeStudents = pageRows(lists.students);
+    const feePayments = pageRows(lists.payments.slice().sort((a, b) => String(b.paidOn || b.date || '').localeCompare(String(a.paidOn || a.date || ''))));
+    return <View style={styles.cardList}>
+      <Text style={styles.detailSectionTitle}>Tình trạng học phí học viên</Text>
+      {renderGrouped(feeStudents.map((student, idx) => (
+        <EntityCard
+          key={student.id}
+          isFirst={idx === 0}
+          avatarInitials={getInitials(student.fullName)}
+          title={student.fullName}
+          subtitle={`Đã thu ${money(student.paidAmount)} · Nợ ${money(studentDue(student))}`}
+          badge={studentDue(student) > 0 ? 'Còn nợ' : studentFee(student) > 0 ? 'Đã hoàn thành' : 'Miễn phí'}
+          details={[]}
+          onPress={() => actions.openStudentDetail(student)}
+          iconActions={canManage ? [{ label: 'Ghi nhận thu', Icon: Banknote, onPress: () => actions.openStudentPayment(student) }] : []}
+        />
+      )))}
+      {empty(lists.students, 'Chưa có học viên phù hợp với bộ lọc học phí.')}
+      <Text style={[styles.detailSectionTitle, { marginTop: 8 }]}>Giao dịch gần đây</Text>
+      {renderGrouped(feePayments.map((item, idx) => (
+        <EntityCard
+          key={item.id || item._id || idx}
+          isFirst={idx === 0}
+          title={item.studentName || lists.students.find((student) => student.id === item.studentId)?.fullName || 'Học viên'}
+          subtitle={`${money(item.amount)} · ${item.date || item.paidOn || '—'} · ${item.method || '—'}`}
+          details={[]}
+          onPress={canManage ? () => actions.openEdit(item) : undefined}
+          iconActions={canManage ? [
+            { label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item) },
+            { label: 'Xóa', Icon: Trash2, onPress: () => actions.deletePayment(item), danger: true },
+          ] : []}
+        />
+      )))}
+      {empty(lists.payments, 'Chưa có giao dịch học phí.')}
+    </View>;
+  }
+  if (area === 'notifications') {
+    const rows = pageRows(lists.notifications);
+    return <View style={styles.cardList}>{renderGrouped(rows.map((item, idx) => (
+      <EntityCard
+        key={item.id || item._id || idx}
+        isFirst={idx === 0}
+        title={item.title}
+        subtitle={`${item.recipients || '—'} (${item.recipientCount || 0}) · ${item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '—'}`}
+        badge={item.status || '—'}
+        details={[]}
+        iconActions={canManage ? [{ label: 'Xóa lịch sử', Icon: Trash2, onPress: () => actions.deleteNotification(item), danger: true }] : []}
+        actions={canManage && item.installmentPlan && item.studentIds?.length ? [{ label: 'Đánh dấu đã thu', Icon: Check, onPress: () => actions.markNotificationInstallmentPaid(item), primary: true }] : []}
+      />
+    )))}{empty(lists.notifications, 'Chưa có lịch sử gửi thông báo.')}</View>;
+  }
+  if (area === 'classrooms' || area === 'resources') {
+    const rows = pageRows(lists.resources);
+    return <View style={styles.cardList}>{renderGrouped(rows.map((item, idx) => (
+      <EntityCard
+        key={item.id}
+        isFirst={idx === 0}
+        title={`${item.name} · ${item.identifier}`}
+        subtitle={`${item.type} · SC ${item.capacity} · ${item.bookings?.length || 0} lịch đặt`}
+        badge={resourceStatusLabel(item.status)}
+        details={[]}
+        iconActions={canManage ? [
+          { label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item) },
+          { label: 'Xóa', Icon: Trash2, onPress: () => actions.confirmDelete(area === 'classrooms' ? 'phòng học' : 'thiết bị', () => actions.deleteResourceRecord(item.id)), danger: true },
+        ] : []}
+        actions={[
+          { label: 'Đặt lịch', Icon: CalendarDays, onPress: () => actions.openBooking(item), primary: true },
+          ...(canManage ? [{ label: item.status === 'MAINTENANCE' ? 'Sẵn sàng' : 'Bảo trì', Icon: RefreshCw, onPress: () => actions.toggleResourceMaintenance(item) }] : []),
+          ...(canManage && item.bookings?.[0]?.id ? [{ label: 'Hủy lịch', Icon: X, onPress: () => actions.cancelBooking(item, item.bookings![0].id!) }] : []),
+        ]}
+      />
+    )))}{empty(lists.resources, area === 'classrooms' ? 'Chưa có phòng học.' : 'Chưa có thiết bị.')}</View>;
+  }
+  if (area === 'retention') {
+    const rows = pageRows(lists.enrollments);
+    return <View style={styles.cardList}>{renderGrouped(rows.map((item, idx) => {
+      const batch = lists.batches.find((row) => row.id === String(item.batchId || ''));
+      const student = lists.students.find((row) => row.id === item.studentId);
+      return (
+        <EntityCard
+          key={`${item.studentId}-${item.batchId}-${idx}`}
+          isFirst={idx === 0}
+          avatarInitials={getInitials(student?.fullName)}
+          title={student?.fullName || 'Học viên'}
+          subtitle={`Lớp ${batch?.code || '—'} · ${item.suspensionReason || 'Chưa ghi nhận lý do'}`}
+          badge={item.status || '—'}
+          details={[]}
+          onPress={canManage && batch ? () => actions.setEnrollmentAction(batch, item, student) : undefined}
+        />
+      );
+    }))}{empty(lists.enrollments, 'Không có học viên đang bảo lưu hoặc chờ xếp học lại.')}</View>;
+  }
+  if (area === 'roadmap') {
+    return <View style={styles.cardList}>
+      <Text style={styles.detailSectionTitle}>Lộ trình đào tạo</Text>
+      {renderGrouped(lists.roadmaps.map((item, idx) => (
+        <EntityCard
+          key={String(item.id || item._id || idx)}
+          isFirst={idx === 0}
+          title={`${item.code || ''} · ${item.name || 'Lộ trình'}`}
+          subtitle={`${(item.steps || []).length} chặng${item.description ? ` · ${item.description}` : ''}`}
+          badge={item.status === 'active' ? 'Đang áp dụng' : 'Tạm dừng'}
+          details={[]}
+          onPress={canManage ? () => actions.openEdit(item) : undefined}
+          iconActions={canManage ? [
+            { label: 'Sửa', Icon: Pencil, onPress: () => actions.openEdit(item) },
+            { label: item.status === 'active' ? 'Tạm dừng' : 'Kích hoạt', Icon: PauseCircle, onPress: () => { void actions.updateRoadmap(String(item.id || item._id), { status: item.status === 'active' ? 'inactive' : 'active' }).then(() => actions.load(true)).catch((cause) => Alert.alert('Không cập nhật được', cause instanceof Error ? cause.message : 'Lỗi cập nhật.')); } },
+          ] : []}
+        />
+      )))}
+      {empty(lists.roadmaps, 'Chưa cấu hình lộ trình đào tạo.')}
+      <Text style={[styles.detailSectionTitle, { marginTop: 8 }]}>Học viên chờ xếp lớp ({lists.waitlist.length})</Text>
+      {renderGrouped(lists.waitlist.map((item, idx) => (
+        <EntityCard
+          key={String(item.id || item._id || `${item.studentId}-${idx}`)}
+          isFirst={idx === 0}
+          avatarInitials={getInitials(item.studentName)}
+          title={item.studentName || 'Học viên'}
+          subtitle={`${item.roadmapName || 'Lộ trình'} · Chờ ${String(item.waitingDays || 0)} ngày`}
+          details={[]}
+          onPress={canManage ? () => actions.placeWaitlistRow(item) : undefined}
+        />
+      )))}
+    </View>;
+  }
   return null;
 }
 
-function EntityCard({ title, subtitle, badge, details, actions = [] }: { title: string; subtitle?: string; badge?: string; details: string[]; actions?: Array<{ label: string; Icon: typeof Plus; onPress: () => void; primary?: boolean }> }) {
-  return <View style={styles.card}><View style={styles.cardHead}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{title}</Text>{subtitle ? <Text style={styles.cardMeta}>{subtitle}</Text> : null}</View>{badge ? <Badge label={badge} /> : null}</View><View style={styles.cardDetails}>{details.filter(Boolean).map((line, index) => <Text key={`${line}-${index}`} style={styles.cardMeta}>{line}</Text>)}</View>{actions.length ? <View style={styles.actionRow}>{actions.map((action) => <Pressable key={action.label} onPress={action.onPress} style={[styles.actionButton, action.primary && styles.primaryAction]}><action.Icon size={13} color={action.primary ? colors.white : action.label === 'Xóa' ? '#B42318' : colors.primary} /><Text style={[styles.actionText, action.primary && styles.primaryActionText, action.label === 'Xóa' && styles.dangerActionText]}>{action.label}</Text></Pressable>)}</View> : null}</View>;
+function EntityCard({
+  title,
+  subtitle,
+  badge,
+  avatarInitials,
+  details,
+  actions = [],
+  iconActions = [],
+  onPress,
+  isFirst = false,
+}: {
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  avatarInitials?: string;
+  details: string[];
+  actions?: Array<{ label: string; Icon: typeof Plus; onPress: () => void; primary?: boolean }>;
+  iconActions?: Array<{ label: string; Icon: typeof Plus; onPress: () => void; danger?: boolean }>;
+  onPress?: () => void;
+  isFirst?: boolean;
+}) {
+  return (
+    <View>
+      {!isFirst ? <View style={[styles.listDivider, avatarInitials ? styles.listDividerInset : null]} /> : null}
+      <Pressable
+        disabled={!onPress}
+        onPress={onPress}
+        style={({ pressed }) => [styles.listRow, pressed && onPress && styles.listRowPressed]}
+      >
+        <View style={styles.cardHead}>
+          {avatarInitials ? (
+            <View style={styles.entityAvatar}>
+              <Text style={styles.entityAvatarText}>{avatarInitials}</Text>
+            </View>
+          ) : null}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={styles.cardTitle}>{title}</Text>
+            {subtitle ? <Text numberOfLines={1} style={styles.cardMeta}>{subtitle}</Text> : null}
+            {details.filter(Boolean).map((line, index) => (
+              <Text key={`${line}-${index}`} numberOfLines={2} style={styles.cardDetailLine}>{line}</Text>
+            ))}
+          </View>
+          {iconActions.length > 0 ? (
+            <View style={styles.inlineIconActions}>
+              {iconActions.map((action) => (
+                <Pressable
+                  key={action.label}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
+                  hitSlop={4}
+                  onPress={(e) => { e.stopPropagation(); action.onPress(); }}
+                  style={({ pressed }) => [styles.inlineIconBtn, action.danger && styles.inlineIconBtnDanger, pressed && { opacity: 0.6 }]}
+                >
+                  <action.Icon size={14} color={action.danger ? '#B42318' : colors.primary} />
+                </Pressable>
+              ))}
+            </View>
+          ) : onPress && !actions.length ? (
+            <ChevronRight size={16} color="#94A3B8" style={{ alignSelf: 'center' }} />
+          ) : null}
+        </View>
+        {actions.length ? (
+          <View style={[styles.actionRow, avatarInitials ? { marginLeft: 50 } : null]}>
+            {actions.map((action) => (
+              <Pressable key={action.label} onPress={action.onPress} style={[styles.actionButton, action.primary && styles.primaryAction]}>
+                <action.Icon size={12} color={action.primary ? colors.white : action.label === 'Xóa' || action.label === 'Xóa lịch sử' ? '#B42318' : colors.primary} />
+                <Text style={[styles.actionText, action.primary && styles.primaryActionText, (action.label === 'Xóa' || action.label === 'Xóa lịch sử') && styles.dangerActionText]}>{action.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+      </Pressable>
+    </View>
+  );
 }
 function FilterChoice({ title, value, options, onChange }: { title: string; value: string; options: PickOption[]; onChange: (value: string) => void }) {
   return <View style={styles.filterGroup}><Text style={styles.detailSectionTitle}>{title}</Text><View style={styles.filterChoiceList}>{options.map((option) => <Pressable key={option.value} onPress={() => onChange(option.value)} style={[styles.filterChoice, value === option.value && styles.filterChoiceActive]}><Text style={[styles.filterChoiceText, value === option.value && styles.filterChoiceTextActive]} numberOfLines={2}>{option.label}</Text>{value === option.value ? <Check size={13} color={colors.white} /> : null}</Pressable>)}</View></View>;
@@ -1501,16 +1947,163 @@ function classroomScheduleDetails(resource: StudentResource, batches: BatchRecor
 function attendanceStatusLabel(status: string) { return ({ present: 'Có mặt', absent: 'Vắng', excused: 'Có phép', late: 'Đi muộn' } as Record<string, string>)[status] || status; }
 function nextAttendanceStatus(current?: 'present' | 'absent' | 'excused' | 'late') { return current === undefined ? 'present' : current === 'present' ? 'late' : current === 'late' ? 'excused' : current === 'excused' ? 'absent' : 'present'; }
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+} as const;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background }, companyScopeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 7, paddingBottom: 2 }, scopeLabel: { color: colors.muted, fontSize: 9, fontWeight: '700' }, companyScopeButton: { flex: 1, minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white }, companyScopeText: { flex: 1, color: colors.primary, fontSize: 9, fontWeight: '700' }, navScroll: { flexGrow: 0, flexShrink: 0, height: 43, marginTop: 3 }, navContent: { alignItems: 'center', gap: 7, paddingHorizontal: 14 }, navChip: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 31, paddingHorizontal: 11, borderWidth: 1, borderColor: colors.border, borderRadius: 20, backgroundColor: colors.white }, navChipActive: { backgroundColor: colors.primary, borderColor: colors.primary }, navText: { color: colors.muted, fontSize: 10, fontWeight: '700' }, navTextActive: { color: colors.white },
-  content: { flexGrow: 1, padding: 15, paddingTop: 4, paddingBottom: 35 },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 }, searchBox: { minHeight: 41, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white }, searchInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: 10, paddingVertical: 7 }, filterButton: { minHeight: 39, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 11, backgroundColor: colors.white }, filterButtonActive: { borderColor: colors.primary, backgroundColor: '#EFF6FF' }, filterButtonText: { color: colors.primary, fontSize: 10, fontWeight: '700' }, addButton: { minHeight: 39, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, borderRadius: 11, backgroundColor: colors.primary }, addText: { color: colors.white, fontSize: 9, fontWeight: '800' }, filters: { gap: 6, paddingBottom: 10 }, filterChip: { paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 15, backgroundColor: colors.white }, filterChipSelected: { borderColor: colors.primary, backgroundColor: colors.primary }, filterChipText: { color: colors.muted, fontSize: 9, fontWeight: '700' }, filterChipTextSelected: { color: colors.white }, cardList: { gap: 9, paddingBottom: 6 },
-  card: { padding: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.white }, progressionCard: { padding: 11, gap: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white }, cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 7 }, cardTitle: { color: colors.ink, fontSize: 12, fontWeight: '800', lineHeight: 17 }, cardMeta: { color: colors.muted, fontSize: 9, lineHeight: 14, marginTop: 3 }, badge: { maxWidth: 110, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 8, backgroundColor: '#EAF2FF' }, badgeText: { color: colors.primary, fontSize: 8, fontWeight: '800' }, cardDetails: { gap: 1, marginTop: 7 }, actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 9, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F0F2F6' }, actionButton: { minHeight: 31, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, borderRadius: 9, backgroundColor: '#EFF4FA' }, actionText: { color: colors.primary, fontSize: 9, fontWeight: '700' }, primaryAction: { backgroundColor: colors.primary }, primaryActionText: { color: colors.white }, dangerAction: { backgroundColor: '#FFF1F0' }, dangerActionText: { color: '#B42318' },
-  emptyState: { flex: 1, minHeight: 270, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 25 }, loadState: { flex: 1, minHeight: 320, alignItems: 'center', justifyContent: 'center', padding: 22, paddingBottom: 160, gap: 7 }, emptyTitle: { color: colors.ink, fontSize: 12, fontWeight: '800', textAlign: 'center' }, emptyText: { color: colors.muted, fontSize: 10, lineHeight: 15, textAlign: 'center' }, retryButton: { marginTop: 2, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9, backgroundColor: '#EAF2FF' }, retryText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
-  backdrop: { flex: 1, justifyContent: 'center', padding: 14, backgroundColor: 'rgba(19,30,48,0.48)' }, dialog: { maxHeight: '92%', borderWidth: 1, borderColor: colors.border, borderRadius: 18, backgroundColor: colors.background, overflow: 'hidden' }, detailDialog: { height: '92%' }, pickerDialog: { maxHeight: '75%' }, modalHeader: { minHeight: 53, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 15, borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.white }, modalTitle: { flex: 1, color: colors.ink, fontSize: 14, fontWeight: '800' }, closeButton: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#F1F3F7' }, formContent: { padding: 14, gap: 1 }, fieldWrap: { marginBottom: 6 }, roadmapStepsField: { gap: 7, marginTop: 5, marginBottom: 10 }, roadmapStepBlock: { gap: 7, padding: 9, borderWidth: 1, borderColor: '#E4EAF2', borderRadius: 11, backgroundColor: colors.white }, roadmapRulePanel: { gap: 5, padding: 8, borderRadius: 9, backgroundColor: '#F6F8FB' }, roadmapStepRow: { flexDirection: 'row', alignItems: 'center', gap: 7 }, roadmapStepNumber: { width: 24, color: colors.primary, fontSize: 10, fontWeight: '800', textAlign: 'center' }, removeStepButton: { width: 32, height: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F4C9C5', borderRadius: 9, backgroundColor: '#FFF1F0' }, addStepButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: '#C9D9FF', borderRadius: 9, backgroundColor: '#EFF6FF' }, addStepText: { color: colors.primary, fontSize: 9, fontWeight: '700' }, field: { marginBottom: 9 }, fieldLabel: { color: colors.ink, fontSize: 9, fontWeight: '700', marginBottom: 5 }, input: { minHeight: 40, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white, color: colors.ink, fontSize: 10 }, multiline: { minHeight: 86, textAlignVertical: 'top' }, selectField: { minHeight: 40, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 9, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white }, selectValue: { flex: 1, color: colors.ink, fontSize: 10 }, placeholder: { color: colors.muted }, formError: { color: '#B42318', fontSize: 10, lineHeight: 15, paddingVertical: 8 }, helperText: { color: colors.muted, fontSize: 9, lineHeight: 14, paddingHorizontal: 2, paddingVertical: 7 }, modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, padding: 12, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.white }, cancelButton: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#F1F3F7' }, cancelText: { color: colors.ink, fontSize: 10, fontWeight: '700' }, saveButton: { minHeight: 39, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 15, borderRadius: 10, backgroundColor: colors.primary }, saveText: { color: colors.white, fontSize: 10, fontWeight: '800' }, disabled: { opacity: 0.55 },
-  optionRow: { minHeight: 51, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#EEF1F5' }, optionSelected: { backgroundColor: '#EAF2FF' }, optionTitle: { color: colors.ink, fontSize: 10, fontWeight: '700' }, optionDetail: { color: colors.muted, fontSize: 9, marginTop: 3 }, pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginTop: 12, marginBottom: 8, padding: 8, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white }, paginationText: { color: colors.muted, fontSize: 9, fontWeight: '700' }, pageButton: { minHeight: 30, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#EAF2FF' }, pageButtonText: { color: colors.primary, fontSize: 9, fontWeight: '800' }, filterDateRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 10, paddingTop: 8 }, filterGroup: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border }, filterChoiceList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingHorizontal: 10 }, filterChoice: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 15, backgroundColor: colors.white }, filterChoiceActive: { borderColor: colors.primary, backgroundColor: colors.primary }, filterChoiceText: { maxWidth: 220, color: colors.muted, fontSize: 9, fontWeight: '700' }, filterChoiceTextActive: { color: colors.white }, filterModalContent: { paddingBottom: 2 }, filterModalFooter: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 13, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.white }, filterModalHint: { flex: 1, color: colors.muted, fontSize: 9 }, clearFilterButton: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, backgroundColor: '#F1F3F7' }, clearFilterText: { color: colors.primary, fontSize: 9, fontWeight: '800' }, branchButton: { maxWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 6 }, branchButtonText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  detailContent: { padding: 14, paddingBottom: 26 }, studentIdentity: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingBottom: 13 }, studentAvatar: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#EAF2FF' }, detailGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 8 }, detailCell: { width: '48%', minHeight: 52, padding: 9, borderRadius: 10, backgroundColor: '#F2F5FA' }, detailLabel: { color: colors.muted, fontSize: 8 }, detailValue: { color: colors.ink, fontSize: 10, fontWeight: '700', marginTop: 4 }, detailSection: { marginTop: 14, padding: 11, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white }, detailSectionTitle: { color: colors.ink, fontSize: 11, fontWeight: '800', marginBottom: 8 }, installmentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#EEF1F5' }, miniAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: '#EAF2FF' }, miniActionText: { color: colors.primary, fontSize: 9, fontWeight: '700' }, secondaryWide: { minHeight: 37, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginVertical: 7, borderRadius: 10, backgroundColor: '#EAF2FF' }, secondaryWideText: { color: colors.primary, fontSize: 10, fontWeight: '800' }, emptyHint: { color: colors.muted, fontSize: 9, paddingVertical: 9 }, detailActionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingHorizontal: 13, paddingVertical: 8 }, row: { flexDirection: 'row', alignItems: 'center', gap: 8 }, twoColumns: { flexDirection: 'row', gap: 8 }, checkbox: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 6, backgroundColor: colors.white }, checkboxSelected: { borderColor: colors.primary, backgroundColor: colors.primary }, qrPanel: { alignItems: 'center', gap: 9, marginVertical: 9, padding: 12, borderRadius: 12, backgroundColor: colors.white }, qrUrl: { color: colors.primary, fontSize: 8, textAlign: 'center' },
-  weekdayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 2 }, weekdayChip: { minHeight: 34, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white }, weekdayChipActive: { borderColor: colors.primary, backgroundColor: colors.primary }, weekdayChipText: { color: colors.ink, fontSize: 10, fontWeight: '700' }, weekdayChipTextActive: { color: colors.white },
+  headerBranchBtn: { paddingVertical: 4, paddingLeft: 4, maxWidth: 190 },
+  branchBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  branchBtnText: { color: colors.ink, fontSize: 13, fontWeight: '700', flexShrink: 1 },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.35)', justifyContent: 'flex-end' },
+  sheetModal: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 28, maxHeight: '78%' },
+  sheetHandle: { width: 38, height: 4, borderRadius: 99, backgroundColor: '#D6DFEC', alignSelf: 'center', marginBottom: 12 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  sheetClose: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 14, gap: 12, marginBottom: 6 },
+  sheetRowActive: { backgroundColor: '#F0F6FF' },
+  sheetRowTitle: { color: '#111827', fontSize: 13.5, fontWeight: '600' },
+  sheetRowSub: { color: '#6B7280', fontSize: 11.5, marginTop: 2 },
+  switcherBarWrap: { marginHorizontal: 14, marginTop: 10, marginBottom: 0 },
+  container: { flex: 1, backgroundColor: PASTEL_BACKDROP_TOP_COLOR },
+  companyScopeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 2 },
+  scopeLabel: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
+  companyScopeButton: { flex: 1, minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: colors.white },
+  companyScopeText: { flex: 1, color: '#111827', fontSize: 13, fontWeight: '600' },
+  content: { flexGrow: 1, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 92 },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  searchBox: { height: 40, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 99, backgroundColor: colors.white },
+  searchInput: { flex: 1, minWidth: 0, color: '#111827', fontSize: 13.5, fontWeight: '400', paddingVertical: 0 },
+  filterButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: colors.white },
+  filterButtonActive: { borderColor: colors.primary, backgroundColor: '#EFF6FF' },
+  filterButtonText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  addButton: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 13, borderRadius: 10, backgroundColor: colors.primary },
+  addText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingBottom: 10 },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 7, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 99, backgroundColor: colors.white },
+  filterChipSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
+  filterChipText: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
+  filterChipTextSelected: { color: colors.white, fontWeight: '600' },
+  cardList: { gap: 8, paddingBottom: 8 },
+  listGroup: { backgroundColor: colors.white, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', overflow: 'hidden' },
+  listRow: { paddingHorizontal: 13, paddingVertical: 10, backgroundColor: colors.white },
+  listRowPressed: { backgroundColor: '#F5F8FD' },
+  listDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#EEF2F7', marginLeft: 13 },
+  listDividerInset: { marginLeft: 63 },
+  card: { ...HAIRLINE_CARD, padding: 13 },
+  progressionCard: { ...HAIRLINE_CARD, padding: 13, gap: 8 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  titleBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  entityAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F1FC', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  entityAvatarText: { color: colors.primary, fontSize: 13.5, fontWeight: '700', letterSpacing: 0.2 },
+  cardTitle: { color: '#111827', fontSize: 14, fontWeight: '600', lineHeight: 19 },
+  cardMeta: { color: '#6B7280', fontSize: 12, fontWeight: '400', lineHeight: 16.5, marginTop: 1 },
+  cardDetailLine: { color: '#6B7280', fontSize: 11.5, fontWeight: '400', lineHeight: 16, marginTop: 1 },
+  badge: { maxWidth: 116, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, backgroundColor: '#EAF2FF', flexShrink: 0 },
+  badgeText: { color: colors.primary, fontSize: 10, fontWeight: '600' },
+  inlineIconActions: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
+  inlineIconBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#F3F7FD', alignItems: 'center', justifyContent: 'center' },
+  inlineIconBtnDanger: { backgroundColor: '#FFF1F0' },
+  cardDetails: { gap: 2, marginTop: 6 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 7 },
+  actionButton: { minHeight: 27, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: '#F3F7FD' },
+  actionText: { color: colors.primary, fontSize: 11, fontWeight: '600' },
+  primaryAction: { backgroundColor: colors.primary },
+  primaryActionText: { color: colors.white },
+  dangerAction: { backgroundColor: '#FFF1F0' },
+  dangerActionText: { color: '#B42318' },
+  fab: { position: 'absolute', right: 18, bottom: 22, width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#1D4ED8', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 10, elevation: 6 },
+  fabPressed: { opacity: 0.88, transform: [{ scale: 0.96 }] },
+  emptyState: { flex: 1, minHeight: 270, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 25 },
+  loadState: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', padding: 22, paddingBottom: 140, gap: 8 },
+  emptyTitle: { color: '#111827', fontSize: 14.5, fontWeight: '600', textAlign: 'center' },
+  emptyText: { color: '#6B7280', fontSize: 12.5, lineHeight: 18, textAlign: 'center' },
+  retryButton: { marginTop: 4, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10, backgroundColor: colors.primary },
+  retryText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
+  backdrop: { flex: 1, justifyContent: 'center', padding: 14, backgroundColor: 'rgba(15, 23, 42, 0.35)' },
+  dialog: { maxHeight: '92%', borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 18, backgroundColor: colors.white, overflow: 'hidden' },
+  detailDialog: { height: '92%' },
+  pickerDialog: { maxHeight: '75%' },
+  modalHeader: { minHeight: 53, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#E8EDF4', backgroundColor: colors.white },
+  modalTitle: { flex: 1, color: '#111827', fontSize: 15.5, fontWeight: '600' },
+  closeButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#F3F6FA' },
+  formContent: { padding: 14, gap: 4 },
+  fieldWrap: { marginBottom: 6 },
+  roadmapStepsField: { gap: 8, marginTop: 6, marginBottom: 10 },
+  roadmapStepBlock: { ...HAIRLINE_CARD, gap: 8, padding: 12 },
+  roadmapRulePanel: { gap: 6, padding: 10, borderRadius: 10, backgroundColor: '#F6F8FC' },
+  roadmapStepRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  roadmapStepNumber: { width: 24, color: colors.primary, fontSize: 12.5, fontWeight: '700', textAlign: 'center' },
+  removeStepButton: { width: 36, height: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F4C9C5', borderRadius: 10, backgroundColor: '#FFF1F0' },
+  addStepButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: '#C9D9FF', borderRadius: 10, backgroundColor: '#EFF6FF' },
+  addStepText: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
+  field: { marginBottom: 10 },
+  fieldLabel: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginBottom: 6 },
+  input: { minHeight: 42, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: colors.white, color: '#111827', fontSize: 13.5 },
+  multiline: { minHeight: 88, textAlignVertical: 'top' },
+  selectField: { minHeight: 42, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: colors.white },
+  selectValue: { flex: 1, color: '#111827', fontSize: 13.5 },
+  placeholder: { color: '#94A3B8' },
+  formError: { color: '#B91C1C', fontSize: 12.5, lineHeight: 18, paddingVertical: 6 },
+  helperText: { color: '#6B7280', fontSize: 12, lineHeight: 17, paddingHorizontal: 2, paddingVertical: 6 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, padding: 12, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#E8EDF4', backgroundColor: colors.white },
+  cancelButton: { minHeight: 42, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, backgroundColor: '#F1F5F9' },
+  cancelText: { color: '#374151', fontSize: 13, fontWeight: '600' },
+  saveButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, backgroundColor: colors.primary },
+  saveText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  disabled: { opacity: 0.45 },
+  optionRow: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  optionSelected: { backgroundColor: '#F0F6FF', borderRadius: 10 },
+  optionTitle: { color: '#111827', fontSize: 13.5, fontWeight: '600' },
+  optionDetail: { color: '#6B7280', fontSize: 12, marginTop: 2 },
+  pagination: { ...HAIRLINE_CARD, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 12, marginBottom: 8, padding: 9 },
+  paginationText: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
+  pageButton: { minHeight: 34, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 9, backgroundColor: '#EAF2FF' },
+  pageButtonText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  filterDateRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 18, paddingTop: 10 },
+  filterGroup: { paddingHorizontal: 18, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  filterChoiceList: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  filterChoice: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 99, backgroundColor: colors.white },
+  filterChoiceActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  filterChoiceText: { maxWidth: 220, color: '#6B7280', fontSize: 12, fontWeight: '500' },
+  filterChoiceTextActive: { color: colors.white, fontWeight: '600' },
+  filterModalContent: { paddingBottom: 6 },
+  filterModalFooter: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 18, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EEF2F7', backgroundColor: colors.white },
+  filterModalHint: { flex: 1, color: '#6B7280', fontSize: 12 },
+  clearFilterButton: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#F1F5F9' },
+  clearFilterText: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
+  detailContent: { padding: 14, paddingBottom: 26 },
+  studentIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  studentAvatar: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: '#1EA7E1' },
+  studentAvatarText: { color: colors.white, fontSize: 16, fontWeight: '500', letterSpacing: 0.2 },
+  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  detailCell: { width: '48%', minHeight: 54, padding: 11, borderRadius: 10, backgroundColor: '#F6F8FC', borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2' },
+  detailLabel: { color: '#6B7280', fontSize: 11, fontWeight: '400' },
+  detailValue: { color: '#111827', fontSize: 13, fontWeight: '600', marginTop: 4 },
+  detailSection: { ...HAIRLINE_CARD, marginTop: 12, padding: 14 },
+  detailSectionTitle: { color: '#111827', fontSize: 13.5, fontWeight: '600', marginBottom: 8 },
+  installmentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EEF2F7' },
+  miniAction: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#EAF2FF' },
+  miniActionText: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
+  secondaryWide: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginVertical: 7, borderRadius: 10, backgroundColor: '#EAF2FF' },
+  secondaryWideText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  emptyHint: { color: '#6B7280', fontSize: 12.5, paddingVertical: 10 },
+  detailActionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  twoColumns: { flexDirection: 'row', gap: 8 },
+  checkbox: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 6, backgroundColor: colors.white },
+  checkboxSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
+  qrPanel: { ...HAIRLINE_CARD, alignItems: 'center', gap: 10, marginVertical: 9, padding: 14 },
+  qrUrl: { color: colors.primary, fontSize: 11.5, textAlign: 'center' },
+  weekdayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 2 },
+  weekdayChip: { minHeight: 36, paddingHorizontal: 13, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 99, backgroundColor: colors.white },
+  weekdayChipActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  weekdayChipText: { color: '#374151', fontSize: 12.5, fontWeight: '500' },
+  weekdayChipTextActive: { color: colors.white, fontWeight: '600' },
   feesActionRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 2, marginBottom: 10 },
-  feesActionBtn: { flex: 1, justifyContent: 'center', minHeight: 36 },
+  feesActionBtn: { flex: 1, justifyContent: 'center', minHeight: 38 },
 });

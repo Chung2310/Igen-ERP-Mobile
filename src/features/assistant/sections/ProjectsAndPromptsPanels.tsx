@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   primaryBtn: { backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   iconButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-  searchField: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink, marginBottom: 10 },
+  searchField: { backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, height: 40, fontSize: 13.5, color: '#111827', marginBottom: 12 },
   catScroll: { marginHorizontal: -18, marginBottom: 12 },
   catRow: { paddingHorizontal: 18, gap: 6 },
   catChip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 99 },

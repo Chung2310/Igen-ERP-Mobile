@@ -188,7 +188,7 @@ export function NotebookPanel() {
         <Pressable style={styles.primaryButton} onPress={() => createNotebook('analysis')}><Plus size={15} color={colors.white} /><Text style={styles.primaryButtonText}>Phân tích dữ liệu</Text></Pressable>
         <Pressable style={styles.secondaryButton} onPress={() => createNotebook('research')}><Plus size={15} color={colors.primary} /><Text style={styles.secondaryText}>Nghiên cứu tài liệu</Text></Pressable>
       </View>
-      <TextInput value={search} onChangeText={setSearch} placeholder="Tìm sổ Notebook" placeholderTextColor={colors.muted} style={styles.input} />
+      <TextInput value={search} onChangeText={setSearch} placeholder="Tìm sổ Notebook" placeholderTextColor="#94A3B8" style={styles.searchField} />
       {visibleNotebooks.map((item) => (
         <Card key={item.id} style={styles.notebookCard}>
           <Pressable style={styles.notebookOpen} onPress={() => setActiveId(item.id)}>
@@ -246,6 +246,7 @@ export function NotebookPanel() {
 
 const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 32, gap: 10 },
+  searchField: { backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, height: 40, fontSize: 13.5, color: '#111827' },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   title: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   sectionTitle: { marginTop: 8, color: colors.ink, fontSize: 14, fontWeight: '800' },

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import {
   createHrContractExtension,
   fetchHrContractsOverview,
@@ -466,8 +467,9 @@ export function HrContractsPanel({
   );
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -507,24 +509,13 @@ export function HrContractsPanel({
           value={search}
           onChangeText={setSearch}
           placeholder="Tìm theo tên nhân viên, loại hợp đồng..."
-          placeholderTextColor={colors.muted}
-          style={[styles.field, { flex: 1 }]}
+          placeholderTextColor="#94A3B8"
+          style={styles.searchField}
         />
         {canManage ? (
-          <>
-            <Pressable onPress={() => setSettingsOpen(true)} style={styles.iconActionBtn}>
-              <Settings size={15} color={colors.primary} />
-            </Pressable>
-            <Pressable
-              onPress={() => (subTab === 'extensions' ? openExtendModal() : openContractModal())}
-              style={styles.primaryBtn}
-            >
-              <Plus size={13} color={colors.white} />
-              <Text style={styles.primaryBtnText}>
-                {subTab === 'extensions' ? 'Gia hạn' : 'Hợp đồng'}
-              </Text>
-            </Pressable>
-          </>
+          <Pressable onPress={() => setSettingsOpen(true)} style={styles.iconActionBtn}>
+            <Settings size={15} color={colors.primary} />
+          </Pressable>
         ) : null}
       </View>
 
@@ -1182,68 +1173,107 @@ export function HrContractsPanel({
         ) : null}
       </FullScreenFormModal>
     </ScrollView>
+    {canManage ? (
+      <HrFab
+        label={subTab === 'extensions' ? 'Thêm gia hạn' : 'Thêm hợp đồng'}
+        onPress={() => (subTab === 'extensions' ? openExtendModal() : openContractModal())}
+      />
+    ) : null}
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  content: { paddingHorizontal: 18, paddingBottom: 28 },
-  segmentRow: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 11, padding: 3, marginBottom: 10 },
-  segmentBtn: { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
-  segmentBtnActive: { backgroundColor: colors.white },
-  segmentText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  segmentTextActive: { color: colors.ink },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  iconActionBtn: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
-  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-  alertBanner: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', padding: 11, marginBottom: 10, gap: 4 },
-  alertTitle: { color: '#92400E', fontSize: 11, fontWeight: '800', flex: 1 },
-  alertItem: { color: '#92400E', fontSize: 10 },
-  missingBanner: { backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', padding: 11, marginBottom: 10 },
-  missingTitle: { color: colors.ink, fontSize: 11, fontWeight: '700' },
-  missingChip: { backgroundColor: colors.white, borderColor: '#9BC5FF', borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 99 },
-  missingChipText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
+} as const;
 
-  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
-  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
-  list: { gap: 10 },
-  card: { padding: 13, gap: 6 },
+const styles = StyleSheet.create({
+  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
+  segmentRow: { flexDirection: 'row', backgroundColor: '#EAF1FA', borderRadius: 10, padding: 3, marginBottom: 10 },
+  segmentBtn: { flex: 1, paddingVertical: 7.5, borderRadius: 8, alignItems: 'center' },
+  segmentBtnActive: { backgroundColor: colors.white },
+  segmentText: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
+  segmentTextActive: { color: '#111827', fontWeight: '600' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  searchField: { flex: 1, backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, height: 40, fontSize: 13.5, color: '#111827' },
+  iconActionBtn: { ...HAIRLINE_CARD, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.primary, minHeight: 40, paddingHorizontal: 12, borderRadius: 10 },
+  primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
+  alertBanner: { ...HAIRLINE_CARD, backgroundColor: '#FFFBEB', borderColor: '#FDE68A', padding: 12, marginBottom: 10, gap: 4 },
+  alertTitle: { color: '#92400E', fontSize: 12.5, fontWeight: '600', flex: 1 },
+  alertItem: { color: '#92400E', fontSize: 11.5 },
+  missingBanner: { ...HAIRLINE_CARD, backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', padding: 12, marginBottom: 10 },
+  missingTitle: { color: '#111827', fontSize: 12.5, fontWeight: '600' },
+  missingChip: { backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99 },
+  missingChipText: { color: colors.primary, fontSize: 11.5, fontWeight: '500' },
+
+  stateCard: { ...HAIRLINE_CARD, padding: 22, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
+  list: {
+    marginHorizontal: -14,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+    gap: 0,
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 5,
+  },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  subMeta: { color: colors.muted, fontSize: 10 },
-  statusBadge: { color: '#475569', backgroundColor: '#F1F5F9', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
+  subMeta: { color: '#6B7280', fontSize: 11.5, fontWeight: '400' },
+  statusBadge: { color: '#475569', backgroundColor: '#F1F5F9', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8, overflow: 'hidden' },
   statusActive: { color: '#16885A', backgroundColor: '#E9F8F1' },
   statusWarn: { color: '#B45309', backgroundColor: '#FFF3E5' },
   statusDanger: { color: '#B91C1C', backgroundColor: '#FEE2E2' },
-  fileChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  fileChipText: { color: colors.primary, fontSize: 10, fontWeight: '700', maxWidth: 150 },
+  fileChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 },
+  fileChipText: { color: colors.primary, fontSize: 11, fontWeight: '500', maxWidth: 150 },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  smallEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EAF2FF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 8 },
-  smallEditBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  smallExtendBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E9F8F1', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 8 },
-  smallExtendBtnText: { color: '#16885A', fontSize: 11, fontWeight: '700' },
+  smallEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
+  smallEditBtnText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  smallExtendBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E9F8F1', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
+  smallExtendBtnText: { color: '#16885A', fontSize: 12, fontWeight: '600' },
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
-  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '90%' },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
-  datePickerField: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  datePickerText: { color: colors.ink, fontSize: 12 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '90%' },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  closeText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
+  field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
+  datePickerField: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  datePickerText: { color: '#111827', fontSize: 13.5 },
   datePickerActions: { flexDirection: 'row', justifyContent: 'flex-end', alignSelf: 'stretch', gap: 8, marginTop: 8 },
-  outlineBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10 },
-  outlineBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  outlineBtn: { ...HAIRLINE_CARD, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 8 },
+  outlineBtnText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  chip: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  chipTextActive: { color: colors.white },
-  uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EAF2FF', borderColor: '#9BC5FF', borderWidth: 1, borderStyle: 'dashed', borderRadius: 11, paddingVertical: 10, paddingHorizontal: 12 },
-  uploadBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  chipText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
+  uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#F5F9FF', borderColor: '#9BC5FF', borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12 },
+  uploadBtnText: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
   disabled: { opacity: 0.45 },
 });
 
