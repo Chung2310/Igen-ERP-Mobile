@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ChevronDown, ChevronRight, Crown, FileText, Minus, Plus } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Crown, FileText, Phone, Plus } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -99,6 +99,24 @@ function parseVndAmount(value: string): number | undefined {
 function formatVndAmount(value?: number | null): string {
   if (value == null || !Number.isFinite(value)) return '—';
   return `${Math.round(value).toLocaleString('vi-VN')} ₫`;
+}
+
+const AVATAR_BG_COLORS = [
+  '#1EA4E9',
+  '#2563EB',
+  '#0EA5A4',
+  '#6366F1',
+  '#0284C7',
+  '#10B981',
+];
+
+function getAvatarBg(seed?: string): string {
+  const str = seed || 'NV';
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = (hash * 31 + str.charCodeAt(i)) % AVATAR_BG_COLORS.length;
+  }
+  return AVATAR_BG_COLORS[Math.abs(hash) % AVATAR_BG_COLORS.length];
 }
 
 function getCategoryColor(division?: string, department?: string): { accent: string; tone: string } {
@@ -240,7 +258,7 @@ export function OrgChartPanel({
         setEmployees(empList);
         setDepartments(deptList);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Không tải được sơ đồ tổ chức.');
+        setError(err instanceof Error ? err.message : 'Không tải được danh sách nhân sự.');
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -625,7 +643,7 @@ export function OrgChartPanel({
         branchId,
       });
       setAddOpen(false);
-      Alert.alert('Thành công', `Đã thêm nhân sự "${addName.trim()}" vào sơ đồ tổ chức.`);
+      Alert.alert('Thành công', `Đã thêm nhân sự "${addName.trim()}" vào danh sách nhân sự.`);
       await loadData(true);
     } catch (err) {
       Alert.alert('Không thể thêm nhân sự', err instanceof Error ? err.message : 'Vui lòng thử lại.');
@@ -656,96 +674,6 @@ export function OrgChartPanel({
     (nodeId: string) => (childrenMap.get(nodeId) ?? []).length,
     [childrenMap],
   );
-
-  // Vẽ cây phân cấp Top-Down giống bản web ERP (có đường nối chữ T)
-  const renderWebStyleTreeNode = (node: OrgNode) => {
-    const kids = childrenMap.get(node.nodeId) ?? [];
-    const collapsed = collapsedTreeIds.has(node.nodeId);
-    const palette = getCategoryColor(node.division, node.department);
-
-    return (
-      <View key={node.nodeId} style={styles.treeNodeCol}>
-        <Card
-          onPress={() => openDetail(node)}
-          style={[styles.treeCard, { borderTopColor: palette.accent }]}
-        >
-          <View style={styles.treeCardHead}>
-            <View style={[styles.avatarSm, { backgroundColor: palette.tone }]}>
-              <Text style={[styles.avatarTextSm, { color: palette.accent }]}>
-                {getInitials(node.displayName)}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.treeCardNameRow}>
-                {node.isLeader ? <Crown size={13} color="#D97706" /> : null}
-                <Text numberOfLines={1} style={styles.treeCardName}>{node.displayName}</Text>
-              </View>
-              <Text numberOfLines={1} style={styles.treeCardRole}>
-                {node.jobTitle || node.position || ROLE_LABELS[node.role || 'user']}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.treeCardFoot}>
-            <Text
-              numberOfLines={1}
-              style={[styles.treeDeptPill, { color: palette.accent, backgroundColor: palette.tone }]}
-            >
-              {node.department || 'Chưa phân phòng'}
-            </Text>
-            {kids.length > 0 ? (
-              <Pressable
-                hitSlop={8}
-                onPress={() => toggleTreeCollapse(node.nodeId)}
-                style={styles.treeToggleBtn}
-              >
-                <View style={styles.treeToggleContent}>
-                  {collapsed ? <><Plus size={12} color={colors.primary} /><Text style={styles.treeToggleText}>{kids.length}</Text></> : <Minus size={12} color={colors.primary} />}
-                </View>
-              </Pressable>
-            ) : null}
-          </View>
-        </Card>
-
-        {!collapsed && kids.length > 0 ? (
-          <View style={styles.treeChildrenWrap}>
-            {/* Đường dọc từ thẻ cha xuống thanh ngang */}
-            <View style={styles.treeStemDown} />
-            <View style={styles.treeChildrenRow}>
-              {kids.map((child, idx) => {
-                const isFirst = idx === 0;
-                const isLast = idx === kids.length - 1;
-                return (
-                  <View key={child.nodeId} style={styles.treeChildSlot}>
-                    {kids.length === 1 ? (
-                      <View style={styles.treeStemSingle} />
-                    ) : (
-                      <View style={styles.treeBranchBar}>
-                        <View
-                          style={[
-                            styles.treeBranchHalf,
-                            styles.treeBranchRightLine,
-                            !isFirst && styles.treeBranchTopLine,
-                          ]}
-                        />
-                        <View
-                          style={[
-                            styles.treeBranchHalf,
-                            styles.treeBranchLeftLine,
-                            !isLast && styles.treeBranchTopLine,
-                          ]}
-                        />
-                      </View>
-                    )}
-                    <View style={styles.treeChildInner}>{renderWebStyleTreeNode(child)}</View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
-      </View>
-    );
-  };
 
   const directReports = useMemo(
     () => (selectedNode ? orgNodes.filter((n) => n.resolvedParentId === selectedNode.nodeId) : []),
@@ -812,11 +740,11 @@ export function OrgChartPanel({
         })}
       </ScrollView>
 
-      {/* Content: Sơ đồ cây Top-Down */}
+      {/* Content: Danh sách nhân sự (style Danh bạ gọn đẹp) */}
       {loading ? (
         <Card style={styles.stateCard}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.muted}>Đang tải sơ đồ tổ chức...</Text>
+          <Text style={styles.muted}>Đang tải danh sách nhân sự...</Text>
         </Card>
       ) : error ? (
         <Card style={styles.stateCard}>
@@ -830,90 +758,80 @@ export function OrgChartPanel({
           <Text style={styles.muted}>Không có nhân sự nào khớp điều kiện lọc.</Text>
         </Card>
       ) : (
-        <View style={styles.canvasWrap}>
-          {/* Thanh điều khiển Zoom & Thu gọn/Mở hết giống web */}
-          <View style={styles.canvasBar}>
-            <View style={styles.zoomGroup}>
-              <Pressable
-                onPress={() => setTreeZoom((z) => Math.max(0.55, Number((z - 0.1).toFixed(2))))}
-                style={styles.zoomBtn}
-              >
-                <Minus size={15} color={colors.ink} />
-              </Pressable>
-              <Pressable onPress={() => setTreeZoom(0.85)} style={styles.zoomReadout}>
-                <Text style={styles.zoomReadoutText}>{Math.round(treeZoom * 100)}%</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setTreeZoom((z) => Math.min(1.2, Number((z + 0.1).toFixed(2))))}
-                style={styles.zoomBtn}
-              >
-                <Plus size={15} color={colors.ink} />
-              </Pressable>
-            </View>
-            <View style={styles.zoomGroup}>
-              <Pressable onPress={expandAllTree} style={styles.canvasActionBtn}>
-                <Text style={styles.canvasActionText}>Mở hết</Text>
-              </Pressable>
-              <Pressable onPress={collapseAllTree} style={styles.canvasActionBtn}>
-                <Text style={styles.canvasActionText}>Thu gọn</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Khung sơ đồ cây Top-Down cuộn 2 chiều */}
-          <View style={styles.treeCanvasCard}>
-            <ScrollView
-              horizontal
-              bounces={false}
-              showsHorizontalScrollIndicator
-              nestedScrollEnabled
-              directionalLockEnabled={false}
-              contentContainerStyle={styles.treeCanvasScroll}
-            >
-              <ScrollView
-                bounces={false}
-                showsVerticalScrollIndicator
-                nestedScrollEnabled
-                contentContainerStyle={styles.treeVerticalScroll}
-              >
-                <View
-                  style={
-                    treeSize
-                      ? {
-                          width: Math.max(treeSize.width * treeZoom, 280),
-                          height: Math.max(treeSize.height * treeZoom, 220),
-                        }
-                      : undefined
-                  }
+        <View style={styles.directoryListCard}>
+          {filteredNodes
+            .slice()
+            .sort((a, b) => {
+              if (Boolean(b.isLeader) !== Boolean(a.isLeader)) {
+                return Number(Boolean(b.isLeader)) - Number(Boolean(a.isLeader));
+              }
+              return (
+                (a.resolvedLevel ?? 4) - (b.resolvedLevel ?? 4) ||
+                a.displayName.localeCompare(b.displayName, 'vi')
+              );
+            })
+            .map((node, idx) => {
+              const roleLabel =
+                node.jobTitle || node.position || ROLE_LABELS[node.role || 'user'] || 'Nhân viên';
+              const deptLabel = node.department || node.division || 'Chưa phân phòng ban';
+              const cleanPhone = node.phone?.replace(/\s+/g, '') || '';
+              return (
+                <Pressable
+                  key={node.nodeId}
+                  accessibilityRole="button"
+                  onPress={() => openDetail(node)}
+                  style={({ pressed }) => [
+                    styles.directoryRow,
+                    idx > 0 && styles.directoryRowDivider,
+                    pressed && styles.directoryRowPressed,
+                  ]}
                 >
                   <View
-                    onLayout={(e) => {
-                      const { width, height } = e.nativeEvent.layout;
-                      if (
-                        width > 0 &&
-                        height > 0 &&
-                        (!treeSize ||
-                          Math.abs(treeSize.width - width) > 2 ||
-                          Math.abs(treeSize.height - height) > 2)
-                      ) {
-                        setTreeSize({ width, height });
-                      }
-                    }}
                     style={[
-                      styles.treeRootsRow,
-                      {
-                        transform: [{ scale: treeZoom }],
-                        transformOrigin: 'top left',
-                      },
+                      styles.directoryAvatar,
+                      { backgroundColor: getAvatarBg(node.displayName || node.nodeId) },
                     ]}
                   >
-                    {rootNodes.map((root) => renderWebStyleTreeNode(root))}
+                    <Text style={styles.directoryAvatarText}>{getInitials(node.displayName)}</Text>
                   </View>
-                </View>
-              </ScrollView>
-            </ScrollView>
-            <Text style={styles.canvasHint}>Vuốt ngang / dọc trong khung để xem toàn bộ sơ đồ · Bấm vào thẻ để xem hồ sơ</Text>
-          </View>
+
+                  <View style={styles.directoryCopy}>
+                    <View style={styles.directoryNameRow}>
+                      <Text numberOfLines={1} style={styles.directoryName}>
+                        {node.displayName}
+                      </Text>
+                      {node.isLeader ? <Crown size={13} color="#D97706" /> : null}
+                    </View>
+                    <Text numberOfLines={1} style={styles.directorySub}>
+                      {roleLabel}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.directoryDept}>
+                      {deptLabel}
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={cleanPhone ? `Gọi ${node.displayName}` : 'Chưa có số điện thoại'}
+                    disabled={!cleanPhone}
+                    hitSlop={8}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      if (cleanPhone) {
+                        void Linking.openURL(`tel:${cleanPhone}`).catch(() => {});
+                      }
+                    }}
+                    style={({ pressed }) => [
+                      styles.directoryCallBtn,
+                      !cleanPhone && styles.directoryCallBtnDisabled,
+                      pressed && cleanPhone && styles.directoryCallBtnPressed,
+                    ]}
+                  >
+                    <Phone size={16} strokeWidth={1.8} color={colors.primary} />
+                  </Pressable>
+                </Pressable>
+              );
+            })}
         </View>
       )}
 
@@ -1408,5 +1326,81 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
   disabled: { opacity: 0.45 },
+  directoryListCard: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5EAF2',
+    overflow: 'hidden',
+  },
+  directoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    gap: 13,
+    backgroundColor: colors.white,
+  },
+  directoryRowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#EEF2F7',
+  },
+  directoryRowPressed: {
+    backgroundColor: '#F5F8FD',
+  },
+  directoryAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  directoryAvatarText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  directoryCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  directoryNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  directoryName: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  directorySub: {
+    color: '#64748B',
+    fontSize: 12.5,
+    fontWeight: '400',
+  },
+  directoryDept: {
+    color: '#7C8BA1',
+    fontSize: 12.5,
+    fontWeight: '400',
+  },
+  directoryCallBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5FD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  directoryCallBtnDisabled: {
+    opacity: 0.3,
+  },
+  directoryCallBtnPressed: {
+    backgroundColor: '#DCE8FC',
+  },
 });
 

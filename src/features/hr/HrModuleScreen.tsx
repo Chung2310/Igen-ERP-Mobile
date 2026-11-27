@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { Building2, CalendarDays, Check, ChevronDown, ClipboardList, FileText, GraduationCap, MapPinned, Network, NotebookText, Target, Wallet, Workflow } from 'lucide-react-native';
+import { Building2, CalendarDays, Check, ChevronDown, ClipboardList, FileText, GraduationCap, MapPinned, NotebookText, Target, Users, Wallet, Workflow } from 'lucide-react-native';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { HrBranchesPanel } from '@/features/hr/sections/HrBranchesPanel';
 import { HrContractsPanel } from '@/features/hr/sections/HrContractsPanel';
@@ -22,7 +22,7 @@ import { fetchCompanyBranches, type ErpBranch } from '@/features/overview/overvi
 import { colors } from '@/theme/colors';
 
 const HR_TABS: Array<{ key: HrTabId; label: string; icon: LucideIcon; readPermissions?: string[] }> = [
-  { key: 'employees', label: 'Sơ đồ tổ chức', icon: Network },
+  { key: 'employees', label: 'Danh sách nhân sự', icon: Users },
   { key: 'departments', label: 'Phòng ban', icon: Building2, readPermissions: ['hr:read', 'access:read', 'hr:manage', 'access:manage'] },
   { key: 'branches', label: 'Chi nhánh', icon: MapPinned, readPermissions: ['access:read', 'hr:read'] },
   { key: 'training', label: 'Đào tạo', icon: GraduationCap, readPermissions: ['hr:read', 'hr:manage'] },
