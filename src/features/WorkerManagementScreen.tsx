@@ -1,6 +1,7 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { CenteredPageLoader } from '@/components/BrandLoader';
 import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
+import { PASTEL_BACKDROP_TOP_COLOR, PastelBackdrop } from '@/components/PastelBackdrop';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
@@ -637,8 +638,11 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
   if (!scope && tab !== 'notifications') return <ScrollView contentContainerStyle={styles.center}><Text style={styles.heading}>Chọn cơ sở lao động</Text><Text style={styles.muted}>Cần có mã công ty để tải hồ sơ, dự án và hợp đồng.</Text>{isSuperAdmin ? companies.map((item) => <Pressable key={item.code} style={[styles.card, { alignSelf: 'stretch' }]} onPress={() => setCompanyCode(item.code)}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.muted}>{item.code}</Text></Pressable>) : null}{isSuperAdmin && !companies.length && <Text style={styles.muted}>{error || 'Đang tải danh sách cơ sở…'}</Text>}</ScrollView>;
 
   return <View style={styles.container}>
+    <PastelBackdrop idPrefix="worker" />
     {isSuperAdmin && <Pressable style={styles.companySelect} onPress={() => setCompanyPickerOpen(true)}><Text style={styles.muted}>Cơ sở: </Text><Text style={styles.companyName}>{companies.find((item) => item.code === companyCode)?.name || companyCode || 'Chọn cơ sở'}</Text></Pressable>}
     <Stack.Screen options={{
+      headerStyle: { backgroundColor: PASTEL_BACKDROP_TOP_COLOR },
+      headerShadowVisible: false,
       headerRight: branches.length > 0 && canSwitchBranch ? () => (
         <Pressable onPress={() => setBranchPickerOpen(true)} style={styles.headerBranchBtn} accessibilityRole="button" accessibilityLabel="Chọn chi nhánh để xem dữ liệu lao động">
           <View style={styles.branchBtnContent}><Text numberOfLines={1} style={styles.branchBtnText}>{branchesLoading ? 'Đang tải…' : branchName}</Text><ChevronDown size={14} color={colors.primary} /></View>
@@ -819,7 +823,7 @@ const styles = StyleSheet.create({
   qrLinkText: { color: colors.ink, fontSize: 10, lineHeight: 16, textAlign: 'center' },
   branchOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: 12, borderBottomWidth: 1, borderColor: colors.border },
   branchOptionSelected: { backgroundColor: '#EAF2FF', borderRadius: 9 },
-  container: { flex: 1, backgroundColor: colors.background }, content: { flexGrow: 1, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 28, gap: 9 },
+  container: { flex: 1, backgroundColor: PASTEL_BACKDROP_TOP_COLOR }, content: { flexGrow: 1, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 28, gap: 9 },
   switcherBarWrap: { marginHorizontal: 14, marginTop: 10, marginBottom: 0 },
   partnerSelect: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white }, partnerSelectText: { flex: 1, color: colors.ink, fontSize: 9, fontWeight: '600' },
   companySelect: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 8 }, companyName: { color: colors.ink, fontSize: 10, fontWeight: '800' }, toolbar: { flexDirection: 'row', alignItems: 'center', gap: 7 }, search: { minHeight: 40, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white }, searchInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: 9 }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, row: { flexDirection: 'row', alignItems: 'center', gap: 8 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, chip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 9, backgroundColor: '#F1F3F6' }, chipSelected: { backgroundColor: '#E7F0FF', borderWidth: 1, borderColor: '#C9D9FF' }, chipText: { color: colors.ink, fontSize: 8, fontWeight: '700' }, chipTextSelected: { color: colors.primary },
