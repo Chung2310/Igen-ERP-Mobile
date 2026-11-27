@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { ChevronRight, Plus } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import {
   createHrDepartment,
@@ -279,20 +281,16 @@ export function DepartmentsPanel({
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1 }}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 92 }]} showsVerticalScrollIndicator={false}>
       <View style={styles.searchRow}>
         <TextInput
           value={search}
           onChangeText={setSearch}
           placeholder="Tìm theo tên, mã phòng ban, trưởng phòng..."
-          placeholderTextColor={colors.muted}
-          style={[styles.field, { flex: 1 }]}
+          placeholderTextColor="#94A3B8"
+          style={styles.searchField}
         />
-        {canManage ? (
-          <Pressable onPress={openCreate} style={styles.primaryBtn}>
-            <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Thêm</Text></View>
-          </Pressable>
-        ) : null}
       </View>
 
       {loading ? (
@@ -334,239 +332,224 @@ export function DepartmentsPanel({
         </View>
       )}
 
-      {/* Detail & Edit Department Modal */}
-      <Modal
+      {/* Detail & Edit Department Full-Screen Page */}
+      <FullScreenFormModal
         visible={Boolean(selectedDept)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedDept(null)}
+        title={isEditing ? 'Chỉnh sửa phòng ban' : selectedDept?.name || 'Chi tiết phòng ban'}
+        cancelLabel={isEditing ? 'Hủy' : undefined}
+        onSave={isEditing ? () => void onSaveEdit() : undefined}
+        saving={saving}
+        onClose={() => {
+          if (isEditing) setIsEditing(false);
+          else setSelectedDept(null);
+        }}
       >
-        <Pressable style={styles.backdrop} onPress={() => setSelectedDept(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            {selectedDept ? (
-              <>
-                <View style={styles.headRow}>
-                  <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>
-                    {isEditing ? 'Chỉnh sửa phòng ban' : selectedDept.name}
-                  </Text>
-                  <Pressable onPress={() => setSelectedDept(null)} hitSlop={8}>
-                    <Text style={styles.closeText}>Đóng</Text>
-                  </Pressable>
-                </View>
+        {selectedDept ? (
+          isEditing ? (
+            <View style={{ gap: 8, paddingBottom: 10 }}>
+              <Text style={styles.label}>Tên phòng ban *</Text>
+              <TextInput value={name} onChangeText={setName} style={styles.field} />
 
-                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
-                  {isEditing ? (
-                    <View style={{ gap: 8, paddingBottom: 10 }}>
-                      <Text style={styles.label}>Tên phòng ban *</Text>
-                      <TextInput value={name} onChangeText={setName} style={styles.field} />
+              <Text style={styles.label}>Mã phòng ban</Text>
+              <TextInput value={code} onChangeText={setCode} placeholder="VD: PB-KD" placeholderTextColor={colors.muted} style={styles.field} />
 
-                      <Text style={styles.label}>Mã phòng ban</Text>
-                      <TextInput value={code} onChangeText={setCode} placeholder="VD: PB-KD" placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Trưởng phòng</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
+                <Pressable
+                  onPress={() => setManagerUid('')}
+                  style={[styles.chip, !managerUid && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
+                </Pressable>
+                {employees.slice(0, 25).map((emp) => {
+                  const uid = emp.uid || emp._id || emp.id || '';
+                  const active = managerUid === uid;
+                  return (
+                    <Pressable
+                      key={uid}
+                      onPress={() => setManagerUid(uid)}
+                      style={[styles.chip, active && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {emp.displayName}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
-                      <Text style={styles.label}>Trưởng phòng</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
-                        <Pressable
-                          onPress={() => setManagerUid('')}
-                          style={[styles.chip, !managerUid && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
-                        </Pressable>
-                        {employees.slice(0, 25).map((emp) => {
-                          const uid = emp.uid || emp._id || emp.id || '';
-                          const active = managerUid === uid;
-                          return (
-                            <Pressable
-                              key={uid}
-                              onPress={() => setManagerUid(uid)}
-                              style={[styles.chip, active && styles.chipActive]}
-                            >
-                              <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                                {emp.displayName}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </ScrollView>
+              <Text style={styles.label}>Mô tả chức năng</Text>
+              <TextInput
+                value={desc}
+                onChangeText={setDesc}
+                multiline
+                style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
+              />
 
-                      <Text style={styles.label}>Mô tả chức năng</Text>
-                      <TextInput
-                        value={desc}
-                        onChangeText={setDesc}
-                        multiline
-                        style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
-                      />
-
-                      <View style={styles.switchRow}>
-                        <Text style={styles.label}>Đang hoạt động</Text>
-                        <Switch
-                          value={isActive}
-                          onValueChange={setIsActive}
-                          trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                        />
-                      </View>
-
-                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                        <Pressable
-                          onPress={() => setIsEditing(false)}
-                          style={styles.cancelBtn}
-                        >
-                          <Text style={styles.cancelBtnText}>Hủy</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={saving}
-                          onPress={() => void onSaveEdit()}
-                          style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
-                        >
-                          <Text style={styles.submitBtnText}>
-                            {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={{ gap: 10, paddingBottom: 10 }}>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Mã phòng ban</Text>
-                        <Text style={styles.infoVal}>{selectedDept.code || '—'}</Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Trưởng phòng</Text>
-                        <Text style={styles.infoVal}>{selectedDept.managerName || 'Chưa chỉ định'}</Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Trạng thái</Text>
-                        <Text style={styles.infoVal}>
-                          {selectedDept.isActive === false ? 'Tạm ngưng' : 'Đang hoạt động'}
-                        </Text>
-                      </View>
-                      <View style={styles.infoRow}>
-                        <Text style={styles.muted}>Sĩ số</Text>
-                        <Text style={styles.infoVal}>
-                          {selectedDept.employeeCount ?? selectedMembers.length} nhân sự
-                        </Text>
-                      </View>
-                      {selectedDept.description ? (
-                        <View style={{ gap: 4 }}>
-                          <Text style={styles.label}>Mô tả chức năng</Text>
-                          <Text style={styles.muted}>{selectedDept.description}</Text>
-                        </View>
-                      ) : null}
-
-                      <View style={{ gap: 6, marginTop: 4 }}>
-                        <Text style={styles.label}>
-                          Nhân sự trong phòng ({selectedMembers.length})
-                        </Text>
-                        {selectedMembers.length > 0 ? (
-                          selectedMembers.slice(0, 15).map((m, idx) => (
-                            <View key={m.uid || m._id || idx} style={styles.memberItem}>
-                              <Text style={styles.rowTitle}>{m.displayName}</Text>
-                              <Text style={styles.subMeta}>
-                                {m.jobTitle || m.position || m.role || 'Nhân viên'}
-                                {m.email ? ` · ${m.email}` : ''}
-                              </Text>
-                            </View>
-                          ))
-                        ) : (
-                          <Text style={styles.muted}>Chưa có nhân sự nào thuộc phòng ban này.</Text>
-                        )}
-                      </View>
-
-                      {canManage ? (
-                        <View style={{ gap: 8, marginTop: 8 }}>
-                          <Pressable onPress={startEdit} style={styles.submitBtn}>
-                            <Text style={styles.submitBtnText}>Chỉnh sửa phòng ban</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => onDelete(selectedDept)}
-                            style={styles.deleteBtn}
-                          >
-                            <Text style={styles.deleteBtnText}>Xóa phòng ban</Text>
-                          </Pressable>
-                        </View>
-                      ) : null}
-                    </View>
-                  )}
-                </ScrollView>
-              </>
-            ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Create Department Modal */}
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Thêm phòng ban mới</Text>
-              <Pressable onPress={() => setCreateOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-              <View style={{ gap: 8 }}>
-                <Text style={styles.label}>Tên phòng ban *</Text>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Tên phòng ban"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
+              <View style={styles.switchRow}>
+                <Text style={styles.label}>Đang hoạt động</Text>
+                <Switch
+                  value={isActive}
+                  onValueChange={setIsActive}
+                  trackColor={{ true: colors.primary, false: '#CBD5E1' }}
                 />
-                <Text style={styles.label}>Mã phòng ban</Text>
-                <TextInput
-                  value={code}
-                  onChangeText={setCode}
-                  placeholder="Mã phòng ban (tùy chọn)"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-                <Text style={styles.label}>Trưởng phòng</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
-                  <Pressable
-                    onPress={() => setManagerUid('')}
-                    style={[styles.chip, !managerUid && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
-                  </Pressable>
-                  {employees.slice(0, 25).map((emp) => {
-                    const uid = emp.uid || emp._id || emp.id || '';
-                    const active = managerUid === uid;
-                    return (
-                      <Pressable
-                        key={uid}
-                        onPress={() => setManagerUid(uid)}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {emp.displayName}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-                <Text style={styles.label}>Mô tả chức năng</Text>
-                <TextInput
-                  value={desc}
-                  onChangeText={setDesc}
-                  placeholder="Mô tả chức năng"
-                  placeholderTextColor={colors.muted}
-                  multiline
-                  style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
-                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                <Pressable
+                  onPress={() => setIsEditing(false)}
+                  style={styles.cancelBtn}
+                >
+                  <Text style={styles.cancelBtnText}>Hủy</Text>
+                </Pressable>
                 <Pressable
                   disabled={saving}
-                  onPress={() => void onCreate()}
-                  style={[styles.submitBtn, saving && styles.disabled]}
+                  onPress={() => void onSaveEdit()}
+                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
                 >
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Tạo phòng ban'}</Text>
+                  <Text style={styles.submitBtnText}>
+                    {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  </Text>
                 </Pressable>
               </View>
-            </ScrollView>
+            </View>
+          ) : (
+            <View style={{ gap: 10, paddingBottom: 10 }}>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Mã phòng ban</Text>
+                <Text style={styles.infoVal}>{selectedDept.code || '—'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Trưởng phòng</Text>
+                <Text style={styles.infoVal}>{selectedDept.managerName || 'Chưa chỉ định'}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Trạng thái</Text>
+                <Text style={styles.infoVal}>
+                  {selectedDept.isActive === false ? 'Tạm ngưng' : 'Đang hoạt động'}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.muted}>Sĩ số</Text>
+                <Text style={styles.infoVal}>
+                  {selectedDept.employeeCount ?? selectedMembers.length} nhân sự
+                </Text>
+              </View>
+              {selectedDept.description ? (
+                <View style={{ gap: 4 }}>
+                  <Text style={styles.label}>Mô tả chức năng</Text>
+                  <Text style={styles.muted}>{selectedDept.description}</Text>
+                </View>
+              ) : null}
+
+              <View style={{ gap: 6, marginTop: 4 }}>
+                <Text style={styles.label}>
+                  Nhân sự trong phòng ({selectedMembers.length})
+                </Text>
+                {selectedMembers.length > 0 ? (
+                  selectedMembers.slice(0, 15).map((m, idx) => (
+                    <View key={m.uid || m._id || idx} style={styles.memberItem}>
+                      <Text style={styles.rowTitle}>{m.displayName}</Text>
+                      <Text style={styles.subMeta}>
+                        {m.jobTitle || m.position || m.role || 'Nhân viên'}
+                        {m.email ? ` · ${m.email}` : ''}
+                      </Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.muted}>Chưa có nhân sự nào thuộc phòng ban này.</Text>
+                )}
+              </View>
+
+              {canManage ? (
+                <View style={{ gap: 8, marginTop: 8 }}>
+                  <Pressable onPress={startEdit} style={styles.submitBtn}>
+                    <Text style={styles.submitBtnText}>Chỉnh sửa phòng ban</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => onDelete(selectedDept)}
+                    style={styles.deleteBtn}
+                  >
+                    <Text style={styles.deleteBtnText}>Xóa phòng ban</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          )
+        ) : null}
+      </FullScreenFormModal>
+
+      {/* Create Department Full-Screen Page */}
+      <FullScreenFormModal
+        visible={createOpen}
+        title="Thêm phòng ban mới"
+        cancelLabel="Hủy"
+        onSave={() => void onCreate()}
+        saving={saving}
+        onClose={() => setCreateOpen(false)}
+      >
+        <View style={{ gap: 8 }}>
+          <Text style={styles.label}>Tên phòng ban *</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Tên phòng ban"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Mã phòng ban</Text>
+          <TextInput
+            value={code}
+            onChangeText={setCode}
+            placeholder="Mã phòng ban (tùy chọn)"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Trưởng phòng</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
+            <Pressable
+              onPress={() => setManagerUid('')}
+              style={[styles.chip, !managerUid && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
+            </Pressable>
+            {employees.slice(0, 25).map((emp) => {
+              const uid = emp.uid || emp._id || emp.id || '';
+              const active = managerUid === uid;
+              return (
+                <Pressable
+                  key={uid}
+                  onPress={() => setManagerUid(uid)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {emp.displayName}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Text style={styles.label}>Mô tả chức năng</Text>
+          <TextInput
+            value={desc}
+            onChangeText={setDesc}
+            placeholder="Mô tả chức năng"
+            placeholderTextColor={colors.muted}
+            multiline
+            style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
+          />
+          <Pressable
+            disabled={saving}
+            onPress={() => void onCreate()}
+            style={[styles.submitBtn, saving && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Tạo phòng ban'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
+    {canManage ? <HrFab label="Thêm phòng ban" onPress={openCreate} /> : null}
+    </View>
   );
 }
 
@@ -904,45 +887,77 @@ export function PayrollPanel({
   );
 }
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
+} as const;
+
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 18, paddingBottom: 28 },
+  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 },
-  title: { color: colors.ink, fontSize: 16, fontWeight: '800', marginBottom: 10 },
-  list: { gap: 9 },
-  card: { padding: 13, gap: 4 },
-  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  subMeta: { color: colors.muted, fontSize: 10, marginTop: 2 },
-  badge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, overflow: 'hidden' },
-  moneyVal: { color: '#16885A', fontSize: 13, fontWeight: '800' },
+  title: { color: '#111827', fontSize: 15, fontWeight: '700', marginBottom: 10 },
+  list: {
+    marginHorizontal: -14,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+    gap: 0,
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 3,
+  },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
+  subMeta: { color: '#6B7280', fontSize: 11.5, fontWeight: '400', marginTop: 2 },
+  badge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8, overflow: 'hidden' },
+  moneyVal: { color: '#16885A', fontSize: 14, fontWeight: '600' },
   subTabs: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 99 },
+  chip: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  chipTextActive: { color: colors.white },
-  primaryBtn: { backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  chipText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
+  primaryBtn: { backgroundColor: colors.primary, minHeight: 40, paddingHorizontal: 13, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   iconButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   departmentCount: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
-  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
-  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 10, maxHeight: '86%' },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  stateCard: { ...HAIRLINE_CARD, padding: 22, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 18, gap: 10, maxHeight: '86%' },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  closeText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
+  searchField: { flex: 1, backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, height: 40, fontSize: 13.5, color: '#111827' },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingBottom: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  infoVal: { color: colors.ink, fontSize: 12, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
-  memberItem: { backgroundColor: '#F8FAFD', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: colors.border },
-  cancelBtn: { backgroundColor: '#F1F5F9', minHeight: 44, paddingHorizontal: 18, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  cancelBtnText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  deleteBtn: { backgroundColor: '#FCEBEC', minHeight: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  deleteBtnText: { color: '#C74848', fontSize: 12, fontWeight: '700' },
-  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10, fontSize: 12, color: colors.ink },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  submitBtnText: { color: colors.white, fontSize: 13, fontWeight: '700' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  infoVal: { color: '#111827', fontSize: 13.5, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
+  memberItem: { backgroundColor: '#F6F8FC', borderRadius: 10, padding: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2' },
+  cancelBtn: { backgroundColor: '#F1F5F9', minHeight: 44, paddingHorizontal: 18, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText: { color: '#374151', fontSize: 13, fontWeight: '600' },
+  deleteBtn: { backgroundColor: '#FCEBEC', minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  deleteBtnText: { color: '#C74848', fontSize: 13, fontWeight: '600' },
+  field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
   disabled: { opacity: 0.45 },
 });
 

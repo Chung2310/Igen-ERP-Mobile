@@ -104,6 +104,173 @@ export function IgenEmptyState({
   );
 }
 
+/**
+ * Minh họa SVG mờ lấy cảm hứng từ mascot robot iGen kết hợp hộp thư trống
+ * cho màn hình Thông báo / Hộp thư.
+ */
+export function IgenInboxEmptyIllustration({
+  width = 136,
+  height = 100,
+}: {
+  width?: number;
+  height?: number;
+}) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 144 106" fill="none">
+      {/* Ground shadow & soft pastel cloud backdrop */}
+      <Ellipse cx="72" cy="91" rx="44" ry="6" fill="#E3F2FD" fillOpacity={0.78} />
+      <Path
+        d="M30 80C21.5 80 15 73.8 15 65.8C15 58.6 20.2 52.8 27 51.7C29 40.5 38.6 32 50.2 32C56.2 32 61.8 34.2 66 37.9C70 34.7 75 32.8 80.5 32.8C92.2 32.8 101.8 41.8 102.8 53.2C110.2 54.4 115.8 60.5 115.8 68C115.8 75.5 109.6 80 102 80H30Z"
+        fill="#E5F4FD"
+        fillOpacity={0.78}
+      />
+
+      {/* Subtle floating sparkles & dots */}
+      <Path
+        d="M25 28L26.3 31.4L29.7 32.7L26.3 34L25 37.4L23.7 34L20.3 32.7L23.7 31.4L25 28Z"
+        fill="#9FD8FA"
+        fillOpacity={0.75}
+      />
+      <Circle cx="115" cy="27" r="2.8" fill="#A9DDFB" fillOpacity={0.68} />
+      <Circle cx="121" cy="36" r="1.7" fill="#BCE6FC" fillOpacity={0.7} />
+      <Circle cx="34" cy="43" r="1.6" fill="#BCE6FC" fillOpacity={0.72} />
+
+      {/* Tiny dotted breeze trail & mini floating paper plane from open inbox */}
+      <Path
+        d="M84 34C88 26 95 22 102 21"
+        stroke="#A4D8F8"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeDasharray="2.5 3.5"
+      />
+      <Path
+        d="M103 18.5L112.5 16L107.2 24.2L105.6 21.1L103 18.5Z"
+        fill="#B6E1FA"
+        fillOpacity={0.9}
+      />
+      <Path
+        d="M105.6 21.1L112.5 16"
+        stroke="#7AC8F8"
+        strokeWidth="1"
+        strokeLinecap="round"
+      />
+
+      {/* Open mailbox / inbox on the right */}
+      {/* Mailbox post */}
+      <Rect x="84.5" y="72" width="7" height="17" rx="3" fill="#B9E1FA" fillOpacity={0.82} />
+
+      {/* Mailbox back body */}
+      <Path
+        d="M64 51C64 43.3 70.3 37 78 37H97C104.7 37 111 43.3 111 51V72C111 74.2 109.2 76 107 76H68C65.8 76 64 74.2 64 72V51Z"
+        fill="#FFFFFF"
+        fillOpacity={0.95}
+        stroke="#B5DDF7"
+        strokeWidth="1.6"
+      />
+
+      {/* Soft shading on right side of mailbox */}
+      <Path
+        d="M89 37.8H97C104.2 37.8 110.2 43.7 110.2 51V72C110.2 73.8 108.8 75.2 107 75.2H89V37.8Z"
+        fill="#EAF6FE"
+        fillOpacity={0.72}
+      />
+
+      {/* Open front arch cavity */}
+      <Path
+        d="M68 53C68 46.9 72.9 42 79 42C85.1 42 90 46.9 90 53V72H68V53Z"
+        fill="#D3ECFC"
+        fillOpacity={0.85}
+      />
+
+      {/* Open front lid resting forward */}
+      <Path
+        d="M66.5 72H90.5L85.5 80.5C84.8 81.6 83.6 82.3 82.3 82.3H63.8C62.2 82.3 61.3 80.5 62.2 79.1L66.5 72Z"
+        fill="#FFFFFF"
+        fillOpacity={0.95}
+        stroke="#B5DDF7"
+        strokeWidth="1.5"
+      />
+
+      {/* Small mail slot line / envelope detail inside */}
+      <Path
+        d="M73 59.5H85M75 64H83"
+        stroke="#8ACFF9"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeOpacity={0.75}
+      />
+
+      {/* Mailbox side flag (resting calmly) */}
+      <Path
+        d="M103 55V45.5H111.5V50.2H105.6"
+        fill="#8ACFF9"
+        fillOpacity={0.88}
+      />
+      <Circle cx="104.3" cy="56" r="2.2" fill="#7AC8F8" />
+
+      {/* iGen robot mascot peeking beside the mailbox on the left */}
+      {/* Tilted antenna */}
+      <Path
+        d="M52 38L49 28.8"
+        stroke="#95CBEF"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+      />
+      <Circle cx="48.2" cy="26.2" r="4" fill="#7AC8F8" fillOpacity={0.88} />
+      <Circle cx="47.1" cy="25.1" r="1.2" fill="#FFFFFF" fillOpacity={0.85} />
+      <Path
+        d="M46.8 39C48.1 36.2 56.9 36.2 58.2 39Z"
+        fill="#8ACFF9"
+        fillOpacity={0.88}
+      />
+
+      {/* Ear-cups */}
+      <Rect x="29.5" y="47.2" width="6" height="14" rx="3" fill="#9FD6F9" fillOpacity={0.82} />
+      <Rect x="70.5" y="47.2" width="6" height="14" rx="3" fill="#9FD6F9" fillOpacity={0.82} />
+
+      {/* Rounded robot head */}
+      <Rect
+        x="33.5"
+        y="38"
+        width="39"
+        height="31"
+        rx="15"
+        fill="#FFFFFF"
+        fillOpacity={0.96}
+        stroke="#B5DDF7"
+        strokeWidth="1.6"
+      />
+
+      {/* Soft pastel visor */}
+      <Rect
+        x="38.8"
+        y="44"
+        width="28.4"
+        height="18.6"
+        rx="9"
+        fill="#CBE8FB"
+        fillOpacity={0.82}
+      />
+
+      {/* Calm friendly eyes & gentle smile looking slightly toward mailbox */}
+      <Circle cx="48.2" cy="52.6" r="2.1" fill="#5CB6EE" fillOpacity={0.86} />
+      <Circle cx="59.8" cy="52.6" r="2.1" fill="#5CB6EE" fillOpacity={0.86} />
+      <Path
+        d="M51 57.3C52.7 58.6 55.3 58.6 57 57.3"
+        stroke="#5CB6EE"
+        strokeOpacity={0.82}
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        fill="none"
+      />
+
+      {/* Little floating robot hands (right hand gently resting near mailbox) */}
+      <Ellipse cx="38.5" cy="73" rx="5.2" ry="3" fill="#B9E1FA" fillOpacity={0.82} />
+      <Ellipse cx="68.5" cy="70.5" rx="5.2" ry="3" fill="#9FD6F9" fillOpacity={0.88} />
+    </Svg>
+  );
+}
+
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',

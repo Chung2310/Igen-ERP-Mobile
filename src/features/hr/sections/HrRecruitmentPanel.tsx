@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -24,6 +23,8 @@ import {
   Users,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { DateTimeField } from '@/features/quotation/DateTimeField';
 import {
@@ -1049,181 +1050,159 @@ export function HrRecruitmentPanel({
 
   function renderApplicantModal() {
     return (
-      <Modal
+      <FullScreenFormModal
         visible={appModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
+        title={editingApp ? 'Chỉnh sửa thông tin ứng viên' : 'Thêm ứng viên mới'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveApplicant()}
+        saving={saving}
+        onClose={() => {
           setAppModalOpen(false);
           setEditingApp(null);
         }}
       >
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => {
-            setAppModalOpen(false);
-            setEditingApp(null);
-          }}
-        >
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>
-                {editingApp ? 'Chỉnh sửa thông tin ứng viên' : 'Thêm ứng viên mới'}
-              </Text>
+        <View style={{ gap: 8, paddingBottom: 14 }}>
+          {!editingApp ? (
+            <>
+              <Text style={styles.label}>Phòng ban *</Text>
               <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: appDepartmentOpen }}
                 onPress={() => {
-                  setAppModalOpen(false);
-                  setEditingApp(null);
+                  setAppJobOpen(false);
+                  setAppDepartmentOpen((open) => !open);
                 }}
+                style={styles.departmentDropdownButton}
               >
-                <Text style={styles.closeText}>Đóng</Text>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.departmentDropdownText, !aDepartment && styles.departmentPlaceholder]}
+                >
+                  {aDepartment || 'Chọn phòng ban'}
+                </Text>
+                <ChevronDown size={15} color={colors.primary} />
               </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-              <View style={{ gap: 8, paddingBottom: 14 }}>
-                {!editingApp ? (
-                  <>
-                    <Text style={styles.label}>Phòng ban *</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded: appDepartmentOpen }}
-                      onPress={() => {
-                        setAppJobOpen(false);
-                        setAppDepartmentOpen((open) => !open);
-                      }}
-                      style={styles.departmentDropdownButton}
-                    >
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.departmentDropdownText, !aDepartment && styles.departmentPlaceholder]}
+              {appDepartmentOpen ? (
+                <View style={styles.departmentDropdownMenu}>
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                    {applicantDepartmentOptions.map((department) => (
+                      <Pressable
+                        key={department}
+                        onPress={() => selectApplicantDepartment(department)}
+                        style={styles.departmentDropdownOption}
                       >
-                        {aDepartment || 'Chọn phòng ban'}
-                      </Text>
-                      <ChevronDown size={15} color={colors.primary} />
-                    </Pressable>
-                    {appDepartmentOpen ? (
-                      <View style={styles.departmentDropdownMenu}>
-                        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
-                          {applicantDepartmentOptions.map((department) => (
-                            <Pressable
-                              key={department}
-                              onPress={() => selectApplicantDepartment(department)}
-                              style={styles.departmentDropdownOption}
-                            >
-                              <Text numberOfLines={1} style={styles.departmentDropdownText}>
-                                {department}
-                              </Text>
-                            </Pressable>
-                          ))}
-                          {!applicantDepartmentOptions.length ? (
-                            <Text style={styles.departmentEmptyText}>Chưa có phòng ban</Text>
-                          ) : null}
-                        </ScrollView>
-                      </View>
+                        <Text numberOfLines={1} style={styles.departmentDropdownText}>
+                          {department}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    {!applicantDepartmentOptions.length ? (
+                      <Text style={styles.departmentEmptyText}>Chưa có phòng ban</Text>
                     ) : null}
+                  </ScrollView>
+                </View>
+              ) : null}
 
-                    <Text style={styles.label}>Vị trí ứng tuyển *</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded: appJobOpen, disabled: !applicantJobs.length }}
-                      disabled={!applicantJobs.length}
-                      onPress={() => {
-                        setAppDepartmentOpen(false);
-                        setAppJobOpen((open) => !open);
-                      }}
-                      style={[
-                        styles.departmentDropdownButton,
-                        !applicantJobs.length && styles.disabled,
-                      ]}
-                    >
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.departmentDropdownText, !aJobId && styles.departmentPlaceholder]}
+              <Text style={styles.label}>Vị trí ứng tuyển *</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: appJobOpen, disabled: !applicantJobs.length }}
+                disabled={!applicantJobs.length}
+                onPress={() => {
+                  setAppDepartmentOpen(false);
+                  setAppJobOpen((open) => !open);
+                }}
+                style={[
+                  styles.departmentDropdownButton,
+                  !applicantJobs.length && styles.disabled,
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[styles.departmentDropdownText, !aJobId && styles.departmentPlaceholder]}
+                >
+                  {jobMap.get(aJobId)?.title || 'Chọn vị trí tuyển dụng'}
+                </Text>
+                <ChevronDown size={15} color={colors.primary} />
+              </Pressable>
+              {appJobOpen ? (
+                <View style={styles.departmentDropdownMenu}>
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                    {applicantJobs.map((job) => (
+                      <Pressable
+                        key={job.id}
+                        onPress={() => {
+                          setAJobId(job.id);
+                          setAppJobOpen(false);
+                        }}
+                        style={styles.departmentDropdownOption}
                       >
-                        {jobMap.get(aJobId)?.title || 'Chọn vị trí tuyển dụng'}
-                      </Text>
-                      <ChevronDown size={15} color={colors.primary} />
-                    </Pressable>
-                    {appJobOpen ? (
-                      <View style={styles.departmentDropdownMenu}>
-                        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
-                          {applicantJobs.map((job) => (
-                            <Pressable
-                              key={job.id}
-                              onPress={() => {
-                                setAJobId(job.id);
-                                setAppJobOpen(false);
-                              }}
-                              style={styles.departmentDropdownOption}
-                            >
-                              <Text numberOfLines={1} style={styles.departmentDropdownText}>
-                                {job.title}
-                              </Text>
-                            </Pressable>
-                          ))}
-                          {!applicantJobs.length ? (
-                            <Text style={styles.departmentEmptyText}>Chưa có tin đang tuyển. Hãy mở tin tuyển dụng trước.</Text>
-                          ) : null}
-                        </ScrollView>
-                      </View>
-                    ) : null}
+                        <Text numberOfLines={1} style={styles.departmentDropdownText}>
+                          {job.title}
+                        </Text>
+                      </Pressable>
+                    ))}
                     {!applicantJobs.length ? (
-                      <Text style={styles.muted}>Phòng ban này chưa có tin đang tuyển. Hãy mở tin tuyển dụng trước.</Text>
+                      <Text style={styles.departmentEmptyText}>Chưa có tin đang tuyển. Hãy mở tin tuyển dụng trước.</Text>
                     ) : null}
-                  </>
-                ) : null}
-                <Text style={styles.label}>Họ và tên *</Text>
-                <TextInput value={aName} onChangeText={setAName} placeholder="Nguyễn Văn A" style={styles.field} />
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Email</Text>
-                    <TextInput value={aEmail} onChangeText={setAEmail} keyboardType="email-address" autoCapitalize="none" style={styles.field} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Số điện thoại</Text>
-                    <TextInput value={aPhone} onChangeText={setAPhone} keyboardType="phone-pad" style={styles.field} />
-                  </View>
+                  </ScrollView>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <DateTimeField label="Ngày sinh" mode="date" value={aBirthDate} onChange={setABirthDate} allowClear />
-                  <DateTimeField label="Ngày nhận việc" mode="date" value={aAvailableDate} onChange={setAAvailableDate} allowClear />
-                </View>
-                <Text style={styles.label}>Địa chỉ</Text>
-                <TextInput value={aAddress} onChangeText={setAAddress} placeholder="Quận/Huyện, Tỉnh/Thành..." style={styles.field} />
-                <Text style={styles.label}>Kinh nghiệm</Text>
-                <TextInput value={aExperience} onChangeText={setAExperience} placeholder="VD: 3 năm kinh doanh B2B" style={styles.field} />
-                <Text style={styles.label}>Học vấn</Text>
-                <TextInput value={aEducation} onChangeText={setAEducation} placeholder="VD: Đại học Kinh tế Quốc dân" style={styles.field} />
-                <Text style={styles.label}>Kỹ năng (ngăn cách bằng dấu phẩy)</Text>
-                <TextInput value={aSkills} onChangeText={setASkills} placeholder="Excel, Giao tiếp, Bán hàng..." style={styles.field} />
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Lương mong muốn (VNĐ)</Text>
-                    <TextInput value={aExpectedSalary} onChangeText={setAExpectedSalary} keyboardType="numeric" placeholder="15000000" style={styles.field} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Nguồn ứng viên</Text>
-                    <TextInput value={aSource} onChangeText={setASource} placeholder="LinkedIn / TopCV" style={styles.field} />
-                  </View>
-                </View>
-                <Text style={styles.label}>Ghi chú</Text>
-                <TextInput value={aNotes} onChangeText={setANotes} multiline style={[styles.field, { minHeight: 54, textAlignVertical: 'top' }]} />
-                <Pressable disabled={saving} onPress={() => void onSaveApplicant()} style={[styles.submitBtn, saving && styles.disabled]}>
-                  <Text style={styles.submitBtnText}>
-                    {saving ? 'Đang lưu...' : editingApp ? 'Lưu thay đổi' : 'Thêm ứng viên'}
-                  </Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+              ) : null}
+              {!applicantJobs.length ? (
+                <Text style={styles.muted}>Phòng ban này chưa có tin đang tuyển. Hãy mở tin tuyển dụng trước.</Text>
+              ) : null}
+            </>
+          ) : null}
+          <Text style={styles.label}>Họ và tên *</Text>
+          <TextInput value={aName} onChangeText={setAName} placeholder="Nguyễn Văn A" style={styles.field} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput value={aEmail} onChangeText={setAEmail} keyboardType="email-address" autoCapitalize="none" style={styles.field} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Số điện thoại</Text>
+              <TextInput value={aPhone} onChangeText={setAPhone} keyboardType="phone-pad" style={styles.field} />
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <DateTimeField label="Ngày sinh" mode="date" value={aBirthDate} onChange={setABirthDate} allowClear />
+            <DateTimeField label="Ngày nhận việc" mode="date" value={aAvailableDate} onChange={setAAvailableDate} allowClear />
+          </View>
+          <Text style={styles.label}>Địa chỉ</Text>
+          <TextInput value={aAddress} onChangeText={setAAddress} placeholder="Quận/Huyện, Tỉnh/Thành..." style={styles.field} />
+          <Text style={styles.label}>Kinh nghiệm</Text>
+          <TextInput value={aExperience} onChangeText={setAExperience} placeholder="VD: 3 năm kinh doanh B2B" style={styles.field} />
+          <Text style={styles.label}>Học vấn</Text>
+          <TextInput value={aEducation} onChangeText={setAEducation} placeholder="VD: Đại học Kinh tế Quốc dân" style={styles.field} />
+          <Text style={styles.label}>Kỹ năng (ngăn cách bằng dấu phẩy)</Text>
+          <TextInput value={aSkills} onChangeText={setASkills} placeholder="Excel, Giao tiếp, Bán hàng..." style={styles.field} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Lương mong muốn (VNĐ)</Text>
+              <TextInput value={aExpectedSalary} onChangeText={setAExpectedSalary} keyboardType="numeric" placeholder="15000000" style={styles.field} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Nguồn ứng viên</Text>
+              <TextInput value={aSource} onChangeText={setASource} placeholder="LinkedIn / TopCV" style={styles.field} />
+            </View>
+          </View>
+          <Text style={styles.label}>Ghi chú</Text>
+          <TextInput value={aNotes} onChangeText={setANotes} multiline style={[styles.field, { minHeight: 54, textAlignVertical: 'top' }]} />
+          <Pressable disabled={saving} onPress={() => void onSaveApplicant()} style={[styles.submitBtn, saving && styles.disabled]}>
+            <Text style={styles.submitBtnText}>
+              {saving ? 'Đang lưu...' : editingApp ? 'Lưu thay đổi' : 'Thêm ứng viên'}
+            </Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     );
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -1260,38 +1239,18 @@ export function HrRecruitmentPanel({
         })}
       </View>
 
-      {/* Search + Create button */}
-      <View style={styles.searchRow}>
-        {view !== 'interviews' ? (
+      {/* Search */}
+      {view !== 'interviews' ? (
+        <View style={styles.searchRow}>
           <TextInput
             value={search}
             onChangeText={setSearch}
             placeholder={view === 'jobs' ? 'Tìm tin tuyển dụng...' : 'Tìm ứng viên, email, SĐT...'}
-            placeholderTextColor={colors.muted}
-            style={[styles.field, { flex: 1 }]}
+            placeholderTextColor="#94A3B8"
+            style={styles.searchField}
           />
-        ) : (
-          <View style={{ flex: 1 }} />
-        )}
-        {canManage ? (
-          <Pressable
-            onPress={() => {
-              if (view === 'jobs') openJobEditor();
-              else if (view === 'applicants') {
-                openApplicantEditor();
-              } else {
-                openCreateInterview();
-              }
-            }}
-            style={styles.primaryBtn}
-          >
-            <Plus size={13} color={colors.white} />
-            <Text style={styles.primaryBtnText}>
-              {view === 'jobs' ? 'Tin mới' : view === 'applicants' ? 'Ứng viên' : 'Lịch PV'}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       {/* Sub-view filter chips */}
       {view === 'jobs' ? (
@@ -1375,7 +1334,7 @@ export function HrRecruitmentPanel({
         ) : (
           <View style={styles.list}>
             {filteredJobs.map((job) => (
-              <Card key={job.id} onPress={() => setSelectedJob(job)} style={styles.card}>
+              <Card key={job.id} onPress={() => setSelectedJob(job)} style={styles.listItem}>
                 <View style={styles.headRow}>
                   <Text numberOfLines={2} style={[styles.rowTitle, { flex: 1 }]}>
                     {job.title}
@@ -1428,7 +1387,7 @@ export function HrRecruitmentPanel({
               const stage = app.stageId ? stageMap.get(app.stageId) : undefined;
               const job = app.jobId ? jobMap.get(app.jobId) : undefined;
               return (
-                <Card key={app.id} onPress={() => openApplicantDetail(app)} style={styles.card}>
+                <Card key={app.id} onPress={() => openApplicantDetail(app)} style={styles.listItem}>
                   <View style={styles.headRow}>
                     <Text numberOfLines={1} style={[styles.rowTitle, { flex: 1 }]}>
                       {app.fullName}
@@ -1466,7 +1425,7 @@ export function HrRecruitmentPanel({
                   setIvResultDraft(iv.result || '');
                   setIvNotesDraft(iv.notes || '');
                 }}
-                style={styles.card}
+                style={styles.listItem}
               >
                 <View style={styles.headRow}>
                   <Text numberOfLines={1} style={[styles.rowTitle, { flex: 1 }]}>
@@ -1521,375 +1480,397 @@ export function HrRecruitmentPanel({
         </View>
       )}
 
-      {/* Job Detail Modal */}
-      <Modal
+      {/* Job Detail Full-Screen Page */}
+      <FullScreenFormModal
         visible={Boolean(selectedJob) && !jobModalMode}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedJob(null)}
+        title={selectedJob?.title || 'Chi tiết tin tuyển dụng'}
+        onClose={() => setSelectedJob(null)}
+        rightAction={
+          selectedJob && canManage ? (
+            <Pressable onPress={() => openJobEditor(selectedJob)} hitSlop={8} style={{ padding: 4 }}>
+              <Pencil size={19} color="#526071" strokeWidth={1.9} />
+            </Pressable>
+          ) : undefined
+        }
       >
-        <Pressable style={styles.backdrop} onPress={() => setSelectedJob(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            {selectedJob ? (
+        {selectedJob ? (
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.subMeta}>
+              {selectedJob.department} · {selectedJob.location} · SL: {selectedJob.headcount ?? 1}
+            </Text>
+            <Text style={styles.subMeta}>
+              Hạn ứng tuyển: {selectedJob.applicationDeadline
+                ? new Date(selectedJob.applicationDeadline).toLocaleDateString('vi-VN')
+                : 'Chưa thiết lập'}
+            </Text>
+            {selectedJob.description ? (
               <>
-                <View style={styles.headRow}>
-                  <Text numberOfLines={2} style={[styles.sheetTitle, { flex: 1 }]}>
-                    {selectedJob.title}
-                  </Text>
-                  <Pressable onPress={() => setSelectedJob(null)}>
-                    <Text style={styles.closeText}>Đóng</Text>
-                  </Pressable>
-                </View>
-                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-                  <View style={{ gap: 8, paddingBottom: 12 }}>
-                    <Text style={styles.subMeta}>
-                      {selectedJob.department} · {selectedJob.location} · SL: {selectedJob.headcount ?? 1}
-                    </Text>
-                    <Text style={styles.subMeta}>
-                      Hạn ứng tuyển: {selectedJob.applicationDeadline
-                        ? new Date(selectedJob.applicationDeadline).toLocaleDateString('vi-VN')
-                        : 'Chưa thiết lập'}
-                    </Text>
-                    {selectedJob.description ? (
-                      <>
-                        <Text style={styles.label}>Mô tả công việc</Text>
-                        <Text style={styles.muted}>{selectedJob.description}</Text>
-                      </>
-                    ) : null}
-                    {selectedJob.requirements ? (
-                      <>
-                        <Text style={styles.label}>Yêu cầu</Text>
-                        <Text style={styles.muted}>{selectedJob.requirements}</Text>
-                      </>
-                    ) : null}
-                    {selectedJob.benefits ? (
-                      <>
-                        <Text style={styles.label}>Quyền lợi</Text>
-                        <Text style={styles.muted}>{selectedJob.benefits}</Text>
-                      </>
-                    ) : null}
-                    {selectedJob.jdFileUrl ? (
-                      <Pressable
-                        onPress={() => void Linking.openURL(selectedJob.jdFileUrl!)}
-                        style={styles.linkChip}
-                      >
-                        <ExternalLink size={12} color={colors.primary} />
-                        <Text style={styles.linkText}>Xem file JD đính kèm</Text>
-                      </Pressable>
-                    ) : null}
-
-                    {canManage ? (
-                      <>
-                        <Text style={styles.label}>Đổi trạng thái tin</Text>
-                        <View style={styles.wrapRow}>
-                          {(['open', 'draft', 'paused', 'closed'] as const).map((st) => (
-                            <Pressable
-                              key={st}
-                              onPress={() => void onChangeJobStatus(selectedJob, st)}
-                              style={[styles.chip, selectedJob.status === st && styles.chipActive]}
-                            >
-                              <Text style={[styles.chipText, selectedJob.status === st && styles.chipTextActive]}>
-                                {JOB_STATUS_LABELS[st]}
-                              </Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                        <View style={styles.actionRow}>
-                          <Pressable
-                            onPress={() => openJobEditor(selectedJob)}
-                            style={[styles.submitBtn, { flex: 1, marginTop: 0 }]}
-                          >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                              <Pencil size={13} color={colors.white} />
-                              <Text style={styles.submitBtnText}>Chỉnh sửa</Text>
-                            </View>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => onDeleteJob(selectedJob)}
-                            style={styles.deleteBtn}
-                          >
-                            <Text style={styles.smallRedText}>Xóa</Text>
-                          </Pressable>
-                        </View>
-                      </>
-                    ) : null}
-                  </View>
-                </ScrollView>
+                <Text style={styles.label}>Mô tả công việc</Text>
+                <Text style={styles.muted}>{selectedJob.description}</Text>
               </>
             ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Create / Edit Job Modal */}
-      <Modal visible={Boolean(jobModalMode)} transparent animationType="slide" onRequestClose={() => setJobModalMode(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setJobModalMode(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>
-                {jobModalMode === 'edit' ? 'Sửa tin tuyển dụng' : 'Tạo tin tuyển dụng mới'}
-              </Text>
-              <Pressable onPress={() => setJobModalMode(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
+            {selectedJob.requirements ? (
+              <>
+                <Text style={styles.label}>Yêu cầu</Text>
+                <Text style={styles.muted}>{selectedJob.requirements}</Text>
+              </>
+            ) : null}
+            {selectedJob.benefits ? (
+              <>
+                <Text style={styles.label}>Quyền lợi</Text>
+                <Text style={styles.muted}>{selectedJob.benefits}</Text>
+              </>
+            ) : null}
+            {selectedJob.jdFileUrl ? (
+              <Pressable
+                onPress={() => void Linking.openURL(selectedJob.jdFileUrl!)}
+                style={styles.linkChip}
+              >
+                <ExternalLink size={12} color={colors.primary} />
+                <Text style={styles.linkText}>Xem file JD đính kèm</Text>
               </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-              <View style={{ gap: 8, paddingBottom: 12 }}>
-                <Text style={styles.label}>Tiêu đề vị trí *</Text>
-                <TextInput value={jTitle} onChangeText={setJTitle} placeholder="VD: Chuyên viên Kinh doanh" style={styles.field} />
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Phòng ban</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded: jobDepartmentOpen }}
-                      onPress={() => setJobDepartmentOpen((open) => !open)}
-                      style={styles.departmentDropdownButton}
-                    >
-                      <Text numberOfLines={1} style={[styles.departmentDropdownText, !jDept && styles.departmentPlaceholder]}>
-                        {jDept || 'Chọn phòng ban'}
-                      </Text>
-                      <ChevronDown size={15} color={colors.primary} />
-                    </Pressable>
-                    {jobDepartmentOpen ? (
-                      <View style={styles.departmentDropdownMenu}>
-                        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
-                          <Pressable
-                            onPress={() => {
-                              setJDept('Chung');
-                              setJobDepartmentOpen(false);
-                            }}
-                            style={styles.departmentDropdownOption}
-                          >
-                            <Text style={styles.departmentDropdownText}>Chung</Text>
-                          </Pressable>
-                          {departments.map((department) => (
-                            <Pressable
-                              key={department.id}
-                              onPress={() => {
-                                setJDept(department.name);
-                                setJobDepartmentOpen(false);
-                              }}
-                              style={styles.departmentDropdownOption}
-                            >
-                              <Text numberOfLines={1} style={styles.departmentDropdownText}>
-                                {department.name}
-                              </Text>
-                            </Pressable>
-                          ))}
-                          {!departments.length ? (
-                            <Text style={styles.departmentEmptyText}>Chưa có phòng ban</Text>
-                          ) : null}
-                        </ScrollView>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={{ width: 90 }}>
-                    <Text style={styles.label}>Số lượng</Text>
-                    <TextInput value={jHeadcount} onChangeText={setJHeadcount} keyboardType="numeric" style={styles.field} />
-                  </View>
-                </View>
-                <Text style={styles.label}>Địa điểm làm việc</Text>
-                <TextInput value={jLocation} onChangeText={setJLocation} placeholder="Hà Nội / TP.HCM" style={styles.field} />
-                <DateTimeField
-                  label="Hạn ứng tuyển"
-                  mode="date"
-                  value={jApplicationDeadline}
-                  onChange={setJApplicationDeadline}
-                  allowClear
-                  placeholder="Chọn hạn nhận hồ sơ"
-                />
-                <Text style={styles.label}>Hình thức làm việc</Text>
+            ) : null}
+
+            {canManage ? (
+              <>
+                <Text style={styles.label}>Đổi trạng thái tin</Text>
                 <View style={styles.wrapRow}>
-                  {(['onsite', 'hybrid', 'remote'] as const).map((wp) => (
-                    <Pressable key={wp} onPress={() => setJWorkplace(wp)} style={[styles.chip, jWorkplace === wp && styles.chipActive]}>
-                      <Text style={[styles.chipText, jWorkplace === wp && styles.chipTextActive]}>
-                        {WORKPLACE_LABELS[wp]}
+                  {(['open', 'draft', 'paused', 'closed'] as const).map((st) => (
+                    <Pressable
+                      key={st}
+                      onPress={() => void onChangeJobStatus(selectedJob, st)}
+                      style={[styles.chip, selectedJob.status === st && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, selectedJob.status === st && styles.chipTextActive]}>
+                        {JOB_STATUS_LABELS[st]}
                       </Text>
                     </Pressable>
                   ))}
                 </View>
-                <Text style={styles.label}>Mô tả công việc</Text>
-                <TextInput value={jDesc} onChangeText={setJDesc} multiline style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]} />
-                <Text style={styles.label}>Yêu cầu ứng viên</Text>
-                <TextInput value={jReq} onChangeText={setJReq} multiline style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]} />
-                <Text style={styles.label}>Quyền lợi</Text>
-                <TextInput value={jBenefits} onChangeText={setJBenefits} multiline style={[styles.field, { minHeight: 48, textAlignVertical: 'top' }]} />
-                <Pressable disabled={saving} onPress={() => void onSaveJob()} style={[styles.submitBtn, saving && styles.disabled]}>
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu tin tuyển dụng'}</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+                <View style={styles.actionRow}>
+                  <Pressable
+                    onPress={() => openJobEditor(selectedJob)}
+                    style={[styles.submitBtn, { flex: 1, marginTop: 0 }]}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      <Pencil size={13} color={colors.white} />
+                      <Text style={styles.submitBtnText}>Chỉnh sửa</Text>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => onDeleteJob(selectedJob)}
+                    style={styles.deleteBtn}
+                  >
+                    <Text style={styles.smallRedText}>Xóa</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+          </View>
+        ) : null}
+      </FullScreenFormModal>
+
+      {/* Create / Edit Job Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(jobModalMode)}
+        title={jobModalMode === 'edit' ? 'Sửa tin tuyển dụng' : 'Tạo tin tuyển dụng mới'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveJob()}
+        saving={saving}
+        onClose={() => setJobModalMode(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Tiêu đề vị trí *</Text>
+          <TextInput value={jTitle} onChangeText={setJTitle} placeholder="VD: Chuyên viên Kinh doanh" style={styles.field} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Phòng ban</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: jobDepartmentOpen }}
+                onPress={() => setJobDepartmentOpen((open) => !open)}
+                style={styles.departmentDropdownButton}
+              >
+                <Text numberOfLines={1} style={[styles.departmentDropdownText, !jDept && styles.departmentPlaceholder]}>
+                  {jDept || 'Chọn phòng ban'}
+                </Text>
+                <ChevronDown size={15} color={colors.primary} />
+              </Pressable>
+              {jobDepartmentOpen ? (
+                <View style={styles.departmentDropdownMenu}>
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator>
+                    <Pressable
+                      onPress={() => {
+                        setJDept('Chung');
+                        setJobDepartmentOpen(false);
+                      }}
+                      style={styles.departmentDropdownOption}
+                    >
+                      <Text style={styles.departmentDropdownText}>Chung</Text>
+                    </Pressable>
+                    {departments.map((department) => (
+                      <Pressable
+                        key={department.id}
+                        onPress={() => {
+                          setJDept(department.name);
+                          setJobDepartmentOpen(false);
+                        }}
+                        style={styles.departmentDropdownOption}
+                      >
+                        <Text numberOfLines={1} style={styles.departmentDropdownText}>
+                          {department.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    {!departments.length ? (
+                      <Text style={styles.departmentEmptyText}>Chưa có phòng ban</Text>
+                    ) : null}
+                  </ScrollView>
+                </View>
+              ) : null}
+            </View>
+            <View style={{ width: 90 }}>
+              <Text style={styles.label}>Số lượng</Text>
+              <TextInput value={jHeadcount} onChangeText={setJHeadcount} keyboardType="numeric" style={styles.field} />
+            </View>
+          </View>
+          <Text style={styles.label}>Địa điểm làm việc</Text>
+          <TextInput value={jLocation} onChangeText={setJLocation} placeholder="Hà Nội / TP.HCM" style={styles.field} />
+          <DateTimeField
+            label="Hạn ứng tuyển"
+            mode="date"
+            value={jApplicationDeadline}
+            onChange={setJApplicationDeadline}
+            allowClear
+            placeholder="Chọn hạn nhận hồ sơ"
+          />
+          <Text style={styles.label}>Hình thức làm việc</Text>
+          <View style={styles.wrapRow}>
+            {(['onsite', 'hybrid', 'remote'] as const).map((wp) => (
+              <Pressable key={wp} onPress={() => setJWorkplace(wp)} style={[styles.chip, jWorkplace === wp && styles.chipActive]}>
+                <Text style={[styles.chipText, jWorkplace === wp && styles.chipTextActive]}>
+                  {WORKPLACE_LABELS[wp]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.label}>Mô tả công việc</Text>
+          <TextInput value={jDesc} onChangeText={setJDesc} multiline style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]} />
+          <Text style={styles.label}>Yêu cầu ứng viên</Text>
+          <TextInput value={jReq} onChangeText={setJReq} multiline style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]} />
+          <Text style={styles.label}>Quyền lợi</Text>
+          <TextInput value={jBenefits} onChangeText={setJBenefits} multiline style={[styles.field, { minHeight: 48, textAlignVertical: 'top' }]} />
+          <Pressable disabled={saving} onPress={() => void onSaveJob()} style={[styles.submitBtn, saving && styles.disabled]}>
+            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu tin tuyển dụng'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
       {renderApplicantModal()}
 
-      {/* Create Interview Modal */}
-      <Modal visible={ivModalOpen} transparent animationType="slide" onRequestClose={() => setIvModalOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setIvModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Lên lịch phỏng vấn</Text>
-              <Pressable onPress={() => setIvModalOpen(false)}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Create Interview Full-Screen Page */}
+      <FullScreenFormModal
+        visible={ivModalOpen}
+        title="Lên lịch phỏng vấn"
+        cancelLabel="Hủy"
+        onSave={() => void onCreateInterview()}
+        saving={saving}
+        onClose={() => setIvModalOpen(false)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Chọn ứng viên *</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {applicants.map((a) => (
+              <Pressable key={a.id} onPress={() => setIvApplicantId(a.id)} style={[styles.chip, ivApplicantId === a.id && styles.chipActive]}>
+                <Text style={[styles.chipText, ivApplicantId === a.id && styles.chipTextActive]}>{a.fullName}</Text>
               </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
-              <View style={{ gap: 8 }}>
-                <Text style={styles.label}>Chọn ứng viên *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {applicants.map((a) => (
-                    <Pressable key={a.id} onPress={() => setIvApplicantId(a.id)} style={[styles.chip, ivApplicantId === a.id && styles.chipActive]}>
-                      <Text style={[styles.chipText, ivApplicantId === a.id && styles.chipTextActive]}>{a.fullName}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-                <Text style={styles.label}>Vị trí</Text>
-                <View style={[styles.field, { backgroundColor: '#F1F5F9', justifyContent: 'center' }]}>
-                  <Text style={{ color: colors.ink, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
-                    {jobMap.get(appMap.get(ivApplicantId)?.jobId || '')?.title || 'Tự động theo ứng viên'}
+            ))}
+          </ScrollView>
+          <Text style={styles.label}>Vị trí</Text>
+          <View style={[styles.field, { backgroundColor: '#F1F5F9', justifyContent: 'center' }]}>
+            <Text style={{ color: colors.ink, fontSize: 12, fontWeight: '600' }} numberOfLines={1}>
+              {jobMap.get(appMap.get(ivApplicantId)?.jobId || '')?.title || 'Tự động theo ứng viên'}
+            </Text>
+          </View>
+          <DateTimeField label="Ngày phỏng vấn *" mode="date" value={ivDate} onChange={setIvDate} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <DateTimeField label="Giờ bắt đầu" mode="time" value={ivStart} onChange={setIvStart} />
+            <DateTimeField label="Giờ kết thúc" mode="time" value={ivEnd} onChange={setIvEnd} />
+          </View>
+          <Text style={styles.label}>Hình thức</Text>
+          <View style={styles.wrapRow}>
+            {(['onsite', 'online', 'phone'] as const).map((f) => (
+              <Pressable key={f} onPress={() => setIvFormat(f)} style={[styles.chip, ivFormat === f && styles.chipActive]}>
+                <Text style={[styles.chipText, ivFormat === f && styles.chipTextActive]}>
+                  {INTERVIEW_FORMAT_LABELS[f]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          {ivFormat === 'online' ? (
+            <>
+              <Text style={styles.label}>Link họp</Text>
+              <TextInput value={ivLink} onChangeText={setIvLink} autoCapitalize="none" placeholder="https://meet.google.com/..." placeholderTextColor={colors.muted} style={styles.field} />
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>Địa điểm</Text>
+              <TextInput value={ivLocation} onChangeText={setIvLocation} placeholder="Phòng họp tầng 3..." placeholderTextColor={colors.muted} style={styles.field} />
+            </>
+          )}
+          <Text style={styles.label}>Trạng thái</Text>
+          <View style={styles.wrapRow}>
+            {(['scheduled', 'completed', 'cancelled'] as const).map((st) => (
+              <Pressable key={st} onPress={() => setIvStatus(st)} style={[styles.chip, ivStatus === st && styles.chipActive]}>
+                <Text style={[styles.chipText, ivStatus === st && styles.chipTextActive]}>
+                  {INTERVIEW_STATUS_LABELS[st]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.label}>Kết quả</Text>
+          <TextInput
+            value={ivResult}
+            onChangeText={setIvResult}
+            placeholder="VD: Đạt / Cần phỏng vấn vòng 2..."
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Người phỏng vấn ({ivInterviewerIds.length})</Text>
+          <View style={[styles.wrapRow, { backgroundColor: '#F5F8FC', borderRadius: 10, padding: 8 }]}>
+            {employees.length ? employees.map((emp) => {
+              const empId = emp.uid || emp.id || emp._id || '';
+              if (!empId) return null;
+              const selected = ivInterviewerIds.includes(empId);
+              return (
+                <Pressable
+                  key={empId}
+                  onPress={() => toggleInterviewer(empId)}
+                  style={[styles.chip, selected && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                    {emp.displayName || emp.email || empId}
                   </Text>
-                </View>
-                <DateTimeField label="Ngày phỏng vấn *" mode="date" value={ivDate} onChange={setIvDate} />
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <DateTimeField label="Giờ bắt đầu" mode="time" value={ivStart} onChange={setIvStart} />
-                  <DateTimeField label="Giờ kết thúc" mode="time" value={ivEnd} onChange={setIvEnd} />
-                </View>
-                <Text style={styles.label}>Hình thức</Text>
-                <View style={styles.wrapRow}>
-                  {(['onsite', 'online', 'phone'] as const).map((f) => (
-                    <Pressable key={f} onPress={() => setIvFormat(f)} style={[styles.chip, ivFormat === f && styles.chipActive]}>
-                      <Text style={[styles.chipText, ivFormat === f && styles.chipTextActive]}>
-                        {INTERVIEW_FORMAT_LABELS[f]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {ivFormat === 'online' ? (
-                  <>
-                    <Text style={styles.label}>Link họp</Text>
-                    <TextInput value={ivLink} onChangeText={setIvLink} autoCapitalize="none" placeholder="https://meet.google.com/..." placeholderTextColor={colors.muted} style={styles.field} />
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.label}>Địa điểm</Text>
-                    <TextInput value={ivLocation} onChangeText={setIvLocation} placeholder="Phòng họp tầng 3..." placeholderTextColor={colors.muted} style={styles.field} />
-                  </>
-                )}
-                <Text style={styles.label}>Trạng thái</Text>
-                <View style={styles.wrapRow}>
-                  {(['scheduled', 'completed', 'cancelled'] as const).map((st) => (
-                    <Pressable key={st} onPress={() => setIvStatus(st)} style={[styles.chip, ivStatus === st && styles.chipActive]}>
-                      <Text style={[styles.chipText, ivStatus === st && styles.chipTextActive]}>
-                        {INTERVIEW_STATUS_LABELS[st]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <Text style={styles.label}>Kết quả</Text>
-                <TextInput
-                  value={ivResult}
-                  onChangeText={setIvResult}
-                  placeholder="VD: Đạt / Cần phỏng vấn vòng 2..."
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-                <Text style={styles.label}>Người phỏng vấn ({ivInterviewerIds.length})</Text>
-                <View style={[styles.wrapRow, { backgroundColor: '#F5F8FC', borderRadius: 10, padding: 8 }]}>
-                  {employees.length ? employees.map((emp) => {
-                    const empId = emp.uid || emp.id || emp._id || '';
-                    if (!empId) return null;
-                    const selected = ivInterviewerIds.includes(empId);
-                    return (
-                      <Pressable
-                        key={empId}
-                        onPress={() => toggleInterviewer(empId)}
-                        style={[styles.chip, selected && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, selected && styles.chipTextActive]}>
-                          {emp.displayName || emp.email || empId}
-                        </Text>
-                      </Pressable>
-                    );
-                  }) : (
-                    <Text style={styles.muted}>Chưa có danh sách người phỏng vấn</Text>
-                  )}
-                </View>
-                <Text style={styles.label}>Ghi chú</Text>
-                <TextInput value={ivNotes} onChangeText={setIvNotes} multiline placeholder="Nhập ghi chú..." placeholderTextColor={colors.muted} style={[styles.field, { minHeight: 50, textAlignVertical: 'top' }]} />
-                <Pressable disabled={saving} onPress={() => void onCreateInterview()} style={[styles.submitBtn, saving && styles.disabled]}>
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo lịch phỏng vấn'}</Text>
                 </Pressable>
-              </View>
-            </ScrollView>
+              );
+            }) : (
+              <Text style={styles.muted}>Chưa có danh sách người phỏng vấn</Text>
+            )}
+          </View>
+          <Text style={styles.label}>Ghi chú</Text>
+          <TextInput value={ivNotes} onChangeText={setIvNotes} multiline placeholder="Nhập ghi chú..." placeholderTextColor={colors.muted} style={[styles.field, { minHeight: 50, textAlignVertical: 'top' }]} />
+          <Pressable disabled={saving} onPress={() => void onCreateInterview()} style={[styles.submitBtn, saving && styles.disabled]}>
+            <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo lịch phỏng vấn'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
+    {canManage ? (
+      <HrFab
+        label={view === 'jobs' ? 'Thêm tin tuyển dụng' : view === 'applicants' ? 'Thêm ứng viên' : 'Thêm lịch phỏng vấn'}
+        onPress={() => {
+          if (view === 'jobs') openJobEditor();
+          else if (view === 'applicants') openApplicantEditor();
+          else openCreateInterview();
+        }}
+      />
+    ) : null}
+    </View>
   );
 }
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
+} as const;
+
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 18, paddingBottom: 28 },
-  segmentRow: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 11, padding: 3, marginBottom: 10 },
-  segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 7, borderRadius: 9 },
+  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
+  segmentRow: { flexDirection: 'row', backgroundColor: '#EAF1FA', borderRadius: 10, padding: 3, marginBottom: 10 },
+  segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 7.5, borderRadius: 8 },
   segmentBtnActive: { backgroundColor: colors.white },
-  segmentText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  segmentTextActive: { color: colors.ink },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
-  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
-  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
-  list: { gap: 10 },
-  card: { padding: 13, gap: 5 },
+  segmentText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  segmentTextActive: { color: '#111827', fontWeight: '600' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  searchField: { flex: 1, backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, height: 40, fontSize: 13.5, color: '#111827' },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.primary, minHeight: 40, paddingHorizontal: 12, borderRadius: 10 },
+  primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
+  stateCard: { ...HAIRLINE_CARD, padding: 22, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
+  list: {
+    marginHorizontal: -14,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+    gap: 0,
+  },
+  listItem: {
+    backgroundColor: colors.white,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  card: { ...HAIRLINE_CARD, padding: 14, gap: 6 },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  subMeta: { color: colors.muted, fontSize: 10 },
-  badge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
+  subMeta: { color: '#6B7280', fontSize: 11.5, fontWeight: '400' },
+  badge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8, overflow: 'hidden' },
   badgeGreen: { color: '#16885A', backgroundColor: '#E9F8F1' },
   badgeRed: { color: '#B91C1C', backgroundColor: '#FEE2E2' },
   badgeGray: { color: '#64748B', backgroundColor: '#F1F5F9' },
-  linkChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5, alignSelf: 'flex-start' },
-  linkText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  linkChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignSelf: 'flex-start' },
+  linkText: { color: colors.primary, fontSize: 11.5, fontWeight: '500' },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  jobEditIconBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#EAF2FF' },
-  smallGreenBtn: { backgroundColor: '#E9F8F1', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  smallGreenText: { color: '#16885A', fontSize: 11, fontWeight: '700' },
-  smallRedBtn: { backgroundColor: '#FEE2E2', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  smallRedText: { color: '#B91C1C', fontSize: 11, fontWeight: '700' },
-  deleteBtn: { backgroundColor: '#FEE2E2', minHeight: 44, paddingHorizontal: 18, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  transitionBox: { backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 12, padding: 11, gap: 8, marginTop: 4 },
-  historyRow: { backgroundColor: '#F8FAFC', borderColor: colors.border, borderWidth: 1, borderRadius: 10, padding: 9, gap: 2 },
+  jobEditIconBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#EAF2FF' },
+  smallGreenBtn: { backgroundColor: '#E9F8F1', paddingHorizontal: 11, paddingVertical: 6.5, borderRadius: 8 },
+  smallGreenText: { color: '#16885A', fontSize: 11.5, fontWeight: '600' },
+  smallRedBtn: { backgroundColor: '#FEE2E2', paddingHorizontal: 11, paddingVertical: 6.5, borderRadius: 8 },
+  smallRedText: { color: '#B91C1C', fontSize: 11.5, fontWeight: '600' },
+  deleteBtn: { backgroundColor: '#FEE2E2', minHeight: 44, paddingHorizontal: 18, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  transitionBox: { backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, gap: 8, marginTop: 4 },
+  historyRow: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 10, gap: 2 },
   detailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  backBtn: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  backBtnText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingBottom: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  infoVal: { color: colors.ink, fontSize: 12, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
-  infoValLeft: { color: colors.ink, fontSize: 12, lineHeight: 18 },
-  skillChip: { backgroundColor: '#EAF2FF', color: colors.primary, fontSize: 10, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, overflow: 'hidden' },
+  backBtn: { ...HAIRLINE_CARD, paddingHorizontal: 12, paddingVertical: 8 },
+  backBtnText: { color: '#111827', fontSize: 12.5, fontWeight: '600' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  infoVal: { color: '#111827', fontSize: 13.5, fontWeight: '500', flexShrink: 1, textAlign: 'right' },
+  infoValLeft: { color: '#374151', fontSize: 13, lineHeight: 19 },
+  skillChip: { backgroundColor: '#EAF2FF', color: colors.primary, fontSize: 11, fontWeight: '500', paddingHorizontal: 9, paddingVertical: 3.5, borderRadius: 99, overflow: 'hidden' },
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
-  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '90%' },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
-  departmentDropdownButton: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  departmentDropdownText: { color: colors.ink, fontSize: 12, flexShrink: 1 },
-  departmentPlaceholder: { color: colors.muted },
-  departmentDropdownMenu: { maxHeight: 150, marginTop: 4, borderColor: colors.border, borderWidth: 1, borderRadius: 10, backgroundColor: colors.white, overflow: 'hidden' },
-  departmentDropdownOption: { paddingHorizontal: 9, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  departmentEmptyText: { color: colors.muted, fontSize: 11, padding: 9 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '90%' },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  closeText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
+  field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
+  departmentDropdownButton: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  departmentDropdownText: { color: '#111827', fontSize: 13.5, flexShrink: 1 },
+  departmentPlaceholder: { color: '#94A3B8' },
+  departmentDropdownMenu: { maxHeight: 150, marginTop: 4, borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, backgroundColor: colors.white, overflow: 'hidden' },
+  departmentDropdownOption: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  departmentEmptyText: { color: '#6B7280', fontSize: 12, padding: 10 },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  chip: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  chipTextActive: { color: colors.white },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  chipText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
   disabled: { opacity: 0.45 },
 });

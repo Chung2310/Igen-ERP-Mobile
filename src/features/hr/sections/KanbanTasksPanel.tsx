@@ -1,4 +1,5 @@
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -49,6 +50,7 @@ import {
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   createKanbanProject,
@@ -1070,8 +1072,9 @@ export function KanbanTasksPanel({
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -1099,11 +1102,6 @@ export function KanbanTasksPanel({
             <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.secondaryActionText}>Dự án</Text></View>
           </Pressable>
         ) : null}
-        {canManageTasks && (
-        <Pressable onPress={() => openCreateTask('')} style={styles.primaryBtn}>
-          <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Việc</Text></View>
-        </Pressable>
-        )}
       </View>
 
       {/* Scope Filter: Tất cả | Theo dự án | Không dự án | KPI tháng */}
@@ -1212,7 +1210,7 @@ export function KanbanTasksPanel({
                     </Card>
                   </View>
 
-                  <View style={styles.groupsWrap}>
+                  <View style={styles.kpiList}>
                     {visibleRows.map((row) => {
                       const pct = row.percent;
                       const pctColor =
@@ -1415,512 +1413,458 @@ export function KanbanTasksPanel({
         </>
       )}
 
-      {/* Create / Edit Task Modal */}
-      <Modal
+      {/* Create / Edit Task Full-Screen Page */}
+      <FullScreenFormModal
         visible={taskModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
+        title={editingTask ? 'Chi tiết & sửa công việc' : 'Giao việc mới'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveTask()}
+        saving={savingTask || uploadingTaskAttachment || recordingTaskAudio}
+        onClose={() => {
           if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
         }}
       >
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => {
-            if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
-          }}
-        >
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>
-                {editingTask ? 'Chi tiết & sửa công việc' : 'Giao việc mới'}
+        <View style={styles.form}>
+          <Text style={styles.label}>Tên công việc *</Text>
+          <TextInput
+            value={taskTitle}
+            onChangeText={setTaskTitle}
+            placeholder="Nhập tiêu đề công việc..."
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Thuộc dự án</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 6, marginBottom: 4 }}
+          >
+            <Pressable
+              onPress={() => setTaskProjectId('')}
+              style={[styles.chip, !taskProjectId && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, !taskProjectId && styles.chipTextActive]}>
+                Không thuộc dự án
               </Text>
+            </Pressable>
+            {projects.map((p) => (
               <Pressable
-                onPress={() => {
-                  if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
-                }}
-                hitSlop={8}
+                key={p.id}
+                onPress={() => setTaskProjectId(p.id)}
+                style={[styles.chip, taskProjectId === p.id && styles.chipActive]}
               >
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
-              <View style={styles.form}>
-                <Text style={styles.label}>Tên công việc *</Text>
-                <TextInput
-                  value={taskTitle}
-                  onChangeText={setTaskTitle}
-                  placeholder="Nhập tiêu đề công việc..."
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <Text style={styles.label}>Thuộc dự án</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 6, marginBottom: 4 }}
-                >
-                  <Pressable
-                    onPress={() => setTaskProjectId('')}
-                    style={[styles.chip, !taskProjectId && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, !taskProjectId && styles.chipTextActive]}>
-                      Không thuộc dự án
-                    </Text>
-                  </Pressable>
-                  {projects.map((p) => (
-                    <Pressable
-                      key={p.id}
-                      onPress={() => setTaskProjectId(p.id)}
-                      style={[styles.chip, taskProjectId === p.id && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, taskProjectId === p.id && styles.chipTextActive]}>
-                        {p.name}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-
-                <Text style={styles.label}>Trạng thái</Text>
-                <View style={styles.wrapRow}>
-                  {STATUS_META.map((st) => (
-                    <Pressable
-                      key={st.key}
-                      onPress={() => setTaskStatus(st.key)}
-                      style={[styles.chip, taskStatus === st.key && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, taskStatus === st.key && styles.chipTextActive]}>
-                        {st.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.label}>Độ ưu tiên</Text>
-                <View style={styles.wrapRow}>
-                  {PRIORITY_OPTIONS.map((p) => (
-                    <Pressable
-                      key={p.key}
-                      onPress={() => setTaskPriority(p.key)}
-                      style={[styles.chip, taskPriority === p.key && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, taskPriority === p.key && styles.chipTextActive]}>
-                        {p.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.label}>Người thực hiện</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 6, marginBottom: 4 }}
-                >
-                  {employees.slice(0, 25).map((emp) => {
-                    const uid = emp.uid || emp._id || emp.id || '';
-                    const active = taskAssigneeUid === uid;
-                    return (
-                      <Pressable
-                        key={uid}
-                        onPress={() => setTaskAssigneeUid(uid)}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {emp.displayName}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-
-                <Text style={styles.label}>Phân loại</Text>
-                <View style={styles.wrapRow}>
-                  {TASK_CATEGORIES.map((cat) => (
-                    <Pressable
-                      key={cat}
-                      onPress={() => setTaskCategory(cat)}
-                      style={[styles.chip, taskCategory === cat && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, taskCategory === cat && styles.chipTextActive]}>
-                        {cat}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                {taskCategory === 'Bán hàng' ? (
-                  <>
-                    <Text style={styles.label}>Chỉ tiêu doanh số KPI (VNĐ)</Text>
-                    <TextInput
-                      value={taskSalesKpiTarget}
-                      onChangeText={setTaskSalesKpiTarget}
-                      keyboardType="numeric"
-                      placeholder="VD: 50000000"
-                      placeholderTextColor={colors.muted}
-                      style={styles.field}
-                    />
-                  </>
-                ) : null}
-
-                <Text style={styles.label}>Hạn chót *</Text>
-                <Pressable style={styles.dateTimeField} onPress={() => openDatePicker('taskDue')}>
-                  <CalendarDays size={16} color={colors.primary} />
-                  <Text numberOfLines={1} style={taskDueDate ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                    {taskDueDate ? formatTaskDateTime(taskDueDate) : 'Chọn ngày và giờ'}
-                  </Text>
-                  <ChevronRight size={16} color={colors.muted} />
-                </Pressable>
-
-                <Text style={styles.label}>Thời gian bắt đầu</Text>
-                <View style={styles.dateTimeInputRow}>
-                  <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('taskStart')}>
-                    <Clock3 size={16} color={colors.primary} />
-                    <Text numberOfLines={1} style={taskStartTime ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                      {taskStartTime ? formatTaskDateTime(taskStartTime) : 'Chọn ngày và giờ'}
-                    </Text>
-                    <ChevronRight size={16} color={colors.muted} />
-                  </Pressable>
-                  {taskStartTime ? (
-                    <Pressable onPress={() => setTaskStartTime('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa thời gian bắt đầu">
-                      <X size={15} color={colors.muted} />
-                    </Pressable>
-                  ) : null}
-                </View>
-
-                <Text style={styles.label}>Giờ dự tính</Text>
-                <TextInput
-                  value={taskEstTime}
-                  onChangeText={setTaskEstTime}
-                  keyboardType="numeric"
-                  placeholder="VD: 4"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <Text style={styles.label}>Link / Ghi chú</Text>
-                <TextInput
-                  value={taskLinkNote}
-                  onChangeText={setTaskLinkNote}
-                  placeholder="Link tài liệu hoặc ghi chú..."
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <Text style={styles.label}>Tệp đính kèm</Text>
-                {taskAttachments.map((attachment) => (
-                  <View key={attachment.id} style={styles.attachmentRow}>
-                    {attachment.type === 'audio' ? <Mic size={15} color="#7754C8" /> : null}
-                    {attachment.type === 'video' ? <Video size={15} color="#B42318" /> : null}
-                    {attachment.type === 'link' ? <Link2 size={15} color={colors.primary} /> : null}
-                    {attachment.type === 'file' || attachment.type === 'image' ? <FileText size={15} color={colors.primary} /> : null}
-                    <Pressable
-                      style={styles.attachmentNameButton}
-                      onPress={() => void Linking.openURL(attachment.url).catch(() => Alert.alert('Không mở được tệp', 'Hãy thử lại sau.'))}
-                    >
-                      <Text numberOfLines={1} style={styles.attachmentName}>{attachment.name}</Text>
-                      <Text style={styles.attachmentMeta}>
-                        {attachment.type.toUpperCase()}{attachment.size ? ` · ${(attachment.size / (1024 * 1024)).toFixed(1)} MB` : ''}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityLabel={`Gỡ ${attachment.name}`}
-                      hitSlop={8}
-                      onPress={() => setTaskAttachments((current) => current.filter((item) => item.id !== attachment.id))}
-                      style={styles.attachmentRemove}
-                    >
-                      <X size={15} color="#B42318" />
-                    </Pressable>
-                  </View>
-                ))}
-                <View style={styles.attachmentActions}>
-                  <Pressable
-                    onPress={() => void pickTaskAttachments()}
-                    disabled={uploadingTaskAttachment || recordingTaskAudio}
-                    style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-                  >
-                    <Paperclip size={14} color={colors.primary} />
-                    <Text style={styles.attachmentActionText}>Chọn tệp</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => void (recordingTaskAudio ? stopTaskAudioRecording() : recordTaskAudio())}
-                    disabled={uploadingTaskAttachment}
-                    style={[styles.attachmentAction, recordingTaskAudio && styles.recordingAction, uploadingTaskAttachment && styles.disabled]}
-                  >
-                    {recordingTaskAudio ? <Square size={13} color="#B42318" /> : <Mic size={14} color={colors.primary} />}
-                    <Text style={[styles.attachmentActionText, recordingTaskAudio && styles.recordingActionText]}>
-                      {recordingTaskAudio ? 'Dừng ghi âm' : 'Ghi âm'}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => void recordTaskVideo()}
-                    disabled={uploadingTaskAttachment || recordingTaskAudio}
-                    style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-                  >
-                    <Video size={14} color={colors.primary} />
-                    <Text style={styles.attachmentActionText}>Ghi hình</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.attachmentLinkRow}>
-                  <TextInput
-                    value={taskAttachmentLinkDraft}
-                    onChangeText={setTaskAttachmentLinkDraft}
-                    autoCapitalize="none"
-                    keyboardType="url"
-                    placeholder="Link tài liệu (https://...)"
-                    placeholderTextColor={colors.muted}
-                    style={[styles.field, styles.attachmentLinkInput]}
-                  />
-                  <Pressable
-                    onPress={addTaskAttachmentLink}
-                    disabled={uploadingTaskAttachment || recordingTaskAudio}
-                    style={[styles.addAttachmentLink, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-                  >
-                    <Link2 size={14} color={colors.white} />
-                    <Text style={styles.addAttachmentLinkText}>Thêm</Text>
-                  </Pressable>
-                </View>
-                {uploadingTaskAttachment ? (
-                  <View style={styles.attachmentUploading}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={styles.attachmentMeta}>Đang tải tệp lên...</Text>
-                  </View>
-                ) : null}
-
-                <Pressable
-                  disabled={savingTask || uploadingTaskAttachment || recordingTaskAudio}
-                  onPress={() => void onSaveTask()}
-                  style={[styles.submitBtn, (savingTask || uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {savingTask ? 'Đang lưu...' : editingTask ? 'Lưu thay đổi' : 'Tạo công việc'}
-                  </Text>
-                </Pressable>
-
-                {editingTask && canManageTasks ? (
-                  <Pressable
-                    onPress={() => onDeleteTask(editingTask)}
-                    style={styles.deleteBtn}
-                  >
-                    <Text style={styles.deleteBtnText}>Xóa công việc</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Báo cáo tiến độ / yêu cầu trợ giúp */}
-      <Modal
-        visible={activityMode !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
-      >
-        <Pressable
-          style={styles.backdrop}
-          onPress={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
-        >
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <View style={styles.activityModalHeading}>
-                {activityMode === 'progress' ? <Sliders size={18} color={colors.primary} /> : <LifeBuoy size={18} color="#B42318" />}
-                <Text style={styles.sheetTitle}>
-                  {activityMode === 'progress' ? 'Báo cáo tiến độ công việc' : 'Yêu cầu trợ giúp công việc'}
+                <Text style={[styles.chipText, taskProjectId === p.id && styles.chipTextActive]}>
+                  {p.name}
                 </Text>
-              </View>
-              <Pressable
-                onPress={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
-                hitSlop={8}
-              >
-                <Text style={styles.closeText}>Đóng</Text>
               </Pressable>
-            </View>
-            {activityTask ? <Text numberOfLines={2} style={styles.activityTaskTitle}>{activityTask.title}</Text> : null}
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-              <View style={styles.form}>
-                {activityMode === 'progress' ? (
-                  <>
-                    <View style={styles.progressEditorSummary}>
-                      <Text style={styles.label}>Tiến độ hoàn thành</Text>
-                      <Text style={styles.progressEditorPercent}>{activityProgress}%</Text>
-                    </View>
-                    <TextInput
-                      value={String(activityProgress)}
-                      onChangeText={(value) => {
-                        const digits = value.replace(/[^0-9]/g, '').slice(0, 3);
-                        if (!digits) { setActivityProgress(0); return; }
-                        setActivityProgress(Math.min(100, Number(digits)));
-                      }}
-                      keyboardType="number-pad"
-                      maxLength={3}
-                      selectTextOnFocus
-                      accessibilityLabel="Tiến độ phần trăm"
-                      style={styles.progressPercentInput}
-                    />
-                    <View style={styles.wrapRow}>
-                      {[0, 25, 50, 75, 100].map((value) => (
-                        <Pressable
-                          key={value}
-                          onPress={() => setActivityProgress(value)}
-                          style={[styles.chip, activityProgress === value && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, activityProgress === value && styles.chipTextActive]}>{value}%</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <Text style={styles.label}>Nội dung báo cáo *</Text>
-                    <TextInput
-                      value={activityNote}
-                      onChangeText={setActivityNote}
-                      multiline
-                      maxLength={2000}
-                      placeholder="Mô tả kết quả đã hoàn thành hoặc vướng mắc..."
-                      placeholderTextColor={colors.muted}
-                      style={[styles.field, styles.activityNoteField]}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.label}>Chọn người hỗ trợ</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
-                      <Pressable
-                        onPress={() => setActivityHelperUid('')}
-                        style={[styles.chip, !activityHelperUid && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, !activityHelperUid && styles.chipTextActive]}>Cả nhóm</Text>
-                      </Pressable>
-                      {employees
-                        .filter((employee) => {
-                          const uid = employee.id || employee._id || employee.uid || '';
-                          return uid && uid !== currentUid && uid !== activityTask?.assigneeUid;
-                        })
-                        .map((employee) => {
-                          const uid = employee.id || employee._id || employee.uid || '';
-                          const selected = activityHelperUid === uid;
-                          return (
-                            <Pressable
-                              key={uid}
-                              onPress={() => setActivityHelperUid(uid)}
-                              style={[styles.chip, selected && styles.chipActive]}
-                            >
-                              <Text style={[styles.chipText, selected && styles.chipTextActive]}>{employee.displayName}</Text>
-                            </Pressable>
-                          );
-                        })}
-                    </ScrollView>
-                    <Text style={styles.helpHint}>Để cả nhóm nhận thông báo hoặc chọn một người hỗ trợ cụ thể.</Text>
-                    <Text style={styles.label}>Nguyên nhân cần trợ giúp *</Text>
-                    <TextInput
-                      value={activityNote}
-                      onChangeText={setActivityNote}
-                      multiline
-                      maxLength={2000}
-                      placeholder="Mô tả vướng mắc hoặc hỗ trợ bạn cần..."
-                      placeholderTextColor={colors.muted}
-                      style={[styles.field, styles.activityNoteField]}
-                    />
-                  </>
-                )}
-                <Text style={styles.activityCharCount}>{activityNote.length}/2000 ký tự</Text>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.label}>Trạng thái</Text>
+          <View style={styles.wrapRow}>
+            {STATUS_META.map((st) => (
+              <Pressable
+                key={st.key}
+                onPress={() => setTaskStatus(st.key)}
+                style={[styles.chip, taskStatus === st.key && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, taskStatus === st.key && styles.chipTextActive]}>
+                  {st.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Độ ưu tiên</Text>
+          <View style={styles.wrapRow}>
+            {PRIORITY_OPTIONS.map((p) => (
+              <Pressable
+                key={p.key}
+                onPress={() => setTaskPriority(p.key)}
+                style={[styles.chip, taskPriority === p.key && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, taskPriority === p.key && styles.chipTextActive]}>
+                  {p.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Người thực hiện</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 6, marginBottom: 4 }}
+          >
+            {employees.slice(0, 25).map((emp) => {
+              const uid = emp.uid || emp._id || emp.id || '';
+              const active = taskAssigneeUid === uid;
+              return (
                 <Pressable
-                  onPress={() => void saveTaskActivity()}
-                  disabled={savingActivity || !activityNote.trim()}
-                  style={[styles.submitBtn, (savingActivity || !activityNote.trim()) && styles.disabled]}
+                  key={uid}
+                  onPress={() => setTaskAssigneeUid(uid)}
+                  style={[styles.chip, active && styles.chipActive]}
                 >
-                  <Text style={styles.submitBtnText}>
-                    {savingActivity ? 'Đang lưu...' : activityMode === 'progress' ? 'Lưu báo cáo tiến độ' : 'Gửi yêu cầu trợ giúp'}
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {emp.displayName}
                   </Text>
                 </Pressable>
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+              );
+            })}
+          </ScrollView>
 
-      {/* Create / Edit Project Modal */}
-      <Modal
-        visible={projectModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setProjectModalOpen(false)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setProjectModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>
-                {editingProject ? 'Chỉnh sửa dự án' : 'Tạo dự án mới'}
-              </Text>
-              <Pressable onPress={() => setProjectModalOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
+          <Text style={styles.label}>Phân loại</Text>
+          <View style={styles.wrapRow}>
+            {TASK_CATEGORIES.map((cat) => (
+              <Pressable
+                key={cat}
+                onPress={() => setTaskCategory(cat)}
+                style={[styles.chip, taskCategory === cat && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, taskCategory === cat && styles.chipTextActive]}>
+                  {cat}
+                </Text>
               </Pressable>
-            </View>
-            <View style={styles.form}>
-              <Text style={styles.label}>Tên dự án *</Text>
+            ))}
+          </View>
+
+          {taskCategory === 'Bán hàng' ? (
+            <>
+              <Text style={styles.label}>Chỉ tiêu doanh số KPI (VNĐ)</Text>
               <TextInput
-                value={projName}
-                onChangeText={setProjName}
-                placeholder="VD: Triển khai ERP Q4"
+                value={taskSalesKpiTarget}
+                onChangeText={setTaskSalesKpiTarget}
+                keyboardType="numeric"
+                placeholder="VD: 50000000"
                 placeholderTextColor={colors.muted}
                 style={styles.field}
               />
+            </>
+          ) : null}
 
-              <Text style={styles.label}>Độ ưu tiên</Text>
+          <Text style={styles.label}>Hạn chót *</Text>
+          <Pressable style={styles.dateTimeField} onPress={() => openDatePicker('taskDue')}>
+            <CalendarDays size={16} color={colors.primary} />
+            <Text numberOfLines={1} style={taskDueDate ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+              {taskDueDate ? formatTaskDateTime(taskDueDate) : 'Chọn ngày và giờ'}
+            </Text>
+            <ChevronRight size={16} color={colors.muted} />
+          </Pressable>
+
+          <Text style={styles.label}>Thời gian bắt đầu</Text>
+          <View style={styles.dateTimeInputRow}>
+            <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('taskStart')}>
+              <Clock3 size={16} color={colors.primary} />
+              <Text numberOfLines={1} style={taskStartTime ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+                {taskStartTime ? formatTaskDateTime(taskStartTime) : 'Chọn ngày và giờ'}
+              </Text>
+              <ChevronRight size={16} color={colors.muted} />
+            </Pressable>
+            {taskStartTime ? (
+              <Pressable onPress={() => setTaskStartTime('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa thời gian bắt đầu">
+                <X size={15} color={colors.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <Text style={styles.label}>Giờ dự tính</Text>
+          <TextInput
+            value={taskEstTime}
+            onChangeText={setTaskEstTime}
+            keyboardType="numeric"
+            placeholder="VD: 4"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Link / Ghi chú</Text>
+          <TextInput
+            value={taskLinkNote}
+            onChangeText={setTaskLinkNote}
+            placeholder="Link tài liệu hoặc ghi chú..."
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Tệp đính kèm</Text>
+          {taskAttachments.map((attachment) => (
+            <View key={attachment.id} style={styles.attachmentRow}>
+              {attachment.type === 'audio' ? <Mic size={15} color="#7754C8" /> : null}
+              {attachment.type === 'video' ? <Video size={15} color="#B42318" /> : null}
+              {attachment.type === 'link' ? <Link2 size={15} color={colors.primary} /> : null}
+              {attachment.type === 'file' || attachment.type === 'image' ? <FileText size={15} color={colors.primary} /> : null}
+              <Pressable
+                style={styles.attachmentNameButton}
+                onPress={() => void Linking.openURL(attachment.url).catch(() => Alert.alert('Không mở được tệp', 'Hãy thử lại sau.'))}
+              >
+                <Text numberOfLines={1} style={styles.attachmentName}>{attachment.name}</Text>
+                <Text style={styles.attachmentMeta}>
+                  {attachment.type.toUpperCase()}{attachment.size ? ` · ${(attachment.size / (1024 * 1024)).toFixed(1)} MB` : ''}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityLabel={`Gỡ ${attachment.name}`}
+                hitSlop={8}
+                onPress={() => setTaskAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                style={styles.attachmentRemove}
+              >
+                <X size={15} color="#B42318" />
+              </Pressable>
+            </View>
+          ))}
+          <View style={styles.attachmentActions}>
+            <Pressable
+              onPress={() => void pickTaskAttachments()}
+              disabled={uploadingTaskAttachment || recordingTaskAudio}
+              style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+            >
+              <Paperclip size={14} color={colors.primary} />
+              <Text style={styles.attachmentActionText}>Chọn tệp</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void (recordingTaskAudio ? stopTaskAudioRecording() : recordTaskAudio())}
+              disabled={uploadingTaskAttachment}
+              style={[styles.attachmentAction, recordingTaskAudio && styles.recordingAction, uploadingTaskAttachment && styles.disabled]}
+            >
+              {recordingTaskAudio ? <Square size={13} color="#B42318" /> : <Mic size={14} color={colors.primary} />}
+              <Text style={[styles.attachmentActionText, recordingTaskAudio && styles.recordingActionText]}>
+                {recordingTaskAudio ? 'Dừng ghi âm' : 'Ghi âm'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void recordTaskVideo()}
+              disabled={uploadingTaskAttachment || recordingTaskAudio}
+              style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+            >
+              <Video size={14} color={colors.primary} />
+              <Text style={styles.attachmentActionText}>Ghi hình</Text>
+            </Pressable>
+          </View>
+          <View style={styles.attachmentLinkRow}>
+            <TextInput
+              value={taskAttachmentLinkDraft}
+              onChangeText={setTaskAttachmentLinkDraft}
+              autoCapitalize="none"
+              keyboardType="url"
+              placeholder="Link tài liệu (https://...)"
+              placeholderTextColor={colors.muted}
+              style={[styles.field, styles.attachmentLinkInput]}
+            />
+            <Pressable
+              onPress={addTaskAttachmentLink}
+              disabled={uploadingTaskAttachment || recordingTaskAudio}
+              style={[styles.addAttachmentLink, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+            >
+              <Link2 size={14} color={colors.white} />
+              <Text style={styles.addAttachmentLinkText}>Thêm</Text>
+            </Pressable>
+          </View>
+          {uploadingTaskAttachment ? (
+            <View style={styles.attachmentUploading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.attachmentMeta}>Đang tải tệp lên...</Text>
+            </View>
+          ) : null}
+
+          <Pressable
+            disabled={savingTask || uploadingTaskAttachment || recordingTaskAudio}
+            onPress={() => void onSaveTask()}
+            style={[styles.submitBtn, (savingTask || uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingTask ? 'Đang lưu...' : editingTask ? 'Lưu thay đổi' : 'Tạo công việc'}
+            </Text>
+          </Pressable>
+
+          {editingTask && canManageTasks ? (
+            <Pressable
+              onPress={() => onDeleteTask(editingTask)}
+              style={styles.deleteBtn}
+            >
+              <Text style={styles.deleteBtnText}>Xóa công việc</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </FullScreenFormModal>
+
+      {/* Báo cáo tiến độ / yêu cầu trợ giúp */}
+      <FullScreenFormModal
+        visible={activityMode !== null}
+        title={activityMode === 'progress' ? 'Báo cáo tiến độ công việc' : 'Yêu cầu trợ giúp công việc'}
+        cancelLabel="Hủy"
+        onSave={() => void saveTaskActivity()}
+        saving={savingActivity}
+        onClose={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
+      >
+        <View style={styles.form}>
+          {activityTask ? <Text numberOfLines={2} style={styles.activityTaskTitle}>{activityTask.title}</Text> : null}
+          {activityMode === 'progress' ? (
+            <>
+              <View style={styles.progressEditorSummary}>
+                <Text style={styles.label}>Tiến độ hoàn thành</Text>
+                <Text style={styles.progressEditorPercent}>{activityProgress}%</Text>
+              </View>
+              <TextInput
+                value={String(activityProgress)}
+                onChangeText={(value) => {
+                  const digits = value.replace(/[^0-9]/g, '').slice(0, 3);
+                  if (!digits) { setActivityProgress(0); return; }
+                  setActivityProgress(Math.min(100, Number(digits)));
+                }}
+                keyboardType="number-pad"
+                maxLength={3}
+                selectTextOnFocus
+                accessibilityLabel="Tiến độ phần trăm"
+                style={styles.progressPercentInput}
+              />
               <View style={styles.wrapRow}>
-                {(['high', 'medium', 'low'] as const).map((p) => (
+                {[0, 25, 50, 75, 100].map((value) => (
                   <Pressable
-                    key={p}
-                    onPress={() => setProjPriority(p)}
-                    style={[styles.chip, projPriority === p && styles.chipActive]}
+                    key={value}
+                    onPress={() => setActivityProgress(value)}
+                    style={[styles.chip, activityProgress === value && styles.chipActive]}
                   >
-                    <Text style={[styles.chipText, projPriority === p && styles.chipTextActive]}>
-                      {p === 'high' ? 'Cao' : p === 'low' ? 'Thấp' : 'Trung bình'}
-                    </Text>
+                    <Text style={[styles.chipText, activityProgress === value && styles.chipTextActive]}>{value}%</Text>
                   </Pressable>
                 ))}
               </View>
-
-              <Text style={styles.label}>Hạn hoàn thành</Text>
-              <View style={styles.dateTimeInputRow}>
-                <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('projectDue')}>
-                  <CalendarDays size={16} color={colors.primary} />
-                  <Text numberOfLines={1} style={projDueAt ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                    {projDueAt ? formatProjectDate(projDueAt) : 'Chọn ngày'}
-                  </Text>
-                  <ChevronRight size={16} color={colors.muted} />
+              <Text style={styles.label}>Nội dung báo cáo *</Text>
+              <TextInput
+                value={activityNote}
+                onChangeText={setActivityNote}
+                multiline
+                maxLength={2000}
+                placeholder="Mô tả kết quả đã hoàn thành hoặc vướng mắc..."
+                placeholderTextColor={colors.muted}
+                style={[styles.field, styles.activityNoteField]}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>Chọn người hỗ trợ</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
+                <Pressable
+                  onPress={() => setActivityHelperUid('')}
+                  style={[styles.chip, !activityHelperUid && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, !activityHelperUid && styles.chipTextActive]}>Cả nhóm</Text>
                 </Pressable>
-                {projDueAt ? (
-                  <Pressable onPress={() => setProjDueAt('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa hạn hoàn thành">
-                    <X size={15} color={colors.muted} />
-                  </Pressable>
-                ) : null}
-              </View>
+                {employees
+                  .filter((employee) => {
+                    const uid = employee.id || employee._id || employee.uid || '';
+                    return uid && uid !== currentUid && uid !== activityTask?.assigneeUid;
+                  })
+                  .map((employee) => {
+                    const uid = employee.id || employee._id || employee.uid || '';
+                    const selected = activityHelperUid === uid;
+                    return (
+                      <Pressable
+                        key={uid}
+                        onPress={() => setActivityHelperUid(uid)}
+                        style={[styles.chip, selected && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, selected && styles.chipTextActive]}>{employee.displayName}</Text>
+                      </Pressable>
+                    );
+                  })}
+              </ScrollView>
+              <Text style={styles.helpHint}>Để cả nhóm nhận thông báo hoặc chọn một người hỗ trợ cụ thể.</Text>
+              <Text style={styles.label}>Nguyên nhân cần trợ giúp *</Text>
+              <TextInput
+                value={activityNote}
+                onChangeText={setActivityNote}
+                multiline
+                maxLength={2000}
+                placeholder="Mô tả vướng mắc hoặc hỗ trợ bạn cần..."
+                placeholderTextColor={colors.muted}
+                style={[styles.field, styles.activityNoteField]}
+              />
+            </>
+          )}
+          <Text style={styles.activityCharCount}>{activityNote.length}/2000 ký tự</Text>
+          <Pressable
+            onPress={() => void saveTaskActivity()}
+            disabled={savingActivity || !activityNote.trim()}
+            style={[styles.submitBtn, (savingActivity || !activityNote.trim()) && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingActivity ? 'Đang lưu...' : activityMode === 'progress' ? 'Lưu báo cáo tiến độ' : 'Gửi yêu cầu trợ giúp'}
+            </Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
 
+      {/* Create / Edit Project Full-Screen Page */}
+      <FullScreenFormModal
+        visible={projectModalOpen}
+        title={editingProject ? 'Chỉnh sửa dự án' : 'Tạo dự án mới'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveProject()}
+        saving={savingProj}
+        onClose={() => setProjectModalOpen(false)}
+      >
+        <View style={styles.form}>
+          <Text style={styles.label}>Tên dự án *</Text>
+          <TextInput
+            value={projName}
+            onChangeText={setProjName}
+            placeholder="VD: Triển khai ERP Q4"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Độ ưu tiên</Text>
+          <View style={styles.wrapRow}>
+            {(['high', 'medium', 'low'] as const).map((p) => (
               <Pressable
-                disabled={savingProj}
-                onPress={() => void onSaveProject()}
-                style={[styles.submitBtn, savingProj && styles.disabled]}
+                key={p}
+                onPress={() => setProjPriority(p)}
+                style={[styles.chip, projPriority === p && styles.chipActive]}
               >
-                <Text style={styles.submitBtnText}>
-                  {savingProj ? 'Đang lưu...' : editingProject ? 'Cập nhật dự án' : 'Tạo dự án'}
+                <Text style={[styles.chipText, projPriority === p && styles.chipTextActive]}>
+                  {p === 'high' ? 'Cao' : p === 'low' ? 'Thấp' : 'Trung bình'}
                 </Text>
               </Pressable>
+            ))}
+          </View>
 
-              {editingProject && canManageTasks ? (
-                <Pressable
-                  onPress={() => onDeleteProject(editingProject)}
-                  style={styles.deleteBtn}
-                >
-                  <Text style={styles.deleteBtnText}>Xóa dự án</Text>
-                </Pressable>
-              ) : null}
-            </View>
+          <Text style={styles.label}>Hạn hoàn thành</Text>
+          <View style={styles.dateTimeInputRow}>
+            <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('projectDue')}>
+              <CalendarDays size={16} color={colors.primary} />
+              <Text numberOfLines={1} style={projDueAt ? styles.dateTimeValue : styles.dateTimePlaceholder}>
+                {projDueAt ? formatProjectDate(projDueAt) : 'Chọn ngày'}
+              </Text>
+              <ChevronRight size={16} color={colors.muted} />
+            </Pressable>
+            {projDueAt ? (
+              <Pressable onPress={() => setProjDueAt('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa hạn hoàn thành">
+                <X size={15} color={colors.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <Pressable
+            disabled={savingProj}
+            onPress={() => void onSaveProject()}
+            style={[styles.submitBtn, savingProj && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingProj ? 'Đang lưu...' : editingProject ? 'Cập nhật dự án' : 'Tạo dự án'}
+            </Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+
+          {editingProject && canManageTasks ? (
+            <Pressable
+              onPress={() => onDeleteProject(editingProject)}
+              style={styles.deleteBtn}
+            >
+              <Text style={styles.deleteBtnText}>Xóa dự án</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS === 'ios' && activeDatePicker ? (
         <Modal
@@ -1970,54 +1914,73 @@ export function KanbanTasksPanel({
         </Modal>
       ) : null}
     </ScrollView>
+    {canManageTasks ? <HrFab label="Thêm công việc" onPress={() => openCreateTask('')} /> : null}
+    </View>
   );
 }
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
+} as const;
+
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 18, paddingBottom: 28 },
-  topActions: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 10 },
+  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   search: {
     flex: 1,
-    backgroundColor: colors.white,
-    borderColor: colors.border,
+    backgroundColor: '#F6F8FC',
+    borderColor: '#DCE5F2',
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 12,
-    color: colors.ink,
+    borderRadius: 99,
+    paddingHorizontal: 14,
+    height: 40,
+    fontSize: 13.5,
+    color: '#111827',
   },
-  primaryBtn: { backgroundColor: colors.primary, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
-  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  primaryBtn: { backgroundColor: colors.primary, minHeight: 40, paddingHorizontal: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   iconButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  secondaryActionBtn: { backgroundColor: '#EAF2FF', borderColor: '#D6E5FF', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 9, borderRadius: 10 },
-  secondaryActionText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  scopeBar: { flexDirection: 'row', backgroundColor: '#EAF0F8', borderRadius: 11, padding: 3, gap: 3, marginBottom: 10 },
-  scopeBtn: { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
+  secondaryActionBtn: { ...HAIRLINE_CARD, minHeight: 40, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center' },
+  secondaryActionText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  scopeBar: { flexDirection: 'row', backgroundColor: '#EAF1FA', borderRadius: 10, padding: 3, gap: 3, marginBottom: 10 },
+  scopeBtn: { flex: 1, paddingVertical: 7.5, borderRadius: 8, alignItems: 'center' },
   scopeBtnActive: { backgroundColor: colors.white },
-  scopeText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  scopeTextActive: { color: colors.primary },
-  chipScroll: { marginHorizontal: -18, marginBottom: 12 },
-  chipRow: { paddingHorizontal: 18, gap: 6 },
-  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  scopeText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  scopeTextActive: { color: colors.primary, fontWeight: '600' },
+  chipScroll: { flexGrow: 0, marginHorizontal: -14, marginBottom: 12 },
+  chipRow: { paddingHorizontal: 14, gap: 6 },
+  chip: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  chipTextActive: { color: colors.white },
-  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
-  muted: { color: colors.muted, fontSize: 11 },
-  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
-  groupsWrap: { gap: 12 },
+  chipText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
+  stateCard: { ...HAIRLINE_CARD, padding: 22, alignItems: 'center', gap: 10 },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400' },
+  errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
+  groupsWrap: {
+    marginHorizontal: -14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+    gap: 0,
+  },
   groupCard: {
     backgroundColor: colors.white,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
     overflow: 'hidden',
   },
   groupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 13,
     gap: 10,
     backgroundColor: '#FAFBFD',
   },
@@ -2029,54 +1992,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  groupTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  groupSub: { color: colors.muted, fontSize: 10, marginTop: 2 },
-  progressTrack: { height: 5, borderRadius: 99, backgroundColor: '#E5ECF5', marginTop: 6, overflow: 'hidden' },
+  groupTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  groupSub: { color: '#6B7280', fontSize: 11.5, fontWeight: '400', marginTop: 2 },
+  progressTrack: { height: 5, borderRadius: 99, backgroundColor: '#E8EDF4', marginTop: 6, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: '#16885A', borderRadius: 99 },
   groupHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  tinyAddBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
-  tinyAddText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
-  tinyIconBtn: { width: 26, height: 26, borderRadius: 8, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  tinyIconText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  caret: { color: colors.muted, fontSize: 14, fontWeight: '800', paddingHorizontal: 2 },
-  groupBody: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  emptyGroupText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 14 },
+  tinyAddBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 },
+  tinyAddText: { color: colors.primary, fontSize: 11, fontWeight: '600' },
+  tinyIconBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  tinyIconText: { color: '#374151', fontSize: 12, fontWeight: '600' },
+  caret: { color: '#6B7280', fontSize: 14, fontWeight: '600', paddingHorizontal: 2 },
+  groupBody: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EDF2F8' },
+  emptyGroupText: { color: '#6B7280', fontSize: 12, textAlign: 'center', paddingVertical: 14 },
   taskRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#EDF2F8',
     gap: 6,
   },
   taskRowTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-  taskTitle: { color: colors.ink, fontSize: 12, fontWeight: '700', flex: 1, lineHeight: 17 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 99 },
-  statusBadgeText: { fontSize: 9, fontWeight: '800' },
+  taskTitle: { color: '#111827', fontSize: 13.5, fontWeight: '500', flex: 1, lineHeight: 19 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8 },
+  statusBadgeText: { fontSize: 10.5, fontWeight: '500' },
   taskRowMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   taskMetaGroup: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
-  taskMetaText: { color: colors.muted, fontSize: 10, flex: 1 },
-  priorityTag: { fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 99, overflow: 'hidden' },
+  taskMetaText: { color: '#6B7280', fontSize: 11.5, flex: 1 },
+  priorityTag: { fontSize: 10, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 8, overflow: 'hidden' },
   taskProgressSummary: { gap: 2, marginTop: 1 },
   progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  taskProgressLabel: { color: colors.muted, fontSize: 9, fontWeight: '700' },
-  taskProgressPercent: { color: colors.primary, fontSize: 10, fontWeight: '800' },
-  progressNote: { color: colors.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
-  helpNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, padding: 9, borderRadius: 10, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FFF1F0' },
-  helpNoticeTitle: { color: '#B42318', fontSize: 10, fontWeight: '800' },
-  helpNoticeText: { color: '#7F1D1D', fontSize: 10, lineHeight: 14, marginTop: 2 },
+  taskProgressLabel: { color: '#6B7280', fontSize: 10.5, fontWeight: '500' },
+  taskProgressPercent: { color: colors.primary, fontSize: 11, fontWeight: '600' },
+  progressNote: { color: '#6B7280', fontSize: 10.5, lineHeight: 15, marginTop: 2 },
+  helpNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, padding: 10, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#FECACA', backgroundColor: '#FFF1F0' },
+  helpNoticeTitle: { color: '#B42318', fontSize: 11, fontWeight: '600' },
+  helpNoticeText: { color: '#7F1D1D', fontSize: 11, lineHeight: 16, marginTop: 2 },
   helpersLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   taskActivityActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
-  taskActivityBtn: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 9, backgroundColor: '#EAF2FF' },
-  taskActivityBtnText: { color: colors.primary, fontSize: 9, fontWeight: '800' },
-  taskHelpBtn: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 9, backgroundColor: '#FFF1F0' },
-  taskHelpBtnText: { color: '#B42318', fontSize: 9, fontWeight: '800' },
-  taskResolveBtn: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 9, backgroundColor: '#E9F8F1' },
-  taskResolveBtnText: { color: '#16885A', fontSize: 9, fontWeight: '800' },
-  taskJoinBtn: { minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderRadius: 9, backgroundColor: '#B42318' },
-  taskJoinBtnText: { color: colors.white, fontSize: 9, fontWeight: '800' },
+  taskActivityBtn: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#EAF2FF' },
+  taskActivityBtnText: { color: colors.primary, fontSize: 10.5, fontWeight: '600' },
+  taskHelpBtn: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#FFF1F0' },
+  taskHelpBtnText: { color: '#B42318', fontSize: 10.5, fontWeight: '600' },
+  taskResolveBtn: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#E9F8F1' },
+  taskResolveBtnText: { color: '#16885A', fontSize: 10.5, fontWeight: '600' },
+  taskJoinBtn: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#B42318' },
+  taskJoinBtnText: { color: colors.white, fontSize: 10.5, fontWeight: '600' },
   kpiTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 },
-  kpiTagBox: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  kpiTag: { fontSize: 9, fontWeight: '800' },
+  kpiTagBox: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
+  kpiTag: { fontSize: 10, fontWeight: '500' },
   kpiTagOk: { backgroundColor: '#DCFCE7' },
   kpiTagOkText: { color: '#15803D' },
   kpiTagLate: { backgroundColor: '#FEE2E2' },
@@ -2085,71 +2048,91 @@ const styles = StyleSheet.create({
   kpiTagInfoText: { color: colors.primary },
 
   // Monthly KPI
-  kpiWrap: { gap: 10 },
-  kpiBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, gap: 10 },
+  kpiWrap: { gap: 9 },
+  kpiBar: { ...HAIRLINE_CARD, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, gap: 10 },
   monthNav: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  monthBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#F1F5FB', alignItems: 'center', justifyContent: 'center' },
-  monthBtnText: { color: colors.ink, fontSize: 16, fontWeight: '800', lineHeight: 18 },
-  monthLabelBox: { paddingHorizontal: 9, height: 28, borderRadius: 8, backgroundColor: '#EAF2FF', alignItems: 'center', justifyContent: 'center' },
-  monthLabelText: { color: colors.primary, fontSize: 10, fontWeight: '800' },
-  kpiSummaryRow: { flexDirection: 'row', gap: 7 },
-  kpiSummaryBox: { flex: 1, paddingVertical: 10, paddingHorizontal: 6, alignItems: 'center' },
-  kpiSummaryVal: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  kpiRowCard: { padding: 12, gap: 6 },
-  kpiPctText: { fontSize: 13, fontWeight: '800' },
+  monthBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#F5F8FD', alignItems: 'center', justifyContent: 'center' },
+  monthBtnText: { color: '#111827', fontSize: 16, fontWeight: '600', lineHeight: 18 },
+  monthLabelBox: { paddingHorizontal: 10, height: 30, borderRadius: 8, backgroundColor: '#EAF2FF', alignItems: 'center', justifyContent: 'center' },
+  monthLabelText: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
+  kpiSummaryRow: { flexDirection: 'row', gap: 8 },
+  kpiSummaryBox: { ...HAIRLINE_CARD, flex: 1, paddingVertical: 11, paddingHorizontal: 6, alignItems: 'center' },
+  kpiSummaryVal: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  kpiList: {
+    marginHorizontal: -14,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+  },
+  kpiRowCard: {
+    backgroundColor: colors.white,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 5,
+  },
+  kpiPctText: { fontSize: 14, fontWeight: '600' },
   kpiRowMetrics: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  kpiMetricText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
+  kpiMetricText: { color: '#6B7280', fontSize: 11, fontWeight: '500' },
 
   // Modals
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
-  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, maxHeight: '86%' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 18, maxHeight: '86%' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   activityModalHeading: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  activityTaskTitle: { color: colors.muted, fontSize: 11, marginBottom: 6 },
+  activityTaskTitle: { color: '#6B7280', fontSize: 12, marginBottom: 6 },
   progressEditorSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  progressEditorPercent: { color: colors.primary, fontSize: 22, fontWeight: '800' },
-  progressPercentInput: { minHeight: 44, borderWidth: 1, borderColor: colors.border, borderRadius: 11, backgroundColor: colors.background, textAlign: 'center', color: colors.ink, fontSize: 18, fontWeight: '800', paddingVertical: 6 },
+  progressEditorPercent: { color: colors.primary, fontSize: 22, fontWeight: '600' },
+  progressPercentInput: { minHeight: 44, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: '#F6F8FC', textAlign: 'center', color: '#111827', fontSize: 18, fontWeight: '600', paddingVertical: 6 },
   activityNoteField: { minHeight: 92, textAlignVertical: 'top' },
-  activityCharCount: { color: colors.muted, textAlign: 'right', fontSize: 9 },
-  helpHint: { color: colors.muted, fontSize: 10, lineHeight: 14 },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', flex: 1 },
-  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  activityCharCount: { color: '#6B7280', textAlign: 'right', fontSize: 10.5 },
+  helpHint: { color: '#6B7280', fontSize: 11.5, lineHeight: 16 },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600', flex: 1 },
+  closeText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   form: { gap: 8, paddingBottom: 10 },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
-  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
-  attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: '#FAFBFD' },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
+  field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
+  attachmentRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 10, backgroundColor: '#FAFBFD' },
   attachmentNameButton: { flex: 1, minWidth: 0 },
-  attachmentName: { color: colors.ink, fontSize: 11, fontWeight: '700' },
-  attachmentMeta: { color: colors.muted, fontSize: 9, marginTop: 2 },
+  attachmentName: { color: '#111827', fontSize: 12.5, fontWeight: '500' },
+  attachmentMeta: { color: '#6B7280', fontSize: 10.5, marginTop: 2 },
   attachmentRemove: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF1F0' },
   attachmentActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  attachmentAction: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white },
-  attachmentActionText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+  attachmentAction: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 9, backgroundColor: colors.white },
+  attachmentActionText: { color: colors.primary, fontSize: 11.5, fontWeight: '500' },
   recordingAction: { backgroundColor: '#FFF1F0', borderColor: '#FECACA' },
   recordingActionText: { color: '#B42318' },
   attachmentLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   attachmentLinkInput: { flex: 1 },
-  addAttachmentLink: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, borderRadius: 9, backgroundColor: colors.primary },
-  addAttachmentLinkText: { color: colors.white, fontSize: 10, fontWeight: '700' },
+  addAttachmentLink: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, borderRadius: 10, backgroundColor: colors.primary },
+  addAttachmentLinkText: { color: colors.white, fontSize: 11.5, fontWeight: '600' },
   attachmentUploading: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  dateTimeField: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 11, paddingVertical: 8 },
+  dateTimeField: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   dateTimeInputRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  dateTimeClear: { width: 30, height: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
-  dateTimeValue: { flex: 1, color: colors.ink, fontSize: 12 },
-  dateTimePlaceholder: { flex: 1, color: colors.muted, fontSize: 12 },
-  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.48)', justifyContent: 'center', padding: 20 },
-  pickerSheet: { backgroundColor: colors.white, borderRadius: 22, overflow: 'hidden', padding: 16 },
-  pickerTitle: { color: colors.ink, fontSize: 15, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
+  dateTimeClear: { width: 32, height: 40, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
+  dateTimeValue: { flex: 1, color: '#111827', fontSize: 13.5 },
+  dateTimePlaceholder: { flex: 1, color: '#94A3B8', fontSize: 13.5 },
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 20 },
+  pickerSheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 16 },
+  pickerTitle: { color: '#111827', fontSize: 15.5, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
   pickerActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
-  pickerCancelBtn: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 11, backgroundColor: '#F1F5F9' },
-  pickerCancelText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  pickerConfirmBtn: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 11, backgroundColor: colors.primary },
-  pickerConfirmText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  pickerCancelBtn: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, backgroundColor: '#F1F5F9' },
+  pickerCancelText: { color: '#374151', fontSize: 13, fontWeight: '600' },
+  pickerConfirmBtn: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 10, backgroundColor: colors.primary },
+  pickerConfirmText: { color: colors.white, fontSize: 13, fontWeight: '600' },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  deleteBtn: { backgroundColor: '#FCEBEC', minHeight: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  deleteBtnText: { color: '#C74848', fontSize: 12, fontWeight: '700' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
+  deleteBtn: { backgroundColor: '#FCEBEC', minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  deleteBtnText: { color: '#C74848', fontSize: 13, fontWeight: '600' },
   disabled: { opacity: 0.45 },
 });
 

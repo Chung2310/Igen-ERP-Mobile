@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import {
   ActivityIndicator,
   Alert,
@@ -320,160 +321,145 @@ function CustomerFormModal({
   };
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) onClose(); }}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {target === 'new' ? 'Thêm khách hàng' : 'Sửa hồ sơ khách hàng'}
-            </Text>
-            <Pressable
-              accessibilityLabel="Đóng"
-              disabled={busy}
-              onPress={onClose}
-              style={styles.modalCloseBtn}
-            >
-              <X size={18} color={colors.muted} />
-            </Pressable>
+    <FullScreenFormModal
+      visible
+      title={target === 'new' ? 'Thêm khách hàng' : 'Sửa hồ sơ khách hàng'}
+      onClose={() => { if (!busy) onClose(); }}
+      footer={
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Action label="Hủy" onPress={onClose} disabled={busy} />
           </View>
-          <ScrollView
-            contentContainerStyle={styles.modalBody}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+          <View style={{ flex: 1 }}>
+            <Action
+              label={busy ? 'Đang lưu…' : 'Lưu khách hàng'}
+              onPress={() => void save()}
+              primary
+              disabled={busy}
+            />
+          </View>
+        </View>
+      }
+    >
+      <View style={{ gap: 12 }}>
+        <SelectChips
+          label="Đối tượng khách hàng"
+          value={form.customerKind || 'individual'}
+          options={[
+            { value: 'individual', label: 'Cá nhân' },
+            { value: 'business', label: 'Doanh nghiệp / tổ chức' },
+          ]}
+          onChange={(value) => setField('customerKind', value)}
+        />
+        <Field
+          label={`${form.customerKind === 'business' ? 'Tên doanh nghiệp / tổ chức' : 'Họ và tên'} *`}
+          value={form.name}
+          onChangeText={(value) => setField('name', value)}
+          placeholder={form.customerKind === 'business' ? 'VD: Công ty TNHH ABC' : 'VD: Nguyễn Văn A'}
+          autoCapitalize="words"
+        />
+        {form.customerKind === 'business' && (
+          <Field
+            label="Người liên hệ"
+            value={form.contactName || ''}
+            onChangeText={(value) => setField('contactName', value)}
+            placeholder="Tên người đại diện liên hệ"
+          />
+        )}
+        <Field
+          label="Số điện thoại *"
+          value={form.phone}
+          onChangeText={(value) => setField('phone', value)}
+          placeholder="09xx xxx xxx"
+          keyboardType="phone-pad"
+        />
+        <Field
+          label="Email"
+          value={form.email || ''}
+          onChangeText={(value) => setField('email', value)}
+          placeholder="email@domain.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        {form.customerKind !== 'business' && (
+          <>
+            <DateTimeField
+              label="Ngày sinh"
+              value={form.dateOfBirth || ''}
+              mode="date"
+              allowClear
+              onChange={(value) => setField('dateOfBirth', value)}
+            />
             <SelectChips
-              label="Đối tượng khách hàng"
-              value={form.customerKind || 'individual'}
+              label="Giới tính"
+              value={form.gender}
               options={[
-                { value: 'individual', label: 'Cá nhân' },
-                { value: 'business', label: 'Doanh nghiệp / tổ chức' },
+                { value: 'male', label: 'Nam' },
+                { value: 'female', label: 'Nữ' },
+                { value: 'other', label: 'Khác' },
               ]}
-              onChange={(value) => setField('customerKind', value)}
+              onChange={(value) => setField('gender', value)}
+            />
+          </>
+        )}
+        <SelectChips
+          label="Chế độ hóa đơn"
+          value={form.type || 'regular'}
+          options={[
+            { value: 'regular', label: 'Khách thường' },
+            { value: 'vat', label: 'Khách xuất VAT' },
+          ]}
+          onChange={(value) => setField('type', value)}
+        />
+        <Field
+          label="Địa chỉ"
+          value={form.address || ''}
+          onChangeText={(value) => setField('address', value)}
+          placeholder="Số nhà, đường, quận/huyện, tỉnh/thành"
+        />
+        {needsBilling && (
+          <View style={styles.subForm}>
+            <Text style={styles.sectionTitle}>Thông tin xuất VAT</Text>
+            <Text style={styles.muted}>Có thể thêm hồ sơ VAT mặc định dùng cho hóa đơn POS.</Text>
+            <Field
+              label="Tên pháp nhân"
+              value={billing.legalName}
+              onChangeText={(value) => setBilling((current) => ({ ...current, legalName: value }))}
             />
             <Field
-              label={`${form.customerKind === 'business' ? 'Tên doanh nghiệp / tổ chức' : 'Họ và tên'} *`}
-              value={form.name}
-              onChangeText={(value) => setField('name', value)}
-              placeholder={form.customerKind === 'business' ? 'VD: Công ty TNHH ABC' : 'VD: Nguyễn Văn A'}
-              autoCapitalize="words"
-            />
-            {form.customerKind === 'business' && (
-              <Field
-                label="Người liên hệ"
-                value={form.contactName || ''}
-                onChangeText={(value) => setField('contactName', value)}
-                placeholder="Tên người đại diện liên hệ"
-              />
-            )}
-            <Field
-              label="Số điện thoại *"
-              value={form.phone}
-              onChangeText={(value) => setField('phone', value)}
-              placeholder="09xx xxx xxx"
-              keyboardType="phone-pad"
+              label="Mã số thuế"
+              value={billing.taxId}
+              onChangeText={(value) => setBilling((current) => ({ ...current, taxId: value }))}
             />
             <Field
-              label="Email"
-              value={form.email || ''}
-              onChangeText={(value) => setField('email', value)}
-              placeholder="email@domain.com"
+              label="Địa chỉ hóa đơn"
+              value={billing.address}
+              onChangeText={(value) => setBilling((current) => ({ ...current, address: value }))}
+            />
+            <Field
+              label="Email nhận hóa đơn"
+              value={billing.invoiceEmail}
+              onChangeText={(value) => setBilling((current) => ({ ...current, invoiceEmail: value }))}
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            {form.customerKind !== 'business' && (
-              <>
-                <DateTimeField
-                  label="Ngày sinh"
-                  value={form.dateOfBirth || ''}
-                  mode="date"
-                  allowClear
-                  onChange={(value) => setField('dateOfBirth', value)}
-                />
-                <SelectChips
-                  label="Giới tính"
-                  value={form.gender}
-                  options={[
-                    { value: 'male', label: 'Nam' },
-                    { value: 'female', label: 'Nữ' },
-                    { value: 'other', label: 'Khác' },
-                  ]}
-                  onChange={(value) => setField('gender', value)}
-                />
-              </>
-            )}
-            <SelectChips
-              label="Chế độ hóa đơn"
-              value={form.type || 'regular'}
-              options={[
-                { value: 'regular', label: 'Khách thường' },
-                { value: 'vat', label: 'Khách xuất VAT' },
-              ]}
-              onChange={(value) => setField('type', value)}
-            />
             <Field
-              label="Địa chỉ"
-              value={form.address || ''}
-              onChangeText={(value) => setField('address', value)}
-              placeholder="Số nhà, đường, quận/huyện, tỉnh/thành"
+              label="Người liên hệ"
+              value={billing.contactName || ''}
+              onChangeText={(value) => setBilling((current) => ({ ...current, contactName: value }))}
             />
-            {needsBilling && (
-              <View style={styles.subForm}>
-                <Text style={styles.sectionTitle}>Thông tin xuất VAT</Text>
-                <Text style={styles.muted}>Có thể thêm hồ sơ VAT mặc định dùng cho hóa đơn POS.</Text>
-                <Field
-                  label="Tên pháp nhân"
-                  value={billing.legalName}
-                  onChangeText={(value) => setBilling((current) => ({ ...current, legalName: value }))}
-                />
-                <Field
-                  label="Mã số thuế"
-                  value={billing.taxId}
-                  onChangeText={(value) => setBilling((current) => ({ ...current, taxId: value }))}
-                />
-                <Field
-                  label="Địa chỉ hóa đơn"
-                  value={billing.address}
-                  onChangeText={(value) => setBilling((current) => ({ ...current, address: value }))}
-                />
-                <Field
-                  label="Email nhận hóa đơn"
-                  value={billing.invoiceEmail}
-                  onChangeText={(value) => setBilling((current) => ({ ...current, invoiceEmail: value }))}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                <Field
-                  label="Người liên hệ"
-                  value={billing.contactName || ''}
-                  onChangeText={(value) => setBilling((current) => ({ ...current, contactName: value }))}
-                />
-              </View>
-            )}
-            <Field
-              label="Ghi chú"
-              value={form.notes || ''}
-              onChangeText={(value) => setField('notes', value)}
-              placeholder="Ghi chú thêm về khách hàng…"
-              multiline
-            />
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          </ScrollView>
-          <View style={styles.modalFooter}>
-            <View style={{ flex: 1 }}>
-              <Action label="Hủy" onPress={onClose} disabled={busy} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Action
-                label={busy ? 'Đang lưu…' : 'Lưu khách hàng'}
-                onPress={() => void save()}
-                primary
-                disabled={busy}
-              />
-            </View>
           </View>
-        </View>
+        )}
+        <Field
+          label="Ghi chú"
+          value={form.notes || ''}
+          onChangeText={(value) => setField('notes', value)}
+          placeholder="Ghi chú thêm về khách hàng…"
+          multiline
+        />
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
-    </Modal>
+    </FullScreenFormModal>
   );
 }
 
@@ -1083,76 +1069,70 @@ function TransactionsPanel({ customer, branchId }: { customer: Customer; branchI
         </View>
       )}
 
-      <Modal visible={Boolean(selected)} transparent animationType="fade" onRequestClose={() => setSelected(null)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setSelected(null)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chi tiết giao dịch</Text>
-              <Pressable onPress={() => setSelected(null)} style={styles.modalCloseBtn}>
-                <X size={18} color={colors.muted} />
-              </Pressable>
-            </View>
-            <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {detailBusy ? (
-                <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
-              ) : detail ? (
-                <>
-                  <View style={styles.subCard}>
-                    <Text style={styles.cardTitle}>
-                      {selected?.code} · {kindLabel[selected?.kind || 'sale']}
-                    </Text>
-                    <Text style={styles.body}>{detail.item.description}</Text>
-                  </View>
-                  {detail.device && (
-                    <View style={styles.subCard}>
-                      <Text style={styles.sectionTitle}>{detail.device.name}</Text>
-                      <Text style={styles.muted}>IMEI / Serial: {detail.device.serialNumber || '—'}</Text>
-                      <Text style={styles.muted}>
-                        Tình trạng: {detail.device.condition || '—'} · Triệu chứng: {detail.device.symptom || '—'}
-                      </Text>
-                      <Text style={styles.muted}>Chẩn đoán: {detail.device.diagnosis || '—'}</Text>
-                    </View>
-                  )}
-                  {detail.lines.length > 0 && (
-                    <View style={styles.subCard}>
-                      <Text style={styles.sectionTitle}>Sản phẩm / hạng mục</Text>
-                      {detail.lines.map((line, index) => (
-                        <View
-                          key={`${line.sku || line.name}-${index}`}
-                          style={[styles.lineRow, index === detail.lines.length - 1 && { borderBottomWidth: 0 }]}
-                        >
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.cardTitle}>{line.name}</Text>
-                            <Text style={styles.muted}>
-                              {line.sku || '—'} · SL {line.quantity}
-                              {line.serials?.length ? ` · ${line.serials.join(', ')}` : ''}
-                            </Text>
-                          </View>
-                          <Text style={styles.primaryValue}>{money(line.total)}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                  {detail.payments.map((payment, index) => (
-                    <Text key={`p-${index}`} style={styles.muted}>
-                      Đã thu {money(payment.amount)} · {paymentMethodLabel(payment.method)} ·{' '}
-                      {dateLabel(payment.at, true)}
-                    </Text>
-                  ))}
-                  {detail.refunds.map((refund, index) => (
-                    <Text key={`r-${index}`} style={styles.muted}>
-                      Hoàn {money(refund.amount)} · {refund.reason || '—'} · {dateLabel(refund.at, true)}
-                    </Text>
-                  ))}
-                  {detail.note ? <Text style={styles.body}>Ghi chú: {detail.note}</Text> : null}
-                </>
-              ) : (
-                <Text style={styles.empty}>Không tải được chi tiết giao dịch.</Text>
+      <FullScreenFormModal
+        visible={Boolean(selected)}
+        title="Chi tiết giao dịch"
+        onClose={() => setSelected(null)}
+      >
+        <View style={{ gap: 12 }}>
+          {detailBusy ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
+          ) : detail ? (
+            <>
+              <View style={styles.subCard}>
+                <Text style={styles.cardTitle}>
+                  {selected?.code} · {kindLabel[selected?.kind || 'sale']}
+                </Text>
+                <Text style={styles.body}>{detail.item.description}</Text>
+              </View>
+              {detail.device && (
+                <View style={styles.subCard}>
+                  <Text style={styles.sectionTitle}>{detail.device.name}</Text>
+                  <Text style={styles.muted}>IMEI / Serial: {detail.device.serialNumber || '—'}</Text>
+                  <Text style={styles.muted}>
+                    Tình trạng: {detail.device.condition || '—'} · Triệu chứng: {detail.device.symptom || '—'}
+                  </Text>
+                  <Text style={styles.muted}>Chẩn đoán: {detail.device.diagnosis || '—'}</Text>
+                </View>
               )}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+              {detail.lines.length > 0 && (
+                <View style={styles.subCard}>
+                  <Text style={styles.sectionTitle}>Sản phẩm / hạng mục</Text>
+                  {detail.lines.map((line, index) => (
+                    <View
+                      key={`${line.sku || line.name}-${index}`}
+                      style={[styles.lineRow, index === detail.lines.length - 1 && { borderBottomWidth: 0 }]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cardTitle}>{line.name}</Text>
+                        <Text style={styles.muted}>
+                          {line.sku || '—'} · SL {line.quantity}
+                          {line.serials?.length ? ` · ${line.serials.join(', ')}` : ''}
+                        </Text>
+                      </View>
+                      <Text style={styles.primaryValue}>{money(line.total)}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              {detail.payments.map((payment, index) => (
+                <Text key={`p-${index}`} style={styles.muted}>
+                  Đã thu {money(payment.amount)} · {paymentMethodLabel(payment.method)} ·{' '}
+                  {dateLabel(payment.at, true)}
+                </Text>
+              ))}
+              {detail.refunds.map((refund, index) => (
+                <Text key={`r-${index}`} style={styles.muted}>
+                  Hoàn {money(refund.amount)} · {refund.reason || '—'} · {dateLabel(refund.at, true)}
+                </Text>
+              ))}
+              {detail.note ? <Text style={styles.body}>Ghi chú: {detail.note}</Text> : null}
+            </>
+          ) : (
+            <Text style={styles.empty}>Không tải được chi tiết giao dịch.</Text>
+          )}
+        </View>
+      </FullScreenFormModal>
     </View>
   );
 }
@@ -1590,56 +1570,52 @@ function BillingPanel({ customer, canManage }: { customer: Customer; canManage: 
         )}
       </View>
 
-      <Modal visible={showForm} transparent animationType="fade" onRequestClose={() => { if (!busy) setShowForm(false); }}>
-        <Pressable style={styles.modalBackdrop} onPress={() => !busy && setShowForm(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Thêm hồ sơ xuất VAT</Text>
-              <Pressable disabled={busy} onPress={() => setShowForm(false)} style={styles.modalCloseBtn}>
-                <X size={18} color={colors.muted} />
-              </Pressable>
+      <FullScreenFormModal
+        visible={showForm}
+        title="Thêm hồ sơ xuất VAT"
+        onClose={() => { if (!busy) setShowForm(false); }}
+        footer={
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Action label="Hủy" disabled={busy} onPress={() => setShowForm(false)} />
             </View>
-            <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
-              <Field
-                label="Tên pháp nhân *"
-                value={form.legalName}
-                onChangeText={(value) => setForm((current) => ({ ...current, legalName: value }))}
-              />
-              <Field
-                label="Mã số thuế *"
-                value={form.taxId}
-                onChangeText={(value) => setForm((current) => ({ ...current, taxId: value }))}
-              />
-              <Field
-                label="Địa chỉ hóa đơn *"
-                value={form.address}
-                onChangeText={(value) => setForm((current) => ({ ...current, address: value }))}
-              />
-              <Field
-                label="Email nhận hóa đơn *"
-                value={form.invoiceEmail}
-                onChangeText={(value) => setForm((current) => ({ ...current, invoiceEmail: value }))}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              <Field
-                label="Người liên hệ"
-                value={form.contactName || ''}
-                onChangeText={(value) => setForm((current) => ({ ...current, contactName: value }))}
-              />
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            </ScrollView>
-            <View style={styles.modalFooter}>
-              <View style={{ flex: 1 }}>
-                <Action label="Hủy" disabled={busy} onPress={() => setShowForm(false)} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Action label={busy ? 'Đang lưu…' : 'Lưu hồ sơ VAT'} onPress={() => void save()} primary disabled={busy} />
-              </View>
+            <View style={{ flex: 1 }}>
+              <Action label={busy ? 'Đang lưu…' : 'Lưu hồ sơ VAT'} onPress={() => void save()} primary disabled={busy} />
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+          </View>
+        }
+      >
+        <View style={{ gap: 12 }}>
+          <Field
+            label="Tên pháp nhân *"
+            value={form.legalName}
+            onChangeText={(value) => setForm((current) => ({ ...current, legalName: value }))}
+          />
+          <Field
+            label="Mã số thuế *"
+            value={form.taxId}
+            onChangeText={(value) => setForm((current) => ({ ...current, taxId: value }))}
+          />
+          <Field
+            label="Địa chỉ hóa đơn *"
+            value={form.address}
+            onChangeText={(value) => setForm((current) => ({ ...current, address: value }))}
+          />
+          <Field
+            label="Email nhận hóa đơn *"
+            value={form.invoiceEmail}
+            onChangeText={(value) => setForm((current) => ({ ...current, invoiceEmail: value }))}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <Field
+            label="Người liên hệ"
+            value={form.contactName || ''}
+            onChangeText={(value) => setForm((current) => ({ ...current, contactName: value }))}
+          />
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </View>
+      </FullScreenFormModal>
     </View>
   );
 }
@@ -2586,17 +2562,17 @@ const styles = StyleSheet.create({
   toolbarStack: { paddingHorizontal: 14, paddingBottom: 6, gap: 8 },
   toolbarActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchBox: {
-    minHeight: 46,
+    height: 40,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 14,
-    paddingHorizontal: 12,
+    borderColor: '#DCE5F2',
+    borderRadius: 99,
+    paddingHorizontal: 14,
     backgroundColor: colors.white,
   },
-  searchInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: 14, paddingVertical: 8 },
+  searchInput: { flex: 1, minWidth: 0, color: '#111827', fontSize: 13.5, paddingVertical: 0 },
   clearBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
   filterBtn: {
     minHeight: 42,

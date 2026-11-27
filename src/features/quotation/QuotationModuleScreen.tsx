@@ -45,6 +45,7 @@ import {
 import { Stack } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { showAppAlert, showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { fetchCompanyBranches, type ErpBranch } from '@/features/overview/overviewApi';
@@ -453,39 +454,35 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
         {totalPages > 1 && <View style={styles.pagination}><Pressable disabled={page <= 1} onPress={() => setPage((value) => Math.max(1, value - 1))} style={[styles.pageButton, page <= 1 && styles.disabledButton]}><ChevronLeft size={17} color={page <= 1 ? '#B7C0CF' : colors.ink} /><Text style={styles.pageButtonText}>Trước</Text></Pressable><Text style={styles.pageLabel}>Trang {page} / {totalPages}</Text><Pressable disabled={page >= totalPages} onPress={() => setPage((value) => Math.min(totalPages, value + 1))} style={[styles.pageButton, page >= totalPages && styles.disabledButton]}><Text style={styles.pageButtonText}>Sau</Text><ChevronRight size={17} color={page >= totalPages ? '#B7C0CF' : colors.ink} /></Pressable></View>}
       </ScrollView>
 
-      <Modal visible={creating} transparent animationType="slide" onRequestClose={() => setCreating(false)}>
+      <FullScreenFormModal visible={creating} title={kind === 'estimate' ? 'Tạo dự toán' : 'Tạo báo giá khách'} onClose={() => setCreating(false)} scrollable={false}>
         <NewQuoteSheet kind={kind} scope={scope} canSelectErpCustomers={canSelectErpCustomers} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); setPage(1); setReloadKey((value) => value + 1); }} />
-      </Modal>
+      </FullScreenFormModal>
 
-      <Modal visible={Boolean(selectedId)} transparent animationType="slide" onRequestClose={() => setSelectedId(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.detailSheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Chi tiết báo giá</Text><Pressable onPress={() => setSelectedId(null)} style={styles.closeButton}><X size={19} color={colors.muted} /></Pressable></View>
-            {detailLoading || !detailQuote ? <BrandLoader size={42} style={styles.loading} /> : <QuoteDetail
-              quote={detailQuote}
-              scope={scope}
-              canManage={canManage}
-              canApprove={canApprove}
-              canManageContract={canManageContract}
-              canUseAi={canUseAi}
-              busy={actionBusy}
-              onCreateEstimate={() => setCreatingEstimateFromQuote(true)}
-              onCreateContract={() => { if (detailQuote) onCreateContract?.(detailQuote); }}
-              onSave={(changes) => saveQuoteChanges(changes)}
-              onRecalculate={(changes) => saveQuoteChanges(changes, true)}
-              onSubmit={() => { void runQuoteAction('submit'); }}
-              onApprove={(changes) => { void runQuoteAction('approve', undefined, changes); }}
-              onReject={(reason) => { void runQuoteAction('reject', reason); }}
-              onDelete={confirmDelete}
-            />}
-          </View>
+      <FullScreenFormModal visible={Boolean(selectedId)} title="Chi tiết báo giá" onClose={() => setSelectedId(null)} scrollable={false}>
+        <View style={{ flex: 1, paddingHorizontal: 16 }}>
+          {detailLoading || !detailQuote ? <BrandLoader size={42} style={styles.loading} /> : <QuoteDetail
+            quote={detailQuote}
+            scope={scope}
+            canManage={canManage}
+            canApprove={canApprove}
+            canManageContract={canManageContract}
+            canUseAi={canUseAi}
+            busy={actionBusy}
+            onCreateEstimate={() => setCreatingEstimateFromQuote(true)}
+            onCreateContract={() => { if (detailQuote) onCreateContract?.(detailQuote); }}
+            onSave={(changes) => saveQuoteChanges(changes)}
+            onRecalculate={(changes) => saveQuoteChanges(changes, true)}
+            onSubmit={() => { void runQuoteAction('submit'); }}
+            onApprove={(changes) => { void runQuoteAction('approve', undefined, changes); }}
+            onReject={(reason) => { void runQuoteAction('reject', reason); }}
+            onDelete={confirmDelete}
+          />}
         </View>
-      </Modal>
+      </FullScreenFormModal>
 
-      {kind === 'customer' && detailQuote && <Modal visible={creatingEstimateFromQuote} transparent animationType="slide" onRequestClose={() => setCreatingEstimateFromQuote(false)}>
+      {kind === 'customer' && detailQuote && <FullScreenFormModal visible={creatingEstimateFromQuote} title="Tạo dự toán từ báo giá khách" onClose={() => setCreatingEstimateFromQuote(false)} scrollable={false}>
         <EstimateFromCustomerQuoteSheet scope={scope} quote={detailQuote} onClose={() => setCreatingEstimateFromQuote(false)} onCreated={() => { setCreatingEstimateFromQuote(false); setSelectedId(null); onEstimateCreated?.(); }} />
-      </Modal>}
+      </FullScreenFormModal>}
     </View>
   );
 }
@@ -837,17 +834,15 @@ function EstimateFromCustomerQuoteSheet({ scope, quote, onClose, onCreated }: { 
     finally { setBusy(false); }
   }
 
-  return <View style={styles.modalBackdrop}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetKeyboard}><View style={styles.createSheet}>
-    <View style={styles.sheetHandle} /><View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>Tạo dự toán từ báo giá khách</Text><Text style={styles.sheetSubtitle}>{quote.quoteNumber} · {quote.customerName}</Text></View><Pressable onPress={onClose} disabled={busy} style={styles.closeButton}><X size={19} color={colors.muted} /></Pressable></View>
-    <ScrollView contentContainerStyle={styles.createContent} keyboardShouldPersistTaps="handled">
+  return <ScrollView contentContainerStyle={[styles.createContent, { paddingHorizontal: 16 }]} keyboardShouldPersistTaps="handled">
+      <Text style={styles.sheetSubtitle}>{quote.quoteNumber} · {quote.customerName}</Text>
       <Card style={styles.sourceQuoteCard}><FileText size={16} color={colors.primary} /><View style={styles.rowCopy}><Text style={styles.rowTitle}>{quote.quoteNumber}</Text><Text style={styles.mutedText}>{quote.lines.length + (quote.missingProducts?.length ?? 0)} hạng mục · {formatMoney(quote.total, quote.currency)}</Text></View></Card>
       <Text style={styles.fieldLabel}>Yêu cầu cụ thể để tính dự toán *</Text><TextInput value={requirements} onChangeText={setRequirements} style={[styles.input, styles.multilineInput]} placeholder="Nêu số lượng, quy cách, vật liệu, lắp đặt hoặc thời hạn cần đáp ứng..." placeholderTextColor={colors.muted} multiline maxLength={10000} />
       <Text style={styles.helperText}>AI sẽ điều chỉnh hạng mục và đơn giá theo yêu cầu; nội dung vẫn cần được kiểm tra trước khi gửi khách.</Text>
       <Text style={styles.fieldLabel}>Mẫu dự toán</Text>{loading ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : templates.length ? templates.map((item) => <Pressable key={item.id} onPress={() => setTemplateId(item.id)} style={[styles.choiceRow, templateId === item.id && styles.choiceSelected]}><Text numberOfLines={1} style={styles.rowTitle}>{item.name || item.originalFilename} · {item.extension?.toUpperCase()}</Text>{templateId === item.id && <Check size={14} color={colors.primary} />}</Pressable>) : <Text style={styles.emptyCopy}>Chưa có mẫu dự toán trong ERP.</Text>}
       {!!error && <View style={styles.formError}><CircleAlert size={15} color="#B54745" /><PopupError error={error} /></View>}
       <View style={styles.footerActions}><Pressable onPress={onClose} disabled={busy} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable onPress={() => { void create(); }} disabled={busy || loading || !templateId || !requirements.trim()} style={[styles.primaryButton, (busy || loading || !templateId || !requirements.trim()) && styles.buttonDisabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={15} color={colors.white} />}<Text style={styles.primaryButtonText}>{busy ? 'Đang tạo...' : 'Tạo dự toán'}</Text></Pressable></View>
-    </ScrollView>
-  </View></KeyboardAvoidingView></View>;
+    </ScrollView>;
 }
 
 function InfoLine({ icon: Icon, label, value }: { icon: typeof UserRound; label: string; value: string }) {
@@ -1118,12 +1113,9 @@ function NewQuoteSheet({ kind, scope, canSelectErpCustomers, onClose, onCreated 
     return candidates.filter((item) => !query || `${item.sku} ${item.name} ${item.description ?? ''}`.toLocaleLowerCase('vi').includes(query)).slice(0, 100);
   }, [candidates, search]);
 
-  return <View style={styles.modalBackdrop}>
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetKeyboard}>
-      <View style={styles.createSheet}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>{kind === 'estimate' ? 'Tạo dự toán' : 'Tạo báo giá khách'}</Text><Text style={styles.sheetSubtitle}>Lưu trực tiếp vào ERP</Text></View><Pressable onPress={onClose} disabled={busy} style={styles.closeButton}><X size={19} color={colors.muted} /></Pressable></View>
-        <ScrollView style={styles.createScroll} contentContainerStyle={styles.createContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+  return <View style={{ flex: 1 }}>
+    <ScrollView style={styles.createScroll} contentContainerStyle={[styles.createContent, { paddingHorizontal: 16 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <Text style={styles.sheetSubtitle}>Lưu trực tiếp vào ERP</Text>
           {templateLoading ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : <>
             <Text style={styles.fieldLabel}>Mẫu tài liệu</Text>
             {templates.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateOptions}>{templates.map((template) => <Pressable key={template.id} onPress={() => { setTemplateId(template.id); invalidateAnalysis(); }} style={[styles.templateOption, templateId === template.id && styles.templateOptionActive]}><FileText size={14} color={templateId === template.id ? colors.primary : colors.muted} /><Text numberOfLines={1} style={[styles.templateText, templateId === template.id && styles.templateTextActive]}>{template.name || template.originalFilename}</Text></Pressable>)}</ScrollView> : <Text style={styles.emptyCopy}>ERP chưa có mẫu phù hợp cho loại chứng từ này.</Text>}
@@ -1217,9 +1209,7 @@ function NewQuoteSheet({ kind, scope, canSelectErpCustomers, onClose, onCreated 
           </>}
           {!!error && <View style={styles.formError}><CircleAlert size={15} color="#B54745" /><PopupError error={error} /></View>}
           {(kind === 'customer' || analysis) && <View style={styles.footerActions}><Pressable onPress={onClose} disabled={busy} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={busy || templateLoading || !templates.length || (kind === 'estimate' && !analysis) || (kind === 'customer' && (catalogLoading || (!selectedCatalogIds.length && !missingProducts.length)))} onPress={() => { void (kind === 'estimate' ? saveEstimate() : saveCustomerQuote()); }} style={[styles.primaryButton, (busy || !templates.length || (kind === 'customer' && !selectedCatalogIds.length && !missingProducts.length)) && styles.buttonDisabled]}>{busy ? <ActivityIndicator size="small" color={colors.white} /> : <Check size={16} color={colors.white} />}<Text style={styles.primaryButtonText}>{busy ? 'Đang lưu...' : kind === 'estimate' ? 'Tạo dự toán' : 'Tạo báo giá'}</Text></Pressable></View>}
-        </ScrollView>
-      </View>
-    </KeyboardAvoidingView>
+    </ScrollView>
     {manualPickerOpen && (
       <View style={styles.pickerOverlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setManualPickerOpen(false)} />
@@ -1339,8 +1329,8 @@ const styles = StyleSheet.create({
   statValue: { color: colors.ink, fontSize: 19, fontWeight: '800', textAlign: 'center' },
   statValueSmall: { color: colors.ink, fontSize: 12, fontWeight: '800', textAlign: 'center' },
   statLabel: { color: colors.muted, fontSize: 9, lineHeight: 12, textAlign: 'center', marginTop: 5 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 43, paddingHorizontal: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: 13 },
-  searchInput: { flex: 1, color: colors.ink, fontSize: 11, paddingVertical: 9 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, paddingHorizontal: 14, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 99 },
+  searchInput: { flex: 1, color: '#111827', fontSize: 13.5, paddingVertical: 0 },
   customerPicker: { marginBottom: 8 },
   customerPickerToggle: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, borderWidth: 1, borderColor: '#D5E2FA', borderRadius: 10, backgroundColor: '#F6F9FF' },
   customerPickerToggleText: { flex: 1, color: colors.primary, fontSize: 9, fontWeight: '700' },

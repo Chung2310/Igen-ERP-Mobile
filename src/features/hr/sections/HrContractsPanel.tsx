@@ -29,6 +29,8 @@ import {
   Upload,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import {
   createHrContractExtension,
   fetchHrContractsOverview,
@@ -465,8 +467,9 @@ export function HrContractsPanel({
   );
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -506,24 +509,13 @@ export function HrContractsPanel({
           value={search}
           onChangeText={setSearch}
           placeholder="Tìm theo tên nhân viên, loại hợp đồng..."
-          placeholderTextColor={colors.muted}
-          style={[styles.field, { flex: 1 }]}
+          placeholderTextColor="#94A3B8"
+          style={styles.searchField}
         />
         {canManage ? (
-          <>
-            <Pressable onPress={() => setSettingsOpen(true)} style={styles.iconActionBtn}>
-              <Settings size={15} color={colors.primary} />
-            </Pressable>
-            <Pressable
-              onPress={() => (subTab === 'extensions' ? openExtendModal() : openContractModal())}
-              style={styles.primaryBtn}
-            >
-              <Plus size={13} color={colors.white} />
-              <Text style={styles.primaryBtnText}>
-                {subTab === 'extensions' ? 'Gia hạn' : 'Hợp đồng'}
-              </Text>
-            </Pressable>
-          </>
+          <Pressable onPress={() => setSettingsOpen(true)} style={styles.iconActionBtn}>
+            <Settings size={15} color={colors.primary} />
+          </Pressable>
         ) : null}
       </View>
 
@@ -703,145 +695,138 @@ export function HrContractsPanel({
         </View>
       )}
 
-      {/* Create / Edit Contract Modal */}
-      <Modal visible={Boolean(editing)} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setEditing(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>
-                {editing === 'new' ? 'Thêm hợp đồng mới' : 'Chỉnh sửa hợp đồng'}
-              </Text>
-              <Pressable onPress={() => setEditing(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Create / Edit Contract Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(editing)}
+        title={editing === 'new' ? 'Thêm hợp đồng mới' : 'Chỉnh sửa hợp đồng'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveContract()}
+        saving={saving || Boolean(uploadingKind)}
+        onClose={() => setEditing(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 14 }}>
+          <Text style={styles.label}>Nhân viên *</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {employees.slice(0, 35).map((emp) => {
+              const active = cEmployeeId === emp._id;
+              return (
+                <Pressable
+                  key={emp._id}
+                  onPress={() => setCEmployeeId(emp._id)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {emp.displayName || emp.email}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={styles.label}>Loại hợp đồng *</Text>
+          <View style={styles.wrapRow}>
+            {CONTRACT_TYPES.map((t) => (
+              <Pressable
+                key={t}
+                onPress={() => setCType(t)}
+                style={[styles.chip, cType === t && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, cType === t && styles.chipTextActive]}>{t}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Ngày bắt đầu *</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openContractDatePicker('start')}
+                style={styles.datePickerField}
+              >
+                <Text style={styles.datePickerText}>
+                  {cStartDate ? formatViDate(cStartDate) : 'Chọn ngày'}
+                </Text>
+                <CalendarDays size={15} color={colors.primary} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
-              <View style={{ gap: 8, paddingBottom: 14 }}>
-                <Text style={styles.label}>Nhân viên *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {employees.slice(0, 35).map((emp) => {
-                    const active = cEmployeeId === emp._id;
-                    return (
-                      <Pressable
-                        key={emp._id}
-                        onPress={() => setCEmployeeId(emp._id)}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                          {emp.displayName || emp.email}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Ngày kết thúc *</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openContractDatePicker('end')}
+                style={styles.datePickerField}
+              >
+                <Text style={styles.datePickerText}>
+                  {cEndDate ? formatViDate(cEndDate) : 'Chọn ngày'}
+                </Text>
+                <CalendarDays size={15} color={colors.primary} />
+              </Pressable>
+            </View>
+          </View>
 
-                <Text style={styles.label}>Loại hợp đồng *</Text>
-                <View style={styles.wrapRow}>
-                  {CONTRACT_TYPES.map((t) => (
-                    <Pressable
-                      key={t}
-                      onPress={() => setCType(t)}
-                      style={[styles.chip, cType === t && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, cType === t && styles.chipTextActive]}>{t}</Text>
-                    </Pressable>
-                  ))}
-                </View>
+          <Text style={styles.label}>Trạng thái</Text>
+          <View style={styles.wrapRow}>
+            {STATUS_OPTIONS.map((st) => (
+              <Pressable
+                key={st.value}
+                onPress={() => setCStatus(st.value)}
+                style={[styles.chip, cStatus === st.value && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, cStatus === st.value && styles.chipTextActive]}>
+                  {st.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
 
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Ngày bắt đầu *</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openContractDatePicker('start')}
-                      style={styles.datePickerField}
-                    >
-                      <Text style={styles.datePickerText}>
-                        {cStartDate ? formatViDate(cStartDate) : 'Chọn ngày'}
-                      </Text>
-                      <CalendarDays size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Ngày kết thúc *</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openContractDatePicker('end')}
-                      style={styles.datePickerField}
-                    >
-                      <Text style={styles.datePickerText}>
-                        {cEndDate ? formatViDate(cEndDate) : 'Chọn ngày'}
-                      </Text>
-                      <CalendarDays size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                </View>
-
-                <Text style={styles.label}>Trạng thái</Text>
-                <View style={styles.wrapRow}>
-                  {STATUS_OPTIONS.map((st) => (
-                    <Pressable
-                      key={st.value}
-                      onPress={() => setCStatus(st.value)}
-                      style={[styles.chip, cStatus === st.value && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, cStatus === st.value && styles.chipTextActive]}>
-                        {st.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.label}>Tệp hợp đồng (PDF / DOC / DOCX)</Text>
-                <Pressable
-                  disabled={Boolean(uploadingKind)}
-                  onPress={() => void pickAndUpload('contract')}
-                  style={styles.uploadBtn}
-                >
-                  <Upload size={13} color={colors.primary} />
-                  <Text style={styles.uploadBtnText}>
-                    {uploadingKind === 'contract'
-                      ? 'Đang tải tệp...'
-                      : cFileName || (cFileUrl ? 'Đã có tệp hợp đồng (Bấm để thay)' : 'Tải tệp hợp đồng lên')}
-                  </Text>
-                </Pressable>
-
-                <Text style={styles.label}>Ảnh bản cứng đã ký (JPG / PNG)</Text>
-                <Pressable
-                  disabled={Boolean(uploadingKind)}
-                  onPress={() => void pickAndUpload('signed')}
-                  style={styles.uploadBtn}
-                >
-                  <Upload size={13} color={colors.primary} />
-                  <Text style={styles.uploadBtnText}>
-                    {uploadingKind === 'signed'
-                      ? 'Đang tải ảnh...'
-                      : cSignedName || (cSignedUrl ? 'Đã có ảnh đã ký (Bấm để thay)' : 'Tải ảnh đã ký lên')}
-                  </Text>
-                </Pressable>
-
-                <Text style={styles.label}>Ghi chú</Text>
-                <TextInput
-                  value={cNote}
-                  onChangeText={setCNote}
-                  multiline
-                  placeholder="Ghi chú thêm về hợp đồng..."
-                  placeholderTextColor={colors.muted}
-                  style={[styles.field, { minHeight: 60, textAlignVertical: 'top' }]}
-                />
-
-                <Pressable
-                  disabled={saving || Boolean(uploadingKind)}
-                  onPress={() => void onSaveContract()}
-                  style={[styles.submitBtn, (saving || Boolean(uploadingKind)) && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu hợp đồng'}</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+          <Text style={styles.label}>Tệp hợp đồng (PDF / DOC / DOCX)</Text>
+          <Pressable
+            disabled={Boolean(uploadingKind)}
+            onPress={() => void pickAndUpload('contract')}
+            style={styles.uploadBtn}
+          >
+            <Upload size={13} color={colors.primary} />
+            <Text style={styles.uploadBtnText}>
+              {uploadingKind === 'contract'
+                ? 'Đang tải tệp...'
+                : cFileName || (cFileUrl ? 'Đã có tệp hợp đồng (Bấm để thay)' : 'Tải tệp hợp đồng lên')}
+            </Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+
+          <Text style={styles.label}>Ảnh bản cứng đã ký (JPG / PNG)</Text>
+          <Pressable
+            disabled={Boolean(uploadingKind)}
+            onPress={() => void pickAndUpload('signed')}
+            style={styles.uploadBtn}
+          >
+            <Upload size={13} color={colors.primary} />
+            <Text style={styles.uploadBtnText}>
+              {uploadingKind === 'signed'
+                ? 'Đang tải ảnh...'
+                : cSignedName || (cSignedUrl ? 'Đã có ảnh đã ký (Bấm để thay)' : 'Tải ảnh đã ký lên')}
+            </Text>
+          </Pressable>
+
+          <Text style={styles.label}>Ghi chú</Text>
+          <TextInput
+            value={cNote}
+            onChangeText={setCNote}
+            multiline
+            placeholder="Ghi chú thêm về hợp đồng..."
+            placeholderTextColor={colors.muted}
+            style={[styles.field, { minHeight: 60, textAlignVertical: 'top' }]}
+          />
+
+          <Pressable
+            disabled={saving || Boolean(uploadingKind)}
+            onPress={() => void onSaveContract()}
+            style={[styles.submitBtn, (saving || Boolean(uploadingKind)) && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu hợp đồng'}</Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS !== 'android' && activeContractDatePicker ? (
         <Modal
@@ -886,98 +871,93 @@ export function HrContractsPanel({
         </Modal>
       ) : null}
 
-      {/* Extend Contract Modal */}
-      <Modal visible={extOpen} transparent animationType="slide" onRequestClose={() => setExtOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setExtOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Gia hạn hợp đồng</Text>
-              <Pressable onPress={() => setExtOpen(false)}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Extend Contract Full-Screen Page */}
+      <FullScreenFormModal
+        visible={extOpen}
+        title="Gia hạn hợp đồng"
+        cancelLabel="Hủy"
+        onSave={() => void onSaveExtension()}
+        saving={saving || Boolean(uploadingKind)}
+        onClose={() => setExtOpen(false)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Chọn hợp đồng *</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {activeContracts.map((c) => (
+              <Pressable
+                key={c._id}
+                onPress={() => {
+                  setExtContractId(c._id);
+                  if (!extNewEndDate && c.endDate) setExtNewEndDate(c.endDate.slice(0, 10));
+                }}
+                style={[styles.chip, extContractId === c._id && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, extContractId === c._id && styles.chipTextActive]}>
+                  {c.employeeName} ({formatViDate(c.endDate)})
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Ngày gia hạn</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openExtensionDatePicker('extensionDate')}
+                style={styles.datePickerField}
+              >
+                <Text style={styles.datePickerText}>{formatViDate(extDate)}</Text>
+                <CalendarDays size={15} color={colors.primary} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
-              <View style={{ gap: 8, paddingBottom: 12 }}>
-                <Text style={styles.label}>Chọn hợp đồng *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {activeContracts.map((c) => (
-                    <Pressable
-                      key={c._id}
-                      onPress={() => {
-                        setExtContractId(c._id);
-                        if (!extNewEndDate && c.endDate) setExtNewEndDate(c.endDate.slice(0, 10));
-                      }}
-                      style={[styles.chip, extContractId === c._id && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, extContractId === c._id && styles.chipTextActive]}>
-                        {c.employeeName} ({formatViDate(c.endDate)})
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Hạn mới *</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openExtensionDatePicker('newEndDate')}
+                style={styles.datePickerField}
+              >
+                <Text style={styles.datePickerText}>
+                  {extNewEndDate ? formatViDate(extNewEndDate) : 'Chọn ngày'}
+                </Text>
+                <CalendarDays size={15} color={colors.primary} />
+              </Pressable>
+            </View>
+          </View>
 
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Ngày gia hạn</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openExtensionDatePicker('extensionDate')}
-                      style={styles.datePickerField}
-                    >
-                      <Text style={styles.datePickerText}>{formatViDate(extDate)}</Text>
-                      <CalendarDays size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Hạn mới *</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openExtensionDatePicker('newEndDate')}
-                      style={styles.datePickerField}
-                    >
-                      <Text style={styles.datePickerText}>
-                        {extNewEndDate ? formatViDate(extNewEndDate) : 'Chọn ngày'}
-                      </Text>
-                      <CalendarDays size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                </View>
+          <Text style={styles.label}>Lý do gia hạn</Text>
+          <TextInput
+            value={extReason}
+            onChangeText={setExtReason}
+            multiline
+            placeholder="Ghi chú lý do gia hạn..."
+            style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]}
+          />
 
-                <Text style={styles.label}>Lý do gia hạn</Text>
-                <TextInput
-                  value={extReason}
-                  onChangeText={setExtReason}
-                  multiline
-                  placeholder="Ghi chú lý do gia hạn..."
-                  style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]}
-                />
-
-                <Text style={styles.label}>Phụ lục gia hạn (PDF / DOC)</Text>
-                <Pressable
-                  disabled={Boolean(uploadingKind)}
-                  onPress={() => void pickAndUpload('extension')}
-                  style={styles.uploadBtn}
-                >
-                  <Upload size={13} color={colors.primary} />
-                  <Text style={styles.uploadBtnText}>
-                    {uploadingKind === 'extension'
-                      ? 'Đang tải...'
-                      : extFileName || 'Tải file phụ lục gia hạn'}
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  disabled={saving || Boolean(uploadingKind)}
-                  onPress={() => void onSaveExtension()}
-                  style={[styles.submitBtn, (saving || Boolean(uploadingKind)) && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Xác nhận gia hạn'}</Text>
-                </Pressable>
-              </View>
-            </ScrollView>
+          <Text style={styles.label}>Phụ lục gia hạn (PDF / DOC)</Text>
+          <Pressable
+            disabled={Boolean(uploadingKind)}
+            onPress={() => void pickAndUpload('extension')}
+            style={styles.uploadBtn}
+          >
+            <Upload size={13} color={colors.primary} />
+            <Text style={styles.uploadBtnText}>
+              {uploadingKind === 'extension'
+                ? 'Đang tải...'
+                : extFileName || 'Tải file phụ lục gia hạn'}
+            </Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+
+          <Pressable
+            disabled={saving || Boolean(uploadingKind)}
+            onPress={() => void onSaveExtension()}
+            style={[styles.submitBtn, (saving || Boolean(uploadingKind)) && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Xác nhận gia hạn'}</Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS !== 'android' && activeExtensionDatePicker ? (
         <Modal
@@ -1022,270 +1002,278 @@ export function HrContractsPanel({
         </Modal>
       ) : null}
 
-      {/* Settings Modal */}
-      <Modal visible={settingsOpen} transparent animationType="slide" onRequestClose={() => setSettingsOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setSettingsOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Cài đặt cảnh báo hết hạn</Text>
-              <Pressable onPress={() => setSettingsOpen(false)}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.label}>Báo trước số ngày (1–365)</Text>
-            <TextInput
-              value={settingDaysStr}
-              onChangeText={setSettingDaysStr}
-              keyboardType="numeric"
-              style={styles.field}
-            />
-            <Pressable
-              disabled={savingSettings}
-              onPress={() => void onSaveSettings()}
-              style={[styles.submitBtn, savingSettings && styles.disabled]}
-            >
-              <Text style={styles.submitBtnText}>{savingSettings ? 'Đang lưu...' : 'Lưu cài đặt'}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Contract Detail Modal */}
-      <Modal
-        visible={Boolean(detailContract)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDetailContract(null)}
+      {/* Settings Full-Screen Page */}
+      <FullScreenFormModal
+        visible={settingsOpen}
+        title="Cài đặt cảnh báo hết hạn"
+        cancelLabel="Hủy"
+        onSave={() => void onSaveSettings()}
+        saving={savingSettings}
+        onClose={() => setSettingsOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setDetailContract(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            {detailContract ? (
+        <View style={{ gap: 8 }}>
+          <Text style={styles.label}>Báo trước số ngày (1–365)</Text>
+          <TextInput
+            value={settingDaysStr}
+            onChangeText={setSettingDaysStr}
+            keyboardType="numeric"
+            style={styles.field}
+          />
+          <Pressable
+            disabled={savingSettings}
+            onPress={() => void onSaveSettings()}
+            style={[styles.submitBtn, savingSettings && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{savingSettings ? 'Đang lưu...' : 'Lưu cài đặt'}</Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
+
+      {/* Contract Detail Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(detailContract)}
+        title="Chi tiết hợp đồng"
+        onClose={() => setDetailContract(null)}
+      >
+        {detailContract ? (
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.rowTitle}>
+              {detailContract.employeeName || detailContract.employeeEmail || 'Nhân sự'}
+            </Text>
+            <Text style={styles.subMeta}>
+              Loại hợp đồng: {detailContract.contractType || 'Hợp đồng lao động'}
+            </Text>
+            <Text style={styles.subMeta}>
+              Trạng thái: {statusLabel(detailContract.status)}
+            </Text>
+            <Text style={styles.subMeta}>
+              Thời hạn: {formatViDate(detailContract.startDate)} →{' '}
+              {formatViDate(detailContract.endDate)}
+            </Text>
+            {detailContract.note ? (
               <>
-                <View style={styles.headRow}>
-                  <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>
-                    Chi tiết hợp đồng
-                  </Text>
-                  <Pressable onPress={() => setDetailContract(null)}>
-                    <Text style={styles.closeText}>Đóng</Text>
-                  </Pressable>
-                </View>
-                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-                  <View style={{ gap: 8, paddingBottom: 12 }}>
-                    <Text style={styles.rowTitle}>
-                      {detailContract.employeeName || detailContract.employeeEmail || 'Nhân sự'}
-                    </Text>
-                    <Text style={styles.subMeta}>
-                      Loại hợp đồng: {detailContract.contractType || 'Hợp đồng lao động'}
-                    </Text>
-                    <Text style={styles.subMeta}>
-                      Trạng thái: {statusLabel(detailContract.status)}
-                    </Text>
-                    <Text style={styles.subMeta}>
-                      Thời hạn: {formatViDate(detailContract.startDate)} →{' '}
-                      {formatViDate(detailContract.endDate)}
-                    </Text>
-                    {detailContract.note ? (
-                      <>
-                        <Text style={styles.label}>Ghi chú</Text>
-                        <Text style={styles.muted}>{detailContract.note}</Text>
-                      </>
-                    ) : null}
-                    {(detailContract.contractFileUrl ||
-                      detailContract.signedImageUrl ||
-                      detailContract.electronicSignatureUrl) ? (
-                      <>
-                        <Text style={styles.label}>Tệp đính kèm</Text>
-                        <View style={styles.wrapRow}>
-                          {detailContract.contractFileUrl ? (
-                            <Pressable
-                              onPress={() => void Linking.openURL(detailContract.contractFileUrl!)}
-                              style={styles.fileChip}
-                            >
-                              <FileText size={12} color={colors.primary} />
-                              <Text style={styles.fileChipText}>
-                                {detailContract.contractFileName || 'File hợp đồng'}
-                              </Text>
-                            </Pressable>
-                          ) : null}
-                          {detailContract.signedImageUrl ? (
-                            <Pressable
-                              onPress={() => void Linking.openURL(detailContract.signedImageUrl!)}
-                              style={styles.fileChip}
-                            >
-                              <ExternalLink size={12} color="#16885A" />
-                              <Text style={[styles.fileChipText, { color: '#16885A' }]}>
-                                Ảnh đã ký
-                              </Text>
-                            </Pressable>
-                          ) : null}
-                          {detailContract.electronicSignatureUrl ? (
-                            <Pressable
-                              onPress={() =>
-                                void Linking.openURL(detailContract.electronicSignatureUrl!)
-                              }
-                              style={styles.fileChip}
-                            >
-                              <ExternalLink size={12} color="#7C3AED" />
-                              <Text style={[styles.fileChipText, { color: '#7C3AED' }]}>
-                                Chữ ký điện tử
-                              </Text>
-                            </Pressable>
-                          ) : null}
-                        </View>
-                      </>
-                    ) : null}
-                    {canManage ? (
-                      <View style={styles.actionRow}>
-                        <Pressable
-                          onPress={() => {
-                            const target = detailContract;
-                            setDetailContract(null);
-                            openContractModal(target);
-                          }}
-                          style={[styles.submitBtn, { flex: 1, marginTop: 0 }]}
-                        >
-                          <Text style={styles.submitBtnText}>Chỉnh sửa</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => {
-                            const target = detailContract;
-                            setDetailContract(null);
-                            openExtendModal(target);
-                          }}
-                          style={[styles.submitBtn, { flex: 1, marginTop: 0, backgroundColor: '#16885A' }]}
-                        >
-                          <Text style={styles.submitBtnText}>Gia hạn</Text>
-                        </Pressable>
-                      </View>
-                    ) : null}
-                  </View>
-                </ScrollView>
+                <Text style={styles.label}>Ghi chú</Text>
+                <Text style={styles.muted}>{detailContract.note}</Text>
               </>
             ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Extension Detail Modal */}
-      <Modal
-        visible={Boolean(detailExtension)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDetailExtension(null)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setDetailExtension(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            {detailExtension ? (
+            {(detailContract.contractFileUrl ||
+              detailContract.signedImageUrl ||
+              detailContract.electronicSignatureUrl) ? (
               <>
-                <View style={styles.headRow}>
-                  <Text style={styles.sheetTitle}>Chi tiết gia hạn hợp đồng</Text>
-                  <Pressable onPress={() => setDetailExtension(null)}>
-                    <Text style={styles.closeText}>Đóng</Text>
-                  </Pressable>
-                </View>
-                <View style={{ gap: 8 }}>
-                  <Text style={styles.rowTitle}>{detailExtension.employeeName}</Text>
-                  <Text style={styles.subMeta}>
-                    Ngày gia hạn: {formatViDate(detailExtension.extensionDate)}
-                  </Text>
-                  <Text style={styles.subMeta}>
-                    Hạn cũ: {formatViDate(detailExtension.previousEndDate)} → Hạn mới:{' '}
-                    {formatViDate(detailExtension.newEndDate)}
-                  </Text>
-                  {detailExtension.reason ? (
-                    <Text style={styles.muted}>Lý do: {detailExtension.reason}</Text>
-                  ) : null}
-                  {detailExtension.extensionFileUrl ? (
+                <Text style={styles.label}>Tệp đính kèm</Text>
+                <View style={styles.wrapRow}>
+                  {detailContract.contractFileUrl ? (
                     <Pressable
-                      onPress={() => void Linking.openURL(detailExtension.extensionFileUrl!)}
-                      style={[styles.fileChip, { alignSelf: 'flex-start' }]}
+                      onPress={() => void Linking.openURL(detailContract.contractFileUrl!)}
+                      style={styles.fileChip}
                     >
                       <FileText size={12} color={colors.primary} />
                       <Text style={styles.fileChipText}>
-                        {detailExtension.extensionFileName || 'Phụ lục gia hạn'}
+                        {detailContract.contractFileName || 'File hợp đồng'}
                       </Text>
                     </Pressable>
                   ) : null}
-                  {detailExtension.signedImageUrl ? (
+                  {detailContract.signedImageUrl ? (
                     <Pressable
-                      onPress={() => void Linking.openURL(detailExtension.signedImageUrl!)}
-                      style={[styles.fileChip, { alignSelf: 'flex-start' }]}
+                      onPress={() => void Linking.openURL(detailContract.signedImageUrl!)}
+                      style={styles.fileChip}
                     >
                       <ExternalLink size={12} color="#16885A" />
                       <Text style={[styles.fileChipText, { color: '#16885A' }]}>
-                        Ảnh gia hạn đã ký
+                        Ảnh đã ký
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {detailContract.electronicSignatureUrl ? (
+                    <Pressable
+                      onPress={() =>
+                        void Linking.openURL(detailContract.electronicSignatureUrl!)
+                      }
+                      style={styles.fileChip}
+                    >
+                      <ExternalLink size={12} color="#7C3AED" />
+                      <Text style={[styles.fileChipText, { color: '#7C3AED' }]}>
+                        Chữ ký điện tử
                       </Text>
                     </Pressable>
                   ) : null}
                 </View>
               </>
             ) : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
+            {canManage ? (
+              <View style={styles.actionRow}>
+                <Pressable
+                  onPress={() => {
+                    const target = detailContract;
+                    setDetailContract(null);
+                    openContractModal(target);
+                  }}
+                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }]}
+                >
+                  <Text style={styles.submitBtnText}>Chỉnh sửa</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    const target = detailContract;
+                    setDetailContract(null);
+                    openExtendModal(target);
+                  }}
+                  style={[styles.submitBtn, { flex: 1, marginTop: 0, backgroundColor: '#16885A' }]}
+                >
+                  <Text style={styles.submitBtnText}>Gia hạn</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+      </FullScreenFormModal>
+
+      {/* Extension Detail Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(detailExtension)}
+        title="Chi tiết gia hạn hợp đồng"
+        onClose={() => setDetailExtension(null)}
+      >
+        {detailExtension ? (
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.rowTitle}>{detailExtension.employeeName}</Text>
+            <Text style={styles.subMeta}>
+              Ngày gia hạn: {formatViDate(detailExtension.extensionDate)}
+            </Text>
+            <Text style={styles.subMeta}>
+              Hạn cũ: {formatViDate(detailExtension.previousEndDate)} → Hạn mới:{' '}
+              {formatViDate(detailExtension.newEndDate)}
+            </Text>
+            {detailExtension.reason ? (
+              <Text style={styles.muted}>Lý do: {detailExtension.reason}</Text>
+            ) : null}
+            {detailExtension.extensionFileUrl ? (
+              <Pressable
+                onPress={() => void Linking.openURL(detailExtension.extensionFileUrl!)}
+                style={[styles.fileChip, { alignSelf: 'flex-start' }]}
+              >
+                <FileText size={12} color={colors.primary} />
+                <Text style={styles.fileChipText}>
+                  {detailExtension.extensionFileName || 'Phụ lục gia hạn'}
+                </Text>
+              </Pressable>
+            ) : null}
+            {detailExtension.signedImageUrl ? (
+              <Pressable
+                onPress={() => void Linking.openURL(detailExtension.signedImageUrl!)}
+                style={[styles.fileChip, { alignSelf: 'flex-start' }]}
+              >
+                <ExternalLink size={12} color="#16885A" />
+                <Text style={[styles.fileChipText, { color: '#16885A' }]}>
+                  Ảnh gia hạn đã ký
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+      </FullScreenFormModal>
     </ScrollView>
+    {canManage ? (
+      <HrFab
+        label={subTab === 'extensions' ? 'Thêm gia hạn' : 'Thêm hợp đồng'}
+        onPress={() => (subTab === 'extensions' ? openExtendModal() : openContractModal())}
+      />
+    ) : null}
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  content: { paddingHorizontal: 18, paddingBottom: 28 },
-  segmentRow: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 11, padding: 3, marginBottom: 10 },
-  segmentBtn: { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
-  segmentBtnActive: { backgroundColor: colors.white },
-  segmentText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  segmentTextActive: { color: colors.ink },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  iconActionBtn: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
-  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-  alertBanner: { backgroundColor: '#FFFBEB', borderColor: '#FDE68A', padding: 11, marginBottom: 10, gap: 4 },
-  alertTitle: { color: '#92400E', fontSize: 11, fontWeight: '800', flex: 1 },
-  alertItem: { color: '#92400E', fontSize: 10 },
-  missingBanner: { backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', padding: 11, marginBottom: 10 },
-  missingTitle: { color: colors.ink, fontSize: 11, fontWeight: '700' },
-  missingChip: { backgroundColor: colors.white, borderColor: '#9BC5FF', borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 99 },
-  missingChipText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
+} as const;
 
-  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
-  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
-  list: { gap: 10 },
-  card: { padding: 13, gap: 6 },
+const styles = StyleSheet.create({
+  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
+  segmentRow: { flexDirection: 'row', backgroundColor: '#EAF1FA', borderRadius: 10, padding: 3, marginBottom: 10 },
+  segmentBtn: { flex: 1, paddingVertical: 7.5, borderRadius: 8, alignItems: 'center' },
+  segmentBtnActive: { backgroundColor: colors.white },
+  segmentText: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
+  segmentTextActive: { color: '#111827', fontWeight: '600' },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  searchField: { flex: 1, backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, height: 40, fontSize: 13.5, color: '#111827' },
+  iconActionBtn: { ...HAIRLINE_CARD, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.primary, minHeight: 40, paddingHorizontal: 12, borderRadius: 10 },
+  primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
+  alertBanner: { ...HAIRLINE_CARD, backgroundColor: '#FFFBEB', borderColor: '#FDE68A', padding: 12, marginBottom: 10, gap: 4 },
+  alertTitle: { color: '#92400E', fontSize: 12.5, fontWeight: '600', flex: 1 },
+  alertItem: { color: '#92400E', fontSize: 11.5 },
+  missingBanner: { ...HAIRLINE_CARD, backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', padding: 12, marginBottom: 10 },
+  missingTitle: { color: '#111827', fontSize: 12.5, fontWeight: '600' },
+  missingChip: { backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99 },
+  missingChipText: { color: colors.primary, fontSize: 11.5, fontWeight: '500' },
+
+  stateCard: { ...HAIRLINE_CARD, padding: 22, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
+  list: {
+    marginHorizontal: -14,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+    gap: 0,
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 5,
+  },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  subMeta: { color: colors.muted, fontSize: 10 },
-  statusBadge: { color: '#475569', backgroundColor: '#F1F5F9', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
+  subMeta: { color: '#6B7280', fontSize: 11.5, fontWeight: '400' },
+  statusBadge: { color: '#475569', backgroundColor: '#F1F5F9', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8, overflow: 'hidden' },
   statusActive: { color: '#16885A', backgroundColor: '#E9F8F1' },
   statusWarn: { color: '#B45309', backgroundColor: '#FFF3E5' },
   statusDanger: { color: '#B91C1C', backgroundColor: '#FEE2E2' },
-  fileChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  fileChipText: { color: colors.primary, fontSize: 10, fontWeight: '700', maxWidth: 150 },
+  fileChip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 },
+  fileChipText: { color: colors.primary, fontSize: 11, fontWeight: '500', maxWidth: 150 },
   actionRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  smallEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EAF2FF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 8 },
-  smallEditBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  smallExtendBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E9F8F1', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 8 },
-  smallExtendBtnText: { color: '#16885A', fontSize: 11, fontWeight: '700' },
+  smallEditBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
+  smallEditBtnText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  smallExtendBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E9F8F1', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
+  smallExtendBtnText: { color: '#16885A', fontSize: 12, fontWeight: '600' },
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
-  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '90%' },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
-  datePickerField: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  datePickerText: { color: colors.ink, fontSize: 12 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '90%' },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  closeText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
+  field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
+  datePickerField: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  datePickerText: { color: '#111827', fontSize: 13.5 },
   datePickerActions: { flexDirection: 'row', justifyContent: 'flex-end', alignSelf: 'stretch', gap: 8, marginTop: 8 },
-  outlineBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10 },
-  outlineBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  outlineBtn: { ...HAIRLINE_CARD, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, paddingVertical: 8 },
+  outlineBtnText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  chip: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  chipTextActive: { color: colors.white },
-  uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#EAF2FF', borderColor: '#9BC5FF', borderWidth: 1, borderStyle: 'dashed', borderRadius: 11, paddingVertical: 10, paddingHorizontal: 12 },
-  uploadBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  chipText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
+  uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#F5F9FF', borderColor: '#9BC5FF', borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12 },
+  uploadBtnText: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
   disabled: { opacity: 0.45 },
 });
 

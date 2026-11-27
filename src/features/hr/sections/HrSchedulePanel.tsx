@@ -1,4 +1,5 @@
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -28,6 +29,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { HrFab } from '@/features/hr/components/HrFab';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -786,8 +788,8 @@ function AttendanceAndCalendarSection({
               value={monthlySearch}
               onChangeText={setMonthlySearch}
               placeholder="Tìm nhân viên theo tên..."
-              placeholderTextColor={colors.muted}
-              style={[styles.field, { marginBottom: 10 }]}
+              placeholderTextColor="#94A3B8"
+              style={[styles.searchField, { marginBottom: 12 }]}
             />
           ) : null}
 
@@ -1150,8 +1152,8 @@ function AttendanceAndCalendarSection({
                   <Card
                     key={hol._id || `${hol.date}-${hol.name}`}
                     style={[
-                      styles.card,
-                      { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+                      styles.listItem,
+                      { backgroundColor: '#FEF2F2' },
                       !hol.isApplied && { opacity: 0.65 },
                     ]}
                   >
@@ -1181,7 +1183,7 @@ function AttendanceAndCalendarSection({
                   const clockText = sClock ? (eClock && eClock !== sClock ? `${sClock} – ${eClock}` : sClock) : '';
                   const isMergedLeave = ev.id.startsWith('leave_app_');
                   return (
-                    <Card key={ev.id} style={styles.card}>
+                    <Card key={ev.id} style={styles.listItem}>
                       <View style={styles.headRow}>
                         <Text style={[styles.badgeInfo, { backgroundColor: palette.bg, color: palette.fg }]}>
                           {EVENT_TYPE_LABELS[ev.type] || ev.type}
@@ -1209,96 +1211,94 @@ function AttendanceAndCalendarSection({
         </>
       )}
 
-      {/* Edit attendance modal */}
-      <Modal visible={Boolean(editingRec)} transparent animationType="slide" onRequestClose={() => setEditingRec(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setEditingRec(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Chỉnh sửa chấm công</Text>
-              <Pressable onPress={() => setEditingRec(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
+      {/* Edit attendance full-screen page */}
+      <FullScreenFormModal
+        visible={Boolean(editingRec)}
+        title="Chỉnh sửa chấm công"
+        cancelLabel="Hủy"
+        onSave={() => void onSaveRec()}
+        saving={savingRec}
+        onClose={() => setEditingRec(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.muted}>
+            {editingRec?.employeeName || editingRec?.displayName} · {formatViDate(editingRec?.date)}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Giờ vào (HH:mm)</Text>
+              <TextInput value={editIn} onChangeText={setEditIn} placeholder="08:30" style={styles.field} />
             </View>
-            <Text style={styles.muted}>
-              {editingRec?.employeeName || editingRec?.displayName} · {formatViDate(editingRec?.date)}
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Giờ vào (HH:mm)</Text>
-                <TextInput value={editIn} onChangeText={setEditIn} placeholder="08:30" style={styles.field} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Giờ ra (HH:mm)</Text>
-                <TextInput value={editOut} onChangeText={setEditOut} placeholder="17:30" style={styles.field} />
-              </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Giờ ra (HH:mm)</Text>
+              <TextInput value={editOut} onChangeText={setEditOut} placeholder="17:30" style={styles.field} />
             </View>
-            <Text style={styles.label}>Ghi chú</Text>
-            <TextInput value={editNote} onChangeText={setEditNote} placeholder="Lý do điều chỉnh..." style={styles.field} />
-            <Pressable
-              disabled={savingRec}
-              onPress={() => void onSaveRec()}
-              style={[styles.submitBtn, savingRec && styles.disabled]}
-            >
-              <Text style={styles.submitBtnText}>{savingRec ? 'Đang lưu...' : 'Lưu điều chỉnh'}</Text>
-            </Pressable>
+          </View>
+          <Text style={styles.label}>Ghi chú</Text>
+          <TextInput value={editNote} onChangeText={setEditNote} placeholder="Lý do điều chỉnh..." style={styles.field} />
+          <Pressable
+            disabled={savingRec}
+            onPress={() => void onSaveRec()}
+            style={[styles.submitBtn, savingRec && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{savingRec ? 'Đang lưu...' : 'Lưu điều chỉnh'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
-      {/* Create Calendar Event Modal */}
-      <Modal visible={eventModalOpen} transparent animationType="slide" onRequestClose={() => setEventModalOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setEventModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Thêm lịch làm việc</Text>
-              <Pressable onPress={() => setEventModalOpen(false)}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Create Calendar Event full-screen page */}
+      <FullScreenFormModal
+        visible={eventModalOpen}
+        title="Thêm lịch làm việc"
+        cancelLabel="Hủy"
+        onSave={() => void onCreateEvent()}
+        saving={savingEv}
+        onClose={() => setEventModalOpen(false)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Loại lịch</Text>
+          <View style={styles.wrapRow}>
+            {(Object.keys(EVENT_TYPE_LABELS) as HrCalendarEventType[]).map((t) => (
+              <Pressable
+                key={t}
+                onPress={() => setEvType(t)}
+                style={[styles.chip, evType === t && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, evType === t && styles.chipTextActive]}>
+                  {EVENT_TYPE_LABELS[t]}
+                </Text>
               </Pressable>
+            ))}
+          </View>
+          <Text style={styles.label}>Tiêu đề *</Text>
+          <TextInput value={evTitle} onChangeText={setEvTitle} placeholder="VD: Họp giao ban đầu tuần" style={styles.field} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Từ ngày (YYYY-MM-DD)</Text>
+              <TextInput value={evStart} onChangeText={setEvStart} style={styles.field} />
             </View>
-            <Text style={styles.label}>Loại lịch</Text>
-            <View style={styles.wrapRow}>
-              {(Object.keys(EVENT_TYPE_LABELS) as HrCalendarEventType[]).map((t) => (
-                <Pressable
-                  key={t}
-                  onPress={() => setEvType(t)}
-                  style={[styles.chip, evType === t && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, evType === t && styles.chipTextActive]}>
-                    {EVENT_TYPE_LABELS[t]}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Đến ngày</Text>
+              <TextInput value={evEnd} onChangeText={setEvEnd} style={styles.field} />
             </View>
-            <Text style={styles.label}>Tiêu đề *</Text>
-            <TextInput value={evTitle} onChangeText={setEvTitle} placeholder="VD: Họp giao ban đầu tuần" style={styles.field} />
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Từ ngày (YYYY-MM-DD)</Text>
-                <TextInput value={evStart} onChangeText={setEvStart} style={styles.field} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Đến ngày</Text>
-                <TextInput value={evEnd} onChangeText={setEvEnd} style={styles.field} />
-              </View>
-            </View>
-            <Text style={styles.label}>Mô tả</Text>
-            <TextInput
-              value={evDesc}
-              onChangeText={setEvDesc}
-              multiline
-              placeholder="Ghi chú chi tiết..."
-              style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]}
-            />
-            <Pressable
-              disabled={savingEv}
-              onPress={() => void onCreateEvent()}
-              style={[styles.submitBtn, savingEv && styles.disabled]}
-            >
-              <Text style={styles.submitBtnText}>{savingEv ? 'Đang lưu...' : 'Tạo lịch'}</Text>
-            </Pressable>
+          </View>
+          <Text style={styles.label}>Mô tả</Text>
+          <TextInput
+            value={evDesc}
+            onChangeText={setEvDesc}
+            multiline
+            placeholder="Ghi chú chi tiết..."
+            style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]}
+          />
+          <Pressable
+            disabled={savingEv}
+            onPress={() => void onCreateEvent()}
+            style={[styles.submitBtn, savingEv && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>{savingEv ? 'Đang lưu...' : 'Tạo lịch'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
     </ScrollView>
   );
@@ -1496,13 +1496,10 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1 }}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 92 }]} showsVerticalScrollIndicator={false}>
       <View style={[styles.headRow, { marginBottom: 10 }]}>
         <Text style={styles.sectionTitle}>Danh sách ca làm việc ({shifts.length})</Text>
-        <Pressable onPress={() => openEditor()} style={styles.primaryBtn}>
-          <Plus size={13} color={colors.white} />
-          <Text style={styles.primaryBtnText}>Thêm ca</Text>
-        </Pressable>
       </View>
 
       {loading ? (
@@ -1516,7 +1513,7 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
       ) : (
         <View style={styles.list}>
           {shifts.map((s) => (
-            <Card key={s._id} style={styles.card}>
+            <Card key={s._id} style={styles.listItem}>
               <View style={styles.headRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                   <View style={[styles.colorDot, { backgroundColor: s.color || colors.primary }]} />
@@ -1619,7 +1616,7 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
                   prev.includes(emp._id) ? prev.filter((id) => id !== emp._id) : [...prev, emp._id],
                 )
               }
-              style={[styles.card, checked && { borderColor: colors.primary, backgroundColor: '#F0F7FF' }]}
+              style={[styles.listItem, checked && { backgroundColor: '#F0F7FF' }]}
             >
               <View style={styles.headRow}>
                 <View style={{ flex: 1 }}>
@@ -1637,109 +1634,102 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
         })}
       </View>
 
-      {/* Edit / Create Shift Modal */}
-      <Modal visible={Boolean(editing)} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setEditing(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>
-                {editing === 'new' ? 'Thêm ca làm việc' : 'Chỉnh sửa ca làm việc'}
-              </Text>
-              <Pressable onPress={() => setEditing(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Edit / Create Shift Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(editing)}
+        title={editing === 'new' ? 'Thêm ca làm việc' : 'Chỉnh sửa ca làm việc'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveShift()}
+        saving={saving}
+        onClose={() => setEditing(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Mã ca *</Text>
+              <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="CA_SANG" style={styles.field} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Tên ca *</Text>
+              <TextInput value={name} onChangeText={setName} placeholder="Ca hành chính" style={styles.field} />
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Bắt đầu</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openShiftTimePicker('startTime')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>{startTime}</Text>
+                <Clock3 size={15} color={colors.primary} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
-              <View style={{ gap: 8 }}>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Mã ca *</Text>
-                    <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="CA_SANG" style={styles.field} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Tên ca *</Text>
-                    <TextInput value={name} onChangeText={setName} placeholder="Ca hành chính" style={styles.field} />
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Bắt đầu</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openShiftTimePicker('startTime')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>{startTime}</Text>
-                      <Clock3 size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Kết thúc</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openShiftTimePicker('endTime')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>{endTime}</Text>
-                      <Clock3 size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Nghỉ trưa từ</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openShiftTimePicker('lunchStart')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>{lunchStart}</Text>
-                      <Clock3 size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Đến</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openShiftTimePicker('lunchEnd')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>{lunchEnd}</Text>
-                      <Clock3 size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                </View>
-                <Text style={styles.label}>Ngày làm việc trong tuần</Text>
-                <View style={styles.wrapRow}>
-                  {DAYS_OF_WEEK.map((d) => {
-                    const active = workingDays.includes(d.v);
-                    return (
-                      <Pressable
-                        key={d.v}
-                        onPress={() =>
-                          setWorkingDays((prev) =>
-                            prev.includes(d.v) ? prev.filter((x) => x !== d.v) : [...prev, d.v],
-                          )
-                        }
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <View style={styles.switchRow}>
-                  <Text style={styles.label}>Đặt làm ca mặc định</Text>
-                  <Switch value={isDefault} onValueChange={setIsDefault} trackColor={{ true: colors.primary, false: '#CBD5E1' }} />
-                </View>
-                <Pressable disabled={saving} onPress={() => void onSaveShift()} style={[styles.submitBtn, saving && styles.disabled]}>
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu ca làm việc'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Kết thúc</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openShiftTimePicker('endTime')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>{endTime}</Text>
+                <Clock3 size={15} color={colors.primary} />
+              </Pressable>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Nghỉ trưa từ</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openShiftTimePicker('lunchStart')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>{lunchStart}</Text>
+                <Clock3 size={15} color={colors.primary} />
+              </Pressable>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Đến</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openShiftTimePicker('lunchEnd')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>{lunchEnd}</Text>
+                <Clock3 size={15} color={colors.primary} />
+              </Pressable>
+            </View>
+          </View>
+          <Text style={styles.label}>Ngày làm việc trong tuần</Text>
+          <View style={styles.wrapRow}>
+            {DAYS_OF_WEEK.map((d) => {
+              const active = workingDays.includes(d.v);
+              return (
+                <Pressable
+                  key={d.v}
+                  onPress={() =>
+                    setWorkingDays((prev) =>
+                      prev.includes(d.v) ? prev.filter((x) => x !== d.v) : [...prev, d.v],
+                    )
+                  }
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
                 </Pressable>
-              </View>
-            </ScrollView>
+              );
+            })}
+          </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Đặt làm ca mặc định</Text>
+            <Switch value={isDefault} onValueChange={setIsDefault} trackColor={{ true: colors.primary, false: '#CBD5E1' }} />
+          </View>
+          <Pressable disabled={saving} onPress={() => void onSaveShift()} style={[styles.submitBtn, saving && styles.disabled]}>
+            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu ca làm việc'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS !== 'android' && activeTimePicker ? (
         <Modal
@@ -1813,6 +1803,8 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
         </Modal>
       ) : null}
     </ScrollView>
+    <HrFab label="Thêm ca làm việc" onPress={() => openEditor()} />
+    </View>
   );
 }
 
@@ -1957,7 +1949,8 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1 }}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 92 }]} showsVerticalScrollIndicator={false}>
       <View style={[styles.headRow, { marginBottom: 10 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Pressable onPress={() => setYear((y) => y - 1)} style={styles.iconBtn}>
@@ -1973,19 +1966,6 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
             <RefreshCw size={13} color={colors.primary} />
             <Text style={styles.outlineBtnText}>{syncing ? '...' : 'Đồng bộ'}</Text>
           </Pressable>
-          <Pressable
-            onPress={() => {
-              setEditingId(null);
-              setFDate(`${year}-01-01`);
-              setFName('');
-              setFType('holiday');
-              setFormOpen(true);
-            }}
-            style={styles.primaryBtn}
-          >
-            <Plus size={13} color={colors.white} />
-            <Text style={styles.primaryBtnText}>Thêm ngày</Text>
-          </Pressable>
         </View>
       </View>
 
@@ -2000,7 +1980,7 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
       ) : (
         <View style={styles.list}>
           {days.map((day) => (
-            <Card key={day._id} style={[styles.card, !day.isApplied && { opacity: 0.55 }]}>
+            <Card key={day._id} style={[styles.listItem, !day.isApplied && { opacity: 0.55 }]}>
               <View style={styles.headRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.rowTitle}>{day.name}</Text>
@@ -2039,42 +2019,40 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
       )}
 
       {/* Create / Edit Holiday Modal */}
-      <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setFormOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>{editingId ? 'Sửa ngày công ty' : 'Thêm ngày công ty'}</Text>
-              <Pressable onPress={() => setFormOpen(false)}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.label}>Ngày *</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={openHolidayDatePicker}
-              style={styles.pickerField}
-            >
-              <Text style={styles.pickerFieldText}>{formatViDate(fDate)}</Text>
-              <CalendarDays size={15} color={colors.primary} />
-            </Pressable>
-            <Text style={styles.label}>Tên ngày *</Text>
-            <TextInput value={fName} onChangeText={setFName} placeholder="VD: Tết Dương Lịch" style={styles.field} />
-            <Text style={styles.label}>Loại ngày</Text>
-            <View style={styles.wrapRow}>
-              {(Object.keys(HOLIDAY_TYPE_LABELS) as HrWorkCalendarDayType[]).map((t) => (
-                <Pressable key={t} onPress={() => setFType(t)} style={[styles.chip, fType === t && styles.chipActive]}>
-                  <Text style={[styles.chipText, fType === t && styles.chipTextActive]}>
-                    {HOLIDAY_TYPE_LABELS[t]}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable onPress={() => void onSaveDay()} style={styles.submitBtn}>
-              <Text style={styles.submitBtnText}>Lưu thay đổi</Text>
-            </Pressable>
+      <FullScreenFormModal
+        visible={formOpen}
+        title={editingId ? 'Sửa ngày công ty' : 'Thêm ngày công ty'}
+        cancelLabel="Hủy"
+        onSave={() => void onSaveDay()}
+        onClose={() => setFormOpen(false)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Ngày *</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={openHolidayDatePicker}
+            style={styles.pickerField}
+          >
+            <Text style={styles.pickerFieldText}>{formatViDate(fDate)}</Text>
+            <CalendarDays size={15} color={colors.primary} />
           </Pressable>
-        </Pressable>
-      </Modal>
+          <Text style={styles.label}>Tên ngày *</Text>
+          <TextInput value={fName} onChangeText={setFName} placeholder="VD: Tết Dương Lịch" style={styles.field} />
+          <Text style={styles.label}>Loại ngày</Text>
+          <View style={styles.wrapRow}>
+            {(Object.keys(HOLIDAY_TYPE_LABELS) as HrWorkCalendarDayType[]).map((t) => (
+              <Pressable key={t} onPress={() => setFType(t)} style={[styles.chip, fType === t && styles.chipActive]}>
+                <Text style={[styles.chipText, fType === t && styles.chipTextActive]}>
+                  {HOLIDAY_TYPE_LABELS[t]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable onPress={() => void onSaveDay()} style={styles.submitBtn}>
+            <Text style={styles.submitBtnText}>Lưu thay đổi</Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS !== 'android' && activeHolidayDatePicker ? (
         <Modal
@@ -2111,31 +2089,41 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
         </Modal>
       ) : null}
 
-      {/* Disable Reason Modal */}
-      <Modal visible={Boolean(disableTarget)} transparent animationType="slide" onRequestClose={() => setDisableTarget(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setDisableTarget(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>Tắt áp dụng {disableTarget?.name}</Text>
-              <Pressable onPress={() => setDisableTarget(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.label}>Lý do tắt áp dụng *</Text>
-            <TextInput
-              value={disableReason}
-              onChangeText={setDisableReason}
-              multiline
-              placeholder="Nhập lý do chi tiết..."
-              style={[styles.field, { minHeight: 72, textAlignVertical: 'top' }]}
-            />
-            <Pressable onPress={() => void onConfirmDisable()} style={styles.submitBtn}>
-              <Text style={styles.submitBtnText}>Xác nhận</Text>
-            </Pressable>
+      {/* Disable Reason Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(disableTarget)}
+        title={`Tắt áp dụng ${disableTarget?.name || ''}`}
+        cancelLabel="Hủy"
+        onSave={() => void onConfirmDisable()}
+        saveLabel="Xác nhận"
+        onClose={() => setDisableTarget(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Lý do tắt áp dụng *</Text>
+          <TextInput
+            value={disableReason}
+            onChangeText={setDisableReason}
+            multiline
+            placeholder="Nhập lý do chi tiết..."
+            style={[styles.field, { minHeight: 72, textAlignVertical: 'top' }]}
+          />
+          <Pressable onPress={() => void onConfirmDisable()} style={styles.submitBtn}>
+            <Text style={styles.submitBtnText}>Xác nhận</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
+    <HrFab
+      label="Thêm ngày nghỉ"
+      onPress={() => {
+        setEditingId(null);
+        setFDate(`${year}-01-01`);
+        setFName('');
+        setFType('holiday');
+        setFormOpen(true);
+      }}
+    />
+    </View>
   );
 }
 
@@ -2287,8 +2275,8 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
         value={search}
         onChangeText={setSearch}
         placeholder="Tìm nhân viên theo tên hoặc email..."
-        placeholderTextColor={colors.muted}
-        style={[styles.field, { marginBottom: 10 }]}
+        placeholderTextColor="#94A3B8"
+        style={[styles.searchField, { marginBottom: 12 }]}
       />
 
       {loading ? (
@@ -2304,7 +2292,7 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
           {filtered.map((emp) => {
             const custom = emp.workHoursConfig?.useCustom;
             return (
-              <Card key={emp._id} onPress={() => openEdit(emp)} style={styles.card}>
+              <Card key={emp._id} onPress={() => openEdit(emp)} style={styles.listItem}>
                 <View style={styles.headRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>{emp.displayName || emp.fullName || emp.email}</Text>
@@ -2322,156 +2310,149 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
         </View>
       )}
 
-      {/* Edit Work Hours Modal */}
-      <Modal visible={Boolean(editing)} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <Pressable style={styles.backdrop} onPress={() => setEditing(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text numberOfLines={1} style={[styles.sheetTitle, { flex: 1 }]}>
-                Giờ làm việc: {editing?.displayName || editing?.email}
-              </Text>
-              <Pressable onPress={() => setEditing(null)}>
-                <Text style={styles.closeText}>Đóng</Text>
+      {/* Edit Work Hours Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(editing)}
+        title={`Giờ làm việc: ${editing?.displayName || editing?.email || ''}`}
+        cancelLabel="Hủy"
+        onSave={() => void onSave()}
+        saving={saving}
+        onClose={() => setEditing(null)}
+      >
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Dùng giờ làm việc riêng</Text>
+            <Switch
+              value={form.useCustom}
+              onValueChange={(v) => setForm((f) => ({ ...f, useCustom: v }))}
+              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
+            />
+          </View>
+
+          <Text style={styles.label}>Trạng thái nhân sự</Text>
+          <View style={styles.wrapRow}>
+            {(['official', 'probation', 'internship'] as const).map((st) => (
+              <Pressable
+                key={st}
+                onPress={() => setForm((f) => ({ ...f, employmentStatus: st }))}
+                style={[styles.chip, form.employmentStatus === st && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, form.employmentStatus === st && styles.chipTextActive]}>
+                  {EMPLOYMENT_STATUS_LABELS[st]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Ngày chính thức</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => openWorkHoursPicker('officialDate')}
+                style={styles.pickerField}
+              >
+                <Text style={styles.pickerFieldText}>
+                  {form.officialDate ? formatViDate(form.officialDate) : 'Chọn ngày'}
+                </Text>
+                <CalendarDays size={15} color={colors.primary} />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-              <View style={{ gap: 8, paddingBottom: 10 }}>
-                <View style={styles.switchRow}>
-                  <Text style={styles.label}>Dùng giờ làm việc riêng</Text>
-                  <Switch
-                    value={form.useCustom}
-                    onValueChange={(v) => setForm((f) => ({ ...f, useCustom: v }))}
-                    trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                  />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>Phép năm riêng</Text>
+              <TextInput
+                value={form.annualLeaveDays != null ? String(form.annualLeaveDays) : ''}
+                onChangeText={(v) =>
+                  setForm((f) => ({ ...f, annualLeaveDays: v.trim() === '' ? undefined : Number(v) }))
+                }
+                keyboardType="numeric"
+                placeholder="Theo công ty"
+                style={styles.field}
+              />
+            </View>
+          </View>
+
+          {form.useCustom ? (
+            <>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Giờ vào</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => openWorkHoursPicker('checkInLimit')}
+                    style={styles.pickerField}
+                  >
+                    <Text style={styles.pickerFieldText}>{form.checkInLimit || '08:30'}</Text>
+                    <Clock3 size={15} color={colors.primary} />
+                  </Pressable>
                 </View>
-
-                <Text style={styles.label}>Trạng thái nhân sự</Text>
-                <View style={styles.wrapRow}>
-                  {(['official', 'probation', 'internship'] as const).map((st) => (
-                    <Pressable
-                      key={st}
-                      onPress={() => setForm((f) => ({ ...f, employmentStatus: st }))}
-                      style={[styles.chip, form.employmentStatus === st && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, form.employmentStatus === st && styles.chipTextActive]}>
-                        {EMPLOYMENT_STATUS_LABELS[st]}
-                      </Text>
-                    </Pressable>
-                  ))}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Giờ ra</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => openWorkHoursPicker('checkOutLimit')}
+                    style={styles.pickerField}
+                  >
+                    <Text style={styles.pickerFieldText}>{form.checkOutLimit || '17:30'}</Text>
+                    <Clock3 size={15} color={colors.primary} />
+                  </Pressable>
                 </View>
-
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Ngày chính thức</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => openWorkHoursPicker('officialDate')}
-                      style={styles.pickerField}
-                    >
-                      <Text style={styles.pickerFieldText}>
-                        {form.officialDate ? formatViDate(form.officialDate) : 'Chọn ngày'}
-                      </Text>
-                      <CalendarDays size={15} color={colors.primary} />
-                    </Pressable>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Phép năm riêng</Text>
-                    <TextInput
-                      value={form.annualLeaveDays != null ? String(form.annualLeaveDays) : ''}
-                      onChangeText={(v) =>
-                        setForm((f) => ({ ...f, annualLeaveDays: v.trim() === '' ? undefined : Number(v) }))
-                      }
-                      keyboardType="numeric"
-                      placeholder="Theo công ty"
-                      style={styles.field}
-                    />
-                  </View>
-                </View>
-
-                {form.useCustom ? (
-                  <>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Giờ vào</Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => openWorkHoursPicker('checkInLimit')}
-                          style={styles.pickerField}
-                        >
-                          <Text style={styles.pickerFieldText}>{form.checkInLimit || '08:30'}</Text>
-                          <Clock3 size={15} color={colors.primary} />
-                        </Pressable>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Giờ ra</Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => openWorkHoursPicker('checkOutLimit')}
-                          style={styles.pickerField}
-                        >
-                          <Text style={styles.pickerFieldText}>{form.checkOutLimit || '17:30'}</Text>
-                          <Clock3 size={15} color={colors.primary} />
-                        </Pressable>
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Nghỉ trưa từ</Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => openWorkHoursPicker('lunchBreakStart')}
-                          style={styles.pickerField}
-                        >
-                          <Text style={styles.pickerFieldText}>{form.lunchBreakStart || '12:00'}</Text>
-                          <Clock3 size={15} color={colors.primary} />
-                        </Pressable>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.label}>Đến</Text>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => openWorkHoursPicker('lunchBreakEnd')}
-                          style={styles.pickerField}
-                        >
-                          <Text style={styles.pickerFieldText}>{form.lunchBreakEnd || '13:00'}</Text>
-                          <Clock3 size={15} color={colors.primary} />
-                        </Pressable>
-                      </View>
-                    </View>
-                    <Text style={styles.label}>Ngày làm việc</Text>
-                    <View style={styles.wrapRow}>
-                      {DAYS_OF_WEEK.map((d) => {
-                        const list = form.workingDays || [];
-                        const active = list.includes(d.v);
-                        return (
-                          <Pressable
-                            key={d.v}
-                            onPress={() =>
-                              setForm((f) => ({
-                                ...f,
-                                workingDays: active ? list.filter((x) => x !== d.v) : [...list, d.v],
-                              }))
-                            }
-                            style={[styles.chip, active && styles.chipActive]}
-                          >
-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  </>
-                ) : (
-                  <Text style={styles.muted}>Nhân viên này đang áp dụng giờ làm việc chung của công ty.</Text>
-                )}
-
-                <Pressable disabled={saving} onPress={() => void onSave()} style={[styles.submitBtn, saving && styles.disabled]}>
-                  <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu cấu hình'}</Text>
-                </Pressable>
               </View>
-            </ScrollView>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Nghỉ trưa từ</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => openWorkHoursPicker('lunchBreakStart')}
+                    style={styles.pickerField}
+                  >
+                    <Text style={styles.pickerFieldText}>{form.lunchBreakStart || '12:00'}</Text>
+                    <Clock3 size={15} color={colors.primary} />
+                  </Pressable>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>Đến</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => openWorkHoursPicker('lunchBreakEnd')}
+                    style={styles.pickerField}
+                  >
+                    <Text style={styles.pickerFieldText}>{form.lunchBreakEnd || '13:00'}</Text>
+                    <Clock3 size={15} color={colors.primary} />
+                  </Pressable>
+                </View>
+              </View>
+              <Text style={styles.label}>Ngày làm việc</Text>
+              <View style={styles.wrapRow}>
+                {DAYS_OF_WEEK.map((d) => {
+                  const list = form.workingDays || [];
+                  const active = list.includes(d.v);
+                  return (
+                    <Pressable
+                      key={d.v}
+                      onPress={() =>
+                        setForm((f) => ({
+                          ...f,
+                          workingDays: active ? list.filter((x) => x !== d.v) : [...list, d.v],
+                        }))
+                      }
+                      style={[styles.chip, active && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : (
+            <Text style={styles.muted}>Nhân viên này đang áp dụng giờ làm việc chung của công ty.</Text>
+          )}
+
+          <Pressable disabled={saving} onPress={() => void onSave()} style={[styles.submitBtn, saving && styles.disabled]}>
+            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu cấu hình'}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
 
       {Platform.OS !== 'android' && activeWorkHoursPicker ? (
         <Modal
@@ -2521,124 +2502,156 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
   );
 }
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
+} as const;
+
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: colors.white },
   subTabScroll: { flexGrow: 0, marginBottom: 10 },
-  subTabRow: { paddingHorizontal: 18, gap: 6 },
+  subTabRow: { paddingHorizontal: 14, gap: 6 },
   subTabPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#EAF2FF',
-    borderColor: '#D6E5FF',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: colors.white,
+    borderColor: '#E5EAF2',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 99,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
   subTabPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  subTabText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  subTabTextActive: { color: colors.white },
+  subTabText: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
+  subTabTextActive: { color: colors.white, fontWeight: '600' },
 
-  content: { paddingHorizontal: 18, paddingBottom: 28 },
-  segmentRow: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 11, padding: 3, marginBottom: 12 },
-  segmentBtn: { flex: 1, paddingVertical: 7, borderRadius: 9, alignItems: 'center' },
+  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
+  segmentRow: { flexDirection: 'row', backgroundColor: '#EAF1FA', borderRadius: 10, padding: 3, marginBottom: 12 },
+  segmentBtn: { flex: 1, paddingVertical: 7.5, borderRadius: 8, alignItems: 'center' },
   segmentBtnActive: { backgroundColor: colors.white },
-  segmentText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  segmentTextActive: { color: colors.ink },
+  segmentText: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
+  segmentTextActive: { color: '#111827', fontWeight: '600' },
 
+  dateBar: { ...HAIRLINE_CARD, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 8, marginBottom: 10 },
+  dateBarText: { color: '#111827', fontSize: 13.5, fontWeight: '600' },
+  iconBtn: { width: 32, height: 32, borderRadius: 9, backgroundColor: '#F5F8FD', alignItems: 'center', justifyContent: 'center' },
 
-  dateBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 8, marginBottom: 10 },
-  dateBarText: { color: colors.ink, fontSize: 12, fontWeight: '800' },
-  iconBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#EAF2FF', alignItems: 'center', justifyContent: 'center' },
+  kpiRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  kpiBox: { ...HAIRLINE_CARD, flex: 1, paddingVertical: 10, alignItems: 'center' },
+  kpiVal: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  kpiLabel: { color: colors.muted, fontSize: 10.5, fontWeight: '400', marginTop: 2 },
 
-  kpiRow: { flexDirection: 'row', gap: 7, marginBottom: 12 },
-  kpiBox: { flex: 1, backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingVertical: 8, alignItems: 'center' },
-  kpiVal: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  kpiLabel: { color: colors.muted, fontSize: 9, fontWeight: '700', marginTop: 2 },
-
-  calCard: { padding: 10, marginTop: 10, marginBottom: 12 },
+  calCard: { ...HAIRLINE_CARD, padding: 12, marginTop: 10, marginBottom: 12 },
   calHeaderRow: { flexDirection: 'row', marginBottom: 6 },
-  calHeaderText: { width: '14.285%', textAlign: 'center', color: colors.muted, fontSize: 10, fontWeight: '700' },
+  calHeaderText: { width: '14.285%', textAlign: 'center', color: '#6B7280', fontSize: 11, fontWeight: '500' },
   calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   calCell: { width: '14.285%', height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
   calCellToday: { backgroundColor: '#EAF2FF' },
   calCellSelected: { backgroundColor: colors.primary },
-  calDayNum: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  calDayNum: { color: '#111827', fontSize: 12.5, fontWeight: '500' },
   dotRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2, height: 8 },
   dot: { width: 4, height: 4, borderRadius: 2 },
-  calMoreText: { fontSize: 8, fontWeight: '800', color: colors.primary, lineHeight: 8 },
+  calMoreText: { fontSize: 8.5, fontWeight: '600', color: colors.primary, lineHeight: 8 },
 
-  list: { gap: 9 },
-  card: { padding: 12, gap: 5 },
+  list: {
+    marginHorizontal: -14,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+    gap: 0,
+  },
+  listItem: {
+    backgroundColor: colors.white,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  card: { ...HAIRLINE_CARD, padding: 14, gap: 5 },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  subMeta: { color: colors.muted, fontSize: 10 },
-  sectionTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', marginBottom: 8 },
-  badgeInfo: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
-  badgeNeutral: { color: colors.muted, backgroundColor: '#F1F5F9', fontSize: 9, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, overflow: 'hidden' },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
+  subMeta: { color: '#6B7280', fontSize: 11.5, fontWeight: '400' },
+  sectionTitle: { color: '#111827', fontSize: 15, fontWeight: '700', marginBottom: 10 },
+  badgeInfo: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8, overflow: 'hidden' },
+  badgeNeutral: { color: '#64748B', backgroundColor: '#F1F5F9', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8, overflow: 'hidden' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
-  timeBadge: { color: colors.ink, backgroundColor: '#F8FAFC', borderColor: colors.border, borderWidth: 1, fontSize: 10, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  modeToggle: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 9, padding: 2 },
+  timeBadge: { color: '#111827', backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, fontSize: 11, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
+  modeToggle: { flexDirection: 'row', backgroundColor: '#EAF1FA', borderRadius: 9, padding: 2 },
   modeToggleBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 7 },
   modeToggleActive: { backgroundColor: colors.primary },
-  modeToggleText: { color: colors.muted, fontSize: 10, fontWeight: '800' },
+  modeToggleText: { color: '#6B7280', fontSize: 11, fontWeight: '600' },
   modeToggleTextActive: { color: colors.white },
-  tableWrap: { backgroundColor: colors.white, borderColor: '#DCE7F4', borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  tableWrap: { ...HAIRLINE_CARD, borderColor: '#DCE7F4', overflow: 'hidden' },
   tableContentRow: { flexDirection: 'row' },
-  tableLeft: { width: 174, borderRightWidth: 1.5, borderRightColor: '#BCEAFF', backgroundColor: colors.white },
-  tableHeaderRow: { flexDirection: 'row', alignItems: 'center', height: 46, backgroundColor: '#E8F7FF', borderBottomWidth: 1, borderBottomColor: '#DCE7F4' },
+  tableLeft: { width: 174, borderRightWidth: 1, borderRightColor: '#DCE7F4', backgroundColor: colors.white },
+  tableHeaderRow: { flexDirection: 'row', alignItems: 'center', height: 46, backgroundColor: '#EEF6FF', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#DCE7F4' },
   tableHeaderLeft: { paddingLeft: 2 },
-  thText: { color: '#007EB8', fontSize: 10, fontWeight: '800' },
-  thTotalCol: { width: 44, textAlign: 'center', backgroundColor: '#D8F2FF', height: '100%', textAlignVertical: 'center', paddingTop: 15 },
-  tableBodyRow: { flexDirection: 'row', alignItems: 'center', height: 48, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E5EEF8', backgroundColor: colors.white },
-  tableRowAlt: { backgroundColor: '#F8FBFF' },
-  tdIndex: { width: 24, textAlign: 'center', color: colors.muted, fontSize: 10, fontWeight: '700' },
+  thText: { color: '#1D4ED8', fontSize: 10.5, fontWeight: '600' },
+  thTotalCol: { width: 44, textAlign: 'center', backgroundColor: '#E2EFFD', height: '100%', textAlignVertical: 'center', paddingTop: 15 },
+  tableBodyRow: { flexDirection: 'row', alignItems: 'center', height: 48, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EDF2F8', backgroundColor: colors.white },
+  tableRowAlt: { backgroundColor: '#FAFBFD' },
+  tdIndex: { width: 24, textAlign: 'center', color: '#6B7280', fontSize: 10.5, fontWeight: '500' },
   tdNameWrap: { flex: 1, paddingHorizontal: 4 },
-  tdName: { color: '#007EB8', fontSize: 11, fontWeight: '700' },
-  tdSub: { color: colors.muted, fontSize: 9 },
-  tdTotalCol: { width: 44, height: '100%', backgroundColor: '#F0FAFF', alignItems: 'center', justifyContent: 'center', borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: '#BCEAFF' },
-  tdTotalVal: { color: '#008DCC', fontSize: 11, fontWeight: '800' },
-  dayHeaderCell: { width: 48, height: 46, alignItems: 'center', justifyContent: 'center', borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: '#DCE7F4', backgroundColor: '#E8F7FF' },
-  dayHeaderWeekend: { backgroundColor: '#F3F7FB' },
-  dayHeaderToday: { backgroundColor: '#C8EEFF' },
-  dayDowText: { color: '#007EB8', fontSize: 9, fontWeight: '700' },
-  dayNumText: { color: colors.ink, fontSize: 12, fontWeight: '800' },
-  dayCell: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: '#E5EEF8', paddingHorizontal: 2 },
-  dayCellWeekend: { backgroundColor: '#F3F7FB' },
-  dayCellToday: { backgroundColor: '#F0FAFF' },
+  tdName: { color: '#1D4ED8', fontSize: 11.5, fontWeight: '600' },
+  tdSub: { color: '#6B7280', fontSize: 9.5 },
+  tdTotalCol: { width: 44, height: '100%', backgroundColor: '#F5F9FF', alignItems: 'center', justifyContent: 'center', borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: '#DCE7F4' },
+  tdTotalVal: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
+  dayHeaderCell: { width: 48, height: 46, alignItems: 'center', justifyContent: 'center', borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: '#DCE7F4', backgroundColor: '#EEF6FF' },
+  dayHeaderWeekend: { backgroundColor: '#F6F8FC' },
+  dayHeaderToday: { backgroundColor: '#DBEAFE' },
+  dayDowText: { color: '#1D4ED8', fontSize: 9.5, fontWeight: '500' },
+  dayNumText: { color: '#111827', fontSize: 12, fontWeight: '600' },
+  dayCell: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: '#EDF2F8', paddingHorizontal: 2 },
+  dayCellWeekend: { backgroundColor: '#F8FAFC' },
+  dayCellToday: { backgroundColor: '#F0F7FF' },
   dayCellDash: { color: '#94A3B8', fontSize: 11 },
   dayCellDot: { color: '#CBD5E1', fontSize: 14 },
-  dayCellVal: { fontSize: 12, fontWeight: '800', lineHeight: 15 },
-  dayCellStatus: { fontSize: 8.5, fontWeight: '700', marginTop: 1 },
+  dayCellVal: { fontSize: 12, fontWeight: '600', lineHeight: 15 },
+  dayCellStatus: { fontSize: 9, fontWeight: '500', marginTop: 1 },
   colorDot: { width: 12, height: 12, borderRadius: 6 },
 
-  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
-  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 10 },
-  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-  outlineBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10 },
-  outlineBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  searchField: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, height: 40, fontSize: 13.5, color: '#111827' },
+  stateCard: { ...HAIRLINE_CARD, padding: 22, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: colors.primary, minHeight: 38, paddingHorizontal: 12, borderRadius: 10 },
+  primaryBtnText: { color: colors.white, fontSize: 12, fontWeight: '600' },
+  outlineBtn: { ...HAIRLINE_CARD, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 38, paddingHorizontal: 11 },
+  outlineBtnText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
-  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '88%' },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, fontSize: 12, color: colors.ink },
-  pickerField: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pickerFieldText: { color: colors.ink, fontSize: 12 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 18, gap: 8, maxHeight: '88%' },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  closeText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
+  field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
+  pickerField: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pickerFieldText: { color: '#111827', fontSize: 13.5 },
   timePickerSheet: { alignItems: 'center' },
   timePickerActions: { flexDirection: 'row', justifyContent: 'flex-end', alignSelf: 'stretch', gap: 8, marginTop: 8 },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  chip: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  chipTextActive: { color: colors.white },
+  chipText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
   disabled: { opacity: 0.45 },
 });
 

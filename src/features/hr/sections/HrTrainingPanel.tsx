@@ -1,4 +1,5 @@
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import { HrNoticeHost, showHrNotice } from '@/features/hr/components/HrNoticeModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { ApiError } from '@/core/network/apiClient';
@@ -890,323 +892,305 @@ export function HrTrainingPanel({
   function renderCourseFormModal() {
     return (
       <>
-      <Modal visible={formOpen} transparent animationType="slide" onRequestClose={() => setFormOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setFormOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>
-                {editingCourse ? 'Cập nhật khóa học' : 'Tạo khóa học mới'}
-              </Text>
-              <Pressable onPress={() => setFormOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
-              <View style={{ gap: 8, paddingBottom: 14 }}>
-                <Text style={styles.label}>Tên khóa học *</Text>
-                <TextInput
-                  value={formTitle}
-                  onChangeText={setFormTitle}
-                  placeholder="VD: Quy chế bảo mật & văn hóa công ty"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <Text style={styles.label}>Mô tả tóm tắt</Text>
-                <TextInput
-                  value={formDesc}
-                  onChangeText={setFormDesc}
-                  multiline
-                  placeholder="Nội dung chính khóa học..."
-                  placeholderTextColor={colors.muted}
-                  style={[styles.field, { minHeight: 62, textAlignVertical: 'top' }]}
-                />
-
-                <Text style={styles.label}>Danh mục đào tạo</Text>
-                <View style={styles.wrapRow}>
-                  {CATEGORIES.map((cat) => {
-                    const active = formCategory === cat;
-                    return (
-                      <Pressable
-                        key={cat}
-                        onPress={() => setFormCategory(cat)}
-                        style={[styles.chip, active && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <Text style={styles.label}>Thời lượng học</Text>
-                <TextInput
-                  value={formDuration}
-                  onChangeText={setFormDuration}
-                  placeholder="VD: 2 giờ 30 phút"
-                  placeholderTextColor={colors.muted}
-                  style={styles.field}
-                />
-
-                <View style={styles.switchRow}>
-                  <Text style={styles.label}>Khóa học bắt buộc</Text>
-                  <Switch
-                    value={formRequired}
-                    onValueChange={setFormRequired}
-                    trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                  />
-                </View>
-                <View style={styles.switchRow}>
-                  <Text style={styles.label}>Tự động giao khi có nhân sự mới</Text>
-                  <Switch
-                    value={formAutoOnboarding}
-                    onValueChange={setFormAutoOnboarding}
-                    trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                  />
-                </View>
-
-                {/* Lessons builder */}
-                <View style={styles.builderHeader}>
-                  <Text style={styles.label}>Bài giảng ({formLessons.length})</Text>
-                  <Pressable
-                    onPress={() => openLessonEditor()}
-                    style={styles.addSmallBtn}
-                  >
-                    <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm bài</Text></View>
-                  </Pressable>
-                </View>
-                {formLessons.map((les, idx) => (
-                  <View key={`lesson-${idx}`} style={styles.builderEntry}>
-                    <Pressable onPress={() => openLessonEditor(idx)} style={[styles.builderCard, styles.builderEntryMain]}>
-                      <View style={styles.headRow}>
-                        <Text style={styles.codeBadge}>Bài {idx + 1}</Text>
-                        <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
-                      </View>
-                      <Text numberOfLines={1} style={styles.rowTitle}>{les.title || 'Chưa có tên bài giảng'}</Text>
-                      <Text numberOfLines={1} style={styles.muted}>
-                        {les.type === 'video' || les.type === 'youtube' ? 'Video' : 'Văn bản / Tài liệu'}
-                        {les.url ? ` · ${les.url}` : ''}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setFormLessons((prev) => prev.filter((_, i) => i !== idx))}
-                      style={styles.deleteEntryBtn}
-                    >
-                      <Text style={styles.smallDelBtnText}>Xóa</Text>
-                    </Pressable>
-                  </View>
-                ))}
-
-                {/* Quiz builder */}
-                <View style={styles.builderHeader}>
-                  <Text style={styles.label}>Trắc nghiệm MCQ ({formQuizzes.length})</Text>
-                  <Pressable
-                    onPress={() => openQuizEditor()}
-                    style={styles.addSmallBtn}
-                  >
-                    <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm câu hỏi</Text></View>
-                  </Pressable>
-                </View>
-                {formQuizzes.map((q, qIdx) => (
-                  <View key={`quiz-${qIdx}`} style={styles.builderEntry}>
-                    <Pressable onPress={() => openQuizEditor(qIdx)} style={[styles.builderCard, styles.builderEntryMain]}>
-                      <View style={styles.headRow}>
-                        <Text style={styles.codeBadge}>Câu {qIdx + 1}</Text>
-                        <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
-                      </View>
-                      <Text numberOfLines={2} style={styles.rowTitle}>{q.question || 'Chưa có nội dung câu hỏi'}</Text>
-                      <Text numberOfLines={1} style={styles.muted}>
-                        {q.options.filter((option) => option.trim()).length} đáp án
-                        {q.options[q.correctOptionIndex]?.trim() ? ` · Đúng: ${q.options[q.correctOptionIndex].trim()}` : ''}
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx))}
-                      style={styles.deleteEntryBtn}
-                    >
-                      <Text style={styles.smallDelBtnText}>Xóa</Text>
-                    </Pressable>
-                  </View>
-                ))}
-
-                <Pressable
-                  disabled={savingCourse}
-                  onPress={() => void handleSaveCourse()}
-                  style={[styles.submitBtn, savingCourse && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {savingCourse
-                      ? 'Đang lưu...'
-                      : editingCourse
-                        ? 'Cập nhật khóa học'
-                        : 'Đăng tải khóa học'}
-                  </Text>
-                </Pressable>
-              </View>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
-      <Modal
-        visible={contentEditorOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setContentEditorOpen(false)}
+      <FullScreenFormModal
+        visible={formOpen}
+        title={editingCourse ? 'Cập nhật khóa học' : 'Tạo khóa học mới'}
+        cancelLabel="Hủy"
+        onSave={() => void handleSaveCourse()}
+        saving={savingCourse}
+        onClose={() => setFormOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setContentEditorOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
-              <Text style={styles.sheetTitle}>
-                {contentEditorKind === 'lesson'
-                  ? editingContentIndex == null ? 'Thêm bài giảng' : 'Cập nhật bài giảng'
-                  : editingContentIndex == null ? 'Thêm câu trắc nghiệm' : 'Cập nhật câu trắc nghiệm'}
-              </Text>
-              <Pressable onPress={() => setContentEditorOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
+        <View style={{ gap: 8, paddingBottom: 14 }}>
+          <Text style={styles.label}>Tên khóa học *</Text>
+          <TextInput
+            value={formTitle}
+            onChangeText={setFormTitle}
+            placeholder="VD: Quy chế bảo mật & văn hóa công ty"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <Text style={styles.label}>Mô tả tóm tắt</Text>
+          <TextInput
+            value={formDesc}
+            onChangeText={setFormDesc}
+            multiline
+            placeholder="Nội dung chính khóa học..."
+            placeholderTextColor={colors.muted}
+            style={[styles.field, { minHeight: 62, textAlignVertical: 'top' }]}
+          />
+
+          <Text style={styles.label}>Danh mục đào tạo</Text>
+          <View style={styles.wrapRow}>
+            {CATEGORIES.map((cat) => {
+              const active = formCategory === cat;
+              return (
+                <Pressable
+                  key={cat}
+                  onPress={() => setFormCategory(cat)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.label}>Thời lượng học</Text>
+          <TextInput
+            value={formDuration}
+            onChangeText={setFormDuration}
+            placeholder="VD: 2 giờ 30 phút"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Khóa học bắt buộc</Text>
+            <Switch
+              value={formRequired}
+              onValueChange={setFormRequired}
+              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
+            />
+          </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Tự động giao khi có nhân sự mới</Text>
+            <Switch
+              value={formAutoOnboarding}
+              onValueChange={setFormAutoOnboarding}
+              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
+            />
+          </View>
+
+          {/* Lessons builder */}
+          <View style={styles.builderHeader}>
+            <Text style={styles.label}>Bài giảng ({formLessons.length})</Text>
+            <Pressable
+              onPress={() => openLessonEditor()}
+              style={styles.addSmallBtn}
+            >
+              <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm bài</Text></View>
+            </Pressable>
+          </View>
+          {formLessons.map((les, idx) => (
+            <View key={`lesson-${idx}`} style={styles.builderEntry}>
+              <Pressable onPress={() => openLessonEditor(idx)} style={[styles.builderCard, styles.builderEntryMain]}>
+                <View style={styles.headRow}>
+                  <Text style={styles.codeBadge}>Bài {idx + 1}</Text>
+                  <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
+                </View>
+                <Text numberOfLines={1} style={styles.rowTitle}>{les.title || 'Chưa có tên bài giảng'}</Text>
+                <Text numberOfLines={1} style={styles.muted}>
+                  {les.type === 'video' || les.type === 'youtube' ? 'Video' : 'Văn bản / Tài liệu'}
+                  {les.url ? ` · ${les.url}` : ''}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setFormLessons((prev) => prev.filter((_, i) => i !== idx))}
+                style={styles.deleteEntryBtn}
+              >
+                <Text style={styles.smallDelBtnText}>Xóa</Text>
               </Pressable>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ maxHeight: 540 }}>
-              {contentEditorKind === 'lesson' ? (
-                <View style={styles.editorForm}>
-                  <Text style={styles.label}>Tên bài giảng *</Text>
-                  <TextInput
-                    value={lessonDraft.title}
-                    onChangeText={(title) => setLessonDraft((prev) => ({ ...prev, title }))}
-                    placeholder="Ví dụ: Quy trình an toàn lao động"
-                    placeholderTextColor={colors.muted}
-                    style={styles.field}
-                  />
+          ))}
 
-                  <Text style={styles.label}>Loại bài giảng</Text>
-                  <View style={styles.wrapRow}>
-                    {(['text', 'video'] as const).map((type) => {
-                      const active = type === 'video'
-                        ? lessonDraft.type === 'video' || lessonDraft.type === 'youtube'
-                        : lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube';
-                      return (
-                        <Pressable
-                          key={type}
-                          onPress={() => setLessonDraft((prev) => ({ ...prev, type }))}
-                          style={[styles.chip, active && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                            {type === 'video' ? 'Video' : 'Văn bản / Tài liệu'}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
-                  <Text style={styles.label}>
-                    {lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link video' : 'Link tài liệu (tùy chọn)'}
-                  </Text>
-                  <TextInput
-                    value={lessonDraft.url || ''}
-                    onChangeText={(url) => setLessonDraft((prev) => ({ ...prev, url }))}
-                    placeholder={lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link YouTube / video...' : 'https://...'}
-                    placeholderTextColor={colors.muted}
-                    autoCapitalize="none"
-                    style={styles.field}
-                  />
-
-                  {lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube' ? (
-                    <>
-                      <Text style={styles.label}>Nội dung bài giảng</Text>
-                      <TextInput
-                        value={lessonDraft.content || ''}
-                        onChangeText={(content) => setLessonDraft((prev) => ({ ...prev, content }))}
-                        multiline
-                        placeholder="Nhập nội dung lý thuyết..."
-                        placeholderTextColor={colors.muted}
-                        style={[styles.field, styles.editorTextArea]}
-                      />
-                    </>
-                  ) : null}
-
-                  <View style={styles.editorActionRow}>
-                    <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
-                      <Text style={styles.cancelBtnText}>Hủy</Text>
-                    </Pressable>
-                    <Pressable onPress={saveLessonDraft} style={[styles.submitBtn, styles.editorAction]}>
-                      <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm bài giảng' : 'Lưu bài giảng'}</Text>
-                    </Pressable>
-                  </View>
+          {/* Quiz builder */}
+          <View style={styles.builderHeader}>
+            <Text style={styles.label}>Trắc nghiệm MCQ ({formQuizzes.length})</Text>
+            <Pressable
+              onPress={() => openQuizEditor()}
+              style={styles.addSmallBtn}
+            >
+              <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm câu hỏi</Text></View>
+            </Pressable>
+          </View>
+          {formQuizzes.map((q, qIdx) => (
+            <View key={`quiz-${qIdx}`} style={styles.builderEntry}>
+              <Pressable onPress={() => openQuizEditor(qIdx)} style={[styles.builderCard, styles.builderEntryMain]}>
+                <View style={styles.headRow}>
+                  <Text style={styles.codeBadge}>Câu {qIdx + 1}</Text>
+                  <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
                 </View>
-              ) : (
-                <View style={styles.editorForm}>
-                  <Text style={styles.label}>Nội dung câu hỏi *</Text>
-                  <TextInput
-                    value={quizDraft.question}
-                    onChangeText={(question) => setQuizDraft((prev) => ({ ...prev, question }))}
-                    multiline
-                    placeholder="Nhập câu hỏi trắc nghiệm..."
-                    placeholderTextColor={colors.muted}
-                    style={[styles.field, styles.editorTextArea]}
-                  />
+                <Text numberOfLines={2} style={styles.rowTitle}>{q.question || 'Chưa có nội dung câu hỏi'}</Text>
+                <Text numberOfLines={1} style={styles.muted}>
+                  {q.options.filter((option) => option.trim()).length} đáp án
+                  {q.options[q.correctOptionIndex]?.trim() ? ` · Đúng: ${q.options[q.correctOptionIndex].trim()}` : ''}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx))}
+                style={styles.deleteEntryBtn}
+              >
+                <Text style={styles.smallDelBtnText}>Xóa</Text>
+              </Pressable>
+            </View>
+          ))}
 
-                  <Text style={styles.label}>Các đáp án · Chọn nút tròn cạnh đáp án đúng</Text>
-                  {quizDraft.options.map((option, optionIndex) => {
-                    const isCorrect = quizDraft.correctOptionIndex === optionIndex;
-                    return (
-                      <View key={`option-${optionIndex}`} style={styles.quizEditorOptionRow}>
-                        <Pressable
-                          accessibilityRole="radio"
-                          accessibilityState={{ checked: isCorrect }}
-                          onPress={() => setQuizDraft((prev) => ({ ...prev, correctOptionIndex: optionIndex }))}
-                          style={[styles.radioOuter, isCorrect && styles.radioOuterActive]}
-                        >
-                          {isCorrect ? <View style={styles.radioInner} /> : null}
-                        </Pressable>
-                        <TextInput
-                          value={option}
-                          onChangeText={(value) => setQuizDraft((prev) => {
-                            const options = [...prev.options];
-                            options[optionIndex] = value;
-                            return { ...prev, options };
-                          })}
-                          placeholder={`Đáp án ${optionIndex + 1}`}
-                          placeholderTextColor={colors.muted}
-                          style={[styles.field, styles.quizEditorOptionField]}
-                        />
-                        {quizDraft.options.length > 2 ? (
-                          <Pressable
-                            onPress={() => setQuizDraft((prev) => {
-                              const options = prev.options.filter((_, index) => index !== optionIndex);
-                              const correctOptionIndex = prev.correctOptionIndex === optionIndex
-                                ? Math.min(optionIndex, options.length - 1)
-                                : prev.correctOptionIndex > optionIndex
-                                  ? prev.correctOptionIndex - 1
-                                  : prev.correctOptionIndex;
-                              return { ...prev, options, correctOptionIndex };
-                            })}
-                            hitSlop={8}
-                          >
-                            <Text style={styles.smallDelBtnText}>Xóa</Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    );
-                  })}
-                  <Pressable onPress={() => setQuizDraft((prev) => ({ ...prev, options: [...prev.options, ''] }))}>
-                    <View style={styles.iconButtonContent}>
-                      <Plus size={13} color={colors.primary} />
-                      <Text style={styles.addSmallBtnText}>Thêm đáp án</Text>
-                    </View>
-                  </Pressable>
-
-                  <View style={styles.editorActionRow}>
-                    <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
-                      <Text style={styles.cancelBtnText}>Hủy</Text>
-                    </Pressable>
-                    <Pressable onPress={saveQuizDraft} style={[styles.submitBtn, styles.editorAction]}>
-                      <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm câu hỏi' : 'Lưu câu hỏi'}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              )}
-            </ScrollView>
+          <Pressable
+            disabled={savingCourse}
+            onPress={() => void handleSaveCourse()}
+            style={[styles.submitBtn, savingCourse && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingCourse
+                ? 'Đang lưu...'
+                : editingCourse
+                  ? 'Cập nhật khóa học'
+                  : 'Đăng tải khóa học'}
+            </Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
+      <FullScreenFormModal
+        visible={contentEditorOpen}
+        title={
+          contentEditorKind === 'lesson'
+            ? editingContentIndex == null ? 'Thêm bài giảng' : 'Cập nhật bài giảng'
+            : editingContentIndex == null ? 'Thêm câu trắc nghiệm' : 'Cập nhật câu trắc nghiệm'
+        }
+        cancelLabel="Hủy"
+        onSave={contentEditorKind === 'lesson' ? saveLessonDraft : saveQuizDraft}
+        onClose={() => setContentEditorOpen(false)}
+      >
+        {contentEditorKind === 'lesson' ? (
+          <View style={styles.editorForm}>
+            <Text style={styles.label}>Tên bài giảng *</Text>
+            <TextInput
+              value={lessonDraft.title}
+              onChangeText={(title) => setLessonDraft((prev) => ({ ...prev, title }))}
+              placeholder="Ví dụ: Quy trình an toàn lao động"
+              placeholderTextColor={colors.muted}
+              style={styles.field}
+            />
+
+            <Text style={styles.label}>Loại bài giảng</Text>
+            <View style={styles.wrapRow}>
+              {(['text', 'video'] as const).map((type) => {
+                const active = type === 'video'
+                  ? lessonDraft.type === 'video' || lessonDraft.type === 'youtube'
+                  : lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube';
+                return (
+                  <Pressable
+                    key={type}
+                    onPress={() => setLessonDraft((prev) => ({ ...prev, type }))}
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {type === 'video' ? 'Video' : 'Văn bản / Tài liệu'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.label}>
+              {lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link video' : 'Link tài liệu (tùy chọn)'}
+            </Text>
+            <TextInput
+              value={lessonDraft.url || ''}
+              onChangeText={(url) => setLessonDraft((prev) => ({ ...prev, url }))}
+              placeholder={lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link YouTube / video...' : 'https://...'}
+              placeholderTextColor={colors.muted}
+              autoCapitalize="none"
+              style={styles.field}
+            />
+
+            {lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube' ? (
+              <>
+                <Text style={styles.label}>Nội dung bài giảng</Text>
+                <TextInput
+                  value={lessonDraft.content || ''}
+                  onChangeText={(content) => setLessonDraft((prev) => ({ ...prev, content }))}
+                  multiline
+                  placeholder="Nhập nội dung lý thuyết..."
+                  placeholderTextColor={colors.muted}
+                  style={[styles.field, styles.editorTextArea]}
+                />
+              </>
+            ) : null}
+
+            <View style={styles.editorActionRow}>
+              <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </Pressable>
+              <Pressable onPress={saveLessonDraft} style={[styles.submitBtn, styles.editorAction]}>
+                <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm bài giảng' : 'Lưu bài giảng'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.editorForm}>
+            <Text style={styles.label}>Nội dung câu hỏi *</Text>
+            <TextInput
+              value={quizDraft.question}
+              onChangeText={(question) => setQuizDraft((prev) => ({ ...prev, question }))}
+              multiline
+              placeholder="Nhập câu hỏi trắc nghiệm..."
+              placeholderTextColor={colors.muted}
+              style={[styles.field, styles.editorTextArea]}
+            />
+
+            <Text style={styles.label}>Các đáp án · Chọn nút tròn cạnh đáp án đúng</Text>
+            {quizDraft.options.map((option, optionIndex) => {
+              const isCorrect = quizDraft.correctOptionIndex === optionIndex;
+              return (
+                <View key={`option-${optionIndex}`} style={styles.quizEditorOptionRow}>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isCorrect }}
+                    onPress={() => setQuizDraft((prev) => ({ ...prev, correctOptionIndex: optionIndex }))}
+                    style={[styles.radioOuter, isCorrect && styles.radioOuterActive]}
+                  >
+                    {isCorrect ? <View style={styles.radioInner} /> : null}
+                  </Pressable>
+                  <TextInput
+                    value={option}
+                    onChangeText={(value) => setQuizDraft((prev) => {
+                      const options = [...prev.options];
+                      options[optionIndex] = value;
+                      return { ...prev, options };
+                    })}
+                    placeholder={`Đáp án ${optionIndex + 1}`}
+                    placeholderTextColor={colors.muted}
+                    style={[styles.field, styles.quizEditorOptionField]}
+                  />
+                  {quizDraft.options.length > 2 ? (
+                    <Pressable
+                      onPress={() => setQuizDraft((prev) => {
+                        const options = prev.options.filter((_, index) => index !== optionIndex);
+                        const correctOptionIndex = prev.correctOptionIndex === optionIndex
+                          ? Math.min(optionIndex, options.length - 1)
+                          : prev.correctOptionIndex > optionIndex
+                            ? prev.correctOptionIndex - 1
+                            : prev.correctOptionIndex;
+                        return { ...prev, options, correctOptionIndex };
+                      })}
+                      hitSlop={8}
+                    >
+                      <Text style={styles.smallDelBtnText}>Xóa</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
+            <Pressable onPress={() => setQuizDraft((prev) => ({ ...prev, options: [...prev.options, ''] }))}>
+              <View style={styles.iconButtonContent}>
+                <Plus size={13} color={colors.primary} />
+                <Text style={styles.addSmallBtnText}>Thêm đáp án</Text>
+              </View>
+            </Pressable>
+
+            <View style={styles.editorActionRow}>
+              <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
+                <Text style={styles.cancelBtnText}>Hủy</Text>
+              </Pressable>
+              <Pressable onPress={saveQuizDraft} style={[styles.submitBtn, styles.editorAction]}>
+                <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm câu hỏi' : 'Lưu câu hỏi'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </FullScreenFormModal>
       </>
     );
   }
@@ -1217,8 +1201,9 @@ export function HrTrainingPanel({
     : undefined;
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -1232,33 +1217,36 @@ export function HrTrainingPanel({
         />
       }
     >
-      <View style={styles.searchRow}>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Tìm theo tên, danh mục, giảng viên..."
-          placeholderTextColor={colors.muted}
-          style={[styles.field, { flex: 1 }]}
-        />
-        {isSupervisor ? (
-          <Pressable onPress={openCreateCourse} style={styles.primaryBtn}>
-            <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Khóa học</Text></View>
-          </Pressable>
-        ) : null}
-      </View>
-
       {isSupervisor ? (
         <View style={styles.monitorBar}>
-          <Pressable onPress={() => setMonitorModalOpen(true)} style={styles.monitorChip}>
-            <View style={styles.iconButtonContent}><Eye size={14} color={colors.primary} /><Text style={styles.monitorChipText}>{monitoredEmployee ? `Tiến độ: ${monitoredEmployee.displayName}` : 'Giám sát tiến độ nhân viên'}</Text>{!monitoredEmployee ? <ChevronDown size={13} color={colors.primary} /> : null}</View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setMonitorModalOpen(true)}
+            style={({ pressed }) => [styles.monitorTriggerBtn, pressed && { opacity: 0.65 }]}
+          >
+            <Eye size={17} strokeWidth={1.6} color={colors.ink} />
+            <Text numberOfLines={1} style={styles.monitorTriggerText}>
+              {monitoredEmployee ? `Tiến độ: ${monitoredEmployee.displayName}` : 'Giám sát tiến độ nhân viên'}
+            </Text>
+            <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
           </Pressable>
           {monitorUid ? (
-            <Pressable onPress={() => setMonitorUid('')} style={styles.clearMonitorBtn}>
+            <Pressable onPress={() => setMonitorUid('')} hitSlop={8} style={styles.clearMonitorBtn}>
               <Text style={styles.clearMonitorText}>Xem của tôi</Text>
             </Pressable>
           ) : null}
         </View>
       ) : null}
+
+      <View style={styles.searchRow}>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Tìm theo tên, danh mục, giảng viên..."
+          placeholderTextColor="#94A3B8"
+          style={styles.searchField}
+        />
+      </View>
 
       {loading ? (
         <Card style={styles.stateCard}>
@@ -1363,30 +1351,35 @@ export function HrTrainingPanel({
         </View>
       )}
 
-      {/* Employee monitor picker modal */}
+      {/* Employee monitor picker bottom sheet matching Employee Directory */}
       <Modal
         visible={monitorModalOpen}
         transparent
+        statusBarTranslucent
         animationType="slide"
         onRequestClose={() => setMonitorModalOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setMonitorModalOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.headRow}>
+        <Pressable style={styles.monitorSheetBackdrop} onPress={() => setMonitorModalOpen(false)}>
+          <Pressable style={styles.monitorSheet} onPress={() => {}}>
+            <View style={styles.monitorSheetHandle} />
+            <View style={[styles.headRow, { marginBottom: 12 }]}>
               <Text style={styles.sheetTitle}>Giám sát tiến độ nhân viên</Text>
               <Pressable onPress={() => setMonitorModalOpen(false)} hitSlop={8}>
                 <Text style={styles.closeText}>Đóng</Text>
               </Pressable>
             </View>
-            <ScrollView style={{ maxHeight: 360 }}>
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
               <Pressable
                 onPress={() => {
                   setMonitorUid('');
                   setMonitorModalOpen(false);
                 }}
-                style={[styles.pickerRow, !monitorUid && styles.pickerRowActive]}
+                style={[styles.monitorSheetRow, !monitorUid && styles.monitorSheetRowActive]}
               >
-                <Text style={styles.rowTitle}>Khóa học của tôi</Text>
+                <Text style={[styles.monitorSheetRowText, !monitorUid && styles.monitorSheetRowTextActive]}>
+                  Khóa học của tôi
+                </Text>
+                {!monitorUid ? <Check size={17} color={colors.primary} /> : null}
               </Pressable>
               {employees.map((emp) => {
                 const uid = emp.uid || emp._id || emp.id || '';
@@ -1398,10 +1391,15 @@ export function HrTrainingPanel({
                       setMonitorUid(uid);
                       setMonitorModalOpen(false);
                     }}
-                    style={[styles.pickerRow, selected && styles.pickerRowActive]}
+                    style={[styles.monitorSheetRow, selected && styles.monitorSheetRowActive]}
                   >
-                    <Text style={styles.rowTitle}>{emp.displayName}</Text>
-                    <Text style={styles.subMeta}>{emp.jobTitle || emp.role || 'Nhân viên'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.monitorSheetRowText, selected && styles.monitorSheetRowTextActive]}>
+                        {emp.displayName}
+                      </Text>
+                      <Text style={styles.subMeta}>{emp.jobTitle || emp.role || 'Nhân viên'}</Text>
+                    </View>
+                    {selected ? <Check size={17} color={colors.primary} /> : null}
                   </Pressable>
                 );
               })}
@@ -1413,104 +1411,147 @@ export function HrTrainingPanel({
       {renderCourseFormModal()}
       <HrNoticeHost />
     </ScrollView>
+    {isSupervisor ? <HrFab label="Thêm khóa học" onPress={openCreateCourse} /> : null}
+    </View>
   );
 }
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
+} as const;
+
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 18, paddingBottom: 28 },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-  monitorBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  monitorChip: { backgroundColor: '#EAF2FF', borderColor: '#CBE0FF', borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 99 },
-  monitorChipText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  clearMonitorBtn: { paddingHorizontal: 8, paddingVertical: 5 },
-  clearMonitorText: { color: '#B91C1C', fontSize: 11, fontWeight: '700' },
-  primaryBtn: { backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
-  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  searchField: { flex: 1, backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, height: 40, fontSize: 13.5, color: '#111827' },
+  monitorBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6, paddingBottom: 12, gap: 10 },
+  monitorTriggerBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
+  monitorTriggerText: { color: colors.ink, fontSize: 15, fontWeight: '400', flexShrink: 1 },
+  monitorChip: { backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
+  monitorChipText: { color: colors.primary, fontSize: 12, fontWeight: '500' },
+  clearMonitorBtn: { paddingVertical: 4, paddingLeft: 8 },
+  clearMonitorText: { color: colors.primary, fontSize: 13.5, fontWeight: '500' },
+  monitorSheetBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.35)', justifyContent: 'flex-end' },
+  monitorSheet: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 26 },
+  monitorSheetHandle: { width: 38, height: 4, borderRadius: 99, backgroundColor: '#D6DFEC', alignSelf: 'center', marginBottom: 12 },
+  monitorSheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 13, borderRadius: 12, marginBottom: 4, gap: 10 },
+  monitorSheetRowActive: { backgroundColor: '#F0F6FF' },
+  monitorSheetRowText: { color: colors.ink, fontSize: 14.5, fontWeight: '400' },
+  monitorSheetRowTextActive: { color: colors.primary, fontWeight: '500' },
+  primaryBtn: { backgroundColor: colors.primary, minHeight: 40, paddingHorizontal: 13, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   iconButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   courseMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
-  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
-  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
-  list: { gap: 10 },
-  card: { padding: 13, gap: 6 },
+  stateCard: { ...HAIRLINE_CARD, padding: 22, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
+  list: {
+    marginHorizontal: -14,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+    gap: 0,
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 5,
+  },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
-  categoryBadge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  requiredBadge: { color: '#B45309', backgroundColor: '#FFF3E5', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  doneBadge: { color: '#16885A', backgroundColor: '#E9F8F1', fontSize: 9, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  codeBadge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  subMeta: { color: colors.muted, fontSize: 10 },
+  categoryBadge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
+  requiredBadge: { color: '#B45309', backgroundColor: '#FFF3E5', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
+  doneBadge: { color: '#16885A', backgroundColor: '#E9F8F1', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
+  codeBadge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
+  subMeta: { color: '#6B7280', fontSize: 11.5, fontWeight: '400' },
   cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
-  progressTrack: { height: 6, backgroundColor: '#E2E8F0', borderRadius: 99, overflow: 'hidden' },
+  progressTrack: { height: 6, backgroundColor: '#E8EDF4', borderRadius: 99, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 99 },
   actionBtn: { backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9 },
   actionBtnDone: { backgroundColor: '#16885A' },
-  actionBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  actionBtnText: { color: colors.white, fontSize: 12, fontWeight: '600' },
 
   // Detail / Study Room
   detailTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  backBtn: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  backBtnText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  smallEditBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9 },
-  smallEditBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  smallDelBtn: { backgroundColor: '#FEE2E2', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9 },
-  smallDelBtnText: { color: '#B91C1C', fontSize: 11, fontWeight: '700' },
-  heroCard: { padding: 14, gap: 6, marginBottom: 12 },
-  heroTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', lineHeight: 22 },
+  backBtn: { ...HAIRLINE_CARD, paddingHorizontal: 12, paddingVertical: 8 },
+  backBtnText: { color: '#111827', fontSize: 12.5, fontWeight: '600' },
+  smallEditBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9 },
+  smallEditBtnText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  smallDelBtn: { backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9 },
+  smallDelBtnText: { color: '#B91C1C', fontSize: 12, fontWeight: '600' },
+  heroCard: { ...HAIRLINE_CARD, padding: 14, gap: 6, marginBottom: 12 },
+  heroTitle: { color: '#111827', fontSize: 15.5, fontWeight: '700', lineHeight: 22 },
   progressSection: { gap: 5, marginTop: 4 },
-  progressLabel: { color: colors.ink, fontSize: 11, fontWeight: '700' },
-  progressPct: { color: colors.primary, fontSize: 12, fontWeight: '800' },
-  bypassBtn: { marginTop: 6, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
-  bypassBtnText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  sectionTitle: { color: colors.ink, fontSize: 12, fontWeight: '800', marginBottom: 6 },
-  syllabusPill: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, maxWidth: 190 },
+  progressLabel: { color: '#374151', fontSize: 12, fontWeight: '500' },
+  progressPct: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
+  bypassBtn: { marginTop: 6, borderColor: '#E5EAF2', borderWidth: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center' },
+  bypassBtnText: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
+  sectionTitle: { color: '#111827', fontSize: 14, fontWeight: '700', marginBottom: 8 },
+  syllabusPill: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, maxWidth: 190 },
   syllabusPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  syllabusText: { color: colors.ink, fontSize: 11, fontWeight: '700' },
-  syllabusTextActive: { color: colors.white },
-  studyCard: { padding: 15, gap: 10 },
-  lessonCounter: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  studyHeading: { color: colors.ink, fontSize: 15, fontWeight: '800', lineHeight: 21 },
-  studyBody: { color: colors.ink, fontSize: 12, lineHeight: 19 },
-  overviewBox: { backgroundColor: '#F8FAFC', borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 12, gap: 5 },
-  overviewTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' },
-  overviewBullet: { color: colors.muted, fontSize: 12 },
+  syllabusText: { color: '#111827', fontSize: 12, fontWeight: '500' },
+  syllabusTextActive: { color: colors.white, fontWeight: '600' },
+  studyCard: { ...HAIRLINE_CARD, padding: 15, gap: 10 },
+  lessonCounter: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
+  studyHeading: { color: '#111827', fontSize: 15, fontWeight: '600', lineHeight: 21 },
+  studyBody: { color: '#374151', fontSize: 13, lineHeight: 20 },
+  overviewBox: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, gap: 5 },
+  overviewTitle: { color: '#111827', fontSize: 13, fontWeight: '600' },
+  overviewBullet: { color: '#6B7280', fontSize: 12.5 },
   overviewBulletRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  resourceBox: { backgroundColor: '#F0F7FF', borderColor: '#CBE0FF', borderWidth: 1, borderRadius: 12, padding: 12, gap: 4 },
-  resourceTitle: { color: colors.primary, fontSize: 12, fontWeight: '800' },
-  resourceUrl: { color: colors.muted, fontSize: 11 },
-  lessonContentBox: { backgroundColor: '#F8FAFC', borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 12 },
-  studyFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  resourceBox: { backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, gap: 4 },
+  resourceTitle: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  resourceUrl: { color: '#6B7280', fontSize: 11.5 },
+  lessonContentBox: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12 },
+  studyFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EEF2F7' },
 
   // Quiz
-  quizTag: { color: '#16885A', fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
-  quizBox: { backgroundColor: '#F8FAFC', borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 12 },
+  quizTag: { color: '#16885A', fontSize: 10.5, fontWeight: '600', letterSpacing: 0.3 },
+  quizBox: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12 },
   quizBoxError: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
-  quizQuestion: { color: colors.ink, fontSize: 12, fontWeight: '800', lineHeight: 18 },
-  quizOption: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 10, padding: 10 },
+  quizQuestion: { color: '#111827', fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  quizOption: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: 1, borderRadius: 10, padding: 10 },
   quizOptionActive: { backgroundColor: '#EAF2FF', borderColor: colors.primary },
-  quizOptionText: { color: colors.ink, fontSize: 12, flex: 1 },
-  quizOptionTextActive: { color: colors.primary, fontWeight: '700' },
-  quizErrorText: { color: '#B91C1C', fontSize: 11, fontWeight: '600', marginTop: 6 },
+  quizOptionText: { color: '#111827', fontSize: 12.5, flex: 1 },
+  quizOptionTextActive: { color: colors.primary, fontWeight: '600' },
+  quizErrorText: { color: '#B91C1C', fontSize: 11.5, fontWeight: '500', marginTop: 6 },
   radioOuter: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
   radioOuterActive: { borderColor: colors.primary },
   radioInner: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary },
 
   // Modal & Form
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
-  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, gap: 10, maxHeight: '90%' },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
-  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 18, gap: 10, maxHeight: '90%' },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  closeText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
+  field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  chip: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  chipTextActive: { color: colors.white },
+  chipText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
-  builderHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  builderCard: { backgroundColor: '#F8FAFC', borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 10, gap: 7 },
+  builderHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EEF2F7' },
+  builderCard: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 11, gap: 7 },
   builderEntry: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   builderEntryMain: { flex: 1 },
   deleteEntryBtn: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 8 },
@@ -1520,14 +1561,14 @@ const styles = StyleSheet.create({
   editorAction: { flex: 1 },
   quizEditorOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   quizEditorOptionField: { flex: 1 },
-  addSmallBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
-  addSmallBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  pickerRow: { padding: 12, borderRadius: 11, backgroundColor: '#F8FAFC', marginBottom: 6 },
+  addSmallBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  addSmallBtnText: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
+  pickerRow: { padding: 12, borderRadius: 10, backgroundColor: '#F6F8FC', marginBottom: 6 },
   pickerRowActive: { backgroundColor: '#EAF2FF' },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6, paddingHorizontal: 14 },
-  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  cancelBtn: { backgroundColor: '#F1F5F9', minHeight: 44, paddingHorizontal: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  cancelBtnText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 6, paddingHorizontal: 14 },
+  submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
+  cancelBtn: { backgroundColor: '#F1F5F9', minHeight: 44, paddingHorizontal: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  cancelBtnText: { color: '#374151', fontSize: 13, fontWeight: '600' },
   disabled: { opacity: 0.45 },
 });
 

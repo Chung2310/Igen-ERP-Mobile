@@ -13,9 +13,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ChevronDown, ChevronRight, Crown, FileText, Minus, Plus } from 'lucide-react-native';
+import { Building2, Check, ChevronDown, ChevronRight, Crown, FileText, Pencil, Phone, Plus, Search } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
   deleteHrEmployee,
@@ -101,6 +104,24 @@ function formatVndAmount(value?: number | null): string {
   return `${Math.round(value).toLocaleString('vi-VN')} ₫`;
 }
 
+const AVATAR_BG_COLORS = [
+  '#1EA4E9',
+  '#2563EB',
+  '#0EA5A4',
+  '#6366F1',
+  '#0284C7',
+  '#10B981',
+];
+
+function getAvatarBg(seed?: string): string {
+  const str = seed || 'NV';
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = (hash * 31 + str.charCodeAt(i)) % AVATAR_BG_COLORS.length;
+  }
+  return AVATAR_BG_COLORS[Math.abs(hash) % AVATAR_BG_COLORS.length];
+}
+
 function getCategoryColor(division?: string, department?: string): { accent: string; tone: string } {
   const s = `${division || ''} ${department || ''}`.toLowerCase();
   if (/quản trị|giám đốc|ceo|coo|admin/.test(s)) return { accent: '#0F172A', tone: '#E2E8F0' };
@@ -175,6 +196,7 @@ export function OrgChartPanel({
   companyCode?: string;
   branchId?: string;
 }) {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const currentUserId = user?._id || user?.id || '';
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
@@ -190,6 +212,7 @@ export function OrgChartPanel({
   const [viewMode, setViewMode] = useState<'tree' | 'focus' | 'department' | 'list'>('tree');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('Tất cả');
+  const [deptFilterOpen, setDeptFilterOpen] = useState(false);
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const [collapsedTreeIds, setCollapsedTreeIds] = useState<Set<string>>(new Set());
   const [treeZoom, setTreeZoom] = useState<number>(0.85);
@@ -240,7 +263,7 @@ export function OrgChartPanel({
         setEmployees(empList);
         setDepartments(deptList);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Không tải được sơ đồ tổ chức.');
+        setError(err instanceof Error ? err.message : 'Không tải được danh sách nhân sự.');
       } finally {
         setLoading(false);
         setRefreshing(false);
@@ -625,7 +648,7 @@ export function OrgChartPanel({
         branchId,
       });
       setAddOpen(false);
-      Alert.alert('Thành công', `Đã thêm nhân sự "${addName.trim()}" vào sơ đồ tổ chức.`);
+      Alert.alert('Thành công', `Đã thêm nhân sự "${addName.trim()}" vào danh sách nhân sự.`);
       await loadData(true);
     } catch (err) {
       Alert.alert('Không thể thêm nhân sự', err instanceof Error ? err.message : 'Vui lòng thử lại.');
@@ -657,96 +680,6 @@ export function OrgChartPanel({
     [childrenMap],
   );
 
-  // Vẽ cây phân cấp Top-Down giống bản web ERP (có đường nối chữ T)
-  const renderWebStyleTreeNode = (node: OrgNode) => {
-    const kids = childrenMap.get(node.nodeId) ?? [];
-    const collapsed = collapsedTreeIds.has(node.nodeId);
-    const palette = getCategoryColor(node.division, node.department);
-
-    return (
-      <View key={node.nodeId} style={styles.treeNodeCol}>
-        <Card
-          onPress={() => openDetail(node)}
-          style={[styles.treeCard, { borderTopColor: palette.accent }]}
-        >
-          <View style={styles.treeCardHead}>
-            <View style={[styles.avatarSm, { backgroundColor: palette.tone }]}>
-              <Text style={[styles.avatarTextSm, { color: palette.accent }]}>
-                {getInitials(node.displayName)}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.treeCardNameRow}>
-                {node.isLeader ? <Crown size={13} color="#D97706" /> : null}
-                <Text numberOfLines={1} style={styles.treeCardName}>{node.displayName}</Text>
-              </View>
-              <Text numberOfLines={1} style={styles.treeCardRole}>
-                {node.jobTitle || node.position || ROLE_LABELS[node.role || 'user']}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.treeCardFoot}>
-            <Text
-              numberOfLines={1}
-              style={[styles.treeDeptPill, { color: palette.accent, backgroundColor: palette.tone }]}
-            >
-              {node.department || 'Chưa phân phòng'}
-            </Text>
-            {kids.length > 0 ? (
-              <Pressable
-                hitSlop={8}
-                onPress={() => toggleTreeCollapse(node.nodeId)}
-                style={styles.treeToggleBtn}
-              >
-                <View style={styles.treeToggleContent}>
-                  {collapsed ? <><Plus size={12} color={colors.primary} /><Text style={styles.treeToggleText}>{kids.length}</Text></> : <Minus size={12} color={colors.primary} />}
-                </View>
-              </Pressable>
-            ) : null}
-          </View>
-        </Card>
-
-        {!collapsed && kids.length > 0 ? (
-          <View style={styles.treeChildrenWrap}>
-            {/* Đường dọc từ thẻ cha xuống thanh ngang */}
-            <View style={styles.treeStemDown} />
-            <View style={styles.treeChildrenRow}>
-              {kids.map((child, idx) => {
-                const isFirst = idx === 0;
-                const isLast = idx === kids.length - 1;
-                return (
-                  <View key={child.nodeId} style={styles.treeChildSlot}>
-                    {kids.length === 1 ? (
-                      <View style={styles.treeStemSingle} />
-                    ) : (
-                      <View style={styles.treeBranchBar}>
-                        <View
-                          style={[
-                            styles.treeBranchHalf,
-                            styles.treeBranchRightLine,
-                            !isFirst && styles.treeBranchTopLine,
-                          ]}
-                        />
-                        <View
-                          style={[
-                            styles.treeBranchHalf,
-                            styles.treeBranchLeftLine,
-                            !isLast && styles.treeBranchTopLine,
-                          ]}
-                        />
-                      </View>
-                    )}
-                    <View style={styles.treeChildInner}>{renderWebStyleTreeNode(child)}</View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
-      </View>
-    );
-  };
-
   const directReports = useMemo(
     () => (selectedNode ? orgNodes.filter((n) => n.resolvedParentId === selectedNode.nodeId) : []),
     [orgNodes, selectedNode],
@@ -760,8 +693,13 @@ export function OrgChartPanel({
   );
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
-      contentContainerStyle={styles.content}
+      style={styles.directoryScroll}
+      contentContainerStyle={[
+        styles.directoryContent,
+        { paddingBottom: Math.max(insets.bottom, 20) + 84 },
+      ]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -775,461 +713,478 @@ export function OrgChartPanel({
         />
       }
     >
-      {/* Search + Add button */}
-      <View style={styles.searchRow}>
+      {/* Top toolbar matching MISA Danh bạ: [Dept dropdown] on left, [+ Thêm NS] text action on right */}
+      <View style={styles.directoryTopBar}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setDeptFilterOpen(true)}
+          style={({ pressed }) => [styles.deptTriggerBtn, pressed && { opacity: 0.65 }]}
+        >
+          <Building2 size={17} strokeWidth={1.6} color={colors.ink} />
+          <Text numberOfLines={1} style={styles.deptTriggerText}>
+            {filterDepartment === 'Tất cả' ? 'Tất cả phòng ban' : filterDepartment}
+          </Text>
+          <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
+        </Pressable>
+      </View>
+
+      {/* Full-width rounded pill search bar */}
+      <View style={styles.directorySearchWrap}>
+        <Search size={17} strokeWidth={1.6} color="#94A3B8" />
         <TextInput
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholder="Tìm theo tên, chức danh, phòng ban..."
-          placeholderTextColor={colors.muted}
-          style={[styles.search, { flex: 1, marginBottom: 0 }]}
+          placeholderTextColor="#94A3B8"
+          style={styles.directorySearchInput}
         />
-        {isManager ? (
-          <Pressable onPress={openAddModal} style={styles.primaryBtn}>
-            <View style={styles.iconButtonContent}><Plus size={14} color={colors.white} /><Text style={styles.primaryBtnText}>Thêm NS</Text></View>
-          </Pressable>
-        ) : null}
       </View>
 
-      {/* Department filter pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.deptRow}
-        style={styles.deptScroll}
-      >
-        {departmentOptions.map((dept) => {
-          const active = filterDepartment === dept;
-          return (
-            <Pressable
-              key={dept}
-              onPress={() => setFilterDepartment(dept)}
-              style={[styles.deptChip, active && styles.deptChipActive]}
-            >
-              <Text style={[styles.deptText, active && styles.deptTextActive]}>{dept}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      {/* Content: Sơ đồ cây Top-Down */}
+      {/* Content: Danh sách nhân sự phẳng nền trắng (MISA Danh bạ style) */}
       {loading ? (
-        <Card style={styles.stateCard}>
+        <View style={styles.directoryStateWrap}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.muted}>Đang tải sơ đồ tổ chức...</Text>
-        </Card>
+          <Text style={styles.muted}>Đang tải danh sách nhân sự...</Text>
+        </View>
       ) : error ? (
-        <Card style={styles.stateCard}>
+        <View style={styles.directoryStateWrap}>
           <PopupError error={error} />
           <Pressable onPress={() => void loadData()} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Thử lại</Text>
           </Pressable>
-        </Card>
+        </View>
       ) : !filteredNodes.length ? (
-        <Card style={styles.stateCard}>
+        <View style={styles.directoryStateWrap}>
           <Text style={styles.muted}>Không có nhân sự nào khớp điều kiện lọc.</Text>
-        </Card>
+        </View>
       ) : (
-        <View style={styles.canvasWrap}>
-          {/* Thanh điều khiển Zoom & Thu gọn/Mở hết giống web */}
-          <View style={styles.canvasBar}>
-            <View style={styles.zoomGroup}>
-              <Pressable
-                onPress={() => setTreeZoom((z) => Math.max(0.55, Number((z - 0.1).toFixed(2))))}
-                style={styles.zoomBtn}
-              >
-                <Minus size={15} color={colors.ink} />
-              </Pressable>
-              <Pressable onPress={() => setTreeZoom(0.85)} style={styles.zoomReadout}>
-                <Text style={styles.zoomReadoutText}>{Math.round(treeZoom * 100)}%</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setTreeZoom((z) => Math.min(1.2, Number((z + 0.1).toFixed(2))))}
-                style={styles.zoomBtn}
-              >
-                <Plus size={15} color={colors.ink} />
-              </Pressable>
-            </View>
-            <View style={styles.zoomGroup}>
-              <Pressable onPress={expandAllTree} style={styles.canvasActionBtn}>
-                <Text style={styles.canvasActionText}>Mở hết</Text>
-              </Pressable>
-              <Pressable onPress={collapseAllTree} style={styles.canvasActionBtn}>
-                <Text style={styles.canvasActionText}>Thu gọn</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Khung sơ đồ cây Top-Down cuộn 2 chiều */}
-          <View style={styles.treeCanvasCard}>
-            <ScrollView
-              horizontal
-              bounces={false}
-              showsHorizontalScrollIndicator
-              nestedScrollEnabled
-              directionalLockEnabled={false}
-              contentContainerStyle={styles.treeCanvasScroll}
-            >
-              <ScrollView
-                bounces={false}
-                showsVerticalScrollIndicator
-                nestedScrollEnabled
-                contentContainerStyle={styles.treeVerticalScroll}
-              >
-                <View
-                  style={
-                    treeSize
-                      ? {
-                          width: Math.max(treeSize.width * treeZoom, 280),
-                          height: Math.max(treeSize.height * treeZoom, 220),
-                        }
-                      : undefined
-                  }
+        <View style={styles.directoryListFlat}>
+          {filteredNodes
+            .slice()
+            .sort((a, b) => {
+              if (Boolean(b.isLeader) !== Boolean(a.isLeader)) {
+                return Number(Boolean(b.isLeader)) - Number(Boolean(a.isLeader));
+              }
+              return (
+                (a.resolvedLevel ?? 4) - (b.resolvedLevel ?? 4) ||
+                a.displayName.localeCompare(b.displayName, 'vi')
+              );
+            })
+            .map((node) => {
+              const roleLabel =
+                node.jobTitle || node.position || ROLE_LABELS[node.role || 'user'] || 'Nhân viên';
+              const deptLabel = node.department || node.division || 'Chưa phân phòng ban';
+              const cleanPhone = node.phone?.replace(/\s+/g, '') || '';
+              return (
+                <Pressable
+                  key={node.nodeId}
+                  accessibilityRole="button"
+                  onPress={() => openDetail(node)}
+                  style={({ pressed }) => [
+                    styles.directoryRow,
+                    pressed && styles.directoryRowPressed,
+                  ]}
                 >
-                  <View
-                    onLayout={(e) => {
-                      const { width, height } = e.nativeEvent.layout;
-                      if (
-                        width > 0 &&
-                        height > 0 &&
-                        (!treeSize ||
-                          Math.abs(treeSize.width - width) > 2 ||
-                          Math.abs(treeSize.height - height) > 2)
-                      ) {
-                        setTreeSize({ width, height });
+                  <View style={styles.directoryAvatar}>
+                    <Text style={styles.directoryAvatarText}>{getInitials(node.displayName)}</Text>
+                  </View>
+
+                  <View style={styles.directoryCopy}>
+                    <View style={styles.directoryNameRow}>
+                      <Text numberOfLines={1} style={styles.directoryName}>
+                        {node.displayName}
+                      </Text>
+                      {node.isLeader ? <Crown size={13} color="#D97706" /> : null}
+                    </View>
+                    <Text numberOfLines={1} style={styles.directorySub}>
+                      {roleLabel}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.directoryDept}>
+                      {deptLabel}
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={cleanPhone ? `Gọi ${node.displayName}` : 'Chưa có số điện thoại'}
+                    disabled={!cleanPhone}
+                    hitSlop={8}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      if (cleanPhone) {
+                        void Linking.openURL(`tel:${cleanPhone}`).catch(() => {});
                       }
                     }}
-                    style={[
-                      styles.treeRootsRow,
-                      {
-                        transform: [{ scale: treeZoom }],
-                        transformOrigin: 'top left',
-                      },
+                    style={({ pressed }) => [
+                      styles.directoryCallBtn,
+                      !cleanPhone && styles.directoryCallBtnDisabled,
+                      pressed && cleanPhone && styles.directoryCallBtnPressed,
                     ]}
                   >
-                    {rootNodes.map((root) => renderWebStyleTreeNode(root))}
-                  </View>
-                </View>
-              </ScrollView>
-            </ScrollView>
-            <Text style={styles.canvasHint}>Vuốt ngang / dọc trong khung để xem toàn bộ sơ đồ · Bấm vào thẻ để xem hồ sơ</Text>
-          </View>
+                    <Phone
+                      size={15}
+                      strokeWidth={1.6}
+                      color={colors.primary}
+                      fill={colors.primary}
+                    />
+                  </Pressable>
+                </Pressable>
+              );
+            })}
         </View>
       )}
 
-      {/* Employee Detail & Edit Modal */}
+      {/* Department filter bottom sheet */}
       <Modal
-        visible={Boolean(selectedNode)}
+        visible={deptFilterOpen}
         transparent
+        statusBarTranslucent
         animationType="slide"
-        onRequestClose={() => setSelectedNode(null)}
+        onRequestClose={() => setDeptFilterOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setSelectedNode(null)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            {selectedNode ? (
-              <>
-                <View style={styles.modalHeader}>
-                  <Text numberOfLines={1} style={styles.sheetTitle}>
-                    {isEditing ? 'Chỉnh sửa hồ sơ' : selectedNode.displayName}
-                  </Text>
-                  <Pressable onPress={() => setSelectedNode(null)} hitSlop={8}>
-                    <Text style={styles.closeText}>Đóng</Text>
+        <Pressable style={styles.deptSheetBackdrop} onPress={() => setDeptFilterOpen(false)}>
+          <Pressable
+            style={[styles.deptSheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
+            onPress={() => {}}
+          >
+            <View style={styles.deptSheetHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.sheetTitle}>Lọc theo phòng ban</Text>
+              <Pressable onPress={() => setDeptFilterOpen(false)} hitSlop={8}>
+                <Text style={styles.closeText}>Đóng</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              {departmentOptions.map((dept) => {
+                const selected = filterDepartment === dept;
+                return (
+                  <Pressable
+                    key={dept}
+                    onPress={() => {
+                      setFilterDepartment(dept);
+                      setDeptFilterOpen(false);
+                    }}
+                    style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                  >
+                    <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                      {dept === 'Tất cả' ? 'Tất cả phòng ban' : dept}
+                    </Text>
+                    {selected ? <Check size={17} color={colors.primary} /> : null}
                   </Pressable>
-                </View>
-
-                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
-                  {isEditing ? (
-                    <View style={styles.form}>
-                      <Text style={styles.label}>Họ và tên *</Text>
-                      <TextInput value={editName} onChangeText={setEditName} style={styles.field} />
-
-                      <Text style={styles.label}>Chức danh</Text>
-                      <TextInput value={editJobTitle} onChangeText={setEditJobTitle} placeholder="VD: Trưởng phòng Kinh doanh" placeholderTextColor={colors.muted} style={styles.field} />
-
-                      <Text style={styles.label}>Phòng ban</Text>
-                      <TextInput value={editDepartment} onChangeText={setEditDepartment} placeholder="Tên phòng ban" placeholderTextColor={colors.muted} style={styles.field} />
-
-                      <Text style={styles.label}>Khối chức năng</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
-                        {DIVISIONS.map((div) => (
-                          <Pressable
-                            key={div}
-                            onPress={() => setEditDivision(div)}
-                            style={[styles.deptChip, editDivision === div && styles.deptChipActive]}
-                          >
-                            <Text style={[styles.deptText, editDivision === div && styles.deptTextActive]}>{div}</Text>
-                          </Pressable>
-                        ))}
-                      </ScrollView>
-
-                      <Text style={styles.label}>Quản lý trực tiếp</Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
-                        <Pressable
-                          onPress={() => setEditParentId('')}
-                          style={[styles.deptChip, !editParentId && styles.deptChipActive]}
-                        >
-                          <Text style={[styles.deptText, !editParentId && styles.deptTextActive]}>Không có</Text>
-                        </Pressable>
-                        {orgNodes
-                          .filter((n) => n.nodeId !== selectedNode.nodeId)
-                          .slice(0, 20)
-                          .map((cand) => (
-                            <Pressable
-                              key={cand.nodeId}
-                              onPress={() => setEditParentId(cand.nodeId)}
-                              style={[styles.deptChip, editParentId === cand.nodeId && styles.deptChipActive]}
-                            >
-                              <Text style={[styles.deptText, editParentId === cand.nodeId && styles.deptTextActive]}>
-                                {cand.displayName}
-                              </Text>
-                            </Pressable>
-                          ))}
-                      </ScrollView>
-
-                      <Text style={styles.label}>Số điện thoại</Text>
-                      <TextInput value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" style={styles.field} />
-
-                      <Text style={styles.label}>Trình độ chuyên môn</Text>
-                      <TextInput value={editQualification} onChangeText={setEditQualification} style={styles.field} />
-
-                      <Text style={styles.label}>Lương tháng (VNĐ)</Text>
-                      <TextInput value={editSalary} onChangeText={setEditSalary} keyboardType="numeric" style={styles.field} />
-
-                      <Text style={styles.label}>Link mô tả công việc (JD)</Text>
-                      <TextInput value={editJdLink} onChangeText={setEditJdLink} autoCapitalize="none" style={styles.field} />
-
-                      <View style={styles.actionRow}>
-                        <Pressable onPress={() => setIsEditing(false)} style={styles.secondaryBtn}>
-                          <Text style={styles.secondaryBtnText}>Hủy</Text>
-                        </Pressable>
-                        <Pressable
-                          disabled={savingEdit}
-                          onPress={() => void onSaveEdit()}
-                          style={[styles.submitBtn, { flex: 1 }, savingEdit && styles.disabled]}
-                        >
-                          <Text style={styles.submitBtnText}>
-                            {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={styles.detailBody}>
-                      <View style={styles.detailTop}>
-                        <View style={styles.detailRoleRow}>
-                          {selectedNode.isLeader ? <Crown size={14} color="#D97706" /> : null}
-                          <Text style={styles.detailRole}>
-                            {selectedNode.isLeader ? 'Trưởng nhóm · ' : ''}
-                            {selectedNode.jobTitle || selectedNode.position || 'Chưa cập nhật chức vụ'}
-                          </Text>
-                        </View>
-                        <Text style={styles.muted}>
-                          {selectedNode.department || 'Chưa phân phòng ban'}
-                          {selectedNode.division ? ` · ${selectedNode.division}` : ''}
-                        </Text>
-                      </View>
-
-                      <View style={styles.infoGrid}>
-                        <InfoLine label="Email" value={selectedNode.email || '—'} />
-                        <InfoLine label="Điện thoại" value={selectedNode.phone || 'Chưa cập nhật'} />
-                        <InfoLine label="Chuyên môn" value={selectedNode.qualification || '—'} />
-                        {selectedNode.monthlySalary != null ? (
-                          <InfoLine label="Lương tháng" value={formatVndAmount(selectedNode.monthlySalary)} />
-                        ) : null}
-                        {leaveBalance ? (
-                          <InfoLine
-                            label={`Phép năm ${leaveBalance.year ?? new Date().getFullYear()}`}
-                            value={`Còn ${leaveBalance.remaining ?? 0} / ${leaveBalance.entitlement ?? 0} ngày`}
-                          />
-                        ) : null}
-                      </View>
-
-                      {selectedNode.jobDescriptionLink ? (
-                        <Pressable
-                          onPress={() => void Linking.openURL(selectedNode.jobDescriptionLink!)}
-                          style={styles.jdLinkBtn}
-                        >
-                          <View style={styles.iconButtonContent}>
-                            <FileText size={15} color={colors.primary} />
-                            <Text style={styles.jdLinkText}>Mở mô tả công việc (JD)</Text>
-                            <ChevronRight size={15} color={colors.primary} />
-                          </View>
-                        </Pressable>
-                      ) : null}
-
-                      {directManager ? (
-                        <View style={styles.relSection}>
-                          <Text style={styles.relTitle}>Báo cáo trực tiếp cho</Text>
-                          <Pressable onPress={() => openDetail(directManager)} style={styles.relChip}>
-                            <Text style={styles.relChipText}>{directManager.displayName}</Text>
-                          </Pressable>
-                        </View>
-                      ) : null}
-
-                      {directReports.length > 0 ? (
-                        <View style={styles.relSection}>
-                          <Text style={styles.relTitle}>Cấp dưới trực thuộc ({directReports.length})</Text>
-                          <View style={styles.relList}>
-                            {directReports.map((sub) => (
-                              <Pressable key={sub.nodeId} onPress={() => openDetail(sub)} style={styles.relChip}>
-                                <Text style={styles.relChipText}>{sub.displayName}</Text>
-                              </Pressable>
-                            ))}
-                          </View>
-                        </View>
-                      ) : null}
-
-                      {canEdit(selectedNode) ? (
-                        <View style={styles.detailActions}>
-                          <Pressable
-                            disabled={savingLeader}
-                            onPress={() => void onToggleLeader()}
-                            style={styles.leaderBtn}
-                          >
-                            <View style={styles.iconButtonContent}>
-                              {!savingLeader && !selectedNode.isLeader ? <Crown size={14} color={colors.primary} /> : null}
-                              <Text style={styles.leaderBtnText}>
-                                {savingLeader
-                                  ? 'Đang cập nhật...'
-                                  : selectedNode.isLeader
-                                    ? 'Hủy chức Trưởng nhóm'
-                                    : 'Đặt làm Trưởng nhóm'}
-                              </Text>
-                            </View>
-                          </Pressable>
-                          <Pressable onPress={startEdit} style={styles.submitBtn}>
-                            <Text style={styles.submitBtnText}>Chỉnh sửa hồ sơ</Text>
-                          </Pressable>
-                        </View>
-                      ) : null}
-
-                      {canDelete(selectedNode) ? (
-                        <Pressable onPress={() => onDeleteNode(selectedNode)} style={styles.deleteBtn}>
-                          <Text style={styles.deleteBtnText}>Xóa nhân sự khỏi sơ đồ</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  )}
-                </ScrollView>
-              </>
-            ) : null}
+                );
+              })}
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
 
-      {/* Add Employee Modal */}
-      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setAddOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>Thêm nhân sự mới</Text>
-              <Pressable onPress={() => setAddOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
-              <View style={styles.form}>
-                <Text style={styles.label}>Họ và tên *</Text>
-                <TextInput value={addName} onChangeText={setAddName} placeholder="Nguyễn Văn A" placeholderTextColor={colors.muted} style={styles.field} />
+      {/* Employee Detail & Edit Full-Screen Page */}
+      <FullScreenFormModal
+        visible={Boolean(selectedNode)}
+        title={isEditing ? 'Chỉnh sửa hồ sơ' : selectedNode?.displayName || 'Hồ sơ nhân sự'}
+        cancelLabel={isEditing ? 'Hủy' : undefined}
+        onSave={isEditing ? () => void onSaveEdit() : undefined}
+        saving={savingEdit}
+        onClose={() => {
+          if (isEditing) setIsEditing(false);
+          else setSelectedNode(null);
+        }}
+        rightAction={
+          selectedNode && !isEditing && canEdit(selectedNode) ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Chỉnh sửa hồ sơ"
+              onPress={startEdit}
+              hitSlop={10}
+              style={({ pressed }) => [{ padding: 6 }, pressed && { opacity: 0.55 }]}
+            >
+              <Pencil size={19} strokeWidth={1.7} color="#374151" />
+            </Pressable>
+          ) : undefined
+        }
+      >
+        {selectedNode ? (
+          isEditing ? (
+            <View style={styles.form}>
+              <Text style={styles.label}>Họ và tên *</Text>
+              <TextInput value={editName} onChangeText={setEditName} style={styles.field} />
 
-                <Text style={styles.label}>Email đăng nhập *</Text>
-                <TextInput value={addEmail} onChangeText={setAddEmail} keyboardType="email-address" autoCapitalize="none" placeholder="email@congty.vn" placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Chức danh</Text>
+              <TextInput value={editJobTitle} onChangeText={setEditJobTitle} placeholder="VD: Trưởng phòng Kinh doanh" placeholderTextColor={colors.muted} style={styles.field} />
 
-                <Text style={styles.label}>Mật khẩu (tối thiểu 6 ký tự) *</Text>
-                <TextInput value={addPassword} onChangeText={setAddPassword} secureTextEntry placeholder="••••••" placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Phòng ban</Text>
+              <TextInput value={editDepartment} onChangeText={setEditDepartment} placeholder="Tên phòng ban" placeholderTextColor={colors.muted} style={styles.field} />
 
-                <Text style={styles.label}>Vai trò</Text>
-                <View style={styles.relList}>
-                  {(['user', 'manager', 'branch_owner', 'admin'] as const).map((r) => (
-                    <Pressable
-                      key={r}
-                      onPress={() => setAddRole(r)}
-                      style={[styles.deptChip, addRole === r && styles.deptChipActive]}
-                    >
-                      <Text style={[styles.deptText, addRole === r && styles.deptTextActive]}>
-                        {ROLE_LABELS[r]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+              <Text style={styles.label}>Khối chức năng</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
+                {DIVISIONS.map((div) => (
+                  <Pressable
+                    key={div}
+                    onPress={() => setEditDivision(div)}
+                    style={[styles.deptChip, editDivision === div && styles.deptChipActive]}
+                  >
+                    <Text style={[styles.deptText, editDivision === div && styles.deptTextActive]}>{div}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
 
-                <Text style={styles.label}>Phòng ban</Text>
+              <Text style={styles.label}>Quản lý trực tiếp</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
                 <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: addDepartmentOpen }}
-                  onPress={() => setAddDepartmentOpen((open) => !open)}
-                  style={styles.departmentSelector}
+                  onPress={() => setEditParentId('')}
+                  style={[styles.deptChip, !editParentId && styles.deptChipActive]}
                 >
-                  <Text style={[styles.departmentSelectorText, !addDepartment && styles.departmentPlaceholder]}>
-                    {addDepartment || 'Chọn phòng ban'}
-                  </Text>
-                  <ChevronDown size={16} color={colors.muted} />
+                  <Text style={[styles.deptText, !editParentId && styles.deptTextActive]}>Không có</Text>
                 </Pressable>
-                {addDepartmentOpen ? (
-                  <View style={styles.departmentDropdown}>
-                    {departmentOptions.length > 1 ? (
-                      <ScrollView nestedScrollEnabled style={styles.departmentOptions}>
-                        {departmentOptions.slice(1).map((department) => (
-                          <Pressable
-                            key={department}
-                            onPress={() => {
-                              setAddDepartment(department);
-                              setAddDepartmentOpen(false);
-                            }}
-                            style={styles.departmentOption}
-                          >
-                            <Text style={styles.departmentOptionText}>{department}</Text>
-                          </Pressable>
-                        ))}
-                      </ScrollView>
-                    ) : (
-                      <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>
-                    )}
-                  </View>
-                ) : null}
-
-                <Text style={styles.label}>Quản lý trực tiếp</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
-                  {orgNodes.slice(0, 20).map((cand) => (
+                {orgNodes
+                  .filter((n) => n.nodeId !== selectedNode.nodeId)
+                  .slice(0, 20)
+                  .map((cand) => (
                     <Pressable
                       key={cand.nodeId}
-                      onPress={() => setAddParentId(cand.nodeId)}
-                      style={[styles.deptChip, addParentId === cand.nodeId && styles.deptChipActive]}
+                      onPress={() => setEditParentId(cand.nodeId)}
+                      style={[styles.deptChip, editParentId === cand.nodeId && styles.deptChipActive]}
                     >
-                      <Text style={[styles.deptText, addParentId === cand.nodeId && styles.deptTextActive]}>
+                      <Text style={[styles.deptText, editParentId === cand.nodeId && styles.deptTextActive]}>
                         {cand.displayName}
                       </Text>
                     </Pressable>
                   ))}
-                </ScrollView>
+              </ScrollView>
 
-                <Text style={styles.label}>Số điện thoại</Text>
-                <TextInput value={addPhone} onChangeText={setAddPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Số điện thoại</Text>
+              <TextInput value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" style={styles.field} />
 
-                <Text style={styles.label}>Trình độ chuyên môn</Text>
-                <TextInput value={addQualification} onChangeText={setAddQualification} placeholder="Đại học / Thạc sĩ..." placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Trình độ chuyên môn</Text>
+              <TextInput value={editQualification} onChangeText={setEditQualification} style={styles.field} />
 
-                <Text style={styles.label}>Lương tháng (VNĐ)</Text>
-                <TextInput value={addSalary} onChangeText={setAddSalary} keyboardType="numeric" placeholder="15.000.000" placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Lương tháng (VNĐ)</Text>
+              <TextInput value={editSalary} onChangeText={setEditSalary} keyboardType="numeric" style={styles.field} />
 
-                <Text style={styles.label}>Link mô tả công việc (JD)</Text>
-                <TextInput value={addJdLink} onChangeText={setAddJdLink} autoCapitalize="none" placeholder="https://..." placeholderTextColor={colors.muted} style={styles.field} />
+              <Text style={styles.label}>Link mô tả công việc (JD)</Text>
+              <TextInput value={editJdLink} onChangeText={setEditJdLink} autoCapitalize="none" style={styles.field} />
 
+              <View style={styles.actionRow}>
+                <Pressable onPress={() => setIsEditing(false)} style={styles.secondaryBtn}>
+                  <Text style={styles.secondaryBtnText}>Hủy</Text>
+                </Pressable>
                 <Pressable
-                  disabled={adding}
-                  onPress={() => void onAddEmployee()}
-                  style={[styles.submitBtn, adding && styles.disabled]}
+                  disabled={savingEdit}
+                  onPress={() => void onSaveEdit()}
+                  style={[styles.submitBtn, { flex: 1 }, savingEdit && styles.disabled]}
                 >
                   <Text style={styles.submitBtnText}>
-                    {adding ? 'Đang thêm...' : 'Thêm vào sơ đồ tổ chức'}
+                    {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
                   </Text>
                 </Pressable>
               </View>
-            </ScrollView>
+            </View>
+          ) : (
+            <View style={styles.detailBody}>
+              <Text style={styles.detailSectionTitle}>Thông tin chung</Text>
+
+              <View style={styles.infoGrid}>
+                <InfoLine
+                  label="Chức vụ"
+                  value={`${selectedNode.isLeader ? 'Trưởng nhóm · ' : ''}${selectedNode.jobTitle || selectedNode.position || 'Chưa cập nhật'}`}
+                />
+                <InfoLine
+                  label="Phòng ban"
+                  value={selectedNode.department || 'Chưa phân phòng ban'}
+                />
+                {selectedNode.division ? (
+                  <InfoLine label="Khối chức năng" value={selectedNode.division} />
+                ) : null}
+                <InfoLine label="Email" value={selectedNode.email || '-'} />
+                <InfoLine label="Điện thoại" value={selectedNode.phone || '-'} />
+                <InfoLine label="Chuyên môn" value={selectedNode.qualification || '-'} />
+                {selectedNode.monthlySalary != null ? (
+                  <InfoLine label="Lương tháng" value={formatVndAmount(selectedNode.monthlySalary)} />
+                ) : null}
+                {leaveBalance ? (
+                  <InfoLine
+                    label={`Phép năm ${leaveBalance.year ?? new Date().getFullYear()}`}
+                    value={`Còn ${leaveBalance.remaining ?? 0} / ${leaveBalance.entitlement ?? 0} ngày`}
+                  />
+                ) : null}
+              </View>
+
+              {selectedNode.jobDescriptionLink ? (
+                <Pressable
+                  onPress={() => void Linking.openURL(selectedNode.jobDescriptionLink!)}
+                  style={styles.jdLinkBtn}
+                >
+                  <View style={styles.iconButtonContent}>
+                    <FileText size={15} color={colors.primary} />
+                    <Text style={styles.jdLinkText}>Mở mô tả công việc (JD)</Text>
+                    <ChevronRight size={15} color={colors.primary} />
+                  </View>
+                </Pressable>
+              ) : null}
+
+              {directManager ? (
+                <View style={styles.relSection}>
+                  <Text style={styles.relTitle}>Báo cáo trực tiếp cho</Text>
+                  <Pressable onPress={() => openDetail(directManager)} style={styles.relChip}>
+                    <Text style={styles.relChipText}>{directManager.displayName}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {directReports.length > 0 ? (
+                <View style={styles.relSection}>
+                  <Text style={styles.relTitle}>Cấp dưới trực thuộc ({directReports.length})</Text>
+                  <View style={styles.relList}>
+                    {directReports.map((sub) => (
+                      <Pressable key={sub.nodeId} onPress={() => openDetail(sub)} style={styles.relChip}>
+                        <Text style={styles.relChipText}>{sub.displayName}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {canEdit(selectedNode) ? (
+                <View style={styles.detailActions}>
+                  <Pressable
+                    disabled={savingLeader}
+                    onPress={() => void onToggleLeader()}
+                    style={styles.leaderBtn}
+                  >
+                    <View style={styles.iconButtonContent}>
+                      {!savingLeader && !selectedNode.isLeader ? <Crown size={14} color="#B45309" /> : null}
+                      <Text style={styles.leaderBtnText}>
+                        {savingLeader
+                          ? 'Đang cập nhật...'
+                          : selectedNode.isLeader
+                            ? 'Hủy chức Trưởng nhóm'
+                            : 'Đặt làm Trưởng nhóm'}
+                      </Text>
+                    </View>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {canDelete(selectedNode) ? (
+                <Pressable onPress={() => onDeleteNode(selectedNode)} style={styles.deleteBtn}>
+                  <Text style={styles.deleteBtnText}>Xóa nhân sự khỏi danh sách</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          )
+        ) : null}
+      </FullScreenFormModal>
+
+      {/* Add Employee Full-Screen Page */}
+      <FullScreenFormModal
+        visible={addOpen}
+        title="Thêm nhân sự mới"
+        cancelLabel="Hủy"
+        onSave={() => void onAddEmployee()}
+        saving={adding}
+        onClose={() => setAddOpen(false)}
+      >
+        <View style={styles.form}>
+          <Text style={styles.label}>Họ và tên *</Text>
+          <TextInput value={addName} onChangeText={setAddName} placeholder="Nguyễn Văn A" placeholderTextColor={colors.muted} style={styles.field} />
+
+          <Text style={styles.label}>Email đăng nhập *</Text>
+          <TextInput value={addEmail} onChangeText={setAddEmail} keyboardType="email-address" autoCapitalize="none" placeholder="email@congty.vn" placeholderTextColor={colors.muted} style={styles.field} />
+
+          <Text style={styles.label}>Mật khẩu (tối thiểu 6 ký tự) *</Text>
+          <TextInput value={addPassword} onChangeText={setAddPassword} secureTextEntry placeholder="••••••" placeholderTextColor={colors.muted} style={styles.field} />
+
+          <Text style={styles.label}>Vai trò</Text>
+          <View style={styles.relList}>
+            {(['user', 'manager', 'branch_owner', 'admin'] as const).map((r) => (
+              <Pressable
+                key={r}
+                onPress={() => setAddRole(r)}
+                style={[styles.deptChip, addRole === r && styles.deptChipActive]}
+              >
+                <Text style={[styles.deptText, addRole === r && styles.deptTextActive]}>
+                  {ROLE_LABELS[r]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Phòng ban</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: addDepartmentOpen }}
+            onPress={() => setAddDepartmentOpen((open) => !open)}
+            style={styles.departmentSelector}
+          >
+            <Text style={[styles.departmentSelectorText, !addDepartment && styles.departmentPlaceholder]}>
+              {addDepartment || 'Chọn phòng ban'}
+            </Text>
+            <ChevronDown size={16} color={colors.muted} />
           </Pressable>
-        </Pressable>
-      </Modal>
+          {addDepartmentOpen ? (
+            <View style={styles.departmentDropdown}>
+              {departmentOptions.length > 1 ? (
+                <ScrollView nestedScrollEnabled style={styles.departmentOptions}>
+                  {departmentOptions.slice(1).map((department) => (
+                    <Pressable
+                      key={department}
+                      onPress={() => {
+                        setAddDepartment(department);
+                        setAddDepartmentOpen(false);
+                      }}
+                      style={styles.departmentOption}
+                    >
+                      <Text style={styles.departmentOptionText}>{department}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              ) : (
+                <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>
+              )}
+            </View>
+          ) : null}
+
+          <Text style={styles.label}>Quản lý trực tiếp</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
+            {orgNodes.slice(0, 20).map((cand) => (
+              <Pressable
+                key={cand.nodeId}
+                onPress={() => setAddParentId(cand.nodeId)}
+                style={[styles.deptChip, addParentId === cand.nodeId && styles.deptChipActive]}
+              >
+                <Text style={[styles.deptText, addParentId === cand.nodeId && styles.deptTextActive]}>
+                  {cand.displayName}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.label}>Số điện thoại</Text>
+          <TextInput value={addPhone} onChangeText={setAddPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor={colors.muted} style={styles.field} />
+
+          <Text style={styles.label}>Trình độ chuyên môn</Text>
+          <TextInput value={addQualification} onChangeText={setAddQualification} placeholder="Đại học / Thạc sĩ..." placeholderTextColor={colors.muted} style={styles.field} />
+
+          <Text style={styles.label}>Lương tháng (VNĐ)</Text>
+          <TextInput value={addSalary} onChangeText={setAddSalary} keyboardType="numeric" placeholder="15.000.000" placeholderTextColor={colors.muted} style={styles.field} />
+
+          <Text style={styles.label}>Link mô tả công việc (JD)</Text>
+          <TextInput value={addJdLink} onChangeText={setAddJdLink} autoCapitalize="none" placeholder="https://..." placeholderTextColor={colors.muted} style={styles.field} />
+
+          <Pressable
+            disabled={adding}
+            onPress={() => void onAddEmployee()}
+            style={[styles.submitBtn, adding && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {adding ? 'Đang thêm...' : 'Thêm vào danh sách nhân sự'}
+            </Text>
+          </Pressable>
+        </View>
+      </FullScreenFormModal>
     </ScrollView>
+    {isManager ? <HrFab label="Thêm nhân sự" onPress={openAddModal} /> : null}
+    </View>
   );
 }
 
@@ -1375,10 +1330,23 @@ const styles = StyleSheet.create({
   detailTop: { paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   detailRole: { color: colors.primary, fontSize: 12, fontWeight: '800' },
   detailRoleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  infoGrid: { gap: 8 },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingBottom: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  infoLabel: { color: colors.muted, fontSize: 11 },
-  infoVal: { color: colors.ink, fontSize: 11, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
+  detailSectionTitle: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '600',
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  infoGrid: { gap: 0 },
+  infoRow: {
+    paddingVertical: 12,
+    gap: 5,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  infoLabel: { color: '#6B7280', fontSize: 12.5, fontWeight: '400' },
+  infoVal: { color: '#111827', fontSize: 15, fontWeight: '500' },
   jdLinkBtn: { backgroundColor: '#EAF2FF', padding: 10, borderRadius: 10 },
   jdLinkText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
   relSection: { gap: 6 },
@@ -1408,5 +1376,182 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
   disabled: { opacity: 0.45 },
+  directoryScroll: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  directoryContent: {
+    backgroundColor: colors.white,
+    flexGrow: 1,
+  },
+  directoryTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 12,
+    gap: 10,
+  },
+  deptTriggerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flex: 1,
+  },
+  deptTriggerText: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '400',
+    flexShrink: 1,
+  },
+  directoryAddLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingVertical: 4,
+    paddingLeft: 8,
+  },
+  directoryAddLinkText: {
+    color: colors.primary,
+    fontSize: 14.5,
+    fontWeight: '500',
+  },
+  directorySearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 14,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    height: 40,
+    borderRadius: 99,
+    backgroundColor: '#F6F8FC',
+    borderWidth: 1,
+    borderColor: '#DCE5F2',
+    gap: 10,
+  },
+  directorySearchInput: {
+    flex: 1,
+    fontSize: 13.5,
+    color: '#111827',
+    fontWeight: '400',
+    paddingVertical: 0,
+  },
+  directoryStateWrap: {
+    paddingVertical: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  directoryListFlat: {
+    backgroundColor: colors.white,
+  },
+  directoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 14,
+    backgroundColor: colors.white,
+  },
+  directoryRowPressed: {
+    backgroundColor: '#F5F8FD',
+  },
+  directoryAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1EA7E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  directoryAvatarText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+  },
+  directoryCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  directoryNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  directoryName: {
+    color: '#111827',
+    fontSize: 15.5,
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  directorySub: {
+    color: '#6B7280',
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  directoryDept: {
+    color: '#6B7280',
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  directoryCallBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F6F8FC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  directoryCallBtnDisabled: {
+    opacity: 0.28,
+  },
+  directoryCallBtnPressed: {
+    backgroundColor: '#E5EEFC',
+  },
+  deptSheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    justifyContent: 'flex-end',
+  },
+  deptSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+  },
+  deptSheetHandle: {
+    width: 38,
+    height: 4,
+    borderRadius: 99,
+    backgroundColor: '#D6DFEC',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  deptSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  deptSheetRowActive: {
+    backgroundColor: '#F0F6FF',
+  },
+  deptSheetRowText: {
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: '400',
+  },
+  deptSheetRowTextActive: {
+    color: colors.primary,
+    fontWeight: '500',
+  },
 });
 

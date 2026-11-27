@@ -1,5 +1,6 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { CenteredPageLoader } from '@/components/BrandLoader';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -435,29 +436,49 @@ export function ResourcesScreen() {
         </Sheet>
       </Modal>
 
-      <Modal visible={folderModal} transparent animationType="fade" onRequestClose={() => setFolderModal(false)}>
-        <Sheet onClose={() => setFolderModal(false)} title="Tạo thư mục">
-          <Text style={styles.fieldLabel}>Tên thư mục</Text>
-          <TextInput value={folderName} onChangeText={setFolderName} placeholder="Nhập tên thư mục" placeholderTextColor={colors.muted} style={styles.fieldInput} autoFocus />
-          <View style={styles.sheetButtons}><ActionButton label="Hủy" secondary onPress={() => setFolderModal(false)} /><ActionButton label={savingFolder ? 'Đang tạo...' : 'Tạo thư mục'} disabled={!folderName.trim() || savingFolder} onPress={() => { void saveFolder(); }} /></View>
-        </Sheet>
-      </Modal>
-
-      <Modal visible={Boolean(detailItem)} transparent animationType="fade" onRequestClose={() => setDetailItem(null)}>
-        {detailItem && <Sheet onClose={() => setDetailItem(null)} title="Chi tiết tài nguyên">
-          <View style={styles.detailHero}>
-            <View style={[styles.fileIconContainer, { backgroundColor: detailIcon?.tint }]}>
-              {DetailIcon && <DetailIcon size={19} color={colors.primary} />}
-            </View>
-            <View style={styles.detailCopy}><Text style={styles.detailName}>{detailItem.name}</Text><Text style={styles.detailMeta}>{formatBytes(detailItem.size)}</Text></View>
+      <FullScreenFormModal
+        visible={folderModal}
+        title="Tạo thư mục"
+        onClose={() => setFolderModal(false)}
+        footer={
+          <View style={styles.sheetButtons}>
+            <ActionButton label="Hủy" secondary onPress={() => setFolderModal(false)} />
+            <ActionButton label={savingFolder ? 'Đang tạo...' : 'Tạo thư mục'} disabled={!folderName.trim() || savingFolder} onPress={() => { void saveFolder(); }} />
           </View>
-          <InfoLine label="Người tạo" value={detailItem.creatorName || detailItem.creatorUid || '—'} />
-          <InfoLine label="Cập nhật" value={formatDate(detailItem.updatedAt)} />
-          <InfoLine label="Loại tệp" value={detailItem.mimeType || (detailItem.type === 'folder' ? 'Thư mục' : 'Tệp')} />
-          <InfoLine label="Chia sẻ" value={detailItem.shares?.length ? `${detailItem.shares.length} người/nhóm` : 'Chưa chia sẻ'} />
-          <View style={styles.sheetButtons}><ActionButton label="Đóng" secondary onPress={() => setDetailItem(null)} /><ActionButton label="Mở tệp" onPress={() => openFile(detailItem)} /></View>
-        </Sheet>}
-      </Modal>
+        }
+      >
+        <Text style={styles.fieldLabel}>Tên thư mục</Text>
+        <TextInput value={folderName} onChangeText={setFolderName} placeholder="Nhập tên thư mục" placeholderTextColor={colors.muted} style={styles.fieldInput} autoFocus />
+      </FullScreenFormModal>
+
+      <FullScreenFormModal
+        visible={Boolean(detailItem)}
+        title="Chi tiết tài nguyên"
+        onClose={() => setDetailItem(null)}
+        footer={
+          detailItem ? (
+            <View style={styles.sheetButtons}>
+              <ActionButton label="Đóng" secondary onPress={() => setDetailItem(null)} />
+              <ActionButton label="Mở tệp" onPress={() => openFile(detailItem)} />
+            </View>
+          ) : undefined
+        }
+      >
+        {detailItem && (
+          <>
+            <View style={styles.detailHero}>
+              <View style={[styles.fileIconContainer, { backgroundColor: detailIcon?.tint }]}>
+                {DetailIcon && <DetailIcon size={19} color={colors.primary} />}
+              </View>
+              <View style={styles.detailCopy}><Text style={styles.detailName}>{detailItem.name}</Text><Text style={styles.detailMeta}>{formatBytes(detailItem.size)}</Text></View>
+            </View>
+            <InfoLine label="Người tạo" value={detailItem.creatorName || detailItem.creatorUid || '—'} />
+            <InfoLine label="Cập nhật" value={formatDate(detailItem.updatedAt)} />
+            <InfoLine label="Loại tệp" value={detailItem.mimeType || (detailItem.type === 'folder' ? 'Thư mục' : 'Tệp')} />
+            <InfoLine label="Chia sẻ" value={detailItem.shares?.length ? `${detailItem.shares.length} người/nhóm` : 'Chưa chia sẻ'} />
+          </>
+        )}
+      </FullScreenFormModal>
 
       <Modal visible={Boolean(actionItem)} transparent animationType="fade" onRequestClose={() => setActionItem(null)}>
         {actionItem && <Sheet onClose={() => setActionItem(null)} title="Thao tác">
@@ -477,17 +498,38 @@ export function ResourcesScreen() {
         </Sheet>}
       </Modal>
 
-      <Modal visible={Boolean(renameItem)} transparent animationType="fade" onRequestClose={() => setRenameItem(null)}>
-        {renameItem && <Sheet onClose={() => setRenameItem(null)} title="Đổi tên">
-          <Text style={styles.fieldLabel}>Tên mới</Text>
-          <TextInput value={renameValue} onChangeText={setRenameValue} style={styles.fieldInput} autoFocus />
-          <View style={styles.sheetButtons}><ActionButton label="Hủy" secondary onPress={() => setRenameItem(null)} /><ActionButton label={renaming ? 'Đang lưu...' : 'Lưu'} disabled={!renameValue.trim() || renaming} onPress={() => { void saveRename(); }} /></View>
-        </Sheet>}
-      </Modal>
+      <FullScreenFormModal
+        visible={Boolean(renameItem)}
+        title="Đổi tên"
+        onClose={() => setRenameItem(null)}
+        footer={
+          <View style={styles.sheetButtons}>
+            <ActionButton label="Hủy" secondary onPress={() => setRenameItem(null)} />
+            <ActionButton label={renaming ? 'Đang lưu...' : 'Lưu'} disabled={!renameValue.trim() || renaming} onPress={() => { void saveRename(); }} />
+          </View>
+        }
+      >
+        {renameItem && (
+          <>
+            <Text style={styles.fieldLabel}>Tên mới</Text>
+            <TextInput value={renameValue} onChangeText={setRenameValue} style={styles.fieldInput} autoFocus />
+          </>
+        )}
+      </FullScreenFormModal>
 
-      <Modal visible={Boolean(sharingItem)} transparent animationType="fade" onRequestClose={() => setSharingItem(null)}>
-        {sharingItem && <Sheet onClose={() => setSharingItem(null)} title="Chia sẻ tài nguyên" scrollable>
-          {loadingShares ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : <>
+      <FullScreenFormModal
+        visible={Boolean(sharingItem)}
+        title="Chia sẻ tài nguyên"
+        onClose={() => setSharingItem(null)}
+        footer={
+          <View style={styles.sheetButtons}>
+            <ActionButton label="Hủy" secondary onPress={() => setSharingItem(null)} />
+            <ActionButton label={savingShares ? 'Đang lưu...' : 'Lưu chia sẻ'} disabled={loadingShares || savingShares} onPress={() => { void saveShares(); }} />
+          </View>
+        }
+      >
+        {sharingItem && (
+          loadingShares ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : <>
             <Text style={styles.actionItemName} numberOfLines={1}>{sharingItem.name}</Text>
             <View style={styles.localTabs}>
               <TabButton label="Thành viên" active={shareTab === 'users'} onPress={() => setShareTab('users')} compact />
@@ -503,26 +545,36 @@ export function ResourcesScreen() {
               const checked = shareTargets.some((target) => target.targetId === room._id && target.targetType === 'room');
               return <ShareChoice key={room._id} label={room.name || 'Nhóm chat'} hint={`${room.members.length} thành viên`} checked={checked} onPress={() => toggleRoomShare(room)} />;
             })}
-          </>}
-          <View style={styles.sheetButtons}><ActionButton label="Hủy" secondary onPress={() => setSharingItem(null)} /><ActionButton label={savingShares ? 'Đang lưu...' : 'Lưu chia sẻ'} disabled={loadingShares || savingShares} onPress={() => { void saveShares(); }} /></View>
-        </Sheet>}
-      </Modal>
+          </>
+        )}
+      </FullScreenFormModal>
 
-      <Modal visible={Boolean(moveItem)} transparent animationType="fade" onRequestClose={() => setMoveItem(null)}>
-        {moveItem && <Sheet onClose={() => setMoveItem(null)} title="Di chuyển tài nguyên" scrollable>
-          <Text style={styles.actionItemName} numberOfLines={1}>{moveItem.name}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumb}>
-            <Pressable onPress={() => setMoveFolderId(null)}><Text style={[styles.breadcrumbText, !moveFolderId && styles.breadcrumbCurrent]}>Thư mục gốc</Text></Pressable>
-            {moveBreadcrumb.map((entry, index) => <View key={entry._id} style={styles.crumb}><ChevronRight size={13} color={colors.muted} style={styles.crumbDivider} /><Pressable onPress={() => setMoveFolderId(entry._id)}><Text style={[styles.breadcrumbText, index === moveBreadcrumb.length - 1 && styles.breadcrumbCurrent]}>{entry.name}</Text></Pressable></View>)}
-          </ScrollView>
-          <Pressable style={styles.destinationButton} onPress={() => { void saveMove(); }} disabled={moving}>
-            <Text style={styles.destinationText}>{moveFolderId ? `Chuyển vào “${moveBreadcrumb[moveBreadcrumb.length - 1]?.name || 'thư mục này'}”` : 'Chuyển vào thư mục gốc'}</Text><Check size={17} color={colors.primary} />
-          </Pressable>
-          {loadingMoveFolders ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : moveFolders.map((folder) => <ResourceRow key={folder._id} item={folder} compact onOpen={() => setMoveFolderId(folder._id)} onMore={() => setMoveFolderId(folder._id)} />)}
-          {!loadingMoveFolders && moveFolders.length === 0 && <Text style={styles.emptySmall}>Không có thư mục con.</Text>}
-          <View style={styles.sheetButtons}><ActionButton label="Hủy" secondary onPress={() => setMoveItem(null)} /><ActionButton label={moving ? 'Đang chuyển...' : 'Chuyển'} disabled={moving} onPress={() => { void saveMove(); }} /></View>
-        </Sheet>}
-      </Modal>
+      <FullScreenFormModal
+        visible={Boolean(moveItem)}
+        title="Di chuyển tài nguyên"
+        onClose={() => setMoveItem(null)}
+        footer={
+          <View style={styles.sheetButtons}>
+            <ActionButton label="Hủy" secondary onPress={() => setMoveItem(null)} />
+            <ActionButton label={moving ? 'Đang chuyển...' : 'Chuyển'} disabled={moving} onPress={() => { void saveMove(); }} />
+          </View>
+        }
+      >
+        {moveItem && (
+          <>
+            <Text style={styles.actionItemName} numberOfLines={1}>{moveItem.name}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.breadcrumb}>
+              <Pressable onPress={() => setMoveFolderId(null)}><Text style={[styles.breadcrumbText, !moveFolderId && styles.breadcrumbCurrent]}>Thư mục gốc</Text></Pressable>
+              {moveBreadcrumb.map((entry, index) => <View key={entry._id} style={styles.crumb}><ChevronRight size={13} color={colors.muted} style={styles.crumbDivider} /><Pressable onPress={() => setMoveFolderId(entry._id)}><Text style={[styles.breadcrumbText, index === moveBreadcrumb.length - 1 && styles.breadcrumbCurrent]}>{entry.name}</Text></Pressable></View>)}
+            </ScrollView>
+            <Pressable style={styles.destinationButton} onPress={() => { void saveMove(); }} disabled={moving}>
+              <Text style={styles.destinationText}>{moveFolderId ? `Chuyển vào “${moveBreadcrumb[moveBreadcrumb.length - 1]?.name || 'thư mục này'}”` : 'Chuyển vào thư mục gốc'}</Text><Check size={17} color={colors.primary} />
+            </Pressable>
+            {loadingMoveFolders ? <ActivityIndicator color={colors.primary} style={styles.loading} /> : moveFolders.map((folder) => <ResourceRow key={folder._id} item={folder} compact onOpen={() => setMoveFolderId(folder._id)} onMore={() => setMoveFolderId(folder._id)} />)}
+            {!loadingMoveFolders && moveFolders.length === 0 && <Text style={styles.emptySmall}>Không có thư mục con.</Text>}
+          </>
+        )}
+      </FullScreenFormModal>
     </View>
   );
 }
@@ -599,7 +651,7 @@ const styles = StyleSheet.create({
   secondaryAction: { minHeight: 40, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#EAF2FF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   secondaryActionText: { color: colors.primary, fontSize: 9, fontWeight: '800' },
   refreshButton: { width: 40, height: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
-  search: { minHeight: 41, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, color: colors.ink, fontSize: 10, marginBottom: 11 },
+  search: { height: 40, paddingHorizontal: 14, borderRadius: 99, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DCE5F2', color: '#111827', fontSize: 13.5, marginBottom: 12 },
   countRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
   listHeading: { color: colors.ink, fontSize: 12, fontWeight: '800' },
   countText: { color: colors.muted, fontSize: 8 },
@@ -626,12 +678,12 @@ const styles = StyleSheet.create({
   sheetTitle: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   fieldLabel: { color: colors.ink, fontSize: 9, fontWeight: '700', marginBottom: 6 },
   fieldInput: { minHeight: 42, paddingHorizontal: 11, backgroundColor: colors.white, borderRadius: 11, borderColor: colors.border, borderWidth: 1, color: colors.ink, fontSize: 10, marginBottom: 11 },
-  sheetButtons: { flexDirection: 'row', gap: 8, marginTop: 14, marginBottom: 4 },
-  actionButton: { flex: 1, minHeight: 41, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: 11, marginTop: 8 },
+  sheetButtons: { flexDirection: 'row', gap: 8 },
+  actionButton: { flex: 1, minHeight: 41, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: 11 },
   actionButtonText: { color: colors.white, fontSize: 9, fontWeight: '800' },
   actionButtonSecondary: { backgroundColor: '#E9EDF4' },
   actionButtonSecondaryText: { color: colors.ink },
-  detailHero: { flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 14, backgroundColor: colors.white, marginBottom: 7 },
+  detailHero: { flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 14, backgroundColor: '#F5F7FB', marginBottom: 7 },
   detailCopy: { flex: 1, minWidth: 0, marginLeft: 10 },
   detailName: { color: colors.ink, fontSize: 10, fontWeight: '800' },
   detailMeta: { color: colors.muted, fontSize: 8, marginTop: 4 },

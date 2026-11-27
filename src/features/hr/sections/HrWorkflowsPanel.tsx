@@ -15,8 +15,10 @@ import {
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { Check, ChevronLeft, ChevronRight, Paperclip, Plus, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Folder, Paperclip, Plus, X } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { HrFab } from '@/features/hr/components/HrFab';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -53,6 +55,7 @@ export function HrWorkflowsPanel({
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+  const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
 
   // Detail view state
   const [selectedWorkflow, setSelectedWorkflow] = useState<HrWorkflow | null>(null);
@@ -480,76 +483,66 @@ export function HrWorkflowsPanel({
       setEditingWorkflow(null);
     };
     return (
-      <Modal
+      <FullScreenFormModal
         visible={createOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={close}
+        title={editingWorkflow ? 'Sửa quy trình' : 'Tạo quy trình mới'}
+        cancelLabel="Hủy"
+        onSave={() => void (editingWorkflow ? onUpdateWorkflow() : onCreateWorkflow())}
+        saving={savingWf}
+        onClose={close}
       >
-        <Pressable style={styles.backdrop} onPress={close}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>
-                {editingWorkflow ? 'Sửa quy trình' : 'Tạo quy trình mới'}
-              </Text>
-              <Pressable onPress={close} hitSlop={8} disabled={savingWf}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
+        <View style={{ gap: 8, paddingBottom: 12 }}>
+          <Text style={styles.label}>Tên quy trình *</Text>
+          <TextInput
+            value={wfName}
+            onChangeText={setWfName}
+            placeholder="VD: Quy trình tiếp nhận nhân sự mới"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          <Text style={styles.label}>Danh mục</Text>
+          <TextInput
+            value={wfCategory}
+            onChangeText={setWfCategory}
+            placeholder="VD: Nhân sự / Vận hành"
+            placeholderTextColor={colors.muted}
+            style={styles.field}
+          />
+          {categories.length > 1 ? (
+            <View style={styles.categorySuggestions}>
+              {categories.slice(1).map((category) => (
+                <Pressable
+                  key={category}
+                  onPress={() => setWfCategory(category)}
+                  style={[styles.catChip, wfCategory.trim() === category && styles.catChipActive]}
+                >
+                  <Text style={[styles.catText, wfCategory.trim() === category && styles.catTextActive]}>{category}</Text>
+                </Pressable>
+              ))}
             </View>
-            <View style={{ gap: 8 }}>
-              <Text style={styles.label}>Tên quy trình *</Text>
-              <TextInput
-                value={wfName}
-                onChangeText={setWfName}
-                placeholder="VD: Quy trình tiếp nhận nhân sự mới"
-                placeholderTextColor={colors.muted}
-                style={styles.field}
-              />
-              <Text style={styles.label}>Danh mục</Text>
-              <TextInput
-                value={wfCategory}
-                onChangeText={setWfCategory}
-                placeholder="VD: Nhân sự / Vận hành"
-                placeholderTextColor={colors.muted}
-                style={styles.field}
-              />
-              {categories.length > 1 ? (
-                <View style={styles.categorySuggestions}>
-                  {categories.slice(1).map((category) => (
-                    <Pressable
-                      key={category}
-                      onPress={() => setWfCategory(category)}
-                      style={[styles.catChip, wfCategory.trim() === category && styles.catChipActive]}
-                    >
-                      <Text style={[styles.catText, wfCategory.trim() === category && styles.catTextActive]}>{category}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-              <Text style={styles.label}>Mô tả</Text>
-              <TextInput
-                value={wfDesc}
-                onChangeText={setWfDesc}
-                multiline
-                placeholder="Mục đích và phạm vi áp dụng..."
-                placeholderTextColor={colors.muted}
-                style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
-              />
-              <Pressable
-                disabled={savingWf}
-                onPress={() => void (editingWorkflow ? onUpdateWorkflow() : onCreateWorkflow())}
-                style={[styles.submitBtn, savingWf && styles.disabled]}
-              >
-                <Text style={styles.submitBtnText}>
-                  {savingWf
-                    ? 'Đang lưu...'
-                    : editingWorkflow ? 'Lưu quy trình' : 'Tạo quy trình'}
-                </Text>
-              </Pressable>
-            </View>
+          ) : null}
+          <Text style={styles.label}>Mô tả</Text>
+          <TextInput
+            value={wfDesc}
+            onChangeText={setWfDesc}
+            multiline
+            placeholder="Mục đích và phạm vi áp dụng..."
+            placeholderTextColor={colors.muted}
+            style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+          />
+          <Pressable
+            disabled={savingWf}
+            onPress={() => void (editingWorkflow ? onUpdateWorkflow() : onCreateWorkflow())}
+            style={[styles.submitBtn, savingWf && styles.disabled]}
+          >
+            <Text style={styles.submitBtnText}>
+              {savingWf
+                ? 'Đang lưu...'
+                : editingWorkflow ? 'Lưu quy trình' : 'Tạo quy trình'}
+            </Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      </FullScreenFormModal>
     );
   }
 
@@ -652,257 +645,228 @@ export function HrWorkflowsPanel({
           </View>
         )}
 
-        {/* Step Detail Modal */}
-        <Modal
+        {/* Step Detail Full-Screen Page */}
+        <FullScreenFormModal
           visible={Boolean(selectedStep)}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setSelectedStep(null)}
+          title={
+            selectedStep
+              ? `Bước ${selectedStep.index + 1}: ${selectedStep.step.title || `Bước ${selectedStep.index + 1}`}`
+              : 'Chi tiết bước'
+          }
+          onClose={() => setSelectedStep(null)}
         >
-          <Pressable style={styles.backdrop} onPress={() => setSelectedStep(null)}>
-            <Pressable style={styles.sheet} onPress={() => {}}>
-              {selectedStep ? (
-                <>
-                  <View style={styles.modalHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.stepEyebrow}>BƯỚC {selectedStep.index + 1}</Text>
-                      <Text style={styles.sheetTitle}>
-                        {selectedStep.step.title || `Bước ${selectedStep.index + 1}`}
-                      </Text>
-                    </View>
-                    <Pressable onPress={() => setSelectedStep(null)} hitSlop={8}>
-                      <Text style={styles.closeText}>Đóng</Text>
-                    </Pressable>
-                  </View>
+          {selectedStep ? (
+            <View style={{ gap: 12, paddingBottom: 12 }}>
+              {selectedStep.step.description ? (
+                <Text style={styles.bodyText}>{selectedStep.step.description}</Text>
+              ) : (
+                <Text style={styles.muted}>Chưa có mô tả chi tiết cho bước này.</Text>
+              )}
 
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }}>
-                    <View style={{ gap: 12, paddingBottom: 10 }}>
-                      {selectedStep.step.description ? (
-                        <Text style={styles.bodyText}>{selectedStep.step.description}</Text>
-                      ) : (
-                        <Text style={styles.muted}>Chưa có mô tả chi tiết cho bước này.</Text>
-                      )}
-
-                      {selectedStep.step.note ? (
-                        <View style={styles.noteBox}>
-                          <Text style={styles.noteTitle}>Lưu ý</Text>
-                          <Text style={styles.noteText}>{selectedStep.step.note}</Text>
-                        </View>
-                      ) : null}
-
-                      {selectedStep.step.deliverable ? (
-                        <View style={styles.deliverableBox}>
-                          <Text style={styles.deliverableTitle}>Kết quả cần đạt</Text>
-                          <Text style={styles.deliverableText}>
-                            {selectedStep.step.deliverable}
-                          </Text>
-                        </View>
-                      ) : null}
-
-                      {selectedStep.step.subTasks?.length ? (
-                        <View style={{ gap: 6 }}>
-                          <Text style={styles.subSectionLabel}>
-                            Công việc con ({selectedStep.step.subTasks.length})
-                          </Text>
-                          {selectedStep.step.subTasks.map((sub, i) => (
-                            <View key={sub.id || i} style={styles.subTaskRow}>
-                              <View style={styles.subDot} />
-                              <Text style={styles.subTaskText}>{sub.title}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      ) : null}
-
-                      {selectedStep.step.attachments?.length ? (
-                        <View style={{ gap: 6 }}>
-                          <Text style={styles.subSectionLabel}>
-                            Tệp đính kèm ({selectedStep.step.attachments.length})
-                          </Text>
-                          {selectedStep.step.attachments.map((att, i) => (
-                            <Pressable
-                              key={att.id || i}
-                              onPress={() => {
-                                if (att.url) void Linking.openURL(att.url);
-                              }}
-                              style={styles.attachBtn}
-                            >
-                              <View style={styles.attachBtnContent}>
-                                <Paperclip size={14} color={colors.primary} />
-                                <Text numberOfLines={1} style={styles.attachBtnText}>{att.name || 'Mở tệp đính kèm'}</Text>
-                                <ChevronRight size={14} color={colors.primary} />
-                              </View>
-                            </Pressable>
-                          ))}
-                        </View>
-                      ) : null}
-
-                      {canManage ? (
-                        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                          <Pressable
-                            onPress={() => openEditStep(selectedStep.step)}
-                            style={[styles.submitBtn, { flex: 1 }]}
-                          >
-                            <Text style={styles.submitBtnText}>Chỉnh sửa bước</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => onDeleteStep(selectedStep.step)}
-                            style={styles.deleteBtn}
-                          >
-                            <Text style={styles.deleteBtnText}>Xóa</Text>
-                          </Pressable>
-                        </View>
-                      ) : null}
-                    </View>
-                  </ScrollView>
-                </>
+              {selectedStep.step.note ? (
+                <View style={styles.noteBox}>
+                  <Text style={styles.noteTitle}>Lưu ý</Text>
+                  <Text style={styles.noteText}>{selectedStep.step.note}</Text>
+                </View>
               ) : null}
-            </Pressable>
-          </Pressable>
-        </Modal>
 
-        {/* Add / Edit Step Modal */}
-        <Modal
+              {selectedStep.step.deliverable ? (
+                <View style={styles.deliverableBox}>
+                  <Text style={styles.deliverableTitle}>Kết quả cần đạt</Text>
+                  <Text style={styles.deliverableText}>
+                    {selectedStep.step.deliverable}
+                  </Text>
+                </View>
+              ) : null}
+
+              {selectedStep.step.subTasks?.length ? (
+                <View style={{ gap: 6 }}>
+                  <Text style={styles.subSectionLabel}>
+                    Công việc con ({selectedStep.step.subTasks.length})
+                  </Text>
+                  {selectedStep.step.subTasks.map((sub, i) => (
+                    <View key={sub.id || i} style={styles.subTaskRow}>
+                      <View style={styles.subDot} />
+                      <Text style={styles.subTaskText}>{sub.title}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {selectedStep.step.attachments?.length ? (
+                <View style={{ gap: 6 }}>
+                  <Text style={styles.subSectionLabel}>
+                    Tệp đính kèm ({selectedStep.step.attachments.length})
+                  </Text>
+                  {selectedStep.step.attachments.map((att, i) => (
+                    <Pressable
+                      key={att.id || i}
+                      onPress={() => {
+                        if (att.url) void Linking.openURL(att.url);
+                      }}
+                      style={styles.attachBtn}
+                    >
+                      <View style={styles.attachBtnContent}>
+                        <Paperclip size={14} color={colors.primary} />
+                        <Text numberOfLines={1} style={styles.attachBtnText}>{att.name || 'Mở tệp đính kèm'}</Text>
+                        <ChevronRight size={14} color={colors.primary} />
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              {canManage ? (
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                  <Pressable
+                    onPress={() => openEditStep(selectedStep.step)}
+                    style={[styles.submitBtn, { flex: 1 }]}
+                  >
+                    <Text style={styles.submitBtnText}>Chỉnh sửa bước</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => onDeleteStep(selectedStep.step)}
+                    style={styles.deleteBtn}
+                  >
+                    <Text style={styles.deleteBtnText}>Xóa</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </FullScreenFormModal>
+
+        {/* Add / Edit Step Full-Screen Page */}
+        <FullScreenFormModal
           visible={stepModalOpen}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setStepModalOpen(false)}
+          title={editingStepId ? 'Chỉnh sửa bước' : 'Thêm bước mới'}
+          cancelLabel="Hủy"
+          onSave={() => void onSaveStep()}
+          saving={savingStep || uploadingStepAttachments}
+          onClose={() => setStepModalOpen(false)}
         >
-          <Pressable style={styles.backdrop} onPress={() => setStepModalOpen(false)}>
-            <Pressable style={styles.sheet} onPress={() => {}}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.sheetTitle}>
-                  {editingStepId ? 'Chỉnh sửa bước' : 'Thêm bước mới'}
-                </Text>
-                <Pressable onPress={() => setStepModalOpen(false)} hitSlop={8}>
-                  <Text style={styles.closeText}>Đóng</Text>
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.label}>Tên bước *</Text>
+            <TextInput value={stepTitle} onChangeText={setStepTitle} style={styles.field} />
+
+            <Text style={styles.label}>Mô tả chi tiết</Text>
+            <TextInput
+              value={stepDesc}
+              onChangeText={setStepDesc}
+              multiline
+              style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+            />
+
+            <Text style={styles.label}>Lưu ý quan trọng</Text>
+            <TextInput value={stepNote} onChangeText={setStepNote} style={styles.field} />
+
+            <Text style={styles.label}>Kết quả cần đạt</Text>
+            <TextInput
+              value={stepDeliverable}
+              onChangeText={setStepDeliverable}
+              style={styles.field}
+            />
+
+            <Text style={styles.label}>Công việc con ({stepSubTasks.length})</Text>
+            {stepSubTasks.map((task) => (
+              <View key={task.id} style={styles.subTaskEditRow}>
+                <View style={styles.subDot} />
+                <Text style={styles.subTaskText}>{task.title}</Text>
+                <Pressable
+                  onPress={() => removeStepSubTask(task.id)}
+                  hitSlop={8}
+                  accessibilityLabel={`Xóa công việc con ${task.title}`}
+                >
+                  <X size={15} color={colors.muted} />
                 </Pressable>
               </View>
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }}>
-                <View style={{ gap: 8, paddingBottom: 10 }}>
-                  <Text style={styles.label}>Tên bước *</Text>
-                  <TextInput value={stepTitle} onChangeText={setStepTitle} style={styles.field} />
+            ))}
+            <View style={styles.subTaskAddRow}>
+              <TextInput
+                value={stepSubTaskDraft}
+                onChangeText={setStepSubTaskDraft}
+                onSubmitEditing={addStepSubTask}
+                returnKeyType="done"
+                placeholder="Nhập tên công việc con..."
+                placeholderTextColor={colors.muted}
+                style={[styles.field, { flex: 1 }]}
+              />
+              <Pressable
+                onPress={addStepSubTask}
+                disabled={!stepSubTaskDraft.trim()}
+                style={[styles.subTaskAddBtn, !stepSubTaskDraft.trim() && styles.disabled]}
+              >
+                <Plus size={14} color={colors.primary} />
+                <Text style={styles.categoryAddText}>Thêm</Text>
+              </Pressable>
+            </View>
 
-                  <Text style={styles.label}>Mô tả chi tiết</Text>
-                  <TextInput
-                    value={stepDesc}
-                    onChangeText={setStepDesc}
-                    multiline
-                    style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
-                  />
-
-                  <Text style={styles.label}>Lưu ý quan trọng</Text>
-                  <TextInput value={stepNote} onChangeText={setStepNote} style={styles.field} />
-
-                  <Text style={styles.label}>Kết quả cần đạt</Text>
-                  <TextInput
-                    value={stepDeliverable}
-                    onChangeText={setStepDeliverable}
-                    style={styles.field}
-                  />
-
-                  <Text style={styles.label}>Công việc con ({stepSubTasks.length})</Text>
-                  {stepSubTasks.map((task) => (
-                    <View key={task.id} style={styles.subTaskEditRow}>
-                      <View style={styles.subDot} />
-                      <Text style={styles.subTaskText}>{task.title}</Text>
+            <View style={styles.attachmentSection}>
+              <View style={styles.attachmentHeading}>
+                <Text style={styles.label}>Tệp đính kèm ({stepAttachments.length})</Text>
+                <Pressable
+                  onPress={() => void pickStepAttachments()}
+                  disabled={uploadingStepAttachments || savingStep}
+                  style={[
+                    styles.attachmentAddBtn,
+                    (uploadingStepAttachments || savingStep) && styles.disabled,
+                  ]}
+                >
+                  {uploadingStepAttachments ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Paperclip size={14} color={colors.primary} />
+                  )}
+                  <Text style={styles.attachmentAddText}>
+                    {uploadingStepAttachments ? 'Đang tải...' : 'Thêm tệp'}
+                  </Text>
+                </Pressable>
+              </View>
+              {stepAttachments.length ? (
+                <View style={{ gap: 6 }}>
+                  {stepAttachments.map((attachment, index) => (
+                    <View key={attachment.id || `${attachment.url}-${index}`} style={styles.attachmentRow}>
+                      <Paperclip size={14} color={colors.primary} />
+                      <Text numberOfLines={1} style={styles.attachmentName}>
+                        {attachment.name || 'Tệp đính kèm'}
+                      </Text>
                       <Pressable
-                        onPress={() => removeStepSubTask(task.id)}
+                        onPress={() =>
+                          setStepAttachments((current) =>
+                            current.filter((_, itemIndex) => itemIndex !== index),
+                          )
+                        }
                         hitSlop={8}
-                        accessibilityLabel={`Xóa công việc con ${task.title}`}
+                        accessibilityLabel={`Gỡ tệp ${attachment.name}`}
                       >
-                        <X size={15} color={colors.muted} />
+                        <X size={16} color={colors.muted} />
                       </Pressable>
                     </View>
                   ))}
-                  <View style={styles.subTaskAddRow}>
-                    <TextInput
-                      value={stepSubTaskDraft}
-                      onChangeText={setStepSubTaskDraft}
-                      onSubmitEditing={addStepSubTask}
-                      returnKeyType="done"
-                      placeholder="Nhập tên công việc con..."
-                      placeholderTextColor={colors.muted}
-                      style={[styles.field, { flex: 1 }]}
-                    />
-                    <Pressable
-                      onPress={addStepSubTask}
-                      disabled={!stepSubTaskDraft.trim()}
-                      style={[styles.subTaskAddBtn, !stepSubTaskDraft.trim() && styles.disabled]}
-                    >
-                      <Plus size={14} color={colors.primary} />
-                      <Text style={styles.categoryAddText}>Thêm</Text>
-                    </Pressable>
-                  </View>
-
-                  <View style={styles.attachmentSection}>
-                    <View style={styles.attachmentHeading}>
-                      <Text style={styles.label}>Tệp đính kèm ({stepAttachments.length})</Text>
-                      <Pressable
-                        onPress={() => void pickStepAttachments()}
-                        disabled={uploadingStepAttachments || savingStep}
-                        style={[
-                          styles.attachmentAddBtn,
-                          (uploadingStepAttachments || savingStep) && styles.disabled,
-                        ]}
-                      >
-                        {uploadingStepAttachments ? (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        ) : (
-                          <Paperclip size={14} color={colors.primary} />
-                        )}
-                        <Text style={styles.attachmentAddText}>
-                          {uploadingStepAttachments ? 'Đang tải...' : 'Thêm tệp'}
-                        </Text>
-                      </Pressable>
-                    </View>
-                    {stepAttachments.length ? (
-                      <View style={{ gap: 6 }}>
-                        {stepAttachments.map((attachment, index) => (
-                          <View key={attachment.id || `${attachment.url}-${index}`} style={styles.attachmentRow}>
-                            <Paperclip size={14} color={colors.primary} />
-                            <Text numberOfLines={1} style={styles.attachmentName}>
-                              {attachment.name || 'Tệp đính kèm'}
-                            </Text>
-                            <Pressable
-                              onPress={() =>
-                                setStepAttachments((current) =>
-                                  current.filter((_, itemIndex) => itemIndex !== index),
-                                )
-                              }
-                              hitSlop={8}
-                              accessibilityLabel={`Gỡ tệp ${attachment.name}`}
-                            >
-                              <X size={16} color={colors.muted} />
-                            </Pressable>
-                          </View>
-                        ))}
-                      </View>
-                    ) : (
-                      <Text style={styles.muted}>Chưa có tệp đính kèm.</Text>
-                    )}
-                  </View>
-
-                  <Pressable
-                    disabled={savingStep || uploadingStepAttachments}
-                    onPress={() => void onSaveStep()}
-                    style={[
-                      styles.submitBtn,
-                      (savingStep || uploadingStepAttachments) && styles.disabled,
-                    ]}
-                  >
-                    <Text style={styles.submitBtnText}>
-                      {uploadingStepAttachments
-                        ? 'Đang tải tệp...'
-                        : savingStep
-                          ? 'Đang lưu...'
-                          : 'Lưu bước'}
-                    </Text>
-                  </Pressable>
                 </View>
-              </ScrollView>
+              ) : (
+                <Text style={styles.muted}>Chưa có tệp đính kèm.</Text>
+              )}
+            </View>
+
+            <Pressable
+              disabled={savingStep || uploadingStepAttachments}
+              onPress={() => void onSaveStep()}
+              style={[
+                styles.submitBtn,
+                (savingStep || uploadingStepAttachments) && styles.disabled,
+              ]}
+            >
+              <Text style={styles.submitBtnText}>
+                {uploadingStepAttachments
+                  ? 'Đang tải tệp...'
+                  : savingStep
+                    ? 'Đang lưu...'
+                    : 'Lưu bước'}
+              </Text>
             </Pressable>
-          </Pressable>
-        </Modal>
+          </View>
+        </FullScreenFormModal>
         {renderWorkflowFormModal()}
       </ScrollView>
     );
@@ -910,8 +874,9 @@ export function HrWorkflowsPanel({
 
   // --- Workflow List Screen ---
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -925,60 +890,45 @@ export function HrWorkflowsPanel({
         />
       }
     >
+      {categories.length > 1 || canManage ? (
+        <View style={styles.catTopBar}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setCategoryFilterOpen(true)}
+            style={({ pressed }) => [styles.catTriggerBtn, pressed && { opacity: 0.65 }]}
+          >
+            <Folder size={17} strokeWidth={1.6} color={colors.ink} />
+            <Text numberOfLines={1} style={styles.catTriggerText}>
+              {selectedCategory === 'Tất cả' ? 'Tất cả phân loại' : selectedCategory}
+            </Text>
+            <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
+          </Pressable>
+          {canManage ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Quản lý phân loại quy trình"
+              onPress={() => {
+                setCategoryManagerMode('list');
+                setCategoryManagerOpen(true);
+              }}
+              hitSlop={8}
+              style={({ pressed }) => [styles.catManageLink, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.catManageLinkText}>Quản lý</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       <View style={styles.searchRow}>
         <TextInput
           value={search}
           onChangeText={setSearch}
           placeholder="Tìm quy trình nội bộ..."
-          placeholderTextColor={colors.muted}
+          placeholderTextColor="#94A3B8"
           style={[styles.search, { flex: 1 }]}
         />
-        {canManage ? (
-          <Pressable onPress={openCreateWorkflow} style={styles.primaryBtn}>
-            <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Quy trình</Text></View>
-          </Pressable>
-        ) : null}
       </View>
-
-      {categories.length > 1 || canManage ? (
-        <>
-          {canManage ? (
-            <View style={styles.categoryHeading}>
-              <Text style={styles.categoryHeadingText}>Phân loại quy trình</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Quản lý phân loại quy trình"
-                onPress={() => {
-                  setCategoryManagerMode('list');
-                  setCategoryManagerOpen(true);
-                }}
-                style={styles.categoryManageBtn}
-              >
-                <Text style={styles.categoryManageText}>Quản lý phân loại</Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.catRow}
-            style={styles.catScroll}
-          >
-            {categories.map((cat) => {
-              const active = selectedCategory === cat;
-              return (
-                <Pressable
-                  key={cat}
-                  onPress={() => setSelectedCategory(cat)}
-                  style={[styles.catChip, active && styles.catChipActive]}
-                >
-                  <Text style={[styles.catText, active && styles.catTextActive]}>{cat}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </>
-      ) : null}
 
       {loading ? (
         <Card style={styles.stateCard}>
@@ -998,42 +948,18 @@ export function HrWorkflowsPanel({
       ) : (
         <View style={styles.list}>
           {filtered.map((wf) => (
-            <Card key={wf.id} style={styles.wfCard}>
+            <Card
+              key={wf.id}
+              onPress={() => setSelectedWorkflow(wf)}
+              style={styles.wfCard}
+            >
               <View style={styles.wfCardContentRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setSelectedWorkflow(wf)}
-                  style={styles.wfCardMain}
-                >
-                  <View style={styles.wfCardTop}>
-                    <View style={{ flex: 1 }}>
-                      {wf.category ? <Text style={styles.badge}>{wf.category}</Text> : null}
-                      <Text numberOfLines={2} style={styles.rowTitle}>
-                        {wf.name || wf.title || 'Quy trình'}
-                      </Text>
-                    </View>
-                  </View>
-                  {wf.description ? (
-                    <Text numberOfLines={2} style={styles.muted}>
-                      {wf.description}
-                    </Text>
-                  ) : null}
-                </Pressable>
-                <View style={styles.workflowCardActions}>
-                  <View style={styles.stepCountRow}>
-                    <Text style={styles.stepCountBadge}>{wf.steps?.length ?? 0} bước</Text>
-                    <ChevronRight size={13} color={colors.muted} />
-                  </View>
-                  {canManage ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Sửa quy trình ${wf.name || wf.title || ''}`}
-                      onPress={() => openEditWorkflow(wf)}
-                      style={styles.workflowListEditBtn}
-                    >
-                      <Text style={styles.editSmallText}>Sửa</Text>
-                    </Pressable>
-                  ) : null}
+                <Text numberOfLines={2} style={[styles.rowTitle, { flex: 1, marginTop: 0 }]}>
+                  {wf.name || wf.title || 'Quy trình'}
+                </Text>
+                <View style={styles.stepCountRow}>
+                  <Text style={styles.stepCountBadge}>{wf.steps?.length ?? 0} bước</Text>
+                  <ChevronRight size={14} color={colors.muted} />
                 </View>
               </View>
             </Card>
@@ -1041,230 +967,307 @@ export function HrWorkflowsPanel({
         </View>
       )}
 
-      {renderWorkflowFormModal()}
+      {/* Category filter bottom sheet matching Employee Directory */}
       <Modal
-        visible={categoryManagerOpen}
+        visible={categoryFilterOpen}
         transparent
-        animationType="fade"
-        onRequestClose={() => setCategoryManagerOpen(false)}
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => setCategoryFilterOpen(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setCategoryManagerOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
+        <Pressable style={styles.catSheetBackdrop} onPress={() => setCategoryFilterOpen(false)}>
+          <Pressable style={styles.catSheet} onPress={() => {}}>
+            <View style={styles.catSheetHandle} />
             <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sheetTitle}>
-                  {categoryManagerMode === 'list'
-                    ? 'Quản lý phân loại'
-                    : categoryManagerMode === 'rename' ? 'Đổi tên phân loại' : 'Tạo phân loại'}
-                </Text>
-                {categoryManagerMode === 'list' ? (
-                  <Text style={styles.muted}>Tạo phân loại riêng và gán cho quy trình bất cứ lúc nào.</Text>
-                ) : null}
-              </View>
-              <Pressable onPress={() => setCategoryManagerOpen(false)} hitSlop={8}>
+              <Text style={styles.sheetTitle}>Lọc theo phân loại</Text>
+              <Pressable onPress={() => setCategoryFilterOpen(false)} hitSlop={8}>
                 <Text style={styles.closeText}>Đóng</Text>
               </Pressable>
             </View>
-
-            {categoryManagerMode === 'list' ? (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-                <Pressable onPress={openCreateCategory} style={styles.categoryAddBtn}>
-                  <View style={styles.iconButtonContent}>
-                    <Plus size={14} color={colors.primary} />
-                    <Text style={styles.categoryAddText}>Tạo phân loại</Text>
-                  </View>
-                </Pressable>
-                {categories.slice(1).length ? categories.slice(1).map((category) => {
-                  const count = workflows.filter((workflow) => workflow.category?.trim() === category).length;
-                  return (
-                    <View key={category} style={styles.categoryRow}>
-                      <View style={styles.categoryRowCopy}>
-                        <Text style={styles.rowTitle}>{category}</Text>
-                        <Text style={styles.muted}>{count} quy trình</Text>
-                      </View>
-                      <Pressable onPress={() => openRenameCategory(category)} style={styles.categoryActionBtn}>
-                        <Text style={styles.categoryActionText}>Đổi tên</Text>
-                      </Pressable>
-                      {category !== 'Chung' ? (
-                        <Pressable
-                          disabled={savingCategory}
-                          onPress={() => onDeleteCategory(category)}
-                          style={styles.categoryDeleteBtn}
-                        >
-                          <Text style={styles.categoryDeleteText}>Xóa</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  );
-                }) : (
-                  <Text style={styles.categoryEmpty}>Chưa có phân loại. Bạn có thể tạo danh mục trước khi có quy trình.</Text>
-                )}
-              </ScrollView>
-            ) : (
-              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
-                <View style={{ gap: 8, paddingBottom: 12 }}>
-                  <Text style={styles.label}>Tên phân loại *</Text>
-                  <TextInput
-                    value={categoryNameDraft}
-                    onChangeText={setCategoryNameDraft}
-                    placeholder="Ví dụ: Nhân sự / Vận hành"
-                    placeholderTextColor={colors.muted}
-                    style={styles.field}
-                  />
-                  {categoryManagerMode === 'rename' ? (
-                    <Text style={styles.muted}>
-                      Tên phân loại sẽ được cập nhật cho tất cả {workflows.filter((workflow) => workflow.category?.trim() === categoryEditFrom).length} quy trình đang sử dụng.
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              {categories.map((cat) => {
+                const selected = selectedCategory === cat;
+                return (
+                  <Pressable
+                    key={cat}
+                    onPress={() => {
+                      setSelectedCategory(cat);
+                      setCategoryFilterOpen(false);
+                    }}
+                    style={[styles.catSheetRow, selected && styles.catSheetRowActive]}
+                  >
+                    <Text style={[styles.catSheetRowText, selected && styles.catSheetRowTextActive]}>
+                      {cat === 'Tất cả' ? 'Tất cả phân loại' : cat}
                     </Text>
-                  ) : (
-                    <Text style={styles.muted}>Phân loại sẽ được lưu riêng. Bạn có thể gán vào quy trình khi tạo hoặc cập nhật quy trình.</Text>
-                  )}
-                  <View style={styles.categoryFormActions}>
-                    <Pressable
-                      disabled={savingCategory}
-                      onPress={() => setCategoryManagerMode('list')}
-                      style={[styles.categoryCancelBtn, savingCategory && styles.disabled]}
-                    >
-                      <Text style={styles.categoryActionText}>Hủy</Text>
-                    </Pressable>
-                    <Pressable
-                      disabled={savingCategory}
-                      onPress={() => void onSaveCategory()}
-                      style={[styles.submitBtn, styles.categorySaveBtn, savingCategory && styles.disabled]}
-                    >
-                      <Text style={styles.submitBtnText}>
-                        {savingCategory ? 'Đang lưu...' : categoryManagerMode === 'rename' ? 'Lưu thay đổi' : 'Tạo phân loại'}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </ScrollView>
-            )}
+                    {selected ? <Check size={17} color={colors.primary} /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
+
+      {renderWorkflowFormModal()}
+      <FullScreenFormModal
+        visible={categoryManagerOpen}
+        title={
+          categoryManagerMode === 'list'
+            ? 'Quản lý phân loại'
+            : categoryManagerMode === 'rename' ? 'Đổi tên phân loại' : 'Tạo phân loại'
+        }
+        cancelLabel={categoryManagerMode === 'list' ? undefined : 'Hủy'}
+        onSave={categoryManagerMode === 'list' ? undefined : () => void onSaveCategory()}
+        saving={savingCategory}
+        onClose={() => {
+          if (categoryManagerMode === 'list') {
+            setCategoryManagerOpen(false);
+          } else {
+            setCategoryManagerMode('list');
+          }
+        }}
+      >
+        {categoryManagerMode === 'list' ? (
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.muted}>Tạo phân loại riêng và gán cho quy trình bất cứ lúc nào.</Text>
+            <Pressable onPress={openCreateCategory} style={styles.categoryAddBtn}>
+              <View style={styles.iconButtonContent}>
+                <Plus size={14} color={colors.primary} />
+                <Text style={styles.categoryAddText}>Tạo phân loại</Text>
+              </View>
+            </Pressable>
+            {categories.slice(1).length ? categories.slice(1).map((category) => {
+              const count = workflows.filter((workflow) => workflow.category?.trim() === category).length;
+              return (
+                <View key={category} style={styles.categoryRow}>
+                  <View style={styles.categoryRowCopy}>
+                    <Text style={styles.rowTitle}>{category}</Text>
+                    <Text style={styles.muted}>{count} quy trình</Text>
+                  </View>
+                  <Pressable onPress={() => openRenameCategory(category)} style={styles.categoryActionBtn}>
+                    <Text style={styles.categoryActionText}>Đổi tên</Text>
+                  </Pressable>
+                  {category !== 'Chung' ? (
+                    <Pressable
+                      disabled={savingCategory}
+                      onPress={() => onDeleteCategory(category)}
+                      style={styles.categoryDeleteBtn}
+                    >
+                      <Text style={styles.categoryDeleteText}>Xóa</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            }) : (
+              <Text style={styles.categoryEmpty}>Chưa có phân loại. Bạn có thể tạo danh mục trước khi có quy trình.</Text>
+            )}
+          </View>
+        ) : (
+          <View style={{ gap: 8, paddingBottom: 12 }}>
+            <Text style={styles.label}>Tên phân loại *</Text>
+            <TextInput
+              value={categoryNameDraft}
+              onChangeText={setCategoryNameDraft}
+              placeholder="Ví dụ: Nhân sự / Vận hành"
+              placeholderTextColor={colors.muted}
+              style={styles.field}
+            />
+            {categoryManagerMode === 'rename' ? (
+              <Text style={styles.muted}>
+                Tên phân loại sẽ được cập nhật cho tất cả {workflows.filter((workflow) => workflow.category?.trim() === categoryEditFrom).length} quy trình đang sử dụng.
+              </Text>
+            ) : (
+              <Text style={styles.muted}>Phân loại sẽ được lưu riêng. Bạn có thể gán vào quy trình khi tạo hoặc cập nhật quy trình.</Text>
+            )}
+            <View style={styles.categoryFormActions}>
+              <Pressable
+                disabled={savingCategory}
+                onPress={() => setCategoryManagerMode('list')}
+                style={[styles.categoryCancelBtn, savingCategory && styles.disabled]}
+              >
+                <Text style={styles.categoryActionText}>Hủy</Text>
+              </Pressable>
+              <Pressable
+                disabled={savingCategory}
+                onPress={() => void onSaveCategory()}
+                style={[styles.submitBtn, styles.categorySaveBtn, savingCategory && styles.disabled]}
+              >
+                <Text style={styles.submitBtnText}>
+                  {savingCategory ? 'Đang lưu...' : categoryManagerMode === 'rename' ? 'Lưu thay đổi' : 'Tạo phân loại'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </FullScreenFormModal>
     </ScrollView>
+    {canManage ? <HrFab label="Thêm quy trình" onPress={openCreateWorkflow} /> : null}
+    </View>
   );
 }
 
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+  shadowOpacity: 0,
+  shadowRadius: 0,
+  shadowOffset: { width: 0, height: 0 },
+  elevation: 0,
+} as const;
+
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 18, paddingBottom: 28 },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   search: {
-    backgroundColor: colors.white,
-    borderColor: colors.border,
+    backgroundColor: '#F6F8FC',
+    borderColor: '#DCE5F2',
     borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 12,
-    color: colors.ink,
+    borderRadius: 99,
+    paddingHorizontal: 14,
+    height: 40,
+    fontSize: 13.5,
+    color: '#111827',
   },
-  primaryBtn: { backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
-  primaryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  primaryBtn: { backgroundColor: colors.primary, minHeight: 40, paddingHorizontal: 13, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   iconButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   stepTagRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   attachBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   stepCountRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  dangerSmallBtn: { backgroundColor: '#FCEBEC', paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
-  dangerSmallText: { color: '#C74848', fontSize: 11, fontWeight: '700' },
-  editSmallBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 11, paddingVertical: 9, borderRadius: 10 },
-  editSmallText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  categoryHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
-  categoryHeadingText: { color: colors.ink, fontSize: 11, fontWeight: '800' },
-  categoryManageBtn: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9 },
-  categoryManageText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  catScroll: { marginHorizontal: -18, marginBottom: 12 },
-  catRow: { paddingHorizontal: 18, gap: 6 },
-  catChip: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 },
+  dangerSmallBtn: { backgroundColor: '#FCEBEC', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  dangerSmallText: { color: '#C74848', fontSize: 12, fontWeight: '600' },
+  editSmallBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  editSmallText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  catTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6, paddingBottom: 12, gap: 10 },
+  catTriggerBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
+  catTriggerText: { color: colors.ink, fontSize: 15, fontWeight: '400', flexShrink: 1 },
+  catManageLink: { paddingVertical: 4, paddingLeft: 8 },
+  catManageLinkText: { color: colors.primary, fontSize: 13.5, fontWeight: '500' },
+  catSheetBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.35)', justifyContent: 'flex-end' },
+  catSheet: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 26 },
+  catSheetHandle: { width: 38, height: 4, borderRadius: 99, backgroundColor: '#D6DFEC', alignSelf: 'center', marginBottom: 12 },
+  catSheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 13, borderRadius: 12, marginBottom: 4 },
+  catSheetRowActive: { backgroundColor: '#F0F6FF' },
+  catSheetRowText: { color: colors.ink, fontSize: 14.5, fontWeight: '400' },
+  catSheetRowTextActive: { color: colors.primary, fontWeight: '500' },
+  categoryHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  categoryHeadingText: { color: '#111827', fontSize: 13.5, fontWeight: '700' },
+  categoryManageBtn: { ...HAIRLINE_CARD, paddingHorizontal: 11, paddingVertical: 6 },
+  categoryManageText: { color: colors.primary, fontSize: 11.5, fontWeight: '500' },
+  catScroll: { flexGrow: 0, marginHorizontal: -14, marginBottom: 12 },
+  catRow: { paddingHorizontal: 14, gap: 6 },
+  catChip: { backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  catText: { color: colors.muted, fontSize: 10, fontWeight: '700' },
-  catTextActive: { color: colors.white },
+  catText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  catTextActive: { color: colors.white, fontWeight: '600' },
   categorySuggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  list: { gap: 10 },
+  list: {
+    marginHorizontal: -14,
+    backgroundColor: colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#EEF2F7',
+    gap: 0,
+  },
   wfCardContentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  wfCardMain: { flex: 1, gap: 6 },
+  wfCardMain: { flex: 1, gap: 4 },
   workflowCardActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   workflowListEditBtn: { minHeight: 34, minWidth: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, borderRadius: 9, backgroundColor: '#EAF2FF' },
-  wfCard: { padding: 13, gap: 6 },
+  wfCard: {
+    backgroundColor: colors.white,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 4,
+  },
   wfCardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', marginTop: 3 },
-  badge: { alignSelf: 'flex-start', color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 9, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, overflow: 'hidden' },
-  stepCountBadge: { color: '#0E7490', backgroundColor: '#E8F7FA', fontSize: 10, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 99, overflow: 'hidden' },
-  muted: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-  stateCard: { padding: 20, alignItems: 'center', gap: 10 },
-  errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center' },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600', marginTop: 3 },
+  badge: { alignSelf: 'flex-start', color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
+  stepCountBadge: { color: '#0E7490', backgroundColor: '#E8F7FA', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8, overflow: 'hidden' },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
+  stateCard: { ...HAIRLINE_CARD, padding: 22, alignItems: 'center', gap: 10 },
+  errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
 
   // Detail screen
   detailTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  backBtn: { backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 10 },
-  backText: { color: colors.ink, fontSize: 12, fontWeight: '700' },
-  detailHero: { padding: 15, gap: 8, marginBottom: 14 },
+  backBtn: { ...HAIRLINE_CARD, paddingHorizontal: 12, paddingVertical: 8 },
+  backText: { color: '#111827', fontSize: 12.5, fontWeight: '600' },
+  detailHero: { ...HAIRLINE_CARD, padding: 15, gap: 8, marginBottom: 14 },
   heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
-  detailDesc: { color: colors.muted, fontSize: 12, lineHeight: 18 },
-  sectionHeading: { color: colors.ink, fontSize: 13, fontWeight: '800', marginBottom: 10 },
+  detailTitle: { color: '#111827', fontSize: 16, fontWeight: '700' },
+  detailDesc: { color: '#6B7280', fontSize: 12.5, lineHeight: 19 },
+  sectionHeading: { color: '#111827', fontSize: 14.5, fontWeight: '700', marginBottom: 10 },
   flowWrap: { gap: 2 },
   flowItem: { flexDirection: 'row', alignItems: 'stretch', gap: 10 },
   flowRail: { alignItems: 'center', width: 28 },
   stepNumCircle: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
-  stepNumText: { color: colors.white, fontSize: 11, fontWeight: '800' },
-  flowLine: { width: 2, flex: 1, backgroundColor: '#CBD5E1', marginTop: 4 },
-  stepCard: { flex: 1, padding: 12, gap: 6, marginBottom: 10 },
+  stepNumText: { color: colors.white, fontSize: 11.5, fontWeight: '600' },
+  flowLine: { width: 1.5, flex: 1, backgroundColor: '#DCE5F2', marginTop: 4 },
+  stepCard: { ...HAIRLINE_CARD, flex: 1, padding: 13, gap: 6, marginBottom: 10 },
   stepCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  stepTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', flex: 1 },
+  stepTitle: { color: '#111827', fontSize: 14, fontWeight: '600', flex: 1 },
   chevron: { color: colors.muted, fontSize: 18 },
   stepMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 },
-  stepTagGreen: { backgroundColor: '#E9F8F1', color: '#16885A', fontSize: 9, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  stepTagAmber: { backgroundColor: '#FFF3E5', color: '#C27617', fontSize: 9, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
-  stepTagBlue: { backgroundColor: '#EAF2FF', color: colors.primary, fontSize: 9, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: 'hidden' },
+  stepTagGreen: { backgroundColor: '#E9F8F1', color: '#16885A', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
+  stepTagAmber: { backgroundColor: '#FFF3E5', color: '#C27617', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
+  stepTagBlue: { backgroundColor: '#EAF2FF', color: colors.primary, fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
 
   // Modals
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.42)', justifyContent: 'center', padding: 16 },
-  sheet: { backgroundColor: colors.white, borderRadius: 24, overflow: 'hidden', padding: 18, maxHeight: '86%' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 16 },
+  sheet: { backgroundColor: colors.white, borderRadius: 20, overflow: 'hidden', padding: 18, maxHeight: '86%' },
   modalHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12, gap: 10 },
-  categoryAddBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, marginBottom: 8, alignSelf: 'flex-start' },
-  categoryAddText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  categoryAddBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, marginBottom: 8, alignSelf: 'flex-start' },
+  categoryAddText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
   categoryRowCopy: { flex: 1, gap: 2 },
-  categoryActionBtn: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 8, backgroundColor: '#EAF2FF' },
-  categoryActionText: { color: colors.primary, fontSize: 10, fontWeight: '700' },
-  categoryDeleteBtn: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FCEBEC' },
-  categoryDeleteText: { color: '#C74848', fontSize: 10, fontWeight: '700' },
-  categoryEmpty: { color: colors.muted, fontSize: 11, lineHeight: 16, paddingVertical: 12 },
+  categoryActionBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, backgroundColor: '#EAF2FF' },
+  categoryActionText: { color: colors.primary, fontSize: 11, fontWeight: '600' },
+  categoryDeleteBtn: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, backgroundColor: '#FCEBEC' },
+  categoryDeleteText: { color: '#C74848', fontSize: 11, fontWeight: '600' },
+  categoryEmpty: { color: '#6B7280', fontSize: 12.5, lineHeight: 18, paddingVertical: 12 },
   categoryFormActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  categoryCancelBtn: { minHeight: 42, paddingHorizontal: 18, borderRadius: 11, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  categoryCancelBtn: { minHeight: 44, paddingHorizontal: 18, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
   categorySaveBtn: { flex: 1 },
-  stepEyebrow: { color: colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', marginTop: 2 },
-  closeText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  bodyText: { color: colors.ink, fontSize: 13, lineHeight: 20 },
-  noteBox: { backgroundColor: '#FFF8EB', borderColor: '#FDE2B8', borderWidth: 1, borderRadius: 12, padding: 12, gap: 4 },
-  noteTitle: { color: '#B45309', fontSize: 11, fontWeight: '800' },
-  noteText: { color: '#92400E', fontSize: 12, lineHeight: 18 },
-  deliverableBox: { backgroundColor: '#E9F8F1', borderColor: '#BBEAD3', borderWidth: 1, borderRadius: 12, padding: 12, gap: 4 },
-  deliverableTitle: { color: '#16885A', fontSize: 11, fontWeight: '800' },
-  deliverableText: { color: '#14532D', fontSize: 12, lineHeight: 18 },
-  subSectionLabel: { color: colors.ink, fontSize: 11, fontWeight: '800' },
+  stepEyebrow: { color: colors.primary, fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600', marginTop: 2 },
+  closeText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  bodyText: { color: '#374151', fontSize: 13.5, lineHeight: 20 },
+  noteBox: { backgroundColor: '#FFF8EB', borderColor: '#FDE2B8', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, gap: 4 },
+  noteTitle: { color: '#B45309', fontSize: 12, fontWeight: '600' },
+  noteText: { color: '#92400E', fontSize: 12.5, lineHeight: 18 },
+  deliverableBox: { backgroundColor: '#E9F8F1', borderColor: '#BBEAD3', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, gap: 4 },
+  deliverableTitle: { color: '#16885A', fontSize: 12, fontWeight: '600' },
+  deliverableText: { color: '#14532D', fontSize: 12.5, lineHeight: 18 },
+  subSectionLabel: { color: '#111827', fontSize: 12.5, fontWeight: '600' },
   subTaskRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
-  subTaskEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: colors.background },
+  subTaskEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: '#F6F8FC' },
   subTaskAddRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  subTaskAddBtn: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 11, borderRadius: 10, backgroundColor: '#EAF2FF' },
-  subDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
-  subTaskText: { color: colors.ink, fontSize: 12, flex: 1 },
+  subTaskAddBtn: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#EAF2FF' },
+  subDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
+  subTaskText: { color: '#374151', fontSize: 13, flex: 1 },
   attachBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
-  attachBtnText: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  attachmentSection: { gap: 8, marginTop: 2, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
+  attachBtnText: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
+  attachmentSection: { gap: 8, marginTop: 2, padding: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', backgroundColor: colors.white },
   attachmentHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  attachmentAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 7, backgroundColor: '#EAF2FF' },
-  attachmentAddText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
-  attachmentRow: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 9, backgroundColor: colors.background },
-  attachmentName: { flex: 1, color: colors.ink, fontSize: 11 },
-  label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
-  field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
-  submitBtn: { backgroundColor: colors.primary, minHeight: 42, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
-  submitBtnText: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  deleteBtn: { backgroundColor: '#FCEBEC', minHeight: 42, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  deleteBtnText: { color: '#C74848', fontSize: 12, fontWeight: '700' },
+  attachmentAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#EAF2FF' },
+  attachmentAddText: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
+  attachmentRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9, backgroundColor: '#F6F8FC' },
+  attachmentName: { flex: 1, color: '#111827', fontSize: 12 },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500', marginTop: 4 },
+  field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
+  submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
+  deleteBtn: { backgroundColor: '#FCEBEC', minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  deleteBtnText: { color: '#C74848', fontSize: 13, fontWeight: '600' },
   disabled: { opacity: 0.45 },
 });
 

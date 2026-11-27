@@ -1,10 +1,35 @@
-import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { LockKeyhole } from 'lucide-react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import * as Location from 'expo-location';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Check, LockKeyhole } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { ModuleAppIcon } from '@/components/ModuleAppIcons';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
+import {
+  authenticateBiometric,
+  biometricErrorMessage,
+  getBiometricAvailability,
+  isBiometricCancellation,
+} from '@/core/auth/biometricAuth';
+import {
+  getTodayTimekeeping,
+  listHrBranches,
+  submitCheckIn,
+  submitCheckOut,
+  type TodayTimekeepingData,
+} from '@/features/hr/hrApi';
+import type { HrBranch } from '@/features/hr/types';
 import {
   canAccessModule,
   isModuleVisibleForTenant,
@@ -15,10 +40,14 @@ import { colors } from '@/theme/colors';
 
 const COLUMNS = 4;
 
-function chunkRows(items: ModuleDefinition[]): Array<Array<ModuleDefinition | null>> {
-  const rows: Array<Array<ModuleDefinition | null>> = [];
+type GridTile =
+  | { kind: 'attendance' }
+  | { kind: 'module'; module: ModuleDefinition };
+
+function chunkRows(items: GridTile[]): Array<Array<GridTile | null>> {
+  const rows: Array<Array<GridTile | null>> = [];
   for (let index = 0; index < items.length; index += COLUMNS) {
-    const slice: Array<ModuleDefinition | null> = items.slice(index, index + COLUMNS);
+    const slice: Array<GridTile | null> = items.slice(index, index + COLUMNS);
     while (slice.length < COLUMNS) {
       slice.push(null);
     }
@@ -27,13 +56,185 @@ function chunkRows(items: ModuleDefinition[]): Array<Array<ModuleDefinition | nu
   return rows;
 }
 
+function formatCheckTime(value?: string | null): string {
+  if (!value) return '--:--';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '--:--';
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 export default function ModulesScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, activeBranchId, setActiveBranchId, biometricSettings } = useAuth();
+  const [branches, setBranches] = useState<HrBranch[]>([]);
+  const [attendance, setAttendance] = useState<TodayTimekeepingData | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const isBranchSelectable = user?.role === 'admin' && !user?.branchId;
+  const effectiveBranchId = user?.branchId || activeBranchId || branches[0]?._id;
+  const userId = user?.id || user?._id;
+
+  useEffect(() => {
+    if (!isBranchSelectable) return;
+    let active = true;
+    listHrBranches()
+      .then((items) => {
+        if (!active) return;
+        const activeBranches = items.filter((b) => b.isActive !== false);
+        setBranches(activeBranches);
+        if (
+          activeBranches.length > 0 &&
+          (!activeBranchId || !activeBranches.some((b) => b._id === activeBranchId))
+        ) {
+          setActiveBranchId(activeBranches[0]._id);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [activeBranchId, isBranchSelectable, setActiveBranchId]);
+
+  const loadAttendance = useCallback(async () => {
+    try {
+      const data = await getTodayTimekeeping({
+        uid: userId,
+        companyCode: user?.companyCode,
+        branchId: effectiveBranchId,
+      });
+      setAttendance((prev) => {
+        if (!data.log && prev?.log?.checkOut?.time && prev.log.date === data.workCalendar?.date) {
+          return { log: prev.log, workCalendar: data.workCalendar ?? prev.workCalendar };
+        }
+        return data;
+      });
+    } catch {
+      // Giữ trạng thái hiện tại nếu tạm mất kết nối
+    }
+  }, [effectiveBranchId, user?.companyCode, userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadAttendance();
+    }, [loadAttendance]),
+  );
+
+  const hasCheckIn = Boolean(attendance?.log?.checkIn?.time);
+  const hasCheckOut = Boolean(attendance?.log?.checkOut?.time);
+
+  const onQuickAttendancePress = useCallback(async () => {
+    if (checking) return;
+
+    if (hasCheckIn && hasCheckOut) {
+      Alert.alert(
+        'Đã hoàn thành chấm công hôm nay',
+        `Giờ vào: ${formatCheckTime(attendance?.log?.checkIn?.time)}\nGiờ ra: ${formatCheckTime(attendance?.log?.checkOut?.time)}`,
+      );
+      return;
+    }
+
+    const type: 'in' | 'out' = hasCheckIn ? 'out' : 'in';
+    setChecking(true);
+    try {
+      if (biometricSettings.attendanceEnabled) {
+        const availability = await getBiometricAvailability('attendanceEnabled');
+        if (!availability.available) {
+          throw new Error(availability.message || 'Thiết bị chưa sẵn sàng cho xác thực chấm công.');
+        }
+
+        const result = await authenticateBiometric(
+          'attendanceEnabled',
+          type === 'in' ? 'Xác thực khuôn mặt để check-in' : 'Xác thực khuôn mặt để check-out',
+        );
+        if (!result.success) {
+          if (isBiometricCancellation(result)) return;
+          throw new Error(biometricErrorMessage(result.error));
+        }
+      }
+
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert(
+          'Chưa có quyền vị trí',
+          'Vui lòng cấp quyền truy cập vị trí (GPS) để thực hiện chấm công.',
+        );
+        return;
+      }
+
+      let position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      }).catch(() => null);
+
+      if (!position) {
+        position = await Location.getLastKnownPositionAsync().catch(() => null);
+      }
+
+      if (!position) {
+        Alert.alert(
+          'Không xác định được vị trí',
+          'Không thể lấy tọa độ GPS hiện tại. Hãy bật định vị và thử lại.',
+        );
+        return;
+      }
+
+      const payload = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        deviceInfo: `ERP-Mobile (${Platform.OS} ${String(Platform.Version)})`,
+      };
+
+      const res =
+        type === 'in'
+          ? await submitCheckIn(effectiveBranchId, payload)
+          : await submitCheckOut(effectiveBranchId, payload);
+
+      if (res?.data) {
+        setAttendance((prev) => ({
+          log: res.data ?? prev?.log ?? null,
+          workCalendar: prev?.workCalendar ?? null,
+        }));
+      }
+
+      Alert.alert(
+        type === 'in' ? 'Check-in thành công' : 'Check-out thành công',
+        res?.message || 'Đã ghi nhận chấm công lên hệ thống ERP.',
+      );
+      await loadAttendance();
+    } catch (err) {
+      Alert.alert(
+        type === 'in' ? 'Không thể check-in' : 'Không thể check-out',
+        err instanceof Error ? err.message : 'Vui lòng kiểm tra vị trí, Wi-Fi chi nhánh và thử lại.',
+      );
+    } finally {
+      setChecking(false);
+    }
+  }, [
+    attendance?.log?.checkIn?.time,
+    attendance?.log?.checkOut?.time,
+    biometricSettings.attendanceEnabled,
+    checking,
+    effectiveBranchId,
+    hasCheckIn,
+    hasCheckOut,
+    loadAttendance,
+  ]);
+
   const visibleModules = moduleCatalog.filter((module) =>
     isModuleVisibleForTenant(user, module.slug),
   );
-  const rows = chunkRows(visibleModules);
+  const tiles: GridTile[] = [
+    { kind: 'attendance' },
+    ...visibleModules.map((module): GridTile => ({ kind: 'module', module })),
+  ];
+  const rows = chunkRows(tiles);
+
+  const attendanceLabel = checking
+    ? 'Đang chấm...'
+    : hasCheckIn && hasCheckOut
+      ? 'Đã chấm công'
+      : hasCheckIn
+        ? 'Check-out'
+        : 'Chấm công';
 
   return (
     <Screen backgroundColor="#D8EFFC">
@@ -103,56 +304,95 @@ export default function ModulesScreen() {
           />
         </Svg>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>Tính năng</Text>
-        </View>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>Tính năng</Text>
+          </View>
 
-        <View style={styles.gridCard}>
-          {rows.map((row, rowIndex) => (
-            <View
-              key={`row-${rowIndex}`}
-              style={[styles.row, rowIndex < rows.length - 1 && styles.rowSpacing]}
-            >
-              {row.map((module, colIndex) => {
-                if (!module) {
-                  return <View key={`empty-${rowIndex}-${colIndex}`} style={styles.cell} />;
-                }
+          <View style={styles.gridCard}>
+            {rows.map((row, rowIndex) => (
+              <View
+                key={`row-${rowIndex}`}
+                style={[styles.row, rowIndex < rows.length - 1 && styles.rowSpacing]}
+              >
+                {row.map((tile, colIndex) => {
+                  if (!tile) {
+                    return <View key={`empty-${rowIndex}-${colIndex}`} style={styles.cell} />;
+                  }
 
-                const label = module.shortName ?? module.name;
-                const locked = !canAccessModule(user, module.slug);
-                return (
-                  <View key={module.slug} style={styles.cell}>
-                    <Pressable
-                      disabled={locked}
-                      onPress={() =>
-                        router.push({ pathname: '/modules/[slug]', params: { slug: module.slug } })
-                      }
-                      style={({ pressed }) => [
-                        styles.itemButton,
-                        locked && styles.itemLocked,
-                        pressed && !locked && styles.itemPressed,
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={module.name}
-                    >
-                      <View style={styles.iconWrap}>
-                        <ModuleAppIcon slug={module.slug} size={48} />
-                        {locked ? (
-                          <View style={styles.lockBadge}>
-                            <LockKeyhole size={11} color={colors.muted} />
+                  if (tile.kind === 'attendance') {
+                    return (
+                      <View key="quick-attendance" style={styles.cell}>
+                        <Pressable
+                          disabled={checking}
+                          onPress={() => void onQuickAttendancePress()}
+                          style={({ pressed }) => [
+                            styles.itemButton,
+                            pressed && !checking && styles.itemPressed,
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityLabel={attendanceLabel}
+                        >
+                          <View style={styles.iconWrap}>
+                            <ModuleAppIcon slug="quick-attendance" size={48} />
+                            {checking ? (
+                              <View style={styles.checkingOverlay}>
+                                <ActivityIndicator size="small" color={colors.white} />
+                              </View>
+                            ) : hasCheckIn ? (
+                              <View
+                                style={[
+                                  styles.statusDotBadge,
+                                  hasCheckOut ? styles.statusDotDone : styles.statusDotActive,
+                                ]}
+                              >
+                                <Check size={10} color={colors.white} strokeWidth={2.8} />
+                              </View>
+                            ) : null}
                           </View>
-                        ) : null}
+                          <Text numberOfLines={2} style={styles.moduleName}>
+                            {attendanceLabel}
+                          </Text>
+                        </Pressable>
                       </View>
-                      <Text numberOfLines={2} style={styles.moduleName}>
-                        {label}
-                      </Text>
-                    </Pressable>
-                  </View>
-                );
-              })}
-            </View>
-          ))}
-        </View>
+                    );
+                  }
+
+                  const { module } = tile;
+                  const label = module.shortName ?? module.name;
+                  const locked = !canAccessModule(user, module.slug);
+                  return (
+                    <View key={module.slug} style={styles.cell}>
+                      <Pressable
+                        disabled={locked}
+                        onPress={() =>
+                          router.push({ pathname: '/modules/[slug]', params: { slug: module.slug } })
+                        }
+                        style={({ pressed }) => [
+                          styles.itemButton,
+                          locked && styles.itemLocked,
+                          pressed && !locked && styles.itemPressed,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={module.name}
+                      >
+                        <View style={styles.iconWrap}>
+                          <ModuleAppIcon slug={module.slug} size={48} />
+                          {locked ? (
+                            <View style={styles.lockBadge}>
+                              <LockKeyhole size={11} color={colors.muted} />
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text numberOfLines={2} style={styles.moduleName}>
+                          {label}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
         </ScrollView>
       </View>
     </Screen>
@@ -216,6 +456,35 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     position: 'relative',
+  },
+  checkingOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 13,
+    backgroundColor: 'rgba(15, 23, 42, 0.36)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDotBadge: {
+    position: 'absolute',
+    right: -3,
+    bottom: -3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDotActive: {
+    backgroundColor: '#16A34A',
+  },
+  statusDotDone: {
+    backgroundColor: colors.primary,
   },
   lockBadge: {
     position: 'absolute',

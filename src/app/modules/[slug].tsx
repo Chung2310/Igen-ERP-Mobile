@@ -29,7 +29,7 @@ export default function ModuleScaffoldScreen() {
   const FeatureScreen = getFeatureScreen(module.slug);
   if (FeatureScreen) {
     return (
-      <Screen edges={['quotes', 'inventory', 'repair-warranty', 'retail-sales', 'users', 'retail-partners', 'labor-partners', 'student-partners', 'worker-management', 'student-management', 'customer-management'].includes(module.slug) ? ['left', 'right'] : undefined}>
+      <Screen edges={['hr', 'quotes', 'inventory', 'repair-warranty', 'retail-sales', 'users', 'retail-partners', 'labor-partners', 'student-partners', 'worker-management', 'student-management', 'customer-management'].includes(module.slug) ? ['left', 'right'] : undefined}>
         <Stack.Screen options={module.slug === 'resources' ? { headerShown: false } : { headerShown: true, title: module.name, headerBackTitle: 'Trở lại', headerTintColor: colors.ink }} />
         <FeatureScreen module={module} />
       </Screen>

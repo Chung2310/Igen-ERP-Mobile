@@ -1,9 +1,10 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { PopupError } from '@/components/PopupError';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { ChevronRight, File, FileImage, FileSpreadsheet, FileText, Plus, Upload, X } from 'lucide-react-native';
+import { ChevronRight, File, FileImage, FileSpreadsheet, FileText, Plus, Upload } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { deleteKnowledgeDocument, listKnowledgeDocuments, updateKnowledgeDocumentType, uploadKnowledgeDocument, type ErpKnowledgeDocument, type KnowledgeDocumentType } from '@/features/knowledge/knowledgeApi';
@@ -185,35 +186,49 @@ export function KnowledgeScreen() {
         <Text style={styles.note}>Tệp được xử lý trên ERP; thêm, phân loại và xóa yêu cầu quyền quản lý Kho tri thức.</Text>
       </ScrollView>
 
-      <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
-        {selected && <View style={styles.modalBackdrop}><View style={styles.detailSheet}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Chi tiết tài liệu</Text><Pressable style={styles.closeButton} onPress={() => setSelected(null)}><X size={19} color={colors.muted} /></Pressable></View>
-          <View style={styles.fileHero}><View style={styles.fileIcon}>{SelectedIcon && <SelectedIcon size={21} color="#7852C7" />}</View><View style={styles.fileHeroCopy}><Text style={styles.documentName}>{selected.name}</Text><Text style={styles.fileName}>{selected.fileName}</Text></View></View>
-          <InfoLine label="Danh mục" value={selected.category} />
-          <InfoLine label="Phạm vi kênh" value={selected.channelScope.join(', ')} />
-          <InfoLine label="Mục đích AI" value={selected.purposeScope.join(', ')} />
-          <InfoLine label="Số đoạn tri thức" value={String(selected.chunksCount)} />
-          <InfoLine label="Cập nhật" value={formatDate(selected.updatedAt)} />
-          <InfoLine label="Trạng thái" value={statusLabel(selected.status)} />
-          <View style={styles.sheetActions}>
-            <Pressable style={styles.secondaryButton} onPress={() => setEditing(selected)}><Text style={styles.secondaryButtonText}>Chỉnh sửa</Text></Pressable>
-            <Pressable style={styles.deleteButton} onPress={() => deleteDocument(selected)}><Text style={styles.deleteButtonText}>Xóa tài liệu</Text></Pressable>
-          </View>
-        </View></View>}
-      </Modal>
+      <FullScreenFormModal
+        visible={Boolean(selected)}
+        title="Chi tiết tài liệu"
+        onClose={() => setSelected(null)}
+        footer={
+          selected ? (
+            <View style={styles.sheetActions}>
+              <Pressable style={styles.secondaryButton} onPress={() => setEditing(selected)}><Text style={styles.secondaryButtonText}>Chỉnh sửa</Text></Pressable>
+              <Pressable style={styles.deleteButton} onPress={() => deleteDocument(selected)}><Text style={styles.deleteButtonText}>Xóa tài liệu</Text></Pressable>
+            </View>
+          ) : undefined
+        }
+      >
+        {selected && (
+          <>
+            <View style={styles.fileHero}><View style={styles.fileIcon}>{SelectedIcon && <SelectedIcon size={21} color="#7852C7" />}</View><View style={styles.fileHeroCopy}><Text style={styles.documentName}>{selected.name}</Text><Text style={styles.fileName}>{selected.fileName}</Text></View></View>
+            <InfoLine label="Danh mục" value={selected.category} />
+            <InfoLine label="Phạm vi kênh" value={selected.channelScope.join(', ')} />
+            <InfoLine label="Mục đích AI" value={selected.purposeScope.join(', ')} />
+            <InfoLine label="Số đoạn tri thức" value={String(selected.chunksCount)} />
+            <InfoLine label="Cập nhật" value={formatDate(selected.updatedAt)} />
+            <InfoLine label="Trạng thái" value={statusLabel(selected.status)} />
+          </>
+        )}
+      </FullScreenFormModal>
 
-      <Modal visible={Boolean(editing)} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        {editing && <View style={styles.modalBackdrop}><View style={styles.editSheet}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}><Text style={styles.sheetTitle}>Chỉnh sửa tài liệu</Text><Pressable style={styles.closeButton} onPress={() => setEditing(null)}><X size={19} color={colors.muted} /></Pressable></View>
-          <Text style={styles.fieldLabel}>Tài liệu</Text>
-          <Text style={styles.editDocumentName}>{editing.name}</Text>
-          <Text style={styles.fieldLabel}>Phân loại tri thức</Text>
-          <View style={styles.categoryOptions}>{categories.filter((item) => item.value !== 'all').map((item) => <Pressable key={item.value} onPress={() => setEditing({ ...editing, documentType: item.value as KnowledgeDocumentType, category: item.label })} style={[styles.categoryOption, editing.documentType === item.value && styles.categoryOptionActive]}><Text style={[styles.categoryOptionText, editing.documentType === item.value && styles.categoryOptionTextActive]}>{item.label}</Text></Pressable>)}</View>
+      <FullScreenFormModal
+        visible={Boolean(editing)}
+        title="Chỉnh sửa tài liệu"
+        onClose={() => setEditing(null)}
+        footer={
           <Pressable disabled={saving} onPress={() => { void saveDocument(); }} style={[styles.saveButton, saving && styles.uploadDisabled]}><Text style={styles.saveButtonText}>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</Text></Pressable>
-        </View></View>}
-      </Modal>
+        }
+      >
+        {editing && (
+          <>
+            <Text style={styles.fieldLabel}>Tài liệu</Text>
+            <Text style={styles.editDocumentName}>{editing.name}</Text>
+            <Text style={styles.fieldLabel}>Phân loại tri thức</Text>
+            <View style={styles.categoryOptions}>{categories.filter((item) => item.value !== 'all').map((item) => <Pressable key={item.value} onPress={() => setEditing({ ...editing, documentType: item.value as KnowledgeDocumentType, category: item.label })} style={[styles.categoryOption, editing.documentType === item.value && styles.categoryOptionActive]}><Text style={[styles.categoryOptionText, editing.documentType === item.value && styles.categoryOptionTextActive]}>{item.label}</Text></Pressable>)}</View>
+          </>
+        )}
+      </FullScreenFormModal>
     </View>
   );
 }
@@ -243,12 +258,11 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.primary, fontSize: 9, fontWeight: '800', letterSpacing: 1.1 }, title: { color: colors.ink, fontSize: 24, fontWeight: '800', marginTop: 4 }, subtitle: { color: colors.muted, fontSize: 10, lineHeight: 16, marginTop: 5 },
   summaryRow: { flexDirection: 'row', gap: 8, marginTop: 17 }, summaryCard: { flex: 1, padding: 11, alignItems: 'center', borderRadius: 14 }, summaryValue: { color: colors.ink, fontSize: 17, fontWeight: '800' }, summaryLabel: { color: colors.muted, fontSize: 8, marginTop: 4 },
   uploadButton: { flexDirection: 'row', alignItems: 'center', marginTop: 14, padding: 12, borderRadius: 15, backgroundColor: '#EEF4FF', borderWidth: 1, borderColor: '#DDE9FF' }, uploadIcon: { width: 31, height: 31, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }, uploadCopy: { flex: 1, marginLeft: 10 }, uploadTitle: { color: colors.ink, fontSize: 10, fontWeight: '800' }, uploadHint: { color: colors.muted, fontSize: 8, marginTop: 3 },
-  search: { height: 42, paddingHorizontal: 13, marginTop: 14, borderRadius: 13, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, color: colors.ink, fontSize: 10 }, filters: { gap: 7, paddingVertical: 11 }, filter: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9, backgroundColor: colors.white }, filterActive: { backgroundColor: '#EAF2FF' }, filterText: { color: colors.muted, fontSize: 8, fontWeight: '700' }, filterTextActive: { color: colors.primary },
+  search: { height: 40, paddingHorizontal: 14, marginTop: 14, borderRadius: 99, backgroundColor: colors.white, borderWidth: 1, borderColor: '#DCE5F2', color: '#111827', fontSize: 13.5 }, filters: { gap: 7, paddingVertical: 11 }, filter: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 9, backgroundColor: colors.white }, filterActive: { backgroundColor: '#EAF2FF' }, filterText: { color: colors.muted, fontSize: 8, fontWeight: '700' }, filterTextActive: { color: colors.primary },
   listHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5, marginBottom: 9 }, listTitle: { color: colors.ink, fontSize: 12, fontWeight: '800' }, listCount: { color: colors.muted, fontSize: 8 }, documentList: { gap: 8 }, documentRow: { flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 15 }, documentIcon: { width: 38, height: 40, borderRadius: 12, backgroundColor: '#F1EBFF', alignItems: 'center', justifyContent: 'center' }, documentCopy: { flex: 1, marginHorizontal: 10 }, rowName: { color: colors.ink, fontSize: 10, fontWeight: '800' }, rowMeta: { color: colors.muted, fontSize: 8, marginTop: 5 }, empty: { color: colors.muted, textAlign: 'center', fontSize: 10, padding: 28 }, note: { color: colors.muted, textAlign: 'center', fontSize: 8, lineHeight: 13, marginTop: 16 },
   loading: { padding: 24 }, errorCard: { padding: 11, marginTop: 12, backgroundColor: '#FFF1F0', borderColor: '#F6D6D4' }, errorText: { color: '#A43B36', fontSize: 8, lineHeight: 13 }, uploadDisabled: { opacity: 0.65 },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#10182866' }, detailSheet: { backgroundColor: colors.background, borderTopLeftRadius: 23, borderTopRightRadius: 23, paddingHorizontal: 20, paddingTop: 9, paddingBottom: 25 }, editSheet: { backgroundColor: colors.background, borderTopLeftRadius: 23, borderTopRightRadius: 23, paddingHorizontal: 20, paddingTop: 9, paddingBottom: 25 }, sheetHandle: { alignSelf: 'center', width: 38, height: 4, borderRadius: 3, backgroundColor: '#CDD4E0', marginBottom: 14 }, sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 17 }, sheetTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' }, closeButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  fileHero: { flexDirection: 'row', alignItems: 'center', padding: 13, backgroundColor: colors.white, borderRadius: 15, marginBottom: 12 }, fileIcon: { backgroundColor: '#F1EBFF', width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, fileHeroCopy: { flex: 1, marginLeft: 11 }, documentName: { color: colors.ink, fontSize: 11, fontWeight: '800' }, fileName: { color: colors.muted, fontSize: 8, marginTop: 4 }, infoLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.border }, infoLabel: { color: colors.muted, fontSize: 9 }, infoValue: { color: colors.ink, fontSize: 9, fontWeight: '700' },
-  sheetActions: { flexDirection: 'row', gap: 9, marginTop: 18 }, secondaryButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF2FF', borderRadius: 12 }, secondaryButtonText: { color: colors.primary, fontSize: 10, fontWeight: '800' }, deleteButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FCEBEC', borderRadius: 12 }, deleteButtonText: { color: '#B4232E', fontSize: 10, fontWeight: '800' },
-  fieldLabel: { color: colors.ink, fontSize: 9, fontWeight: '700', marginBottom: 6 }, fieldInput: { height: 43, paddingHorizontal: 12, backgroundColor: colors.white, borderRadius: 12, borderColor: colors.border, borderWidth: 1, color: colors.ink, fontSize: 10, marginBottom: 15 }, categoryOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 19 }, categoryOption: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9, backgroundColor: colors.white }, categoryOptionActive: { backgroundColor: '#EAF2FF' }, categoryOptionText: { color: colors.muted, fontSize: 8, fontWeight: '700' }, categoryOptionTextActive: { color: colors.primary }, saveButton: { minHeight: 43, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: 12 }, saveButtonText: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  editDocumentName: { color: colors.ink, fontSize: 10, lineHeight: 15, padding: 12, borderRadius: 12, backgroundColor: colors.white, marginBottom: 15 },
+  fileHero: { flexDirection: 'row', alignItems: 'center', padding: 13, backgroundColor: '#F5F7FB', borderRadius: 15, marginBottom: 12 }, fileIcon: { backgroundColor: '#F1EBFF', width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, fileHeroCopy: { flex: 1, marginLeft: 11 }, documentName: { color: colors.ink, fontSize: 11, fontWeight: '800' }, fileName: { color: colors.muted, fontSize: 8, marginTop: 4 }, infoLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.border }, infoLabel: { color: colors.muted, fontSize: 9 }, infoValue: { color: colors.ink, fontSize: 9, fontWeight: '700' },
+  sheetActions: { flexDirection: 'row', gap: 9 }, secondaryButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EAF2FF', borderRadius: 12 }, secondaryButtonText: { color: colors.primary, fontSize: 10, fontWeight: '800' }, deleteButton: { flex: 1, minHeight: 42, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FCEBEC', borderRadius: 12 }, deleteButtonText: { color: '#B4232E', fontSize: 10, fontWeight: '800' },
+  fieldLabel: { color: colors.ink, fontSize: 9, fontWeight: '700', marginBottom: 6 }, fieldInput: { height: 43, paddingHorizontal: 12, backgroundColor: colors.white, borderRadius: 12, borderColor: colors.border, borderWidth: 1, color: colors.ink, fontSize: 10, marginBottom: 15 }, categoryOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 19 }, categoryOption: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9, backgroundColor: '#F5F7FB', borderWidth: 1, borderColor: colors.border }, categoryOptionActive: { backgroundColor: '#EAF2FF', borderColor: '#C6D7FF' }, categoryOptionText: { color: colors.muted, fontSize: 8, fontWeight: '700' }, categoryOptionTextActive: { color: colors.primary }, saveButton: { minHeight: 43, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: 12 }, saveButtonText: { color: colors.white, fontSize: 10, fontWeight: '800' },
+  editDocumentName: { color: colors.ink, fontSize: 10, lineHeight: 15, padding: 12, borderRadius: 12, backgroundColor: '#F5F7FB', marginBottom: 15 },
 });

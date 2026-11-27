@@ -1,11 +1,11 @@
 import { CenteredPageLoader } from '@/components/BrandLoader';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -316,51 +316,50 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
         )}
       </ScrollView>
 
-      <Modal visible={creating || Boolean(editing)} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeForm}>
-        <View style={styles.modal}>
-          <View style={styles.modalHeader}>
-            <View style={{ flex: 1 }}><Text style={styles.modalTitle}>{creating ? 'Thêm tài khoản' : 'Cập nhật tài khoản'}</Text><Text style={styles.modalSubtitle}>Thông tin sẽ được lưu trực tiếp vào IGen-ERP.</Text></View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Đóng biểu mẫu" disabled={saving} onPress={closeForm} style={styles.closeButton}><X size={19} color={colors.ink} /></Pressable>
-          </View>
-          <ScrollView style={styles.formScroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
-            <Field label="Họ và tên *" value={form.displayName} onChangeText={(value) => setField('displayName', value)} placeholder="Nguyễn Văn An" />
-            <Field label="Email *" value={form.email} onChangeText={(value) => setField('email', value)} placeholder="ten@congty.vn" keyboardType="email-address" autoCapitalize="none" editable={creating} />
-            {creating && <Field label="Mật khẩu ban đầu *" value={form.password} onChangeText={(value) => setField('password', value)} placeholder="Ít nhất 6 ký tự" secureTextEntry autoCapitalize="none" />}
-            <Field label="Số điện thoại" value={form.phone} onChangeText={(value) => setField('phone', value)} placeholder="090…" keyboardType="phone-pad" />
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Phòng ban</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Chọn phòng ban" accessibilityState={{ expanded: departmentOpen }} disabled={saving} onPress={() => setDepartmentOpen((open) => !open)} style={styles.departmentPicker}>
-                <Text style={[styles.departmentPickerText, !form.department && styles.departmentPlaceholder]}>{form.department || 'Chọn phòng ban'}</Text>
-                <ChevronDown size={15} color={colors.muted} />
-              </Pressable>
-              {departmentOpen ? <View style={styles.departmentMenu}>
-                <ScrollView nestedScrollEnabled style={styles.departmentOptions} keyboardShouldPersistTaps="handled">
-                  {departmentOptions.length ? departmentOptions.map((department) => <Pressable key={department} accessibilityRole="button" onPress={() => { setField('department', department); setDepartmentOpen(false); }} style={styles.departmentOption}>
-                    <Text style={[styles.departmentOptionText, form.department === department && styles.departmentOptionSelected]}>{department}</Text>
-                  </Pressable>) : <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>}
-                </ScrollView>
-              </View> : null}
-            </View>
-
-            <Text style={styles.fieldLabel}>Vai trò</Text>
-            <View style={styles.roleOptions}>
-              {assignableRoles.map((role) => <Pressable key={role.value} disabled={editingSelf} onPress={() => setField('role', role.value)} style={[styles.roleOption, form.role === role.value && styles.roleOptionSelected, editingSelf && styles.optionDisabled]}>
-                <Text style={[styles.roleOptionText, form.role === role.value && styles.roleOptionTextSelected]}>{role.label}</Text>
-              </Pressable>)}
-              {roles.filter((role) => role !== 'all' && role !== 'superadmin' && !assignableRoles.some((item) => item.value === role)).map((role) => <Pressable key={role} disabled={editingSelf} onPress={() => setField('role', role)} style={[styles.roleOption, form.role === role && styles.roleOptionSelected, editingSelf && styles.optionDisabled]}><Text style={[styles.roleOptionText, form.role === role && styles.roleOptionTextSelected]}>{roleLabel(role)}</Text></Pressable>)}
-            </View>
-
-            <Field label="Phân hệ được bật" value={form.enabledModules} onChangeText={(value) => setField('enabledModules', value)} placeholder="hr, inventory, quotation" hint={editingSelf ? 'Không thể thay đổi quyền phân hệ của tài khoản đang đăng nhập.' : 'Nhập module key, phân cách bằng dấu phẩy. Để trống khi tạo để dùng mặc định từ ERP.'} multiline editable={!editingSelf} />
-            <Field label="Quyền thao tác" value={form.permissions} onChangeText={(value) => setField('permissions', value)} placeholder="hr:read, inventory:manage" hint={editingSelf ? 'Không thể thay đổi permission của tài khoản đang đăng nhập.' : 'Nhập permission key do IGen-ERP cấp, ví dụ inventory:read hoặc *. '} multiline editable={!editingSelf} />
-          </ScrollView>
+      <FullScreenFormModal
+        visible={creating || Boolean(editing)}
+        title={creating ? 'Thêm tài khoản' : 'Cập nhật tài khoản'}
+        onClose={closeForm}
+        footer={
           <View style={styles.modalActions}>
             <Pressable disabled={saving} onPress={closeForm} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable>
             <Pressable disabled={saving} onPress={() => void saveAccount()} style={[styles.saveButton, saving && styles.buttonDisabled]}>
               {saving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>{creating ? 'Tạo tài khoản' : 'Lưu thay đổi'}</Text>}
             </Pressable>
           </View>
+        }
+      >
+        <Text style={styles.modalSubtitle}>Thông tin sẽ được lưu trực tiếp vào IGen-ERP.</Text>
+        <Field label="Họ và tên *" value={form.displayName} onChangeText={(value) => setField('displayName', value)} placeholder="Nguyễn Văn An" />
+        <Field label="Email *" value={form.email} onChangeText={(value) => setField('email', value)} placeholder="ten@congty.vn" keyboardType="email-address" autoCapitalize="none" editable={creating} />
+        {creating && <Field label="Mật khẩu ban đầu *" value={form.password} onChangeText={(value) => setField('password', value)} placeholder="Ít nhất 6 ký tự" secureTextEntry autoCapitalize="none" />}
+        <Field label="Số điện thoại" value={form.phone} onChangeText={(value) => setField('phone', value)} placeholder="090…" keyboardType="phone-pad" />
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Phòng ban</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Chọn phòng ban" accessibilityState={{ expanded: departmentOpen }} disabled={saving} onPress={() => setDepartmentOpen((open) => !open)} style={styles.departmentPicker}>
+            <Text style={[styles.departmentPickerText, !form.department && styles.departmentPlaceholder]}>{form.department || 'Chọn phòng ban'}</Text>
+            <ChevronDown size={15} color={colors.muted} />
+          </Pressable>
+          {departmentOpen ? <View style={styles.departmentMenu}>
+            <ScrollView nestedScrollEnabled style={styles.departmentOptions} keyboardShouldPersistTaps="handled">
+              {departmentOptions.length ? departmentOptions.map((department) => <Pressable key={department} accessibilityRole="button" onPress={() => { setField('department', department); setDepartmentOpen(false); }} style={styles.departmentOption}>
+                <Text style={[styles.departmentOptionText, form.department === department && styles.departmentOptionSelected]}>{department}</Text>
+              </Pressable>) : <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>}
+            </ScrollView>
+          </View> : null}
         </View>
-      </Modal>
+
+        <Text style={styles.fieldLabel}>Vai trò</Text>
+        <View style={styles.roleOptions}>
+          {assignableRoles.map((role) => <Pressable key={role.value} disabled={editingSelf} onPress={() => setField('role', role.value)} style={[styles.roleOption, form.role === role.value && styles.roleOptionSelected, editingSelf && styles.optionDisabled]}>
+            <Text style={[styles.roleOptionText, form.role === role.value && styles.roleOptionTextSelected]}>{role.label}</Text>
+          </Pressable>)}
+          {roles.filter((role) => role !== 'all' && role !== 'superadmin' && !assignableRoles.some((item) => item.value === role)).map((role) => <Pressable key={role} disabled={editingSelf} onPress={() => setField('role', role)} style={[styles.roleOption, form.role === role && styles.roleOptionSelected, editingSelf && styles.optionDisabled]}><Text style={[styles.roleOptionText, form.role === role && styles.roleOptionTextSelected]}>{roleLabel(role)}</Text></Pressable>)}
+        </View>
+
+        <Field label="Phân hệ được bật" value={form.enabledModules} onChangeText={(value) => setField('enabledModules', value)} placeholder="hr, inventory, quotation" hint={editingSelf ? 'Không thể thay đổi quyền phân hệ của tài khoản đang đăng nhập.' : 'Nhập module key, phân cách bằng dấu phẩy. Để trống khi tạo để dùng mặc định từ ERP.'} multiline editable={!editingSelf} />
+        <Field label="Quyền thao tác" value={form.permissions} onChangeText={(value) => setField('permissions', value)} placeholder="hr:read, inventory:manage" hint={editingSelf ? 'Không thể thay đổi permission của tài khoản đang đăng nhập.' : 'Nhập permission key do IGen-ERP cấp, ví dụ inventory:read hoặc *. '} multiline editable={!editingSelf} />
+      </FullScreenFormModal>
     </View>
   );
 }
@@ -389,8 +388,8 @@ const styles = StyleSheet.create({
   addButtonText: { color: colors.white, fontSize: 10, fontWeight: '800' },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   toolbarSearch: { flex: 1, marginTop: 0 },
-  searchBox: { minHeight: 45, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginTop: 15, borderRadius: 13, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, gap: 9 },
-  searchInput: { flex: 1, color: colors.ink, fontSize: 12, paddingVertical: 8 },
+  searchBox: { height: 40, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, marginTop: 15, borderRadius: 99, borderWidth: 1, borderColor: '#DCE5F2', backgroundColor: colors.white, gap: 8 },
+  searchInput: { flex: 1, color: '#111827', fontSize: 13.5, paddingVertical: 0 },
   filters: { flexDirection: 'row', gap: 7, paddingVertical: 13 },
   filterChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#EDF1F7' },
   filterChipActive: { backgroundColor: '#E6EEFF' },
@@ -422,13 +421,7 @@ const styles = StyleSheet.create({
   permissionState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 10 },
   permissionTitle: { color: colors.ink, fontSize: 15, fontWeight: '800', textAlign: 'center' },
   permissionCopy: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center' },
-  modal: { flex: 1, backgroundColor: colors.background, paddingTop: 18 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingBottom: 13, borderBottomWidth: 1, borderBottomColor: colors.border },
-  modalTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-  modalSubtitle: { color: colors.muted, fontSize: 10, marginTop: 4 },
-  closeButton: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
-  formScroll: { flex: 1 },
-  form: { flexGrow: 1, paddingHorizontal: 18, paddingTop: 15, paddingBottom: 24 },
+  modalSubtitle: { color: colors.muted, fontSize: 10, marginBottom: 14 },
   field: { marginBottom: 14 },
   fieldLabel: { color: colors.ink, fontSize: 10, fontWeight: '700', marginBottom: 6 },
   input: { minHeight: 43, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 11, backgroundColor: colors.white, color: colors.ink, fontSize: 12 },
@@ -449,7 +442,7 @@ const styles = StyleSheet.create({
   roleOptionText: { color: colors.muted, fontSize: 9, fontWeight: '600' },
   roleOptionTextSelected: { color: colors.primary },
   optionDisabled: { opacity: 0.65 },
-  modalActions: { flexDirection: 'row', gap: 9, padding: 16, paddingBottom: 24, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.white },
+  modalActions: { flexDirection: 'row', gap: 9 },
   cancelButton: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#F0F3F8' },
   cancelText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   saveButton: { flex: 1.5, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.primary },

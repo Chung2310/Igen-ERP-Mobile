@@ -7,6 +7,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import type { BarcodeScanningResult } from 'expo-camera';
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Barcode, Camera, Check, ChevronDown, ChevronRight, CircleAlert, ClipboardCheck, Eye, Package, Pencil, Plus, RefreshCw, Search, Settings2, SlidersHorizontal, Trash2, Truck, X } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { colors } from '@/theme/colors';
 import {
   inventoryApi,
@@ -74,16 +75,12 @@ function StatusPill({ value, tone }: { value: string; tone?: 'green' | 'yellow' 
 function LoadingState() { return <CenteredPageLoader />; }
 function EmptyState({ title, copy }: { title: string; copy?: string }) { return <Card style={styles.emptyCard}><Package size={22} color={colors.muted} /><Text style={styles.emptyTitle}>{title}</Text>{copy ? <Text style={styles.emptyCopy}>{copy}</Text> : null}</Card>; }
 function Sheet({ visible, title, subtitle, onClose, children }: { visible: boolean; title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-    <KeyboardAvoidingView style={styles.sheetBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-      <View style={styles.sheet}>
-        <View style={styles.sheetHandle} />
-        <View style={styles.sheetHeader}><View style={{ flex: 1 }}><Text style={styles.sheetTitle}>{title}</Text>{subtitle ? <Text style={styles.sheetSubtitle}>{subtitle}</Text> : null}</View><Pressable onPress={onClose} style={styles.closeButton}><X size={17} color={colors.muted} /></Pressable></View>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>{children}</ScrollView>
-      </View>
-    </KeyboardAvoidingView>
-  </Modal>;
+  return <FullScreenFormModal visible={visible} title={title} onClose={onClose}>
+    <View style={styles.sheetContent}>
+      {subtitle ? <Text style={styles.sheetSubtitle}>{subtitle}</Text> : null}
+      {children}
+    </View>
+  </FullScreenFormModal>;
 }
 function Field({ label, value, onChangeText, placeholder, keyboardType, multiline, editable = true }: { label: string; value: string; onChangeText?: (text: string) => void; placeholder?: string; keyboardType?: 'default' | 'numeric' | 'decimal-pad' | 'email-address' | 'phone-pad'; multiline?: boolean; editable?: boolean }) {
   return <View style={styles.fieldWrap}><Text style={styles.fieldLabel}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.muted} keyboardType={keyboardType} editable={editable} multiline={multiline} style={[styles.input, multiline && styles.multilineInput, !editable && styles.readonlyInput]} /></View>;
@@ -513,8 +510,8 @@ const styles = StyleSheet.create({
   pageSubtitle: { color: colors.muted, fontSize: 9, marginTop: 3 },
   primaryIconButton: { minHeight: 35, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 11, borderRadius: 11, backgroundColor: colors.primary },
   primaryIconButtonText: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  searchField: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white },
-  searchInput: { flex: 1, minHeight: 40, paddingVertical: 7, color: colors.ink, fontSize: 11 },
+  searchField: { height: 40, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 99, backgroundColor: colors.white },
+  searchInput: { flex: 1, paddingVertical: 0, color: '#111827', fontSize: 13.5 },
   searchAndFilter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchGrow: { flex: 1, minWidth: 0 },
   filterTrigger: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 11, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white },

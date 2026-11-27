@@ -213,5 +213,21 @@ export function StudentDataTransfer({ students, batches, scope, onImported, filt
 }
 
 const styles = StyleSheet.create({
-  actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, marginBottom: 10 }, button: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white }, rowButton: { flexGrow: 1, flexShrink: 1, minWidth: 0 }, filterButtonActive: { borderColor: colors.primary, backgroundColor: '#EFF6FF' }, buttonText: { color: colors.primary, fontSize: 9, fontWeight: '800', flexShrink: 1 }, modal: { flex: 1, backgroundColor: colors.background }, header: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderColor: colors.border }, title: { color: colors.ink, fontSize: 13, fontWeight: '800' }, meta: { color: colors.muted, fontSize: 9, lineHeight: 15 }, summary: { flexDirection: 'row', justifyContent: 'space-around', padding: 10, backgroundColor: colors.white, borderBottomWidth: 1, borderColor: colors.border }, preview: { gap: 6, padding: 12 }, previewRow: { padding: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white }, rowTitle: { color: colors.ink, fontSize: 10, fontWeight: '800' }, error: { color: '#B42318', fontSize: 9, lineHeight: 14 }, footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 7, padding: 12, borderTopWidth: 1, borderColor: colors.border, backgroundColor: colors.white }, primary: { backgroundColor: colors.primary, borderColor: colors.primary }, primaryText: { color: colors.white, fontSize: 10, fontWeight: '800' },
+  actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 2, marginBottom: 10 },
+  button: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: colors.white },
+  rowButton: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
+  filterButtonActive: { borderColor: colors.primary, backgroundColor: '#EFF6FF' },
+  buttonText: { color: colors.primary, fontSize: 12, fontWeight: '600', flexShrink: 1 },
+  modal: { flex: 1, backgroundColor: colors.white },
+  header: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#E8EDF4', backgroundColor: colors.white },
+  title: { color: '#111827', fontSize: 15.5, fontWeight: '600' },
+  meta: { color: '#6B7280', fontSize: 12, lineHeight: 17 },
+  summary: { flexDirection: 'row', justifyContent: 'space-around', padding: 12, backgroundColor: '#F6F8FC', borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#E8EDF4' },
+  preview: { gap: 8, padding: 14 },
+  previewRow: { padding: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 10, backgroundColor: colors.white },
+  rowTitle: { color: '#111827', fontSize: 13.5, fontWeight: '600' },
+  error: { color: '#B91C1C', fontSize: 12, lineHeight: 17 },
+  footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, padding: 14, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#E8EDF4', backgroundColor: colors.white },
+  primary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  primaryText: { color: colors.white, fontSize: 13, fontWeight: '600' },
 });

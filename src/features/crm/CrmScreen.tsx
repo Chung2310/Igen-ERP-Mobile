@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   sectionTabActive: { backgroundColor: colors.white, shadowColor: '#132442', shadowOpacity: 0.07, shadowRadius: 4, elevation: 1 },
   sectionTabText: { color: colors.muted, fontSize: 9, fontWeight: '700' },
   sectionTabTextActive: { color: colors.primary },
-  search: { height: 42, backgroundColor: colors.white, borderColor: colors.border, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, fontSize: 11, color: colors.ink },
+  search: { height: 40, backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 99, paddingHorizontal: 14, fontSize: 13.5, color: '#111827' },
   filters: { flexDirection: 'row', gap: 6, marginTop: 10, marginBottom: 12 },
   filterChip: { paddingHorizontal: 9, paddingVertical: 7, borderRadius: 9, backgroundColor: colors.white },
   filterChipActive: { backgroundColor: '#EAF2FF' },

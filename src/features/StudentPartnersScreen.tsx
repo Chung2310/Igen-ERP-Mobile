@@ -1,7 +1,8 @@
 import { PopupError } from '@/components/PopupError';
+import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Eye, HandCoins, Landmark, Mail, Pencil, Phone, Plus, Search, Trash2, UsersRound, Wallet, X } from 'lucide-react-native';
 import { useAuth } from '@/core/auth/AuthProvider';
 import type { FeatureScreenProps } from '@/features/modules/featureScreenRegistry';
@@ -185,62 +186,86 @@ export function StudentPartnersScreen(_props: FeatureScreenProps) {
       </>}
     </ScrollView>
 
-    <Modal visible={formOpen} transparent animationType="fade" onRequestClose={() => { if (!saving) setFormOpen(false); }}>
-      <Pressable style={styles.modalBackdrop} onPress={() => { if (!saving) setFormOpen(false); }}>
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          <View style={styles.modalHeader}><View style={{ flex: 1 }}><Text style={styles.modalTitle}>{editing ? 'Sửa đối tác học viên' : 'Thêm đối tác học viên'}</Text><Text style={styles.modalSubtitle}>Hoa hồng áp dụng theo cấp doanh số học phí của trung tâm.</Text></View><Pressable onPress={() => { if (!saving) setFormOpen(false); }} style={styles.closeButton}><X size={18} color={colors.muted} /></Pressable></View>
-          <ScrollView style={styles.formScroll} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Field label="Tên đối tác *" value={form.name} onChangeText={(name) => setForm((current) => ({ ...current, name }))} />
-            <Field label="Số điện thoại *" value={form.phone} onChangeText={(phone) => setForm((current) => ({ ...current, phone }))} keyboardType="phone-pad" />
-            <Field label="Email" value={form.email} onChangeText={(email) => setForm((current) => ({ ...current, email }))} keyboardType="email-address" autoCapitalize="none" />
-            <Text style={styles.sectionLabel}>Tài khoản nhận chi trả</Text>
-            <Field label="Ngân hàng" value={form.bankName} onChangeText={(bankName) => setForm((current) => ({ ...current, bankName }))} />
-            <Field label="Số tài khoản" value={form.bankAccountNo} onChangeText={(bankAccountNo) => setForm((current) => ({ ...current, bankAccountNo }))} keyboardType="number-pad" />
-            <Field label="Tên chủ tài khoản" value={form.bankAccountName} onChangeText={(bankAccountName) => setForm((current) => ({ ...current, bankAccountName }))} />
-            <Text style={styles.fieldLabel}>Trạng thái</Text><View style={styles.statusOptions}>{([{ value: true, label: 'Đang hoạt động' }, { value: false, label: 'Ngừng hoạt động' }] as const).map((status) => <Pressable key={String(status.value)} onPress={() => setForm((current) => ({ ...current, isActive: status.value }))} style={[styles.statusOption, form.isActive === status.value && styles.statusOptionSelected]}><Text style={[styles.statusText, form.isActive === status.value && styles.statusTextSelected]}>{status.label}</Text></Pressable>)}</View>
-            <Field label="Ghi chú" value={form.notes} onChangeText={(notes) => setForm((current) => ({ ...current, notes }))} multiline />
-          </ScrollView>
-          <View style={styles.modalActions}><Pressable onPress={() => setFormOpen(false)} disabled={saving} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable onPress={() => void save()} disabled={saving} style={[styles.saveButton, saving && styles.disabled]}>{saving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>{editing ? 'Lưu thay đổi' : 'Tạo đối tác'}</Text>}</Pressable></View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <FullScreenFormModal
+      visible={formOpen}
+      title={editing ? 'Sửa đối tác học viên' : 'Thêm đối tác học viên'}
+      onClose={() => { if (!saving) setFormOpen(false); }}
+      footer={
+        <View style={styles.modalActionsInline}>
+          <Pressable onPress={() => setFormOpen(false)} disabled={saving} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable>
+          <Pressable onPress={() => void save()} disabled={saving} style={[styles.saveButton, saving && styles.disabled]}>{saving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>{editing ? 'Lưu thay đổi' : 'Tạo đối tác'}</Text>}</Pressable>
+        </View>
+      }
+    >
+      <View style={{ gap: 10 }}>
+        <Text style={styles.modalSubtitle}>Hoa hồng áp dụng theo cấp doanh số học phí của trung tâm.</Text>
+        <Field label="Tên đối tác *" value={form.name} onChangeText={(name) => setForm((current) => ({ ...current, name }))} />
+        <Field label="Số điện thoại *" value={form.phone} onChangeText={(phone) => setForm((current) => ({ ...current, phone }))} keyboardType="phone-pad" />
+        <Field label="Email" value={form.email} onChangeText={(email) => setForm((current) => ({ ...current, email }))} keyboardType="email-address" autoCapitalize="none" />
+        <Text style={styles.sectionLabel}>Tài khoản nhận chi trả</Text>
+        <Field label="Ngân hàng" value={form.bankName} onChangeText={(bankName) => setForm((current) => ({ ...current, bankName }))} />
+        <Field label="Số tài khoản" value={form.bankAccountNo} onChangeText={(bankAccountNo) => setForm((current) => ({ ...current, bankAccountNo }))} keyboardType="number-pad" />
+        <Field label="Tên chủ tài khoản" value={form.bankAccountName} onChangeText={(bankAccountName) => setForm((current) => ({ ...current, bankAccountName }))} />
+        <Text style={styles.fieldLabel}>Trạng thái</Text><View style={styles.statusOptions}>{([{ value: true, label: 'Đang hoạt động' }, { value: false, label: 'Ngừng hoạt động' }] as const).map((status) => <Pressable key={String(status.value)} onPress={() => setForm((current) => ({ ...current, isActive: status.value }))} style={[styles.statusOption, form.isActive === status.value && styles.statusOptionSelected]}><Text style={[styles.statusText, form.isActive === status.value && styles.statusTextSelected]}>{status.label}</Text></Pressable>)}</View>
+        <Field label="Ghi chú" value={form.notes} onChangeText={(notes) => setForm((current) => ({ ...current, notes }))} multiline />
+      </View>
+    </FullScreenFormModal>
 
-    <Modal visible={levelFormOpen} transparent animationType="fade" onRequestClose={() => { if (!levelSaving) setLevelFormOpen(false); }}>
-      <Pressable style={styles.modalBackdrop} onPress={() => { if (!levelSaving) setLevelFormOpen(false); }}>
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          <View style={styles.modalHeader}><View style={{ flex: 1 }}><Text style={styles.modalTitle}>{editingLevel ? 'Sửa cấp hoa hồng' : 'Thêm cấp hoa hồng'}</Text><Text style={styles.modalSubtitle}>Tên, ngưỡng học phí và tỷ lệ hoa hồng.</Text></View><Pressable onPress={() => { if (!levelSaving) setLevelFormOpen(false); }} style={styles.closeButton}><X size={18} color={colors.muted} /></Pressable></View>
-          <ScrollView style={styles.formScroll} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled"><Field label="Tên cấp *" value={levelForm.name} onChangeText={(name) => setLevelForm((current) => ({ ...current, name }))} /><Field label="Doanh số học phí tối thiểu (VND) *" value={levelForm.minTuition} onChangeText={(minTuition) => setLevelForm((current) => ({ ...current, minTuition: formatVndInput(minTuition) }))} keyboardType="number-pad" /><Field label="Tỷ lệ hoa hồng (%) *" value={levelForm.commissionRate} onChangeText={(commissionRate) => setLevelForm((current) => ({ ...current, commissionRate }))} keyboardType="decimal-pad" /></ScrollView>
-          <View style={styles.modalActions}><Pressable onPress={() => setLevelFormOpen(false)} disabled={levelSaving} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable onPress={() => void saveLevel()} disabled={levelSaving} style={[styles.saveButton, levelSaving && styles.disabled]}>{levelSaving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>{editingLevel ? 'Lưu thay đổi' : 'Tạo cấp'}</Text>}</Pressable></View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <FullScreenFormModal
+      visible={levelFormOpen}
+      title={editingLevel ? 'Sửa cấp hoa hồng' : 'Thêm cấp hoa hồng'}
+      onClose={() => { if (!levelSaving) setLevelFormOpen(false); }}
+      footer={
+        <View style={styles.modalActionsInline}>
+          <Pressable onPress={() => setLevelFormOpen(false)} disabled={levelSaving} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable>
+          <Pressable onPress={() => void saveLevel()} disabled={levelSaving} style={[styles.saveButton, levelSaving && styles.disabled]}>{levelSaving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>{editingLevel ? 'Lưu thay đổi' : 'Tạo cấp'}</Text>}</Pressable>
+        </View>
+      }
+    >
+      <View style={{ gap: 10 }}>
+        <Text style={styles.modalSubtitle}>Tên, ngưỡng học phí và tỷ lệ hoa hồng.</Text>
+        <Field label="Tên cấp *" value={levelForm.name} onChangeText={(name) => setLevelForm((current) => ({ ...current, name }))} />
+        <Field label="Doanh số học phí tối thiểu (VND) *" value={levelForm.minTuition} onChangeText={(minTuition) => setLevelForm((current) => ({ ...current, minTuition: formatVndInput(minTuition) }))} keyboardType="number-pad" />
+        <Field label="Tỷ lệ hoa hồng (%) *" value={levelForm.commissionRate} onChangeText={(commissionRate) => setLevelForm((current) => ({ ...current, commissionRate }))} keyboardType="decimal-pad" />
+      </View>
+    </FullScreenFormModal>
 
-    <Modal visible={Boolean(detail)} transparent animationType="fade" onRequestClose={() => setDetail(null)}>
-      <Pressable style={styles.modalBackdrop} onPress={() => setDetail(null)}>
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          <View style={styles.modalHeader}><View style={{ flex: 1 }}><Text style={styles.modalTitle}>Hồ sơ đối tác</Text><Text style={styles.modalSubtitle}>{detail?.name || ''}</Text></View><Pressable onPress={() => setDetail(null)} style={styles.closeButton}><X size={18} color={colors.muted} /></Pressable></View>
-          {detailLoading ? <State title="Đang tải hồ sơ" detail="Đang tải giới thiệu và lịch sử chi trả…" loading /> : detail ? <ScrollView style={styles.formScroll} contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.detailStats}><DetailMetric label="Học viên giới thiệu" value={String(detail.referredStudentsCount || 0)} /><DetailMetric label="Tổng hoa hồng" value={money(detail.totalCommission)} /><DetailMetric label="Đã chi trả" value={money(detail.totalPaid)} /><DetailMetric label="Còn phải trả" value={money(detail.unpaidBalance)} /></View>
-            <View style={styles.detailHeader}><Text style={styles.sectionTitle}>Học viên được giới thiệu</Text><Text style={styles.sectionHint}>{detail.levelName || 'Mặc định'} · {detail.commissionValue || 0}% hoa hồng</Text></View>
-            {detail.referredStudents?.length ? detail.referredStudents.map((student) => <View key={student._id} style={styles.detailRow}><View style={styles.detailRowIcon}><UsersRound size={14} color={colors.primary} /></View><View style={styles.detailRowCopy}><Text style={styles.detailName}>{student.fullName}</Text><Text style={styles.detailMeta}>{student.phone || 'Chưa có điện thoại'}{student.status?.length ? ` · ${student.status[0]}` : ''}</Text></View><Text style={styles.detailAmount}>{money(student.commission || 0)}</Text></View>) : <Text style={styles.emptyDetail}>Chưa có học viên được ghi nhận.</Text>}
-            <View style={[styles.detailHeader, styles.payoutHeader]}><Text style={styles.sectionTitle}>Lịch sử chi trả</Text>{canManage && detail.unpaidBalance > 0 ? <Pressable onPress={() => { setDetail(null); openPayout(detail); }} style={styles.smallAction}><Plus size={13} color={colors.white} /><Text style={styles.smallActionText}>Chi trả</Text></Pressable> : null}</View>
-            {detail.payoutHistory?.length ? detail.payoutHistory.map((payout) => <View key={payout.id} style={styles.payoutRow}><Wallet size={14} color="#16885A" /><View style={styles.detailRowCopy}><Text style={styles.detailName}>{money(payout.amount)}</Text><Text style={styles.detailMeta}>{payout.date} · {payout.method}</Text></View><Text numberOfLines={1} style={styles.noteText}>{payout.note || ''}</Text></View>) : <Text style={styles.emptyDetail}>Chưa có lần chi trả nào.</Text>}
-          </ScrollView> : null}
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <FullScreenFormModal
+      visible={Boolean(detail)}
+      title={detail?.name ? `Hồ sơ · ${detail.name}` : 'Hồ sơ đối tác'}
+      onClose={() => setDetail(null)}
+    >
+      {detailLoading ? <State title="Đang tải hồ sơ" detail="Đang tải giới thiệu và lịch sử chi trả…" loading /> : detail ? <View style={{ gap: 10 }}>
+        <View style={styles.detailStats}><DetailMetric label="Học viên giới thiệu" value={String(detail.referredStudentsCount || 0)} /><DetailMetric label="Tổng hoa hồng" value={money(detail.totalCommission)} /><DetailMetric label="Đã chi trả" value={money(detail.totalPaid)} /><DetailMetric label="Còn phải trả" value={money(detail.unpaidBalance)} /></View>
+        <View style={styles.detailHeader}><Text style={styles.sectionTitle}>Học viên được giới thiệu</Text><Text style={styles.sectionHint}>{detail.levelName || 'Mặc định'} · {detail.commissionValue || 0}% hoa hồng</Text></View>
+        {detail.referredStudents?.length ? detail.referredStudents.map((student) => <View key={student._id} style={styles.detailRow}><View style={styles.detailRowIcon}><UsersRound size={14} color={colors.primary} /></View><View style={styles.detailRowCopy}><Text style={styles.detailName}>{student.fullName}</Text><Text style={styles.detailMeta}>{student.phone || 'Chưa có điện thoại'}{student.status?.length ? ` · ${student.status[0]}` : ''}</Text></View><Text style={styles.detailAmount}>{money(student.commission || 0)}</Text></View>) : <Text style={styles.emptyDetail}>Chưa có học viên được ghi nhận.</Text>}
+        <View style={[styles.detailHeader, styles.payoutHeader]}><Text style={styles.sectionTitle}>Lịch sử chi trả</Text>{canManage && detail.unpaidBalance > 0 ? <Pressable onPress={() => { setDetail(null); openPayout(detail); }} style={styles.smallAction}><Plus size={13} color={colors.white} /><Text style={styles.smallActionText}>Chi trả</Text></Pressable> : null}</View>
+        {detail.payoutHistory?.length ? detail.payoutHistory.map((payout) => <View key={payout.id} style={styles.payoutRow}><Wallet size={14} color="#16885A" /><View style={styles.detailRowCopy}><Text style={styles.detailName}>{money(payout.amount)}</Text><Text style={styles.detailMeta}>{payout.date} · {payout.method}</Text></View><Text numberOfLines={1} style={styles.noteText}>{payout.note || ''}</Text></View>) : <Text style={styles.emptyDetail}>Chưa có lần chi trả nào.</Text>}
+      </View> : null}
+    </FullScreenFormModal>
 
-    <Modal visible={Boolean(payoutPartner)} transparent animationType="fade" onRequestClose={() => { if (!payoutSaving) setPayoutPartner(null); }}>
-      <Pressable style={styles.payoutBackdrop} onPress={() => { if (!payoutSaving) setPayoutPartner(null); }}>
-        <Pressable style={styles.payoutCard} onPress={() => {}}>
-          <View style={styles.payoutTop}><View style={styles.payoutIcon}><HandCoins size={18} color={colors.primary} /></View><Pressable onPress={() => { if (!payoutSaving) setPayoutPartner(null); }} style={styles.closeButton}><X size={17} color={colors.muted} /></Pressable></View><Text style={styles.payoutTitle}>Chi trả hoa hồng</Text><Text style={styles.payoutSubtitle}>{payoutPartner?.name}</Text><View style={styles.balanceBox}><Text style={styles.balanceLabel}>Số dư có thể chi</Text><Text style={styles.balanceValue}>{money(payoutPartner?.unpaidBalance || 0)}</Text></View>
-          <Field label="Số tiền (VND)" value={payoutAmount} onChangeText={(v) => setPayoutAmount(formatVndInput(v))} keyboardType="number-pad" />
-          <Text style={styles.fieldLabel}>Phương thức</Text><View style={styles.statusOptions}>{(['Chuyển khoản', 'Tiền mặt'] as const).map((method) => <Pressable key={method} onPress={() => setPayoutMethod(method)} style={[styles.statusOption, payoutMethod === method && styles.statusOptionSelected]}><Text style={[styles.statusText, payoutMethod === method && styles.statusTextSelected]}>{method}</Text></Pressable>)}</View>
-          <Field label="Ghi chú" value={payoutNote} onChangeText={setPayoutNote} />
-          <View style={styles.modalActionsInline}><Pressable onPress={() => setPayoutPartner(null)} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable onPress={() => void savePayout()} disabled={payoutSaving} style={[styles.saveButton, payoutSaving && styles.disabled]}>{payoutSaving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>Ghi nhận chi trả</Text>}</Pressable></View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <FullScreenFormModal
+      visible={Boolean(payoutPartner)}
+      title="Chi trả hoa hồng"
+      onClose={() => { if (!payoutSaving) setPayoutPartner(null); }}
+      footer={
+        <View style={styles.modalActionsInline}>
+          <Pressable onPress={() => setPayoutPartner(null)} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable>
+          <Pressable onPress={() => void savePayout()} disabled={payoutSaving} style={[styles.saveButton, payoutSaving && styles.disabled]}>{payoutSaving ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.saveText}>Ghi nhận chi trả</Text>}</Pressable>
+        </View>
+      }
+    >
+      <View style={{ gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={styles.payoutIcon}><HandCoins size={18} color={colors.primary} /></View>
+          <Text style={styles.payoutSubtitle}>{payoutPartner?.name}</Text>
+        </View>
+        <View style={styles.balanceBox}><Text style={styles.balanceLabel}>Số dư có thể chi</Text><Text style={styles.balanceValue}>{money(payoutPartner?.unpaidBalance || 0)}</Text></View>
+        <Field label="Số tiền (VND)" value={payoutAmount} onChangeText={(v) => setPayoutAmount(formatVndInput(v))} keyboardType="number-pad" />
+        <Text style={styles.fieldLabel}>Phương thức</Text><View style={styles.statusOptions}>{(['Chuyển khoản', 'Tiền mặt'] as const).map((method) => <Pressable key={method} onPress={() => setPayoutMethod(method)} style={[styles.statusOption, payoutMethod === method && styles.statusOptionSelected]}><Text style={[styles.statusText, payoutMethod === method && styles.statusTextSelected]}>{method}</Text></Pressable>)}</View>
+        <Field label="Ghi chú" value={payoutNote} onChangeText={setPayoutNote} />
+      </View>
+    </FullScreenFormModal>
   </View>;
 }
 
@@ -266,8 +291,8 @@ const styles = StyleSheet.create({
   moduleNavTextActive: { color: colors.white },
   content: { padding: 16, paddingTop: 10, paddingBottom: 28 },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  searchBox: { flex: 1, minHeight: 43, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 13, backgroundColor: colors.white },
-  searchInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: 11, paddingVertical: 8 },
+  searchBox: { flex: 1, height: 40, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 99, backgroundColor: colors.white },
+  searchInput: { flex: 1, minWidth: 0, color: '#111827', fontSize: 13.5, paddingVertical: 0 },
   addButton: { minHeight: 43, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 12, borderRadius: 13, backgroundColor: colors.primary },
   addText: { color: colors.white, fontSize: 11, fontWeight: '800' },
   filters: { flexDirection: 'row', gap: 7, paddingVertical: 10 },
