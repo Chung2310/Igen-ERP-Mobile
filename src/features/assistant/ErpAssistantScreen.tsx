@@ -156,7 +156,7 @@ function AiThinkingBubble() {
     const spinLoop = Animated.loop(
       Animated.timing(spinAnim, {
         toValue: 1,
-        duration: 920,
+        duration: 1350,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -166,15 +166,15 @@ function AiThinkingBubble() {
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(val, { toValue: 1, duration: 280, useNativeDriver: true }),
-          Animated.timing(val, { toValue: 0.3, duration: 280, useNativeDriver: true }),
-          Animated.delay(Math.max(0, 340 - delay)),
+          Animated.timing(val, { toValue: 1, duration: 320, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0.35, duration: 320, useNativeDriver: true }),
+          Animated.delay(Math.max(0, 380 - delay)),
         ]),
       );
 
     const p1 = makeDotPulse(dot1, 0);
-    const p2 = makeDotPulse(dot2, 130);
-    const p3 = makeDotPulse(dot3, 260);
+    const p2 = makeDotPulse(dot2, 140);
+    const p3 = makeDotPulse(dot3, 280);
 
     spinLoop.start();
     p1.start();
@@ -196,60 +196,38 @@ function AiThinkingBubble() {
 
   return (
     <View style={styles.thinkingGlowStage}>
-      {/* Tight soft outer blue glow hugging the pill rim */}
+      {/* Orbiting Gaussian-style backlit glow behind the pure white pill */}
       <Animated.View
         pointerEvents="none"
         renderToHardwareTextureAndroid
         shouldRasterizeIOS
         style={[styles.thinkingOuterHaloWrap, { transform: [{ rotate }] }]}
       >
-        <Svg width={84} height={84} viewBox="0 0 84 84" fill="none">
+        <Svg width={94} height={94} viewBox="0 0 94 94" fill="none">
           <Defs>
-            <RadialGradient id="thinkingOuterBloomA" cx="72%" cy="46%" r="24%">
-              <Stop offset="0%" stopColor="#60A5FA" stopOpacity="0.34" />
-              <Stop offset="55%" stopColor="#93C5FD" stopOpacity="0.12" />
+            <RadialGradient id="thinkingBacklightBlue" cx="50%" cy="68%" r="28%">
+              <Stop offset="0%" stopColor="#3B82F6" stopOpacity="0.52" />
+              <Stop offset="32%" stopColor="#60A5FA" stopOpacity="0.32" />
+              <Stop offset="65%" stopColor="#93C5FD" stopOpacity="0.11" />
               <Stop offset="100%" stopColor="#93C5FD" stopOpacity="0" />
             </RadialGradient>
+            <RadialGradient id="thinkingBacklightViolet" cx="66%" cy="60%" r="25%">
+              <Stop offset="0%" stopColor="#818CF8" stopOpacity="0.34" />
+              <Stop offset="40%" stopColor="#A5B4FC" stopOpacity="0.18" />
+              <Stop offset="75%" stopColor="#C7D2FE" stopOpacity="0.06" />
+              <Stop offset="100%" stopColor="#C7D2FE" stopOpacity="0" />
+            </RadialGradient>
           </Defs>
-          <Rect x="0" y="0" width="84" height="84" fill="url(#thinkingOuterBloomA)" />
+          <Rect x="0" y="0" width="94" height="94" fill="url(#thinkingBacklightBlue)" />
+          <Rect x="0" y="0" width="94" height="94" fill="url(#thinkingBacklightViolet)" />
         </Svg>
       </Animated.View>
 
-      {/* Pure-white bubble where only the glowing blue arc is visible */}
-      <View style={styles.thinkingBubbleOuter}>
-        <Animated.View
-          pointerEvents="none"
-          renderToHardwareTextureAndroid
-          shouldRasterizeIOS
-          style={[styles.thinkingSpinnerWrap, { transform: [{ rotate }] }]}
-        >
-          <Svg width={96} height={96} viewBox="0 0 96 96" fill="none">
-            <Defs>
-              <LinearGradient id="thinkingStreakGrad" x1="0.2" y1="0" x2="1" y2="0.9">
-                <Stop offset="0%" stopColor="#93C5FD" stopOpacity="0" />
-                <Stop offset="45%" stopColor="#60A5FA" stopOpacity="0.85" />
-                <Stop offset="80%" stopColor="#3B82F6" stopOpacity="0.92" />
-                <Stop offset="100%" stopColor="#93C5FD" stopOpacity="0" />
-              </LinearGradient>
-            </Defs>
-            <Circle
-              cx="48"
-              cy="48"
-              r="31"
-              stroke="url(#thinkingStreakGrad)"
-              strokeWidth={28}
-              strokeDasharray="66 200"
-              strokeLinecap="round"
-              fill="none"
-            />
-          </Svg>
-        </Animated.View>
-
-        <View style={styles.thinkingBubbleInner}>
-          <Animated.View style={[styles.thinkingDot, { opacity: dot1 }]} />
-          <Animated.View style={[styles.thinkingDot, { opacity: dot2 }]} />
-          <Animated.View style={[styles.thinkingDot, { opacity: dot3 }]} />
-        </View>
+      {/* Pure solid white pill on top — zero border, cleanly reveals only the backlit glow */}
+      <View style={styles.thinkingBubbleSolid}>
+        <Animated.View style={[styles.thinkingDot, { opacity: dot1 }]} />
+        <Animated.View style={[styles.thinkingDot, { opacity: dot2 }]} />
+        <Animated.View style={[styles.thinkingDot, { opacity: dot3 }]} />
       </View>
     </View>
   );
@@ -1681,44 +1659,26 @@ const styles = StyleSheet.create({
   metaSource: { color: colors.muted, fontSize: 10 },
   footerWrap: { gap: 10, marginTop: 8 },
   thinkingGlowStage: {
-    width: 78,
-    height: 48,
+    width: 82,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: -5,
+    marginLeft: -8,
     marginTop: -2,
     overflow: 'visible',
   },
   thinkingOuterHaloWrap: {
     position: 'absolute',
-    width: 84,
-    height: 84,
+    width: 94,
+    height: 94,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thinkingBubbleOuter: {
-    width: 64,
-    height: 36,
-    borderRadius: 18,
+  thinkingBubbleSolid: {
+    width: 62,
+    height: 38,
+    borderRadius: 19,
     borderTopLeftRadius: 6,
-    padding: 1.5,
-    backgroundColor: colors.white,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thinkingSpinnerWrap: {
-    position: 'absolute',
-    width: 96,
-    height: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thinkingBubbleInner: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 16.5,
-    borderTopLeftRadius: 4.5,
     backgroundColor: colors.white,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1726,10 +1686,10 @@ const styles = StyleSheet.create({
     gap: 4.5,
   },
   thinkingDot: {
-    width: 4.2,
-    height: 4.2,
-    borderRadius: 2.1,
-    backgroundColor: '#1F2937',
+    width: 4.5,
+    height: 4.5,
+    borderRadius: 2.25,
+    backgroundColor: '#111827',
   },
   actionCard: {
     padding: 14,
