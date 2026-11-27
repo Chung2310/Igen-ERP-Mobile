@@ -365,7 +365,27 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
   }
 
   function openProjectCreate() { setEditingProject(null); setProjectForm(blankProject()); setProjectModal(true); }
-  function openProjectEdit(project: WorkerProject) { setProjectDetail(null); setEditingProject(project); setProjectForm({ ...blankProject(), ...project, geoLocation: project.geoLocation || null }); setProjectModal(true); }
+  function openProjectEdit(project: WorkerProject) {
+    setProjectDetail(null);
+    setEditingProject(project);
+    setProjectForm({
+      ...blankProject(),
+      code: project.code,
+      name: project.name,
+      quota: project.quota,
+      workerIds: Array.isArray(project.workerIds) ? project.workerIds : [],
+      daysOfWeek: Array.isArray(project.daysOfWeek) ? project.daysOfWeek : blankProject().daysOfWeek,
+      startTime: project.startTime || '08:00',
+      endTime: project.endTime || '17:00',
+      location: project.location || '',
+      geoLocation: project.geoLocation || null,
+      startDate: project.startDate || today(),
+      endDate: project.endDate || today(),
+      status: project.status || 'planned',
+      note: project.note || '',
+    });
+    setProjectModal(true);
+  }
   async function saveProjectForm() {
     if (!scope || !projectForm.code.trim() || !projectForm.name.trim()) { setError('Mã và tên dự án là bắt buộc.'); return; }
     setBusy(true); setError('');
