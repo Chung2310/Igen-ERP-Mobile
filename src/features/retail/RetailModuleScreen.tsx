@@ -607,6 +607,8 @@ export function RetailModuleScreen() {
   const [ordersError, setOrdersError] = useState('');
   const ordersRequestRef = useRef(0);
   const [selectedOrder, setSelectedOrder] = useState<RetailOrder | null>(null);
+  const [afterSaleRequest, setAfterSaleRequest] = useState<{ orderId: string; kind: 'return' | 'buyback'; requestId: number } | null>(null);
+  const afterSaleRequestRef = useRef(0);
   const [orderDetailLoading, setOrderDetailLoading] = useState(false);
   const [orderActionBusy, setOrderActionBusy] = useState(false);
   const [orderActionError, setOrderActionError] = useState('');
@@ -661,6 +663,15 @@ export function RetailModuleScreen() {
       setOrderDetailLoading(false);
     }
   };
+
+  const startAfterSaleFromOrder = (kind: 'return' | 'buyback') => {
+    if (!selectedOrder || !canManage || orderDetailLoading || cancelAttempt) return;
+    setAfterSaleRequest({ orderId: selectedOrder._id, kind, requestId: ++afterSaleRequestRef.current });
+    setSelectedOrder(null);
+    setTab('returns');
+  };
+
+  const clearAfterSaleRequest = useCallback(() => setAfterSaleRequest(null), []);
 
   const collectOrderDue = async () => {
     if (!scope || !selectedOrder || !canManage || orderActionBusy) return;
@@ -1077,7 +1088,7 @@ export function RetailModuleScreen() {
                 </ScrollView>
               )}
             </View>
-          ) : scope ? <RetailAuxPanel tab={tab} scope={scope} canManage={canManage} canManagePoints={canManagePoints} terminalId={terminalId} currentCashierId={currentCashierId} /> : <View style={styles.stateBox}><ActivityIndicator color={colors.primary} /><Text style={styles.stateCopy}>Đang chuẩn bị phạm vi chi nhánh…</Text></View>}
+          ) : scope ? <RetailAuxPanel tab={tab} scope={scope} canManage={canManage} canManagePoints={canManagePoints} terminalId={terminalId} currentCashierId={currentCashierId} afterSaleRequest={afterSaleRequest} onAfterSaleRequestHandled={clearAfterSaleRequest} /> : <View style={styles.stateBox}><ActivityIndicator color={colors.primary} /><Text style={styles.stateCopy}>Đang chuẩn bị phạm vi chi nhánh…</Text></View>}
         </>
       )}
 
@@ -1169,6 +1180,14 @@ export function RetailModuleScreen() {
                       </View>
                     ))}
                   </View>
+
+                  {canManage && <View style={styles.checkoutCard}>
+                    <Text style={styles.detailSectionTitle}>Tạo chứng từ từ đơn này</Text>
+                    <View style={styles.modalActionsRow}>
+                      <View style={{ flex: 1 }}><SecondaryButton disabled={orderActionBusy || Boolean(cancelAttempt)} label="Trả hàng" onPress={() => startAfterSaleFromOrder('return')} /></View>
+                      <View style={{ flex: 1 }}><SecondaryButton disabled={orderActionBusy || Boolean(cancelAttempt)} label="Thu mua lại" onPress={() => startAfterSaleFromOrder('buyback')} /></View>
+                    </View>
+                  </View>}
 
                   <View style={styles.totalsBox}>
                     <View style={styles.totalRow}><Text style={styles.totalLabel}>Tạm tính</Text><Text style={styles.totalValue}>{money(selectedOrder.subtotal)}</Text></View>
