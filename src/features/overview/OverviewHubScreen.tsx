@@ -596,7 +596,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
                 <IgenAssistantAvatarIcon size={38} />
               </Pressable>
             </Link>
-            <Link href="/(tabs)/notifications" asChild>
+            <Link href="/notifications" asChild>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Mở thông báo"

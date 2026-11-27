@@ -12,9 +12,10 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   CheckCheck,
+  ChevronLeft,
   MoreHorizontal,
   Trash2,
 } from 'lucide-react-native';
@@ -77,7 +78,8 @@ function formatNotificationTime(value: string) {
   return `${timeStr} ${pad2(date.getDate())}/${pad2(date.getMonth() + 1)}/${date.getFullYear()}`;
 }
 
-export function NotificationsScreen() {
+export function NotificationsScreen({ showBack = false }: { showBack?: boolean } = {}) {
+  const router = useRouter();
   const { height: windowHeight } = useWindowDimensions();
   const [items, setItems] = useState<UserNotification[]>([]);
   const [type, setType] = useState<NotificationType | 'all'>('all');
@@ -286,6 +288,17 @@ export function NotificationsScreen() {
           <Circle cx="274" cy="24" r="2" fill="#2463EB" fillOpacity={0.08} />
         </Svg>
         <View style={styles.titleRow}>
+          {showBack ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Quay lại"
+              onPress={() => router.back()}
+              hitSlop={8}
+              style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+            >
+              <ChevronLeft size={22} color={colors.ink} strokeWidth={2} />
+            </Pressable>
+          ) : null}
           <View style={styles.titleCopy}>
             <Text style={styles.title}>Thông báo</Text>
             <Text style={styles.subtitle}>
@@ -507,6 +520,17 @@ const styles = StyleSheet.create({
     borderBottomColor: '#D6E6F5',
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  backButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.84)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#CBE0F6',
+  },
+  backButtonPressed: { opacity: 0.72 },
   titleCopy: { flex: 1, gap: 2 },
   title: { color: colors.ink, fontSize: 20, fontWeight: '700' },
   subtitle: { color: '#5A6B84', fontSize: 12, fontWeight: '400', lineHeight: 16 },
