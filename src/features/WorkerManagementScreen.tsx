@@ -32,7 +32,7 @@ import {
 type Tab = 'projects' | 'workers' | 'contracts' | 'notifications';
 
 const WORKER_TAB_PALETTES: Record<Tab, { from: string; to: string; accent: string }> = {
-  projects: { from: '#3E7EFF', to: '#1E54E8', accent: '#2860EE' },
+  projects: { from: '#1EC5B5', to: '#0A968D', accent: '#11A79B' },
   workers: { from: '#86DA1C', to: '#4BB60B', accent: '#5DC210' },
   contracts: { from: '#8E63FA', to: '#5E38E8', accent: '#6C42EE' },
   notifications: { from: '#FF9E2C', to: '#EB6209', accent: '#F27814' },
