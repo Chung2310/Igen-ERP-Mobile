@@ -1,14 +1,16 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { CenteredPageLoader } from '@/components/BrandLoader';
+import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
 import { PopupError } from '@/components/PopupError';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import type { FeatureScreenProps } from '@/features/modules/featureScreenRegistry';
 import { Stack } from 'expo-router';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import * as DocumentPicker from 'expo-document-picker';
 import QRCode from 'react-native-qrcode-svg';
-import { Bell, BriefcaseBusiness, Check, ChevronDown, Download, FileSignature, FileUp, Pencil, Plus, QrCode, Search, Send, SlidersHorizontal, Trash2, Users, X } from 'lucide-react-native';
+import { Bell, Check, ChevronDown, Download, FileUp, Pencil, Plus, QrCode, Search, Send, SlidersHorizontal, Trash2, Users, X } from 'lucide-react-native';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { getErpWebUrl } from '@/core/network/erpWebLinks';
 import { colors } from '@/theme/colors';
@@ -26,9 +28,111 @@ import {
 } from '@/features/workerManagementApi';
 
 type Tab = 'projects' | 'workers' | 'contracts' | 'notifications';
-const tabs: Array<{ key: Tab; label: string; Icon: typeof BriefcaseBusiness }> = [
-  { key: 'projects', label: 'Dự án', Icon: BriefcaseBusiness }, { key: 'workers', label: 'Lao động', Icon: Users },
-  { key: 'contracts', label: 'Hợp đồng', Icon: FileSignature }, { key: 'notifications', label: 'Thông báo', Icon: Bell },
+
+const WORKER_TAB_PALETTES: Record<Tab, { from: string; to: string; accent: string }> = {
+  projects: { from: '#22CA7E', to: '#0DA361', accent: '#14B06B' },
+  workers: { from: '#28C4FF', to: '#0B8CE8', accent: '#1299EE' },
+  contracts: { from: '#8E63FA', to: '#5E38E8', accent: '#6C42EE' },
+  notifications: { from: '#FF9E2C', to: '#EB6209', accent: '#F27814' },
+};
+
+function WorkerTabIcon({ id, size = 24 }: { id: Tab; size?: number }) {
+  const palette = WORKER_TAB_PALETTES[id];
+  const gradId = `worker_tab_bg_${id}`;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+      <Defs>
+        <LinearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0%" stopColor={palette.from} />
+          <Stop offset="100%" stopColor={palette.to} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="56" height="56" rx="15.5" fill={`url(#${gradId})`} />
+      {id === 'projects' ? (
+        <>
+          <Path
+            d="M22 18.8V16.8C22 15.1 23.4 13.8 25 13.8H31C32.6 13.8 34 15.1 34 16.8V18.8"
+            stroke="#FFFFFF"
+            strokeOpacity={0.85}
+            strokeWidth="3"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <Rect x="13" y="18.8" width="30" height="22.4" rx="5.5" fill="#FFFFFF" />
+          <Path d="M13 27.6H43" stroke={palette.accent} strokeOpacity={0.3} strokeWidth="2.2" />
+          <Rect x="24.2" y="25.2" width="7.6" height="5.2" rx="2.2" fill={palette.accent} />
+        </>
+      ) : id === 'workers' ? (
+        <>
+          <Circle cx="36.2" cy="22.8" r="4.1" fill="#FFFFFF" fillOpacity={0.72} />
+          <Path
+            d="M32.4 37.8C32.7 33.2 35.5 30.2 39.2 30.2C42.1 30.2 44.3 32.1 45 35.2C45.3 36.6 44.3 37.8 42.9 37.8H32.4Z"
+            fill="#FFFFFF"
+            fillOpacity={0.72}
+          />
+          <Circle cx="23.5" cy="21.2" r="5.5" fill="#FFFFFF" />
+          <Path
+            d="M12.5 38.5C12.5 32.6 17.2 28.8 23.5 28.8C29.8 28.8 34.5 32.6 34.5 38.5C34.5 39.7 33.5 40.7 32.3 40.7H14.7C13.5 40.7 12.5 39.7 12.5 38.5Z"
+            fill="#FFFFFF"
+          />
+        </>
+      ) : id === 'contracts' ? (
+        <>
+          <Path
+            d="M16 17.2C16 14.6 18.1 12.5 20.7 12.5H31.2L39.5 20.8V38.8C39.5 41.4 37.4 43.5 34.8 43.5H20.7C18.1 43.5 16 41.4 16 38.8V17.2Z"
+            fill="#FFFFFF"
+          />
+          <Path
+            d="M31.2 12.5V18.3C31.2 19.7 32.3 20.8 33.7 20.8H39.5L31.2 12.5Z"
+            fill={palette.accent}
+            fillOpacity={0.35}
+          />
+          <Rect x="20.8" y="24" width="13.4" height="2.7" rx="1.35" fill={palette.accent} />
+          <Rect x="20.8" y="29.5" width="9.5" height="2.7" rx="1.35" fill={palette.accent} fillOpacity={0.72} />
+          <Rect x="20.8" y="35" width="6.5" height="2.7" rx="1.35" fill={palette.accent} fillOpacity={0.5} />
+        </>
+      ) : (
+        <>
+          <Path
+            d="M28 13.5C22.8 13.5 19 17.4 19 22.5V28.4L16.3 32.4C15.7 33.3 16.3 34.5 17.4 34.5H38.6C39.7 34.5 40.3 33.3 39.7 32.4L37 28.4V22.5C37 17.4 33.2 13.5 28 13.5Z"
+            fill="#FFFFFF"
+          />
+          <Path
+            d="M24.2 37.5C24.8 39.6 26.3 41 28 41C29.7 41 31.2 39.6 31.8 37.5H24.2Z"
+            fill="#FFFFFF"
+            fillOpacity={0.86}
+          />
+        </>
+      )}
+    </Svg>
+  );
+}
+
+const workerSections: ReadonlyArray<ModuleSectionItem<Tab>> = [
+  {
+    key: 'projects',
+    label: 'Dự án',
+    subtitle: 'Dự án, phân công & điểm danh QR',
+    renderIcon: (size) => <WorkerTabIcon id="projects" size={size} />,
+  },
+  {
+    key: 'workers',
+    label: 'Lao động',
+    subtitle: 'Hồ sơ, phân loại & nhập xuất CSV',
+    renderIcon: (size) => <WorkerTabIcon id="workers" size={size} />,
+  },
+  {
+    key: 'contracts',
+    label: 'Hợp đồng',
+    subtitle: 'Hợp đồng, gia hạn & cảnh báo',
+    renderIcon: (size) => <WorkerTabIcon id="contracts" size={size} />,
+  },
+  {
+    key: 'notifications',
+    label: 'Thông báo',
+    subtitle: 'Thông báo gửi tới lao động',
+    renderIcon: (size) => <WorkerTabIcon id="notifications" size={size} />,
+  },
 ];
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 function shiftDateKey(value: string, days: number) {
@@ -92,6 +196,30 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
     : 'Chọn chi nhánh';
   const scope = useMemo<WorkerScope | undefined>(() => companyCode ? { companyCode, ...(activeBranchId || user?.branchId ? { branchId: activeBranchId || user?.branchId } : {}) } : undefined, [activeBranchId, companyCode, user?.branchId]);
   const [tab, setTab] = useState<Tab>('projects');
+  const sectionOpacity = useRef(new Animated.Value(1)).current;
+  const sectionTranslateX = useRef(new Animated.Value(0)).current;
+  const transitionDirRef = useRef<number>(0);
+  const handleTabChange = useCallback((nextTab: Tab, direction: -1 | 0 | 1) => {
+    transitionDirRef.current = direction;
+    setTab(nextTab);
+  }, []);
+  useEffect(() => {
+    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 18;
+    sectionOpacity.setValue(0.35);
+    sectionTranslateX.setValue(startX);
+    Animated.parallel([
+      Animated.timing(sectionOpacity, {
+        toValue: 1,
+        duration: 210,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sectionTranslateX, {
+        toValue: 0,
+        duration: 210,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [tab, sectionOpacity, sectionTranslateX]);
   const [workers, setWorkers] = useState<Worker[]>([]); const [projects, setProjects] = useState<WorkerProject[]>([]);
   const [contracts, setContracts] = useState<LaborContract[]>([]); const [notifications, setNotifications] = useState<WorkerNotification[]>([]);
   const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
@@ -512,9 +640,16 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
         </Pressable>
       ) : undefined,
     }} />
-    <ScrollView horizontal style={styles.tabScroll} contentContainerStyle={styles.tabRow} showsHorizontalScrollIndicator={false}>{tabs.map(({ key, label, Icon }) => <Pressable key={key} onPress={() => setTab(key)} style={[styles.tab, tab === key && styles.tabSelected]}><Icon size={14} color={tab === key ? colors.white : colors.muted} /><Text style={[styles.tabText, tab === key && styles.tabTextSelected]}>{label}</Text></Pressable>)}</ScrollView>
+    <ModuleSectionSwitcher
+      items={workerSections}
+      activeKey={tab}
+      onChange={handleTabChange}
+      modalTitle="Chọn tính năng Lao động"
+      style={styles.switcherBarWrap}
+    />
     {error ? <PopupError error={error} /> : null}{busy ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 5 }} /> : null}
 
+    <Animated.View style={{ flex: 1, opacity: sectionOpacity, transform: [{ translateX: sectionTranslateX }] }}>
     {tab === 'workers' && <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
       <View style={styles.toolbar}><View style={styles.search}><Search color={colors.muted} size={15} /><TextInput value={search} onChangeText={setSearch} placeholder="Tìm tên, điện thoại, email" style={styles.searchInput} />{search ? <Pressable onPress={() => setSearch('')}><X size={14} color={colors.muted} /></Pressable> : null}</View><Action label="Lọc" icon={<SlidersHorizontal size={13} color={colors.primary} />} onPress={() => setWorkerFiltersOpen(true)} /><Action label="Thêm" icon={<Plus size={13} color={colors.primary} />} onPress={openWorkerCreate} disabled={!canManage} /></View>
       <View style={styles.actions}><Action label="Xuất CSV" icon={<Download size={13} color={colors.primary} />} onPress={() => void exportWorkers()} /><Action label="Tải mẫu CSV" icon={<Download size={13} color={colors.primary} />} onPress={() => void exportWorkerTemplate()} /><Action label="Nhập CSV" icon={<FileUp size={13} color={colors.primary} />} onPress={() => void chooseWorkerImport()} disabled={!canManage} />{selectedWorkerIds.length > 0 && canManage && <Action label={`Xóa đã chọn (${selectedWorkerIds.length})`} icon={<Trash2 size={13} color="#B42318" />} onPress={() => void deleteSelectedWorkers()} />}</View>
@@ -543,6 +678,7 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
       {loading ? <Loading /> : notifications.map((item, index) => <View key={item._id || `${item.title}-${index}`} style={styles.notificationCard}><View style={styles.notificationHeader}><View style={styles.notificationIcon}><Bell size={15} color={colors.primary} /></View><View style={{ flex: 1, gap: 3 }}><Text style={styles.cardTitle}>{item.title || item.subject || 'Thông báo'}</Text><Text style={styles.notificationDate}>{formatNotificationDate(item.sentAt || item.createdAt) || 'Chưa ghi nhận thời gian'}</Text></View></View><Text style={styles.notificationBody}>{item.content || item.message || 'Không có nội dung.'}</Text></View>)}
       {!loading && !notifications.length && <Empty text="Chưa có thông báo." />}
     </ScrollView>}
+    </Animated.View>
     <Modal visible={branchPickerOpen} transparent animationType="fade" onRequestClose={() => setBranchPickerOpen(false)}>
       <View style={styles.backdrop}><View style={styles.dialog}>
         <ModalHeader title="Chọn chi nhánh" onClose={() => setBranchPickerOpen(false)} />
@@ -679,7 +815,7 @@ const styles = StyleSheet.create({
   branchOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: 12, borderBottomWidth: 1, borderColor: colors.border },
   branchOptionSelected: { backgroundColor: '#EAF2FF', borderRadius: 9 },
   container: { flex: 1, backgroundColor: colors.background }, content: { flexGrow: 1, padding: 13, paddingBottom: 28, gap: 9 },
-  tabScroll: { flexGrow: 0, height: 44 }, tabRow: { alignItems: 'center', gap: 7, paddingHorizontal: 12 }, tab: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 11, borderWidth: 1, borderColor: colors.border, borderRadius: 99, backgroundColor: colors.white }, tabSelected: { backgroundColor: colors.primary, borderColor: colors.primary }, tabText: { color: colors.ink, fontSize: 9, fontWeight: '700' }, tabTextSelected: { color: colors.white },
+  switcherBarWrap: { marginHorizontal: 13, marginTop: 10, marginBottom: 2 },
   partnerSelect: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white }, partnerSelectText: { flex: 1, color: colors.ink, fontSize: 9, fontWeight: '600' },
   companySelect: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 8 }, companyName: { color: colors.ink, fontSize: 10, fontWeight: '800' }, toolbar: { flexDirection: 'row', alignItems: 'center', gap: 7 }, search: { minHeight: 40, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 10, backgroundColor: colors.white }, searchInput: { flex: 1, minWidth: 0, color: colors.ink, fontSize: 9 }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, row: { flexDirection: 'row', alignItems: 'center', gap: 8 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, chip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 9, backgroundColor: '#F1F3F6' }, chipSelected: { backgroundColor: '#E7F0FF', borderWidth: 1, borderColor: '#C9D9FF' }, chipText: { color: colors.ink, fontSize: 8, fontWeight: '700' }, chipTextSelected: { color: colors.primary },
   notificationToolbar: { flexDirection: 'row', alignItems: 'center', gap: 8 }, notificationCard: { padding: 12, gap: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.white }, notificationHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, notificationIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#EAF2FF' }, notificationDate: { color: colors.muted, fontSize: 8 }, notificationBody: { color: colors.ink, fontSize: 9, lineHeight: 15 }, card: { padding: 11, gap: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white }, cardTitle: { color: colors.ink, fontSize: 10, fontWeight: '800' }, heading: { color: colors.ink, fontSize: 13, fontWeight: '800' }, section: { marginTop: 5, color: colors.ink, fontSize: 10, fontWeight: '800' }, muted: { color: colors.muted, fontSize: 8, lineHeight: 13 }, detailText: { color: colors.ink, fontSize: 9, lineHeight: 14 }, openDetail: { alignSelf: 'flex-end', color: colors.primary, fontSize: 8, fontWeight: '800' }, cardActions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 6, marginTop: 4 }, action: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white }, actionText: { color: colors.primary, fontSize: 8, fontWeight: '800' }, primaryButton: { borderColor: colors.primary, backgroundColor: colors.primary }, primaryText: { color: colors.white }, dangerButton: { borderColor: '#F4C9C5', backgroundColor: '#FFF1F0' }, dangerText: { color: '#B42318' }, disabled: { opacity: 0.5 }, error: { marginHorizontal: 12, color: '#B42318', fontSize: 9 }, statusPill: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 9, backgroundColor: '#EEF4FF', color: colors.primary, fontSize: 7, fontWeight: '800' }, checkbox: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 5 }, checkboxSelected: { borderColor: colors.primary, backgroundColor: colors.primary }, summaryRow: { flexDirection: 'row', gap: 7 }, metric: { flex: 1, alignItems: 'center', padding: 9, borderRadius: 10, backgroundColor: colors.white }, metricValue: { color: colors.ink, fontSize: 13, fontWeight: '900' }, detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#F0F2F6' }, field: { flex: 1, gap: 4, marginBottom: 7 }, label: { color: colors.ink, fontSize: 8, fontWeight: '700' }, input: { minHeight: 38, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white, color: colors.ink, fontSize: 9 }, multiline: { minHeight: 68, paddingTop: 8 }, form: { padding: 13, gap: 7 }, modal: { flex: 1, backgroundColor: colors.background }, modalHeader: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.white }, close: { padding: 6 }, backdrop: { flex: 1, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(15,23,42,.45)' }, dialog: { maxHeight: '88%', padding: 12, borderRadius: 14, backgroundColor: colors.background, gap: 8 }, option: { padding: 10, borderBottomWidth: 1, borderColor: colors.border }, center: { flex: 1, minHeight: 320, alignItems: 'center', justifyContent: 'center', padding: 24, paddingBottom: 160, gap: 8 }, primaryButtonWide: { alignSelf: 'stretch' },
