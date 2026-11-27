@@ -79,6 +79,10 @@ function AuthenticatedRouter() {
               options={{ animation: 'fade', animationDuration: 220 }}
             />
             <Stack.Screen
+              name="assistant-chat"
+              options={{ headerShown: false, animation: 'ios_from_right' }}
+            />
+            <Stack.Screen
               name="modules/[slug]"
               options={{
                 headerShown: true,

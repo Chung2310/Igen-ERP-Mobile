@@ -562,7 +562,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
               {branches.length > 1 ? <ChevronDown size={14} color={colors.ink} /> : null}
             </View>
           </Pressable>
-          <Link href="/(tabs)/ai-chat" asChild>
+          <Link href="/assistant-chat" asChild>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Mở trợ lý iGen AI"

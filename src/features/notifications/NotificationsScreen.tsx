@@ -14,12 +14,12 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import {
-  Bell,
   CheckCheck,
   MoreHorizontal,
   Trash2,
 } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { IgenInboxEmptyIllustration } from '@/components/EmptyStateIllustration';
 import { NotificationTypeIcon } from '@/components/NotificationTypeIcons';
 import { PopupError } from '@/components/PopupError';
 import { Screen } from '@/components/Screen';
@@ -402,7 +402,7 @@ export function NotificationsScreen() {
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyWrap}>
-              <Bell size={28} strokeWidth={1.6} color="#B8C3D4" />
+              <IgenInboxEmptyIllustration width={144} height={106} />
               <Text style={styles.emptyTitle}>
                 {error
                   ? 'Chưa tải được thông báo'

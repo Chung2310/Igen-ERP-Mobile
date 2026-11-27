@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,7 +19,36 @@ import {
   View,
 } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { BookMarked, Bot, ChevronRight, ExternalLink, FileText, FolderOpen, Mic, NotebookPen, Palette, Plus, Send, Settings, Sparkles, WandSparkles, X } from 'lucide-react-native';
+import {
+  ArrowLeftRight,
+  ArrowUp,
+  BookMarked,
+  Bot,
+  CalendarCheck,
+  CalendarMinus,
+  Check,
+  ChevronDown,
+  ClipboardCheck,
+  ExternalLink,
+  FileText,
+  FolderOpen,
+  Mail,
+  MessageSquare,
+  Mic,
+  NotebookPen,
+  PackagePlus,
+  Palette,
+  PenLine,
+  Plus,
+  Search,
+  Settings,
+  Sparkles,
+  SquarePen,
+  Trash2,
+  WandSparkles,
+  X,
+} from 'lucide-react-native';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { Card } from '@/components/Card';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -57,7 +89,7 @@ import { colors } from '@/theme/colors';
 
 const MODULE_TABS: Array<{ key: AssistantModuleTab; label: string; icon: LucideIcon }> = [
   { key: 'chat', label: 'Trò chuyện', icon: Sparkles },
-  { key: 'erp', label: 'Trợ lý ERP', icon: Bot },
+  { key: 'erp', label: 'Thao tác', icon: Bot },
   { key: 'agents', label: 'Agent AI', icon: Bot },
   { key: 'projects', label: 'Dự án', icon: FolderOpen },
   { key: 'prompts', label: 'Thư viện', icon: BookMarked },
@@ -70,19 +102,147 @@ const MODULE_TABS: Array<{ key: AssistantModuleTab; label: string; icon: LucideI
   { key: 'settings', label: 'Cài đặt', icon: Settings },
 ];
 
-const CHAT_SUGGESTIONS = [
-  'Giải thích một khái niệm mới theo cách dễ hiểu',
-  'Tóm tắt nội dung này thành các ý chính',
-  'Soạn email chuyên nghiệp giúp tôi',
-  'Đề xuất kế hoạch cho tuần làm việc',
+const CHAT_SUGGESTIONS: Array<{ text: string; Icon: LucideIcon }> = [
+  { text: 'Giải thích một khái niệm mới theo cách dễ hiểu', Icon: PenLine },
+  { text: 'Tóm tắt nội dung này thành các ý chính', Icon: FileText },
+  { text: 'Soạn email chuyên nghiệp giúp tôi', Icon: Mail },
+  { text: 'Đề xuất kế hoạch cho tuần làm việc', Icon: CalendarCheck },
 ];
 
-const ACTION_SUGGESTIONS = [
-  'Tạo phiếu nhập hàng',
-  'Lập phiếu kiểm kê kho',
-  'Tạo đề nghị nghỉ phép',
-  'Tạo phiếu điều chuyển kho',
+const ACTION_SUGGESTIONS: Array<{ text: string; Icon: LucideIcon }> = [
+  { text: 'Tạo phiếu nhập hàng', Icon: PackagePlus },
+  { text: 'Lập phiếu kiểm kê kho', Icon: ClipboardCheck },
+  { text: 'Tạo đề nghị nghỉ phép', Icon: CalendarMinus },
+  { text: 'Tạo phiếu điều chuyển kho', Icon: ArrowLeftRight },
 ];
+
+function IgenSparkleMark({ size = 34 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 36 36" fill="none">
+      <Defs>
+        <LinearGradient id="igenSparkleGrad" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0%" stopColor="#38BDF8" />
+          <Stop offset="45%" stopColor="#2463EB" />
+          <Stop offset="78%" stopColor="#7C3AED" />
+          <Stop offset="100%" stopColor="#22C55E" />
+        </LinearGradient>
+      </Defs>
+      <Path
+        d="M18 2C19.6 11.4 24.6 16.4 34 18C24.6 19.6 19.6 24.6 18 34C16.4 24.6 11.4 19.6 2 18C11.4 16.4 16.4 11.4 18 2Z"
+        fill="url(#igenSparkleGrad)"
+      />
+    </Svg>
+  );
+}
+
+function TwoLineMenuIcon({ color = colors.ink }: { color?: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+      <Path d="M3 7.5H17" stroke={color} strokeWidth="1.7" strokeLinecap="round" />
+      <Path d="M3 12.5H17" stroke={color} strokeWidth="1.7" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function AiThinkingBubble() {
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const dot1 = useRef(new Animated.Value(0.35)).current;
+  const dot2 = useRef(new Animated.Value(0.35)).current;
+  const dot3 = useRef(new Animated.Value(0.35)).current;
+
+  useEffect(() => {
+    const spinLoop = Animated.loop(
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 920,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+
+    const makeDotPulse = (val: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: 1, duration: 280, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0.3, duration: 280, useNativeDriver: true }),
+          Animated.delay(Math.max(0, 340 - delay)),
+        ]),
+      );
+
+    const p1 = makeDotPulse(dot1, 0);
+    const p2 = makeDotPulse(dot2, 130);
+    const p3 = makeDotPulse(dot3, 260);
+
+    spinLoop.start();
+    p1.start();
+    p2.start();
+    p3.start();
+
+    return () => {
+      spinLoop.stop();
+      p1.stop();
+      p2.stop();
+      p3.stop();
+    };
+  }, [dot1, dot2, dot3, spinAnim]);
+
+  const rotate = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <View style={styles.thinkingBubbleOuter}>
+      <Animated.View
+        pointerEvents="none"
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS
+        style={[styles.thinkingSpinnerWrap, { transform: [{ rotate }] }]}
+      >
+        <Svg width={104} height={104} viewBox="0 0 104 104" fill="none">
+          <Defs>
+            <LinearGradient id="thinkingStreakGrad" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#38BDF8" stopOpacity="0.1" />
+              <Stop offset="35%" stopColor="#38BDF8" stopOpacity="0.95" />
+              <Stop offset="70%" stopColor="#2463EB" stopOpacity="1" />
+              <Stop offset="100%" stopColor="#8B5CF6" stopOpacity="0.95" />
+            </LinearGradient>
+          </Defs>
+          {/* Soft wide halo tail */}
+          <Circle
+            cx="52"
+            cy="52"
+            r="34"
+            stroke="#60A5FA"
+            strokeOpacity={0.32}
+            strokeWidth={34}
+            strokeDasharray="125 220"
+            strokeLinecap="round"
+            fill="none"
+          />
+          {/* Crisp luminous comet streak */}
+          <Circle
+            cx="52"
+            cy="52"
+            r="34"
+            stroke="url(#thinkingStreakGrad)"
+            strokeWidth={32}
+            strokeDasharray="96 220"
+            strokeLinecap="round"
+            fill="none"
+          />
+        </Svg>
+      </Animated.View>
+
+      <View style={styles.thinkingBubbleInner}>
+        <Animated.View style={[styles.thinkingDot, { opacity: dot1 }]} />
+        <Animated.View style={[styles.thinkingDot, { opacity: dot2 }]} />
+        <Animated.View style={[styles.thinkingDot, { opacity: dot3 }]} />
+      </View>
+    </View>
+  );
+}
 
 function formatDateLabel(iso?: string): string {
   if (!iso) return '';
@@ -91,7 +251,15 @@ function formatDateLabel(iso?: string): string {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } = {}) {
+export function ErpAssistantScreen({
+  embedded = false,
+  chatOnly = false,
+  onClose,
+}: {
+  embedded?: boolean;
+  chatOnly?: boolean;
+  onClose?: () => void;
+} = {}) {
   const {
     user,
     activeBranchId: branchId,
@@ -134,14 +302,34 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedRefs, setSelectedRefs] = useState<Record<string, string[]>>({});
 
-  // History modal state
+  // History modal & mode dropdown state
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
+  const [historySearchOpen, setHistorySearchOpen] = useState(false);
   const [historyMode, setHistoryMode] = useState<AssistantMode>('qa');
   const [conversations, setConversations] = useState<AssistantConversationSummary[]>([]);
+  const [historyActionItem, setHistoryActionItem] = useState<AssistantConversationSummary | null>(null);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const listRef = useRef<FlatList<AssistantChatMessage>>(null);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setKeyboardVisible(true);
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -362,64 +550,107 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
     );
   }, [executeTurn, lastReply, selectedRefs, sending]);
 
+  const isChatSurface = chatOnly || activeTab === 'chat' || activeTab === 'erp';
+  const greetingName = user?.displayName?.trim() || '';
+
   const body = (
     <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 84 : 0}
+      style={[styles.root, isChatSurface && styles.rootChat]}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === 'ios' ? (chatOnly ? 0 : 84) : 0}
     >
       {/* Header */}
-      <View style={styles.topBar}>
-        <View style={styles.topCopy}>
-          <Text style={styles.eyebrow}>MODULE TRỢ LÝ ERP</Text>
-          <Text style={styles.title}>{activeTab === 'erp' ? 'Trợ lý ERP' : activeTab === 'chat' ? 'Trò chuyện AI' : 'Trợ lý AI'}</Text>
-        </View>
-        {activeTab === 'chat' || activeTab === 'erp' ? (
-          <View style={styles.topActions}>
-            <Pressable accessibilityRole="button" disabled={sending} onPress={openHistory} style={styles.headerBtn}>
-              <Text style={styles.headerBtnText}>Lịch sử</Text>
+      {isChatSurface ? (
+        <View style={styles.geminiTopBar}>
+          <View style={styles.geminiTopLeft}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mở lịch sử trò chuyện"
+              disabled={sending}
+              onPress={openHistory}
+              hitSlop={10}
+              style={({ pressed }) => [styles.geminiIconBtn, pressed && styles.geminiBtnPressed]}
+            >
+              <TwoLineMenuIcon color={colors.ink} />
             </Pressable>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Chọn chế độ trò chuyện"
               disabled={sending}
-              onPress={startNewConversation}
-              style={[styles.headerBtn, styles.headerBtnPrimary]}
+              onPress={() => setModeMenuOpen(true)}
+              style={({ pressed }) => [styles.geminiBrandTrigger, pressed && styles.geminiBtnPressed]}
             >
-              <View style={styles.headerBtnPrimaryContent}><Plus size={15} color={colors.white} /><Text style={styles.headerBtnPrimaryText}>Mới</Text></View>
+              <Text style={styles.geminiBrandTitle}>iGen AI</Text>
+              <Text style={styles.geminiBrandMode}>
+                {activeTab === 'erp' ? 'Thao tác' : 'Trò chuyện'}
+              </Text>
+              <ChevronDown size={15} strokeWidth={1.8} color="#64748B" />
             </Pressable>
           </View>
-        ) : null}
-      </View>
-
-      {/* Module Horizontal Tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.moduleTabsRow}
-        style={styles.moduleTabsScroll}
-      >
-        {MODULE_TABS.map((tab) => {
-          const active = activeTab === tab.key;
-          const Icon = tab.icon;
-          return (
+          <View style={styles.geminiTopRight}>
             <Pressable
-              key={tab.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
+              accessibilityRole="button"
+              accessibilityLabel="Cuộc trò chuyện mới"
               disabled={sending}
-              onPress={() => switchModuleTab(tab.key)}
-              style={[styles.moduleTabPill, active && styles.moduleTabPillActive]}
+              onPress={startNewConversation}
+              hitSlop={10}
+              style={({ pressed }) => [styles.geminiIconBtn, pressed && styles.geminiBtnPressed]}
             >
-              <Icon size={15} color={active ? colors.primary : colors.muted} />
-              <Text style={[styles.moduleTabText, active && styles.moduleTabTextActive]}>
-                {tab.label}
-              </Text>
+              <SquarePen size={20} strokeWidth={1.7} color={colors.ink} />
             </Pressable>
-          );
-        })}
-      </ScrollView>
+            {chatOnly && onClose ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Đóng trò chuyện"
+                onPress={onClose}
+                hitSlop={10}
+                style={({ pressed }) => [styles.geminiIconBtn, pressed && styles.geminiBtnPressed]}
+              >
+                <X size={21} strokeWidth={1.8} color={colors.ink} />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.topBar}>
+          <View style={styles.topCopy}>
+            <Text style={styles.eyebrow}>MODULE TRỢ LÝ ERP</Text>
+            <Text style={styles.title}>Trợ lý AI</Text>
+          </View>
+        </View>
+      )}
 
-      {activeTab === 'projects' ? (
+      {/* Module Horizontal Tabs (hidden in focused chatOnly mode) */}
+      {!chatOnly ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.moduleTabsRow}
+          style={styles.moduleTabsScroll}
+        >
+          {MODULE_TABS.map((tab) => {
+            const active = activeTab === tab.key;
+            const Icon = tab.icon;
+            return (
+              <Pressable
+                key={tab.key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                disabled={sending}
+                onPress={() => switchModuleTab(tab.key)}
+                style={[styles.moduleTabPill, active && styles.moduleTabPillActive]}
+              >
+                <Icon size={14} strokeWidth={1.7} color={active ? colors.white : colors.muted} />
+                <Text style={[styles.moduleTabText, active && styles.moduleTabTextActive]}>
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+
+      {!chatOnly && activeTab === 'projects' ? (
         <ProjectsPanel
           branchId={branchId}
           onOpenProjectChat={(project) => {
@@ -429,7 +660,7 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
             setActiveTab('chat');
           }}
         />
-      ) : activeTab === 'prompts' ? (
+      ) : !chatOnly && activeTab === 'prompts' ? (
         <PromptLibraryPanel
           onUsePrompt={(promptText) => {
             startNewConversation();
@@ -438,26 +669,26 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
             setActiveTab('chat');
           }}
         />
-      ) : activeTab === 'studio' ? (
+      ) : !chatOnly && activeTab === 'studio' ? (
         <StudioPanel />
-      ) : activeTab === 'notebook' ? (
+      ) : !chatOnly && activeTab === 'notebook' ? (
         <NotebookPanel />
-      ) : activeTab === 'meeting' ? (
+      ) : !chatOnly && activeTab === 'meeting' ? (
         <MeetingNotesPanel />
-      ) : activeTab === 'tools' ? (
+      ) : !chatOnly && activeTab === 'tools' ? (
         <AssistantToolsPanel onUsePrompt={(prompt) => {
           startNewConversation();
           setDraft(prompt);
           setMode('qa');
           setActiveTab('chat');
         }} />
-      ) : activeTab === 'memory' ? (
+      ) : !chatOnly && activeTab === 'memory' ? (
         <MemoryPanel />
-      ) : activeTab === 'workflows' ? (
+      ) : !chatOnly && activeTab === 'workflows' ? (
         <WorkflowsPanel />
-      ) : activeTab === 'settings' ? (
+      ) : !chatOnly && activeTab === 'settings' ? (
         <SettingsPanel onSettingsSaved={setAssistantSettings} />
-      ) : activeTab === 'agents' ? (
+      ) : !chatOnly && activeTab === 'agents' ? (
         <AgentsPanel />
       ) : (
         <>
@@ -482,35 +713,38 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
         </View>
       ) : messages.length === 0 ? (
         <ScrollView
-          contentContainerStyle={styles.emptyContent}
+          contentContainerStyle={styles.geminiEmptyContent}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Card style={styles.assistantCard}>
-            <View style={styles.assistantIcon}>
-              <Sparkles size={25} color={colors.primary} />
-            </View>
-            <Text style={styles.assistantTitle}>{activeTab === 'erp' ? 'Thao tác cùng ERP' : 'Hỏi đáp chung'}</Text>
-            <Text style={styles.assistantText}>{activeTab === 'erp'
-              ? 'Mô tả nghiệp vụ cần thực hiện. Trợ lý sẽ kiểm tra dữ liệu, hỏi thông tin còn thiếu và yêu cầu xác nhận trước khi cập nhật ERP.'
-              : 'Đặt câu hỏi, nhờ giải thích, tóm tắt hoặc soạn nội dung. Chế độ này chỉ dùng để hỏi đáp chung.'}</Text>
-          </Card>
+          <View style={styles.geminiHero}>
+            <IgenSparkleMark size={36} />
+            <Text style={styles.geminiGreeting}>
+              {greetingName ? `Xin chào ${greetingName},` : 'Xin chào,'}
+              {'\n'}
+              {activeTab === 'erp' ? 'bạn muốn thao tác gì?' : 'hôm nay bạn cần gì?'}
+            </Text>
+          </View>
 
           {assistantSettings?.showSuggestions !== false ? (
-            <>
-              <Text style={styles.sectionTitle}>{activeTab === 'erp' ? 'Gợi ý thao tác ERP' : 'Gợi ý hỏi đáp'}</Text>
-              <View style={styles.suggestions}>
-                {(activeTab === 'erp' ? ACTION_SUGGESTIONS : CHAT_SUGGESTIONS).map((suggestion) => (
-                  <Card
-                    key={suggestion}
-                    onPress={() => onSendText(suggestion)}
-                    style={styles.suggestion}
-                  >
-                    <Text style={styles.suggestionText}>{suggestion}</Text>
-                    <ChevronRight size={14} color={colors.primary} />
-                  </Card>
-                ))}
-              </View>
-            </>
+            <View style={styles.geminiSuggestions}>
+              {(activeTab === 'erp' ? ACTION_SUGGESTIONS : CHAT_SUGGESTIONS).map(({ text, Icon }) => (
+                <Pressable
+                  key={text}
+                  accessibilityRole="button"
+                  onPress={() => onSendText(text)}
+                  style={({ pressed }) => [
+                    styles.geminiSuggestionRow,
+                    pressed && styles.geminiSuggestionPressed,
+                  ]}
+                >
+                  <View style={styles.geminiSuggestionIcon}>
+                    <Icon size={18} strokeWidth={1.6} color="#334155" />
+                  </View>
+                  <Text style={styles.geminiSuggestionText}>{text}</Text>
+                </Pressable>
+              ))}
+            </View>
           ) : null}
         </ScrollView>
       ) : (
@@ -519,12 +753,20 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
           data={messages}
           keyExtractor={(_, index) => `${conversationId}-${index}`}
           contentContainerStyle={styles.messagesContent}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => {
             const isUser = item.role === 'user';
             return (
               <View style={[styles.msgRow, isUser && styles.msgRowUser]}>
-                {!isUser ? <View style={styles.botLabelRow}><Sparkles size={12} color={colors.primary} /><Text style={styles.botLabel}>{activeTab === 'erp' ? 'Trợ lý ERP' : 'Trợ lý AI'}</Text></View> : null}
+                {!isUser ? (
+                  <View style={styles.botLabelRow}>
+                    <IgenSparkleMark size={16} />
+                    <Text style={styles.botLabel}>
+                      {activeTab === 'erp' ? 'iGen AI · Thao tác' : 'iGen AI'}
+                    </Text>
+                  </View>
+                ) : null}
                 <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleBot]}>
                   <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>
                     {item.content}
@@ -551,12 +793,7 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
           }}
           ListFooterComponent={
             <View style={styles.footerWrap}>
-              {sending ? (
-                <View style={styles.thinkingRow}>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={styles.thinkingText}>{activeTab === 'erp' ? 'Trợ lý ERP đang xử lý...' : 'Trợ lý AI đang trả lời...'}</Text>
-                </View>
-              ) : null}
+              {sending ? <AiThinkingBubble /> : null}
 
               {/* Pending Action Confirmation Card */}
               {activeTab === 'erp' && !sending && lastReply?.status === 'confirmation' && lastReply.action ? (
@@ -641,127 +878,378 @@ export function ErpAssistantScreen({ embedded = false }: { embedded?: boolean } 
         />
       )}
 
-      {/* Composer */}
-      <View style={styles.composerWrap}>
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          placeholder={activeTab === 'erp' ? 'Mô tả thao tác cần thực hiện trên ERP...' : 'Hỏi bất kỳ điều gì...'}
-          placeholderTextColor={colors.muted}
-          multiline
-          submitBehavior={assistantSettings?.enterToSend ? 'submit' : 'newline'}
-          returnKeyType={assistantSettings?.enterToSend ? 'send' : 'default'}
-          onSubmitEditing={() => {
-            if (assistantSettings?.enterToSend) onSendText(draft);
-          }}
-          editable={!sending}
-          style={styles.input}
-        />
-        <Pressable
-          accessibilityRole="button"
-          disabled={sending || !draft.trim()}
-          onPress={() => onSendText()}
-          style={[styles.sendButton, (sending || !draft.trim()) && styles.sendButtonDisabled]}
+      {/* Gemini-style bottom aura + 2-mode pill toggle + floating rounded pill composer */}
+      <View style={[styles.geminiBottomDock, keyboardVisible && styles.geminiBottomDockKeyboard]}>
+        <Svg
+          pointerEvents="none"
+          width="100%"
+          height="100%"
+          viewBox="0 0 360 140"
+          preserveAspectRatio="none"
+          style={StyleSheet.absoluteFill}
         >
-          {sending ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <Send size={17} color={colors.white} />
-          )}
-        </Pressable>
+          <Defs>
+            <LinearGradient id="geminiBottomGlow" x1="0.5" y1="0" x2="0.5" y2="1">
+              <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
+              <Stop offset="42%" stopColor="#EAF3FF" stopOpacity="0.88" />
+              <Stop offset="100%" stopColor="#DCEBFF" stopOpacity="1" />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="360" height="140" fill="url(#geminiBottomGlow)" />
+        </Svg>
+
+        {/* Centered 2-mode toggle: Trò chuyện | Thao tác (hidden while typing like Gemini) */}
+        {!keyboardVisible ? (
+          <View style={styles.modeToggleRow}>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'chat' }}
+              disabled={sending}
+              onPress={() => switchModuleTab('chat')}
+              style={[styles.modeToggleBtn, activeTab === 'chat' && styles.modeToggleBtnActive]}
+            >
+              <Text style={[styles.modeToggleText, activeTab === 'chat' && styles.modeToggleTextActive]}>
+                Trò chuyện
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: activeTab === 'erp' }}
+              disabled={sending}
+              onPress={() => switchModuleTab('erp')}
+              style={[styles.modeToggleBtn, activeTab === 'erp' && styles.modeToggleBtnActive]}
+            >
+              <Text style={[styles.modeToggleText, activeTab === 'erp' && styles.modeToggleTextActive]}>
+                Thao tác
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Floating white pill composer */}
+        <View style={styles.geminiComposerPill}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tạo hội thoại mới"
+            disabled={sending}
+            onPress={startNewConversation}
+            hitSlop={8}
+            style={({ pressed }) => [styles.geminiPlusBtn, pressed && styles.geminiBtnPressed]}
+          >
+            <Plus size={21} strokeWidth={1.7} color="#334155" />
+          </Pressable>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder={activeTab === 'erp' ? 'Yêu cầu thao tác ERP...' : 'Hỏi iGen AI'}
+            placeholderTextColor="#8A96A8"
+            multiline
+            submitBehavior={assistantSettings?.enterToSend ? 'submit' : 'newline'}
+            returnKeyType={assistantSettings?.enterToSend ? 'send' : 'default'}
+            onSubmitEditing={() => {
+              if (assistantSettings?.enterToSend) onSendText(draft);
+            }}
+            editable={!sending}
+            style={styles.geminiInput}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Gửi tin nhắn"
+            disabled={sending || !draft.trim()}
+            onPress={() => onSendText()}
+            style={[
+              styles.geminiSendBtn,
+              draft.trim() && !sending ? styles.geminiSendBtnReady : styles.geminiSendBtnIdle,
+            ]}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <ArrowUp
+                size={19}
+                strokeWidth={2}
+                color={draft.trim() ? colors.white : colors.primary}
+              />
+            )}
+          </Pressable>
+        </View>
       </View>
         </>
       )}
 
-      {/* History Modal */}
+      {/* Floating Mode Dropdown Popover (Gemini style) */}
       <Modal
-        visible={historyOpen}
+        visible={modeMenuOpen}
         transparent
-        animationType="slide"
-        onRequestClose={() => setHistoryOpen(false)}
+        animationType="fade"
+        onRequestClose={() => setModeMenuOpen(false)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setHistoryOpen(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{historyMode === 'qa' ? 'Lịch sử Trò chuyện AI' : 'Lịch sử thao tác ERP'}</Text>
-              <Pressable onPress={() => setHistoryOpen(false)} hitSlop={8}>
-                <Text style={styles.modalClose}>Đóng</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.searchRow}>
-              <TextInput
-                value={historySearch}
-                onChangeText={setHistorySearch}
-                onSubmitEditing={() => {
-                  void loadHistory(historySearch, historyMode);
-                }}
-                placeholder="Tìm hội thoại..."
-                placeholderTextColor={colors.muted}
-                style={styles.searchInput}
-              />
-              <Pressable
-                onPress={() => {
-                  void loadHistory(historySearch, historyMode);
-                }}
-                style={styles.searchBtn}
-              >
-                <Text style={styles.searchBtnText}>Tìm</Text>
-              </Pressable>
-            </View>
-
-            {historyLoading ? (
-              <View style={styles.modalLoading}>
-                <ActivityIndicator size="small" color={colors.primary} />
+        <Pressable style={styles.modePopoverBackdrop} onPress={() => setModeMenuOpen(false)}>
+          <Pressable style={styles.modePopoverCard} onPress={() => {}}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setModeMenuOpen(false);
+                switchModuleTab('chat');
+              }}
+              style={({ pressed }) => [
+                styles.modePopoverItem,
+                pressed && styles.modePopoverItemPressed,
+              ]}
+            >
+              <View style={styles.modePopoverIconCol}>
+                {activeTab === 'chat' ? <Check size={17} strokeWidth={2} color={colors.ink} /> : null}
               </View>
-            ) : (
-              <ScrollView style={styles.historyList} showsVerticalScrollIndicator={false}>
-                {conversations.map((item) => {
-                  const active = item.conversationId === conversationId;
-                  return (
-                    <View
-                      key={item.conversationId}
-                      style={[styles.historyRow, active && styles.historyRowActive]}
-                    >
-                      <Pressable
-                        onPress={() => {
-                          void selectConversation(item);
-                        }}
-                        style={styles.historyCopy}
-                      >
-                        <Text numberOfLines={1} style={styles.historyTitle}>
-                          {item.title || 'Cuộc trò chuyện'}
-                        </Text>
-                        <Text numberOfLines={1} style={styles.historyPreview}>
-                          {item.preview || `${item.messageCount} tin nhắn`}
-                        </Text>
-                        <Text style={styles.historyTime}>{formatDateLabel(item.updatedAt)}</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          void onDeleteConversation(item);
-                        }}
-                        hitSlop={8}
-                        style={styles.deleteBtn}
-                      >
-                        <Text style={styles.deleteBtnText}>Xóa</Text>
-                      </Pressable>
-                    </View>
-                  );
-                })}
-                {!conversations.length ? (
-                  <Text style={styles.emptyHistoryText}>Chưa có lịch sử trò chuyện nào.</Text>
-                ) : null}
-              </ScrollView>
-            )}
+              <View style={styles.modePopoverCopy}>
+                <Text style={styles.modePopoverTitle}>Trò chuyện</Text>
+                <Text style={styles.modePopoverSub}>Hỏi đáp chung, giải thích & soạn nội dung</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setModeMenuOpen(false);
+                switchModuleTab('erp');
+              }}
+              style={({ pressed }) => [
+                styles.modePopoverItem,
+                pressed && styles.modePopoverItemPressed,
+              ]}
+            >
+              <View style={styles.modePopoverIconCol}>
+                {activeTab === 'erp' ? <Check size={17} strokeWidth={2} color={colors.ink} /> : null}
+              </View>
+              <View style={styles.modePopoverCopy}>
+                <Text style={styles.modePopoverTitle}>Thao tác</Text>
+                <Text style={styles.modePopoverSub}>Thực hiện nghiệp vụ & cập nhật dữ liệu ERP</Text>
+              </View>
+            </Pressable>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* Full-screen Gemini-style History Modal */}
+      <Modal
+        visible={historyOpen}
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => {
+          setHistoryActionItem(null);
+          setHistorySearchOpen(false);
+          setHistoryOpen(false);
+        }}
+      >
+        <View style={styles.historyModalRoot}>
+          <Screen backgroundColor={colors.white} edges={['top', 'left', 'right']}>
+            <View style={styles.historyScreen}>
+              {/* Top Bar: iGen AI + Search + Close */}
+              <View style={styles.historyTopBar}>
+                {historySearchOpen ? (
+                  <View style={styles.historyInlineSearchWrap}>
+                    <Search size={18} strokeWidth={1.6} color="#64748B" />
+                    <TextInput
+                      value={historySearch}
+                      onChangeText={setHistorySearch}
+                      onSubmitEditing={() => {
+                        void loadHistory(historySearch, historyMode);
+                      }}
+                      placeholder="Tìm cuộc trò chuyện..."
+                      placeholderTextColor="#94A3B8"
+                      autoFocus
+                      returnKeyType="search"
+                      style={styles.historyInlineSearchInput}
+                    />
+                    {historySearch ? (
+                      <Pressable
+                        hitSlop={8}
+                        onPress={() => {
+                          setHistorySearch('');
+                          void loadHistory('', historyMode);
+                        }}
+                      >
+                        <X size={17} strokeWidth={1.7} color="#64748B" />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : (
+                  <Text style={styles.historyBrand}>iGen AI</Text>
+                )}
+
+                <View style={styles.historyTopActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Tìm lịch sử"
+                    hitSlop={10}
+                    onPress={() => {
+                      if (historySearchOpen) {
+                        void loadHistory(historySearch, historyMode);
+                      } else {
+                        setHistorySearchOpen(true);
+                      }
+                    }}
+                    style={({ pressed }) => [styles.historyIconBtn, pressed && styles.geminiBtnPressed]}
+                  >
+                    <Search size={21} strokeWidth={1.6} color={colors.ink} />
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Đóng lịch sử"
+                    hitSlop={10}
+                    onPress={() => {
+                      setHistoryActionItem(null);
+                      setHistorySearchOpen(false);
+                      setHistoryOpen(false);
+                    }}
+                    style={({ pressed }) => [styles.historyIconBtn, pressed && styles.geminiBtnPressed]}
+                  >
+                    <X size={23} strokeWidth={1.6} color={colors.ink} />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Clean minimalist conversation list */}
+              {historyLoading ? (
+                <View style={styles.historyLoadingWrap}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                </View>
+              ) : (
+                <ScrollView
+                  style={styles.historyListFlex}
+                  contentContainerStyle={styles.historyListContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {conversations.map((item) => {
+                    const active = item.conversationId === conversationId;
+                    return (
+                      <Pressable
+                        key={item.conversationId}
+                        accessibilityRole="button"
+                        onPress={() => {
+                          setHistorySearchOpen(false);
+                          void selectConversation(item);
+                        }}
+                        onLongPress={() => setHistoryActionItem(item)}
+                        delayLongPress={260}
+                        style={({ pressed }) => [
+                          styles.historyItemRow,
+                          active && styles.historyItemRowActive,
+                          pressed && styles.historyItemRowPressed,
+                        ]}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.historyItemTitle, active && styles.historyItemTitleActive]}
+                        >
+                          {item.title || 'Cuộc trò chuyện'}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {!conversations.length ? (
+                    <Text style={styles.emptyHistoryText}>
+                      {historyMode === 'qa'
+                        ? 'Chưa có lịch sử trò chuyện nào.'
+                        : 'Chưa có lịch sử thao tác ERP nào.'}
+                    </Text>
+                  ) : null}
+                </ScrollView>
+              )}
+
+              {/* Bottom user profile footer (Gemini style) */}
+              <View style={styles.historyFooter}>
+                <View style={styles.historyUserRow}>
+                  <View style={styles.historyAvatarRing}>
+                    <View style={styles.historyAvatarInner}>
+                      <Text style={styles.historyAvatarInitial}>
+                        {(greetingName || 'U').slice(0, 1).toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.historyUserCopy}>
+                    <Text numberOfLines={1} style={styles.historyUserName}>
+                      {greetingName || 'Người dùng ERP'}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.historyUserBadge}>
+                      {historyMode === 'qa' ? 'TRÒ CHUYỆN' : 'THAO TÁC ERP'}
+                    </Text>
+                  </View>
+                </View>
+                {!chatOnly ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Cài đặt trợ lý"
+                    hitSlop={10}
+                    onPress={() => {
+                      setHistorySearchOpen(false);
+                      setHistoryOpen(false);
+                      switchModuleTab('settings');
+                    }}
+                    style={({ pressed }) => [styles.historyIconBtn, pressed && styles.geminiBtnPressed]}
+                  >
+                    <Settings size={20} strokeWidth={1.6} color="#475569" />
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          </Screen>
+
+          {/* Long-press Bottom Action Sheet covering full screen edge-to-edge */}
+          {historyActionItem ? (
+            <Pressable
+              style={styles.historySheetOverlay}
+              onPress={() => setHistoryActionItem(null)}
+            >
+              <Pressable style={styles.historyActionSheet} onPress={() => {}}>
+                <View style={styles.historySheetHandle} />
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    const target = historyActionItem;
+                    setHistoryActionItem(null);
+                    setHistorySearchOpen(false);
+                    void selectConversation(target);
+                  }}
+                  style={({ pressed }) => [
+                    styles.historySheetItem,
+                    pressed && styles.historySheetItemPressed,
+                  ]}
+                >
+                  <MessageSquare size={19} strokeWidth={1.6} color={colors.ink} />
+                  <Text style={styles.historySheetItemText}>Mở cuộc trò chuyện</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    const target = historyActionItem;
+                    setHistoryActionItem(null);
+                    void onDeleteConversation(target);
+                  }}
+                  style={({ pressed }) => [
+                    styles.historySheetItem,
+                    pressed && styles.historySheetItemPressed,
+                  ]}
+                >
+                  <Trash2 size={19} strokeWidth={1.6} color={colors.ink} />
+                  <Text style={styles.historySheetItemText}>Xóa</Text>
+                </Pressable>
+              </Pressable>
+            </Pressable>
+          ) : null}
+        </View>
       </Modal>
     </KeyboardAvoidingView>
   );
 
-  return embedded ? body : <Screen>{body}</Screen>;
+  return embedded ? (
+    body
+  ) : (
+    <Screen
+      backgroundColor={isChatSurface ? colors.white : colors.background}
+      edges={chatOnly ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
+    >
+      {body}
+    </Screen>
+  );
 }
 
 export function EmbeddedErpAssistantScreen() {
@@ -770,6 +1258,233 @@ export function EmbeddedErpAssistantScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  rootChat: { backgroundColor: colors.white },
+  geminiTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 10,
+    backgroundColor: colors.white,
+  },
+  geminiTopLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  geminiTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  geminiIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  geminiBtnPressed: {
+    opacity: 0.6,
+  },
+  geminiBrandTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  geminiBrandTitle: {
+    color: colors.ink,
+    fontSize: 17,
+    fontWeight: '500',
+    letterSpacing: -0.2,
+  },
+  geminiBrandMode: {
+    color: '#64748B',
+    fontSize: 16,
+    fontWeight: '400',
+  },
+  geminiEmptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 26,
+    paddingBottom: 24,
+  },
+  geminiHero: {
+    alignItems: 'center',
+    marginBottom: 42,
+    gap: 16,
+  },
+  geminiGreeting: {
+    color: colors.ink,
+    fontSize: 25,
+    lineHeight: 34,
+    fontWeight: '400',
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  geminiSuggestions: {
+    gap: 18,
+    paddingHorizontal: 4,
+  },
+  geminiSuggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 4,
+  },
+  geminiSuggestionPressed: {
+    opacity: 0.55,
+  },
+  geminiSuggestionIcon: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  geminiSuggestionText: {
+    flex: 1,
+    color: '#1E293B',
+    fontSize: 14.5,
+    lineHeight: 20.5,
+    fontWeight: '400',
+  },
+  geminiBottomDock: {
+    paddingTop: 14,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  geminiBottomDockKeyboard: {
+    paddingTop: 8,
+    paddingBottom: 10,
+  },
+  modeToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  modeToggleBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 7,
+    borderRadius: 99,
+  },
+  modeToggleBtnActive: {
+    backgroundColor: colors.white,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  modeToggleText: {
+    color: '#475569',
+    fontSize: 13.5,
+    fontWeight: '400',
+  },
+  modeToggleTextActive: {
+    color: colors.ink,
+    fontWeight: '500',
+  },
+  geminiComposerPill: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: colors.white,
+    borderRadius: 28,
+    paddingLeft: 10,
+    paddingRight: 8,
+    paddingVertical: 7,
+    gap: 6,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.09,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5ECF6',
+  },
+  geminiPlusBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  geminiInput: {
+    flex: 1,
+    minHeight: 36,
+    maxHeight: 112,
+    paddingHorizontal: 4,
+    paddingVertical: 7,
+    fontSize: 15,
+    color: colors.ink,
+    fontWeight: '400',
+  },
+  geminiSendBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  geminiSendBtnIdle: {
+    backgroundColor: '#E8F2FF',
+  },
+  geminiSendBtnReady: {
+    backgroundColor: colors.primary,
+  },
+  modePopoverBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.12)',
+  },
+  modePopoverCard: {
+    position: 'absolute',
+    top: 62,
+    left: 24,
+    right: 24,
+    maxWidth: 300,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    paddingVertical: 10,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E8EEF6',
+  },
+  modePopoverItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  modePopoverItemPressed: {
+    backgroundColor: '#F4F8FF',
+  },
+  modePopoverIconCol: {
+    width: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modePopoverCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  modePopoverTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  modePopoverSub: {
+    color: '#64748B',
+    fontSize: 12.5,
+    fontWeight: '400',
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -880,16 +1595,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   suggestionText: { color: colors.ink, fontSize: 11, fontWeight: '600', flex: 1 },
-  messagesContent: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 18, gap: 12 },
-  msgRow: { alignItems: 'flex-start', maxWidth: '88%' },
-  msgRowUser: { alignSelf: 'flex-end', alignItems: 'flex-end' },
-  botLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4, marginLeft: 4 },
-  botLabel: { color: colors.primary, fontSize: 10, fontWeight: '800' },
-  bubble: { borderRadius: 16, paddingHorizontal: 13, paddingVertical: 10, maxWidth: '100%' },
-  bubbleBot: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border },
-  bubbleUser: { backgroundColor: colors.primary },
-  bubbleText: { color: colors.ink, fontSize: 13, lineHeight: 20 },
-  bubbleTextUser: { color: colors.white },
+  messagesContent: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 18, gap: 16 },
+  msgRow: { alignItems: 'flex-start', maxWidth: '94%' },
+  msgRowUser: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '84%' },
+  botLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  botLabel: { color: '#475569', fontSize: 12, fontWeight: '500' },
+  bubble: { borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, maxWidth: '100%' },
+  bubbleBot: { backgroundColor: 'transparent', paddingHorizontal: 2, paddingVertical: 2 },
+  bubbleUser: { backgroundColor: '#EDF4FF' },
+  bubbleText: { color: colors.ink, fontSize: 14.5, lineHeight: 22, fontWeight: '400' },
+  bubbleTextUser: { color: colors.ink },
   metaBox: {
     marginTop: 8,
     paddingTop: 6,
@@ -901,14 +1616,47 @@ const styles = StyleSheet.create({
   metaLink: { flex: 1, color: colors.primary, fontSize: 11, fontWeight: '700' },
   metaSource: { color: colors.muted, fontSize: 10 },
   footerWrap: { gap: 10, marginTop: 8 },
-  thinkingRow: {
+  thinkingBubbleOuter: {
+    width: 68,
+    height: 38,
+    borderRadius: 18,
+    borderTopLeftRadius: 6,
+    padding: 2.2,
+    backgroundColor: '#F1F5FB',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    shadowColor: '#2463EB',
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  thinkingSpinnerWrap: {
+    position: 'absolute',
+    width: 104,
+    height: 104,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thinkingBubbleInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+    borderTopLeftRadius: 4,
+    backgroundColor: colors.white,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    justifyContent: 'center',
+    gap: 5,
   },
-  thinkingText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
+  thinkingDot: {
+    width: 4.8,
+    height: 4.8,
+    borderRadius: 2.4,
+    backgroundColor: '#475569',
+  },
   actionCard: {
     padding: 14,
     backgroundColor: '#F8FBFF',
@@ -1002,75 +1750,194 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: { opacity: 0.45 },
 
-  // History modal
-  modalBackdrop: {
+  // Full-screen Gemini-style History modal
+  historyModalRoot: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 26,
-    maxHeight: '80%',
   },
-  modalHandle: {
-    width: 38,
-    height: 4,
-    borderRadius: 99,
-    backgroundColor: '#D6DFEC',
-    alignSelf: 'center',
-    marginBottom: 12,
+  historyScreen: {
+    flex: 1,
+    backgroundColor: colors.white,
   },
-  modalHeader: {
+  historyTopBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    paddingHorizontal: 18,
+    paddingTop: 6,
+    paddingBottom: 10,
+    gap: 10,
   },
-  modalTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  modalClose: { color: colors.primary, fontSize: 12, fontWeight: '700' },
-  searchRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  searchInput: {
-    flex: 1,
-    backgroundColor: colors.background,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 11,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 12,
+  historyBrand: {
     color: colors.ink,
+    fontSize: 20,
+    fontWeight: '500',
+    letterSpacing: -0.2,
   },
-  searchBtn: {
-    backgroundColor: colors.primary,
+  historyInlineSearchWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F6FA',
+    borderRadius: 99,
     paddingHorizontal: 14,
-    borderRadius: 11,
+    height: 38,
+    gap: 8,
+  },
+  historyInlineSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.ink,
+    paddingVertical: 0,
+  },
+  historyTopActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  historyIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-  modalLoading: { paddingVertical: 30, alignItems: 'center' },
-  historyList: { maxHeight: 360 },
-  historyRow: {
+  historyLoadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyListFlex: {
+    flex: 1,
+  },
+  historyListContent: {
+    paddingTop: 4,
+    paddingBottom: 24,
+  },
+  historyItemRow: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginHorizontal: 6,
+  },
+  historyItemRowActive: {
+    backgroundColor: '#EFF5FF',
+  },
+  historyItemRowPressed: {
+    backgroundColor: '#F4F7FB',
+  },
+  historyItemTitle: {
+    color: '#111827',
+    fontSize: 15.5,
+    lineHeight: 22,
+    fontWeight: '400',
+  },
+  historyItemTitleActive: {
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  emptyHistoryText: {
+    color: colors.muted,
+    fontSize: 13.5,
+    fontWeight: '400',
+    textAlign: 'center',
+    paddingVertical: 48,
+  },
+  historyFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 11,
-    borderRadius: 13,
-    gap: 10,
-    marginBottom: 6,
-    backgroundColor: '#F8FAFD',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#EDF2F7',
+    backgroundColor: colors.white,
   },
-  historyRowActive: { backgroundColor: '#EAF2FF' },
-  historyCopy: { flex: 1 },
-  historyTitle: { color: colors.ink, fontSize: 13, fontWeight: '700' },
-  historyPreview: { color: colors.muted, fontSize: 11, marginTop: 2 },
-  historyTime: { color: colors.muted, fontSize: 9, marginTop: 4 },
-  deleteBtn: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: '#FCEBEC' },
-  deleteBtnText: { color: '#C74848', fontSize: 10, fontWeight: '700' },
-  emptyHistoryText: { color: colors.muted, fontSize: 11, textAlign: 'center', paddingVertical: 24 },
+  historyUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  historyAvatarRing: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyAvatarInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+    backgroundColor: '#EBF3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyAvatarInitial: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  historyUserCopy: {
+    flex: 1,
+    gap: 1,
+  },
+  historyUserName: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '400',
+  },
+  historyUserBadge: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '400',
+    letterSpacing: 0.4,
+  },
+  historySheetOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.34)',
+    justifyContent: 'flex-end',
+  },
+  historyActionSheet: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
+    paddingHorizontal: 10,
+  },
+  historySheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 99,
+    backgroundColor: '#94A3B8',
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  historySheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  historySheetItemPressed: {
+    backgroundColor: '#F3F6FA',
+  },
+  historySheetItemText: {
+    color: colors.ink,
+    fontSize: 15.5,
+    fontWeight: '400',
+  },
 });
 
