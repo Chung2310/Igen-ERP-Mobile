@@ -2,24 +2,8 @@ import { Stack } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { LucideIcon } from 'lucide-react-native';
-import {
-  Building2,
-  CalendarDays,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  FileText,
-  GraduationCap,
-  MapPinned,
-  NotebookText,
-  Target,
-  Users,
-  Wallet,
-  Workflow,
-} from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { HrTabIcon } from '@/components/HrTabIcons';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { HrBranchesPanel } from '@/features/hr/sections/HrBranchesPanel';
 import { HrContractsPanel } from '@/features/hr/sections/HrContractsPanel';
@@ -42,24 +26,21 @@ type HrTabMeta = {
   key: HrTabId;
   label: string;
   subtitle: string;
-  icon: LucideIcon;
-  accent: string;
-  tone: string;
   readPermissions?: string[];
 };
 
 const HR_TABS: HrTabMeta[] = [
-  { key: 'employees', label: 'Danh sách nhân sự', subtitle: 'Danh bạ, hồ sơ & liên hệ nhân sự', icon: Users, accent: '#2563EB', tone: '#EAF2FF' },
-  { key: 'departments', label: 'Phòng ban', subtitle: 'Cơ cấu & quản lý các phòng ban', icon: Building2, accent: '#7C3AED', tone: '#F3E8FF', readPermissions: ['hr:read', 'access:read', 'hr:manage', 'access:manage'] },
-  { key: 'branches', label: 'Chi nhánh', subtitle: 'Danh sách trụ sở & chi nhánh', icon: MapPinned, accent: '#0EA5E9', tone: '#E0F2FE', readPermissions: ['access:read', 'hr:read'] },
-  { key: 'training', label: 'Đào tạo', subtitle: 'Khóa học & tiến độ đào tạo nội bộ', icon: GraduationCap, accent: '#10B981', tone: '#E9F8F1', readPermissions: ['hr:read', 'hr:manage'] },
-  { key: 'workflows', label: 'Quy trình', subtitle: 'Quy trình vận hành & biểu mẫu HR', icon: Workflow, accent: '#6366F1', tone: '#EEF2FF', readPermissions: ['hr:read', 'hr:manage'] },
-  { key: 'tasks', label: 'Giao việc', subtitle: 'Bảng công việc & theo dõi tiến độ', icon: ClipboardList, accent: '#F97316', tone: '#FFF3E5' },
-  { key: 'attendance', label: 'Lịch & Chấm công', subtitle: 'Lịch làm việc & dữ liệu chấm công', icon: CalendarDays, accent: '#0891B2', tone: '#E8F7FA' },
-  { key: 'leaves', label: 'Đơn từ', subtitle: 'Nghỉ phép, tăng ca & phê duyệt', icon: NotebookText, accent: '#D97706', tone: '#FEF3C7' },
-  { key: 'contracts', label: 'Hợp đồng', subtitle: 'Hợp đồng lao động & gia hạn', icon: FileText, accent: '#E11D48', tone: '#FFE4E6' },
-  { key: 'payroll', label: 'Bảng lương', subtitle: 'Kỳ lương, phiếu lương & thanh toán', icon: Wallet, accent: '#16A34A', tone: '#ECFDF3' },
-  { key: 'recruitment', label: 'Tuyển dụng', subtitle: 'Tin tuyển dụng & hồ sơ ứng viên', icon: Target, accent: '#EC4899', tone: '#FCE7F3' },
+  { key: 'employees', label: 'Danh sách nhân sự', subtitle: 'Danh bạ, hồ sơ & liên hệ nhân sự' },
+  { key: 'departments', label: 'Phòng ban', subtitle: 'Cơ cấu & quản lý các phòng ban', readPermissions: ['hr:read', 'access:read', 'hr:manage', 'access:manage'] },
+  { key: 'branches', label: 'Chi nhánh', subtitle: 'Danh sách trụ sở & chi nhánh', readPermissions: ['access:read', 'hr:read'] },
+  { key: 'training', label: 'Đào tạo', subtitle: 'Khóa học & tiến độ đào tạo nội bộ', readPermissions: ['hr:read', 'hr:manage'] },
+  { key: 'workflows', label: 'Quy trình', subtitle: 'Quy trình vận hành & biểu mẫu HR', readPermissions: ['hr:read', 'hr:manage'] },
+  { key: 'tasks', label: 'Giao việc', subtitle: 'Bảng công việc & theo dõi tiến độ' },
+  { key: 'attendance', label: 'Lịch & Chấm công', subtitle: 'Lịch làm việc & dữ liệu chấm công' },
+  { key: 'leaves', label: 'Đơn từ', subtitle: 'Nghỉ phép, tăng ca & phê duyệt' },
+  { key: 'contracts', label: 'Hợp đồng', subtitle: 'Hợp đồng lao động & gia hạn' },
+  { key: 'payroll', label: 'Bảng lương', subtitle: 'Kỳ lương, phiếu lương & thanh toán' },
+  { key: 'recruitment', label: 'Tuyển dụng', subtitle: 'Tin tuyển dụng & hồ sơ ứng viên' },
 ];
 
 export function HrModuleScreen() {
@@ -134,7 +115,6 @@ export function HrModuleScreen() {
     },
     [currentTabIndex, visibleTabs],
   );
-  const ActiveTabIcon = activeTabMeta?.icon ?? Users;
 
   return (
     <View style={[styles.root, activeVisibleTab === 'employees' && styles.rootWhite]}>
@@ -183,9 +163,7 @@ export function HrModuleScreen() {
               ]}
             >
               <View style={styles.switcherTitleRow}>
-                <View style={[styles.switcherIconBadge, { backgroundColor: activeTabMeta.tone }]}>
-                  <ActiveTabIcon size={14} strokeWidth={1.9} color={activeTabMeta.accent} />
-                </View>
+                <HrTabIcon id={activeTabMeta.key} size={24} />
                 <Text numberOfLines={1} style={styles.switcherTitle}>
                   {activeTabMeta.label}
                 </Text>
@@ -302,7 +280,6 @@ export function HrModuleScreen() {
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {visibleTabs.map((tab) => {
                 const active = tab.key === activeVisibleTab;
-                const Icon = tab.icon;
                 return (
                   <Pressable
                     key={tab.key}
@@ -312,9 +289,7 @@ export function HrModuleScreen() {
                     }}
                     style={[styles.modalRow, active && styles.modalRowActive]}
                   >
-                    <View style={[styles.modalIcon, { backgroundColor: tab.tone }]}>
-                      <Icon size={19} strokeWidth={1.8} color={tab.accent} />
-                    </View>
+                    <HrTabIcon id={tab.key} size={38} />
                     <View style={styles.modalRowCopy}>
                       <Text style={styles.modalRowTitle}>{tab.label}</Text>
                       <Text numberOfLines={1} style={styles.modalRowSub}>
@@ -381,7 +356,7 @@ const styles = StyleSheet.create({
   branchBtnText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
   switcherWrap: {
     paddingHorizontal: 14,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   switcherBar: {
     flexDirection: 'row',
@@ -422,23 +397,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  switcherIconBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   switcherTitle: {
     color: colors.ink,
     fontSize: 14.5,
-    fontWeight: '600',
+    fontWeight: '700',
     flexShrink: 1,
   },
   switcherSubtitle: {
     color: colors.muted,
-    fontSize: 10.5,
-    fontWeight: '400',
+    fontSize: 10,
     marginTop: 2,
     textAlign: 'center',
   },
@@ -471,13 +438,13 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: colors.ink,
-    fontSize: 15.5,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '800',
   },
   modalClose: {
     color: colors.primary,
-    fontSize: 12.5,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '700',
   },
   modalList: {
     flexGrow: 0,
@@ -493,25 +460,17 @@ const styles = StyleSheet.create({
   modalRowActive: {
     backgroundColor: '#F0F6FF',
   },
-  modalIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   modalRowCopy: {
     flex: 1,
   },
   modalRowTitle: {
     color: colors.ink,
-    fontSize: 13.5,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '700',
   },
   modalRowSub: {
     color: colors.muted,
-    fontSize: 11,
-    fontWeight: '400',
+    fontSize: 10,
     marginTop: 2,
   },
   body: { flex: 1 },
