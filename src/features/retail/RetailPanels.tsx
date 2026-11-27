@@ -24,6 +24,8 @@ import {
   type RetailAfterSale,
   type RetailCoupon,
   type RetailCouponAutomation,
+  type RetailCouponTier,
+  type RetailCustomerOption,
   type RetailInvoice,
   type RetailOrder,
   type RetailPointCustomer,
@@ -40,7 +42,8 @@ import { repairApi } from '@/features/repairApi';
 import type { PhoneWarrantyLookupResult, WarrantyLookupResult } from '@/features/repairApi';
 
 export type RetailAuxTab = 'warranty' | 'returns' | 'invoices' | 'reports' | 'shifts' | 'finance' | 'settings' | 'coupons';
-type Props = { tab: RetailAuxTab; scope: RetailScope; canManage: boolean; canManagePoints: boolean; terminalId: string; currentCashierId: string };
+export type RetailAfterSaleRequest = { orderId: string; kind: 'return' | 'buyback'; requestId: number };
+type Props = { tab: RetailAuxTab; scope: RetailScope; canManage: boolean; canManagePoints: boolean; terminalId: string; currentCashierId: string; afterSaleRequest?: RetailAfterSaleRequest | null; onAfterSaleRequestHandled?: () => void };
 
 const money = (value?: number | null) => value == null ? '—' : `${Math.round(Number(value)).toLocaleString('vi-VN')} VND`;
 const formatVndInput = (value: string | number | null | undefined) => {
@@ -52,6 +55,28 @@ const parseVndInput = (value: string) => Number(String(value || '').replace(/[^\
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
 const key = () => globalThis.crypto?.randomUUID?.() || `mobile-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const dateLabel = (value?: string) => value ? new Date(value).toLocaleDateString('vi-VN') : '—';
+const localDatePart = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+const localTimePart = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+function mergeLocalDateTimePart(currentValue: string, mode: 'date' | 'time', nextValue: string) {
+  const date = new Date(currentValue);
+  if (Number.isNaN(date.getTime())) return currentValue;
+  if (mode === 'date') {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(nextValue);
+    if (!match) return currentValue;
+    date.setFullYear(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  } else {
+    const match = /^(\d{2}):(\d{2})$/.exec(nextValue);
+    if (!match) return currentValue;
+    date.setHours(Number(match[1]), Number(match[2]), 0, 0);
+  }
+  return date.toISOString();
+}
 
 function paymentLabel(method?: string) {
   return ({
@@ -144,7 +169,7 @@ function ledgerTypeLabel(type?: string) {
 export function RetailAuxPanel(props: Props) {
   switch (props.tab) {
     case 'warranty': return <WarrantyPanel scope={props.scope} />;
-    case 'returns': return <ReturnsPanel scope={props.scope} canManage={props.canManage} />;
+    case 'returns': return <ReturnsPanel scope={props.scope} canManage={props.canManage} createRequest={props.afterSaleRequest} onCreateRequestHandled={props.onAfterSaleRequestHandled} />;
     case 'invoices': return <InvoicesPanel scope={props.scope} canManage={props.canManage} />;
     case 'reports': return <ReportsPanel scope={props.scope} />;
     case 'shifts': return <ShiftsPanel scope={props.scope} terminalId={props.terminalId} currentCashierId={props.currentCashierId} />;
@@ -274,13 +299,19 @@ function Field({
   placeholder,
   keyboardType,
   multiline,
+  editable = true,
+  maxLength,
+  autoCapitalize,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
   placeholder?: string;
-  keyboardType?: 'default' | 'numeric' | 'phone-pad';
+  keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'decimal-pad';
   multiline?: boolean;
+  editable?: boolean;
+  maxLength?: number;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
 }) {
   return (
     <View style={s.fieldWrap}>
@@ -292,6 +323,9 @@ function Field({
         placeholderTextColor={colors.muted}
         keyboardType={keyboardType}
         multiline={multiline}
+        editable={editable}
+        maxLength={maxLength}
+        autoCapitalize={autoCapitalize}
         style={[s.input, multiline && s.multiline]}
       />
     </View>
@@ -767,7 +801,7 @@ function PhoneWarrantyCard({ result }: { result: PhoneWarrantyLookupResult }) {
   );
 }
 
-function ReturnsPanel({ scope, canManage }: { scope: RetailScope; canManage: boolean }) {
+function ReturnsPanel({ scope, canManage, createRequest, onCreateRequestHandled }: { scope: RetailScope; canManage: boolean; createRequest?: RetailAfterSaleRequest | null; onCreateRequestHandled?: () => void }) {
   const [rows, setRows] = useState<RetailAfterSale[]>([]);
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
@@ -808,6 +842,34 @@ function ReturnsPanel({ scope, canManage }: { scope: RetailScope; canManage: boo
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (canManage) void retailApi.currentShift(scope).then(setShift).catch(() => setShift(null)); }, [canManage, scope]);
+
+  useEffect(() => {
+    if (!createRequest || !canManage) return;
+    let active = true;
+    setKind(createRequest.kind);
+    setSelectedOrder(null);
+    setOrderQuery('');
+    setLineIndex(0);
+    setQty('1');
+    setAmount('');
+    setCondition('good');
+    setIds('');
+    setReason('');
+    setMethod('cash');
+    setError('');
+    void retailApi.orderDetail(scope, createRequest.orderId).then((order) => {
+      if (!active) return;
+      setSelectedOrder(order);
+      setShowCreate(true);
+    }).catch((e) => {
+      if (!active) return;
+      setError(e instanceof Error ? e.message : 'Không tải được chi tiết đơn gốc.');
+      setShowCreate(true);
+    }).finally(() => {
+      if (active) onCreateRequestHandled?.();
+    });
+    return () => { active = false; };
+  }, [canManage, createRequest, onCreateRequestHandled, scope]);
 
   const openFilters = () => {
     setDraftQ(q);
@@ -906,7 +968,6 @@ function ReturnsPanel({ scope, canManage }: { scope: RetailScope; canManage: boo
         right={(
           <View style={s.headerActions}>
             <Action compact secondary label={`Bộ lọc${q || type ? ' •' : ''}`} onPress={openFilters} />
-            {canManage && <Action compact label="+ Tạo mới" onPress={() => setShowCreate(true)} />}
           </View>
         )}
       >
@@ -1890,18 +1951,6 @@ function SettingsPanel({ scope }: { scope: RetailScope }) {
                 <Chip key={size} label={size} active={settings.invoicePaperSize === size} onPress={() => update('invoicePaperSize', size)} />
               ))}
             </View>
-            <Field
-              label="Hạng khách hàng (mỗi dòng: mã | tên | doanh số tối thiểu)"
-              value={settings.customerTiers.map((tier) => `${tier.code} | ${tier.name} | ${tier.minSpend}`).join('\n')}
-              onChangeText={(value) => update(
-                'customerTiers',
-                value.split('\n').filter(Boolean).map((line) => {
-                  const [code = '', name = '', minSpend = '0'] = line.split('|').map((part) => part.trim());
-                  return { code, name, minSpend: Number(minSpend) || 0 };
-                }),
-              )}
-              multiline
-            />
             <Action disabled={saving} label={saving ? 'Đang lưu…' : 'Lưu cài đặt'} onPress={() => void save()} />
           </>
         )}
@@ -1925,6 +1974,19 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
   const [minSubtotal, setMinSubtotal] = useState('0');
   const [maxDiscount, setMaxDiscount] = useState('');
   const [usageLimit, setUsageLimit] = useState('');
+  const [customerTiers, setCustomerTiers] = useState<RetailCouponTier[]>([]);
+  const [customerTierError, setCustomerTierError] = useState('');
+  const [customerTierCodes, setCustomerTierCodes] = useState<string[]>([]);
+  const [couponCustomerId, setCouponCustomerId] = useState<string | null>(null);
+  const [couponCustomerName, setCouponCustomerName] = useState('');
+  const [couponCustomerCode, setCouponCustomerCode] = useState('');
+  const [couponCustomerQuery, setCouponCustomerQuery] = useState('');
+  const [couponCustomerResults, setCouponCustomerResults] = useState<RetailCustomerOption[]>([]);
+  const [couponCustomerLoading, setCouponCustomerLoading] = useState(false);
+  const [couponCustomerError, setCouponCustomerError] = useState('');
+  const [startsAt, setStartsAt] = useState(new Date().toISOString());
+  const [endsAt, setEndsAt] = useState(new Date(Date.now() + 30 * 86400000).toISOString());
+  const [couponActive, setCouponActive] = useState(true);
 
   const [automations, setAutomations] = useState<RetailCouponAutomation[]>([]);
   const [editingAutomation, setEditingAutomation] = useState<RetailCouponAutomation | null>(null);
@@ -1935,6 +1997,8 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
   const [automationMin, setAutomationMin] = useState('0');
   const [automationOrderMin, setAutomationOrderMin] = useState('');
   const [automationDays, setAutomationDays] = useState('7');
+  const [automationEnabled, setAutomationEnabled] = useState(true);
+  const [automationEmailDelivery, setAutomationEmailDelivery] = useState(false);
 
   const [policy, setPolicy] = useState<RetailPointPolicy | null>(null);
   const [pointSearch, setPointSearch] = useState('');
@@ -1961,6 +2025,41 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
   }, [scope]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    let current = true;
+    setCustomerTiers([]);
+    setCustomerTierError('');
+    void retailApi.couponTiers(scope).then((items) => {
+      if (current) setCustomerTiers(items || []);
+    }).catch((e) => {
+      if (current) setCustomerTierError(e instanceof Error ? e.message : 'Không tải được hạng khách hàng.');
+    });
+    return () => { current = false; };
+  }, [scope]);
+
+  useEffect(() => {
+    if (!formOpen || couponCustomerId !== '' || couponCustomerQuery.trim().length < 2) {
+      setCouponCustomerResults([]);
+      setCouponCustomerLoading(false);
+      setCouponCustomerError('');
+      return;
+    }
+    let current = true;
+    const timer = setTimeout(() => {
+      setCouponCustomerResults([]);
+      setCouponCustomerLoading(true);
+      setCouponCustomerError('');
+      void retailApi.searchCustomers(scope, couponCustomerQuery.trim()).then((items) => {
+        if (current) setCouponCustomerResults(items || []);
+      }).catch((e) => {
+        if (current) setCouponCustomerError(e instanceof Error ? e.message : 'Không tìm được khách hàng.');
+      }).finally(() => {
+        if (current) setCouponCustomerLoading(false);
+      });
+    }, 250);
+    return () => { current = false; clearTimeout(timer); };
+  }, [couponCustomerId, couponCustomerQuery, formOpen, scope]);
 
   useEffect(() => {
     if (section !== 'automations') return;
@@ -1999,6 +2098,7 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
   const startEdit = (coupon?: RetailCoupon) => {
     setEditing(coupon || null);
     setFormOpen(true);
+    setError('');
     setName(coupon?.name || '');
     setCode(coupon?.code || '');
     const nextKind = coupon?.discountType || 'percent';
@@ -2007,26 +2107,64 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
     setMinSubtotal(formatVndInput(coupon?.minSubtotal ?? 0));
     setMaxDiscount(coupon?.maxDiscount == null ? '' : formatVndInput(coupon.maxDiscount));
     setUsageLimit(coupon?.usageLimit == null ? '' : String(coupon.usageLimit));
+    setCustomerTierCodes(coupon?.customerTierCodes || []);
+    setCouponCustomerId(coupon?.customerId ?? null);
+    setCouponCustomerName(coupon?.customerName || '');
+    setCouponCustomerCode(coupon?.customerCode || '');
+    setCouponCustomerQuery('');
+    setCouponCustomerError('');
+    setStartsAt(coupon?.startsAt || new Date().toISOString());
+    setEndsAt(coupon?.endsAt || new Date(Date.now() + 30 * 86400000).toISOString());
+    setCouponActive(coupon?.active ?? true);
   };
 
   const saveCoupon = async () => {
-    if (!name.trim() || !code.trim()) { setError('Nhập tên và mã ưu đãi.'); return; }
+    const normalizedCode = code.trim().toUpperCase();
+    const discountValue = kind === 'amount' ? parseVndInput(value) : Number(value);
+    const usageLimitValue = usageLimit.trim() ? Number(usageLimit) : null;
+    if (!name.trim() || !normalizedCode) { setError('Nhập tên và mã ưu đãi.'); return; }
+    if (!/^[A-Z0-9_-]{3,32}$/.test(normalizedCode)) { setError('Mã gồm 3–32 ký tự: chữ không dấu, số, gạch ngang hoặc gạch dưới.'); return; }
+    if ((kind === 'amount' && (!Number.isSafeInteger(discountValue) || discountValue < 1)) || (kind === 'percent' && (!Number.isFinite(discountValue) || discountValue < 0.01 || discountValue > 100 || Math.abs(discountValue * 100 - Math.round(discountValue * 100)) > 1e-8))) {
+      setError(kind === 'percent' ? 'Mức giảm phải từ 0,01% đến 100%, tối đa 2 chữ số thập phân.' : 'Mức giảm tiền phải là số nguyên dương.');
+      return;
+    }
+    const minSubtotalValue = parseVndInput(minSubtotal);
+    const maxDiscountValue = maxDiscount.trim() ? parseVndInput(maxDiscount) : null;
+    if (!Number.isSafeInteger(minSubtotalValue) || (maxDiscountValue !== null && (!Number.isSafeInteger(maxDiscountValue) || maxDiscountValue < 1))) {
+      setError('Đơn tối thiểu phải là số nguyên không âm và mức giảm tối đa phải là số nguyên dương.');
+      return;
+    }
+    if (customerTierCodes.length > 10) { setError('Chỉ chọn tối đa 10 hạng khách hàng.'); return; }
+    if (couponCustomerId !== null && !couponCustomerId) { setError('Vui lòng chọn khách hàng nhận mã.'); return; }
+    if (usageLimitValue !== null && (!Number.isSafeInteger(usageLimitValue) || usageLimitValue < 1 || (editing != null && usageLimitValue < editing.usedCount))) {
+      setError(`Giới hạn lượt dùng phải là số nguyên${editing?.usedCount ? ` không nhỏ hơn ${editing.usedCount}` : ''}.`);
+      return;
+    }
+    const startsAtTime = new Date(startsAt).getTime();
+    const endsAtTime = new Date(endsAt).getTime();
+    if (!Number.isFinite(startsAtTime) || !Number.isFinite(endsAtTime) || endsAtTime <= startsAtTime) {
+      setError('Ngày kết thúc phải sau ngày bắt đầu.');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
       await retailApi.saveCoupon(
         scope,
         {
-          code: code.trim().toUpperCase(),
+          code: normalizedCode,
           name: name.trim(),
           discountType: kind,
-          value: kind === 'amount' ? parseVndInput(value) : Number(value),
-          minSubtotal: parseVndInput(minSubtotal),
-          maxDiscount: maxDiscount.trim() ? parseVndInput(maxDiscount) : null,
-          usageLimit: usageLimit.trim() ? Number(usageLimit) : null,
-          startsAt: editing?.startsAt || new Date().toISOString(),
-          endsAt: editing?.endsAt || new Date(Date.now() + 30 * 86400000).toISOString(),
-          active: editing?.active ?? true,
+          value: discountValue,
+          minSubtotal: minSubtotalValue,
+          maxDiscount: maxDiscountValue,
+          usageLimit: usageLimitValue,
+          customerTierCodes,
+          customerId: couponCustomerId,
+          ...(couponCustomerId ? { customerName: couponCustomerName, customerCode: couponCustomerCode } : {}),
+          startsAt,
+          endsAt,
+          active: couponActive,
           ...(editing ? { version: editing.version } : {}),
         },
         editing?._id,
@@ -2053,6 +2191,7 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
   const startAutomation = (item?: RetailCouponAutomation) => {
     setEditingAutomation(item || null);
     setAutomationOpen(true);
+    setError('');
     setAutomationName(item?.name || '');
     setAutomationTrigger(item?.trigger || 'birthday');
     const nextKind = item?.discountType || 'percent';
@@ -2062,24 +2201,43 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
     setAutomationOrderMin(item?.orderMinTotal == null ? '' : formatVndInput(item.orderMinTotal));
     setAutomationDays(String(item?.validityDays ?? 7));
     setMaxDiscount(item?.maxDiscount == null ? '' : formatVndInput(item.maxDiscount));
+    setAutomationEnabled(item?.enabled ?? true);
+    setAutomationEmailDelivery(item?.deliveryChannels?.includes('email') ?? false);
   };
 
   const saveAutomation = async () => {
-    if (!automationName.trim()) { setError('Nhập tên chương trình.'); return; }
+    const nameValue = automationName.trim();
+    const valueNumber = kind === 'amount' ? parseVndInput(automationValue) : Number(automationValue);
+    const minSubtotalValue = parseVndInput(automationMin);
+    const maxDiscountValue = maxDiscount.trim() ? parseVndInput(maxDiscount) : null;
+    const orderMinTotalValue = automationTrigger === 'order_total' ? parseVndInput(automationOrderMin) : null;
+    const validityDaysValue = Number(automationDays);
+    if (!nameValue || nameValue.length > 120) { setError('Tên chương trình phải có từ 1 đến 120 ký tự.'); return; }
+    if (automationTrigger === 'order_total' && (!Number.isSafeInteger(orderMinTotalValue) || !orderMinTotalValue)) { setError('Mức tiền mua hàng phải là số nguyên dương.'); return; }
+    if ((kind === 'amount' && (!Number.isSafeInteger(valueNumber) || valueNumber < 1)) || (kind === 'percent' && (!Number.isFinite(valueNumber) || valueNumber < 0.01 || valueNumber > 100 || Math.abs(valueNumber * 100 - Math.round(valueNumber * 100)) > 1e-8))) {
+      setError(kind === 'percent' ? 'Mức giảm phải từ 0,01% đến 100%, tối đa 2 chữ số thập phân.' : 'Mức giảm tiền phải là số nguyên dương.');
+      return;
+    }
+    if (!Number.isSafeInteger(minSubtotalValue) || (maxDiscountValue !== null && (!Number.isSafeInteger(maxDiscountValue) || maxDiscountValue < 1))) {
+      setError('Đơn tối thiểu phải là số nguyên không âm và trần giảm phải là số nguyên dương.');
+      return;
+    }
+    if (!Number.isSafeInteger(validityDaysValue) || validityDaysValue < 1 || validityDaysValue > 90) { setError('Thời hạn mã ưu đãi phải từ 1 đến 90 ngày.'); return; }
     setSaving(true);
     setError('');
     try {
-      const input = {
-        name: automationName.trim(),
+      const input: Omit<RetailCouponAutomation, '_id' | 'legacy'> = {
+        name: nameValue,
         trigger: automationTrigger,
-        orderMinTotal: automationTrigger === 'order_total' ? parseVndInput(automationOrderMin) : null,
-        enabled: editingAutomation?.enabled ?? true,
+        orderMinTotal: orderMinTotalValue,
+        enabled: automationEnabled,
         discountType: kind,
-        value: kind === 'amount' ? parseVndInput(automationValue) : Number(automationValue),
-        minSubtotal: parseVndInput(automationMin),
-        maxDiscount: maxDiscount.trim() ? parseVndInput(maxDiscount) : null,
-        validityDays: Number(automationDays),
-        ...(editingAutomation?.version != null ? { version: editingAutomation.version } : {}),
+        value: valueNumber,
+        minSubtotal: minSubtotalValue,
+        maxDiscount: maxDiscountValue,
+        validityDays: validityDaysValue,
+        deliveryChannels: automationEmailDelivery ? ['email'] : [],
+        version: editingAutomation?.version ?? 0,
       };
       await retailApi.saveCouponAutomation(scope, input, editingAutomation?._id);
       setAutomationOpen(false);
@@ -2315,23 +2473,120 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
                   </Pressable>
                 </View>
                 <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6, paddingBottom: 4 }}>
-                  <Field label="Tên chương trình" value={name} onChangeText={setName} placeholder="VD: Khuyến mãi tháng 11" />
-                  <Field label="Mã ưu đãi" value={code} onChangeText={setCode} placeholder="VD: SALE10" />
+                  <View style={s.formBox}>
+                    <View style={s.switchRow}>
+                      <Text style={s.switchLabel}>Dành riêng cho một khách hàng</Text>
+                      <Switch
+                        value={couponCustomerId !== null}
+                        disabled={Boolean(editing)}
+                        onValueChange={(enabled) => {
+                          setCouponCustomerId(enabled ? '' : null);
+                          setCouponCustomerName('');
+                          setCouponCustomerCode('');
+                          setCouponCustomerQuery('');
+                          setCouponCustomerError('');
+                          setUsageLimit(enabled ? '1' : '');
+                        }}
+                        trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                        thumbColor={couponCustomerId !== null ? colors.primary : '#F8FAFC'}
+                      />
+                    </View>
+                    {couponCustomerId !== null && (couponCustomerId ? (
+                      <View style={{ gap: 8 }}>
+                        <View style={s.card}>
+                          <Text style={s.cardTitle}>Người nhận mã</Text>
+                          <Text style={s.copy}>{couponCustomerName || couponCustomerId}{couponCustomerCode ? ` · ${couponCustomerCode}` : ''}</Text>
+                        </View>
+                        {!editing && <Action secondary compact label="Đổi khách hàng" onPress={() => {
+                          setCouponCustomerId('');
+                          setCouponCustomerName('');
+                          setCouponCustomerCode('');
+                          setCouponCustomerQuery('');
+                          setUsageLimit('1');
+                        }} />}
+                      </View>
+                    ) : (
+                      <>
+                        <Field label="Tìm khách hàng" value={couponCustomerQuery} onChangeText={setCouponCustomerQuery} placeholder="Nhập tên, mã hoặc số điện thoại" />
+                        {couponCustomerLoading && <ActivityIndicator size="small" color={colors.primary} />}
+                        {!!couponCustomerError && <ErrorText>{couponCustomerError}</ErrorText>}
+                        {couponCustomerResults.map((customer) => (
+                          <Pressable key={customer.customerId} accessibilityRole="button" onPress={() => {
+                            setCouponCustomerId(customer.customerId);
+                            setCouponCustomerName(customer.name);
+                            setCouponCustomerCode(customer.customerCode);
+                            setCouponCustomerQuery('');
+                            setCouponCustomerResults([]);
+                            setUsageLimit('1');
+                          }} style={s.matchRow}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={s.cardTitle}>{customer.name}</Text>
+                              <Text style={s.copy}>{customer.customerCode} · {customer.phone}</Text>
+                            </View>
+                            <Check size={17} color={colors.primary} />
+                          </Pressable>
+                        ))}
+                        {!couponCustomerLoading && couponCustomerQuery.trim().length >= 2 && !couponCustomerResults.length && !couponCustomerError && <Text style={s.copy}>Không tìm thấy khách hàng phù hợp.</Text>}
+                      </>
+                    ))}
+                    {couponCustomerId !== null && <Text style={s.copy}>Chỉ khách hàng nhận được dùng mã, tối đa một lượt. Không thể đổi người nhận sau khi tạo.</Text>}
+                  </View>
+
+                  <Field label="Tên chương trình" value={name} onChangeText={setName} placeholder="VD: Khuyến mãi tháng 11" maxLength={120} />
+                  <Field label="Mã ưu đãi" value={code} onChangeText={(v) => setCode(v.toUpperCase())} placeholder="VD: SALE10" editable={!editing} maxLength={32} autoCapitalize="characters" />
+                  <Text style={s.copy}>Mã gồm 3–32 ký tự: chữ không dấu, số, gạch ngang hoặc gạch dưới.</Text>
                   <View style={s.chipRow}>
-                    <Chip label="Phần trăm (%)" active={kind === 'percent'} onPress={() => { setKind('percent'); setValue('10'); }} />
-                    <Chip label="Số tiền (VND)" active={kind === 'amount'} onPress={() => { setKind('amount'); setValue(''); }} />
+                    <Chip label="Phần trăm (%)" active={kind === 'percent'} onPress={() => { if (kind !== 'percent') setValue(String(parseVndInput(value))); setKind('percent'); }} />
+                    <Chip label="Số tiền (VND)" active={kind === 'amount'} onPress={() => { if (kind !== 'amount') setValue(formatVndInput(Math.round(Number(value) || 0))); setKind('amount'); }} />
                   </View>
                   <Field
                     label={kind === 'percent' ? 'Mức giảm (%)' : 'Mức giảm (VND)'}
                     value={value}
                     onChangeText={(v) => setValue(kind === 'amount' ? formatVndInput(v) : v.replace(/[^\d.]/g, ''))}
-                    keyboardType="numeric"
+                    keyboardType={kind === 'percent' ? 'decimal-pad' : 'numeric'}
+                    maxLength={kind === 'percent' ? 6 : undefined}
                   />
                   <View style={s.row}>
                     <Field label="Đơn tối thiểu (VND)" value={minSubtotal} onChangeText={(v) => setMinSubtotal(formatVndInput(v))} keyboardType="numeric" />
                     <Field label="Giảm tối đa (VND)" value={maxDiscount} onChangeText={(v) => setMaxDiscount(formatVndInput(v))} keyboardType="numeric" placeholder="Không giới hạn" />
                   </View>
-                  <Field label="Số lượt sử dụng" value={usageLimit} onChangeText={(v) => setUsageLimit(v.replace(/[^\d]/g, ''))} keyboardType="numeric" placeholder="Bỏ trống nếu không giới hạn" />
+                  <Field label="Giới hạn lượt dùng" value={usageLimit} onChangeText={(v) => setUsageLimit(v.replace(/[^\d]/g, ''))} keyboardType="numeric" placeholder="Không giới hạn" editable={couponCustomerId === null} />
+                  {editing && editing.usedCount > 0 && <Text style={s.copy}>Đã sử dụng: {editing.usedCount} lượt. Giới hạn mới không được thấp hơn số đã dùng.</Text>}
+
+                  <View style={s.formBox}>
+                    <View style={s.cardTopRow}>
+                      <Text style={s.label}>Hạng khách hàng áp dụng</Text>
+                      {customerTierCodes.length > 0 && <Action secondary compact label="Đặt lại tất cả" onPress={() => setCustomerTierCodes([])} />}
+                    </View>
+                    <View style={s.chipRow}>
+                      <Chip label="Tất cả khách hàng" active={customerTierCodes.length === 0} onPress={() => setCustomerTierCodes([])} />
+                      {[...customerTiers, ...customerTierCodes.filter((tierCode) => !customerTiers.some((tier) => tier.code === tierCode)).map((tierCode) => ({ code: tierCode, name: `${tierCode} (không còn trong danh sách hạng)` }))].map((tier) => (
+                        <Chip
+                          key={tier.code}
+                          label={tier.name}
+                          active={customerTierCodes.includes(tier.code)}
+                          onPress={() => setCustomerTierCodes((current) => current.includes(tier.code) ? current.filter((codeValue) => codeValue !== tier.code) : [...current, tier.code])}
+                        />
+                      ))}
+                    </View>
+                    {!!customerTierError && <ErrorText>{customerTierError}</ErrorText>}
+                    <Text style={s.copy}>{customerTierCodes.length ? `Mã chỉ áp dụng cho ${customerTierCodes.length} hạng đã chọn.` : 'Mã áp dụng cho tất cả khách hàng.'}</Text>
+                  </View>
+
+                  <View style={s.switchRow}>
+                    <Text style={s.switchLabel}>Cho phép sử dụng</Text>
+                    <Switch value={couponActive} onValueChange={setCouponActive} trackColor={{ false: '#CBD5E1', true: '#93C5FD' }} thumbColor={couponActive ? colors.primary : '#F8FAFC'} />
+                  </View>
+
+                  <View style={s.row}>
+                    <DateTimeField label="Bắt đầu · ngày" value={localDatePart(startsAt)} mode="date" onChange={(next) => setStartsAt((current) => mergeLocalDateTimePart(current, 'date', next))} />
+                    <DateTimeField label="Bắt đầu · giờ" value={localTimePart(startsAt)} mode="time" onChange={(next) => setStartsAt((current) => mergeLocalDateTimePart(current, 'time', next))} />
+                  </View>
+                  <View style={s.row}>
+                    <DateTimeField label="Kết thúc · ngày" value={localDatePart(endsAt)} mode="date" onChange={(next) => setEndsAt((current) => mergeLocalDateTimePart(current, 'date', next))} />
+                    <DateTimeField label="Kết thúc · giờ" value={localTimePart(endsAt)} mode="time" onChange={(next) => setEndsAt((current) => mergeLocalDateTimePart(current, 'time', next))} />
+                  </View>
+                  {startsAt && endsAt && new Date(endsAt) <= new Date(startsAt) && <Text style={s.error}>Ngày kết thúc phải sau ngày bắt đầu.</Text>}
                   <ErrorText>{error}</ErrorText>
                   <View style={s.row}>
                     <View style={{ flex: 1 }}><Action secondary disabled={saving} label="Hủy" onPress={() => { setFormOpen(false); setEditing(null); }} /></View>
@@ -2447,30 +2702,61 @@ function CouponsPanel({ scope, canManagePoints }: { scope: RetailScope; canManag
                   </Pressable>
                 </View>
                 <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingTop: 6, paddingBottom: 4 }}>
-                  <Field label="Tên chương trình" value={automationName} onChangeText={setAutomationName} placeholder="VD: Quà sinh nhật khách VIP" />
+                  <Field label="Tên chương trình" value={automationName} onChangeText={setAutomationName} placeholder="VD: Tặng mã cho đơn từ 2 triệu" maxLength={120} editable={!editingAutomation?.legacy} />
                   <View style={s.chipRow}>
-                    <Chip label="Sinh nhật" active={automationTrigger === 'birthday'} onPress={() => setAutomationTrigger('birthday')} />
-                    <Chip label="Đạt giá trị đơn" active={automationTrigger === 'order_total'} onPress={() => setAutomationTrigger('order_total')} />
+                    <Chip disabled={Boolean(editingAutomation?._id)} label="Sinh nhật khách hàng" active={automationTrigger === 'birthday'} onPress={() => { setAutomationTrigger('birthday'); setAutomationOrderMin(''); }} />
+                    <Chip disabled={Boolean(editingAutomation?._id)} label="Đơn hàng đạt mức tiền" active={automationTrigger === 'order_total'} onPress={() => { setAutomationTrigger('order_total'); setAutomationOrderMin((current) => current || '1,000,000'); }} />
                   </View>
                   {automationTrigger === 'order_total' && (
-                    <Field label="Giá trị đơn tối thiểu (VND)" value={automationOrderMin} onChangeText={(v) => setAutomationOrderMin(formatVndInput(v))} keyboardType="numeric" />
+                    <View style={{ gap: 4 }}>
+                      <Field label="Giá trị đơn tối thiểu để tặng mã (VND)" value={automationOrderMin} onChangeText={(v) => setAutomationOrderMin(formatVndInput(v))} keyboardType="numeric" placeholder="1.000.000" />
+                      <Text style={s.copy}>Xét từng đơn đã thanh toán đủ, gồm thuế và phí giao hàng, trừ tiền hoàn. Mỗi đơn đạt mức sẽ được tặng một mã cho lần mua sau.</Text>
+                    </View>
                   )}
+                  {automationTrigger === 'birthday' && <Text style={s.copy}>Mỗi khách được tặng một mã mỗi năm theo ngày sinh nhật. Ngày 29/2 sẽ nhận quà vào ngày 28/2 trong năm không nhuận.</Text>}
+
+                  <View style={s.formBox}>
+                    <View style={s.switchRow}>
+                      <Text style={s.switchLabel}>Bật chương trình tự động</Text>
+                      <Switch value={automationEnabled} onValueChange={setAutomationEnabled} trackColor={{ false: '#CBD5E1', true: '#93C5FD' }} thumbColor={automationEnabled ? colors.primary : '#F8FAFC'} />
+                    </View>
+                    <Text style={s.copy}>Áp dụng tại chi nhánh hiện tại. Mã tặng chỉ dùng một lần bởi đúng người nhận và hiển thị tại POS khi chọn khách.</Text>
+                  </View>
+
                   <View style={s.chipRow}>
                     <Chip label="Phần trăm (%)" active={kind === 'percent'} onPress={() => { setKind('percent'); setAutomationValue('10'); }} />
-                    <Chip label="Số tiền (VND)" active={kind === 'amount'} onPress={() => { setKind('amount'); setAutomationValue(''); }} />
+                    <Chip label="Số tiền cố định (VND)" active={kind === 'amount'} onPress={() => { setKind('amount'); setAutomationValue('50,000'); }} />
                   </View>
                   <View style={s.row}>
                     <Field
-                      label={kind === 'percent' ? 'Mức giảm (%)' : 'Mức giảm (VND)'}
+                      label={kind === 'percent' ? 'Mức giảm của mã được tặng (%)' : 'Mức giảm của mã được tặng (VND)'}
                       value={automationValue}
                       onChangeText={(v) => setAutomationValue(kind === 'amount' ? formatVndInput(v) : v.replace(/[^\d.]/g, ''))}
-                      keyboardType="numeric"
+                      keyboardType={kind === 'percent' ? 'decimal-pad' : 'numeric'}
+                      maxLength={kind === 'percent' ? 6 : undefined}
                     />
-                    <Field label="Số ngày hiệu lực" value={automationDays} onChangeText={(v) => setAutomationDays(v.replace(/[^\d]/g, ''))} keyboardType="numeric" />
+                    <Field label="Hiệu lực (ngày)" value={automationDays} onChangeText={(v) => setAutomationDays(v.replace(/[^\d]/g, ''))} keyboardType="numeric" maxLength={3} />
                   </View>
+                  <Text style={s.copy}>Thời hạn từ 1 đến 90 ngày, tính từ {automationTrigger === 'birthday' ? 'ngày sinh nhật' : 'khi đơn hoàn tất thanh toán'}.</Text>
                   <View style={s.row}>
-                    <Field label="Đơn tối thiểu (VND)" value={automationMin} onChangeText={(v) => setAutomationMin(formatVndInput(v))} keyboardType="numeric" />
-                    <Field label="Giảm tối đa (VND)" value={maxDiscount} onChangeText={(v) => setMaxDiscount(formatVndInput(v))} keyboardType="numeric" placeholder="Không giới hạn" />
+                    <Field label="Đơn tối thiểu để sử dụng mã (VND)" value={automationMin} onChangeText={(v) => setAutomationMin(formatVndInput(v))} keyboardType="numeric" />
+                    <Field label="Trần giảm của mã được tặng (VND)" value={maxDiscount} onChangeText={(v) => setMaxDiscount(formatVndInput(v))} keyboardType="numeric" placeholder="Không giới hạn" />
+                  </View>
+                  <View style={s.formBox}>
+                    <Text style={s.subHeading}>Gửi mã cho khách hàng</Text>
+                    <View style={s.switchRow}>
+                      <Text style={s.switchLabel}>Gửi email tự động</Text>
+                      <Switch value={automationEmailDelivery} onValueChange={setAutomationEmailDelivery} trackColor={{ false: '#CBD5E1', true: '#93C5FD' }} thumbColor={automationEmailDelivery ? colors.primary : '#F8FAFC'} />
+                    </View>
+                    <Text style={s.copy}>Email được gửi đến địa chỉ trong hồ sơ khách bằng cấu hình SMTP của công ty. Cần cấu hình SMTP trước khi bật; khách chưa có email vẫn được cấp mã tại POS.</Text>
+                    <Text style={s.copy}>Zalo và SMS đang phát triển. Chỉ gửi email cho mã mới được cấp; nếu không bật email, mã chỉ hiển thị tại POS.</Text>
+                  </View>
+                  <View style={s.formBox}>
+                    <Text style={s.subHeading}>Điều kiện tặng mã</Text>
+                    <Text style={s.copy}>{automationTrigger === 'birthday'
+                      ? 'Mỗi khách được tặng một mã mỗi năm theo chương trình. Ngày 29/2 nhận quà ngày 28/2 trong năm không nhuận.'
+                      : 'Chỉ xét đơn hoàn tất thanh toán sau khi bật chương trình. Nếu đơn gốc bị hủy hoặc hoàn tiền xuống dưới mức yêu cầu, mã chưa dùng sẽ không còn áp dụng được.'}</Text>
+                    <Text style={s.copy}>Các chương trình đang bật có thể cùng tặng mã. Mỗi đơn mua sau chỉ áp dụng một mã. Thay đổi cấu hình chỉ áp dụng cho mã chưa cấp; tắt chương trình không thu hồi mã đã tặng.</Text>
                   </View>
                   <ErrorText>{error}</ErrorText>
                   <View style={s.row}>
@@ -2861,9 +3147,9 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function Chip({ label, active, onPress, disabled = false }: { label: string; active: boolean; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={[s.chip, active && s.chipActive]}>
+    <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[s.chip, active && s.chipActive, disabled && s.disabled]}>
       <Text style={[s.chipText, active && s.chipTextActive]}>{label}</Text>
     </Pressable>
   );
