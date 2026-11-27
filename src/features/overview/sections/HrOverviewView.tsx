@@ -1,5 +1,4 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { Card } from '@/components/Card';
 import { SectionHeading } from '@/components/SectionHeading';
 import {
   BreakdownBars,
@@ -82,9 +81,9 @@ export function HrOverviewView({
   ];
 
   const taskRows = [
-    { label: 'Hoàn thành', value: tasks.done, displayValue: `${formatInt(tasks.done)} việc`, color: '#16885A' },
-    { label: 'Đang thực hiện', value: tasks.doing, displayValue: `${formatInt(tasks.doing)} việc`, color: '#2463EB' },
-    { label: 'Chưa bắt đầu', value: tasks.todo, displayValue: `${formatInt(tasks.todo)} việc`, color: '#C27617' },
+    { label: 'Hoàn thành', value: tasks.done, displayValue: `${formatInt(tasks.done)} việc`, color: '#18C93A' },
+    { label: 'Đang thực hiện', value: tasks.doing, displayValue: `${formatInt(tasks.doing)} việc`, color: '#2196F3' },
+    { label: 'Chưa bắt đầu', value: tasks.todo, displayValue: `${formatInt(tasks.todo)} việc`, color: '#F5D610' },
   ];
 
   const deptRows = (personnel?.departmentHeadcounts ?? [])
@@ -130,14 +129,14 @@ export function HrOverviewView({
       <SectionHeading title="Chấm công hôm nay" />
       <View style={styles.attGrid}>
         {attendanceTiles.map((tile) => (
-          <Card key={tile.label} style={styles.attCard}>
+          <View key={tile.label} style={styles.attCard}>
             <View style={[styles.attBadge, { backgroundColor: tile.tone }]}>
               <Text style={[styles.attValue, { color: tile.color }]}>{formatInt(tile.value)}</Text>
             </View>
             <Text numberOfLines={1} style={styles.attLabel}>
               {tile.label}
             </Text>
-          </Card>
+          </View>
         ))}
       </View>
 
@@ -174,23 +173,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5EAF2',
   },
   attBadge: {
-    minWidth: 38,
-    height: 34,
-    borderRadius: 10,
+    minWidth: 36,
+    height: 32,
+    borderRadius: 8,
     paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   attValue: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   attLabel: {
     color: colors.ink,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '400',
     flex: 1,
   },
 });

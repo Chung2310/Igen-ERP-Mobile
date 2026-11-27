@@ -1,22 +1,38 @@
 import { Link } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { Building2, Check, ChevronDown } from 'lucide-react-native';
+import {
+  Calendar,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react-native';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { BrandLoadingOverlay } from '@/components/BrandLoader';
 import { Card } from '@/components/Card';
+import { BranchAppIcon, IgenAssistantAvatarIcon, OverviewTabIcon } from '@/components/OverviewTabIcons';
 import { Screen } from '@/components/Screen';
+import {
+  OverviewPeriodActionContext,
+  type PopoverAnchor,
+} from '@/components/SectionHeading';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
-  fetchBusinessOverview,
   fetchCompanyBranches,
-  fetchDashboardActionItems,
   fetchDashboardSummary,
   fetchFinanceOverview,
   fetchHealthcareOverview,
@@ -32,24 +48,18 @@ import {
   getOverviewDateRange,
   OVERVIEW_PERIOD_OPTIONS,
 } from '@/features/overview/overviewPeriod';
-import {
-  OverviewError,
-  OverviewLoading,
-} from '@/features/overview/OverviewWidgets';
+import { OverviewError } from '@/features/overview/OverviewWidgets';
 import {
   HealthcareOverviewView,
   StudentOverviewView,
   WorkerOverviewView,
 } from '@/features/overview/sections/DomainOverviewViews';
-import { ExecutiveOverviewView } from '@/features/overview/sections/ExecutiveOverviewView';
 import { FinanceOverviewView } from '@/features/overview/sections/FinanceOverviewView';
 import { HrOverviewView } from '@/features/overview/sections/HrOverviewView';
 import { MarketingOverviewView } from '@/features/overview/sections/MarketingOverviewView';
 import { QuotationOverviewView } from '@/features/overview/sections/QuotationOverviewView';
 import { RetailOverviewView } from '@/features/overview/sections/RetailOverviewView';
 import type {
-  BusinessOverviewData,
-  DashboardActionItemsData,
   DashboardSummaryData,
   FinanceOverviewReport,
   HealthcareOverviewData,
@@ -63,7 +73,6 @@ import type {
 import { colors } from '@/theme/colors';
 
 type PagePayload =
-  | { kind: 'executive'; business: BusinessOverviewData; actions: DashboardActionItemsData | null }
   | { kind: 'finance'; report: FinanceOverviewReport; previous: FinanceOverviewReport | null }
   | { kind: 'hr'; summary: DashboardSummaryData; previous: DashboardSummaryData | null }
   | { kind: 'quotation'; data: QuotationOverviewData; previous: QuotationOverviewData | null }
@@ -74,17 +83,6 @@ type PagePayload =
   | { kind: 'healthcare'; data: HealthcareOverviewData };
 
 type CacheEntry = { payload: PagePayload; fetchedAt: number };
-
-function getInitials(name?: string) {
-  return (
-    name
-      ?.trim()
-      .split(/\s+/)
-      .slice(-2)
-      .map((part) => part[0]?.toLocaleUpperCase('vi'))
-      .join('') || 'ERP'
-  );
-}
 
 function formatClock(timestamp: number) {
   const d = new Date(timestamp);
@@ -99,10 +97,20 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   } = useAuth();
   const allowedPages = useMemo(() => resolveAllowedOverviewPages(user), [user]);
 
-  const [selectedPageId, setSelectedPageId] = useState<OverviewPageId>('executive');
+  const [selectedPageId, setSelectedPageId] = useState<OverviewPageId | null>(
+    () => allowedPages[0]?.id ?? null,
+  );
+  const { height: windowHeight } = useWindowDimensions();
   const [periodKey, setPeriodKey] = useState<OverviewPeriodKey>('month');
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [branchPickerOpen, setBranchPickerOpen] = useState(false);
+  const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
+  const [periodMenuAnchor, setPeriodMenuAnchor] = useState<PopoverAnchor | null>(null);
+
+  const openPeriodMenu = useCallback((anchor: PopoverAnchor) => {
+    setPeriodMenuAnchor(anchor);
+    setPeriodMenuOpen(true);
+  }, []);
 
   const canSwitchBranch = user?.role === 'admin' || user?.role === 'superadmin' || !user?.branchId;
   const [branches, setBranches] = useState<ErpBranch[]>([]);
@@ -149,7 +157,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     () => allowedPages.find((p) => p.id === selectedPageId) ?? allowedPages[0],
     [allowedPages, selectedPageId],
   );
-  const activePageId: OverviewPageId = activePage?.id ?? 'executive';
+  const activePageId: OverviewPageId | null = activePage?.id ?? null;
 
   const range = useMemo(() => getOverviewDateRange(periodKey), [periodKey]);
 
@@ -166,6 +174,13 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
 
   const loadActivePage = useCallback(
     async (force: boolean, signal: AbortSignal) => {
+      if (!activePageId) {
+        setPayload(null);
+        setError(null);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
       if (branchesLoading && !activeBranchId) {
         setLoading(true);
         return;
@@ -195,19 +210,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         let next: PagePayload;
 
         switch (activePageId) {
-          case 'executive': {
-            const [bizRes, actRes] = await Promise.allSettled([
-              fetchBusinessOverview(range.from, range.to, scope),
-              fetchDashboardActionItems(scope),
-            ]);
-            if (bizRes.status === 'rejected') throw bizRes.reason;
-            next = {
-              kind: 'executive',
-              business: bizRes.value,
-              actions: actRes.status === 'fulfilled' ? actRes.value : null,
-            };
-            break;
-          }
           case 'finance': {
             const [currRes, prevRes] = await Promise.allSettled([
               fetchFinanceOverview(range.from, range.to, scope),
@@ -320,14 +322,66 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     setReloadTick((t) => t + 1);
   }, []);
 
+  const sectionOpacity = useRef(new Animated.Value(1)).current;
+  const sectionTranslateX = useRef(new Animated.Value(0)).current;
+  const transitionDirRef = useRef<number>(0);
+
   const onSelectPage = useCallback((id: OverviewPageId) => {
+    transitionDirRef.current = 0;
     setSelectedPageId(id);
     setSwitcherOpen(false);
   }, []);
 
+  const currentPageIndex = useMemo(
+    () => Math.max(0, allowedPages.findIndex((p) => p.id === activePageId)),
+    [allowedPages, activePageId],
+  );
+
+  const onStepPage = useCallback(
+    (delta: -1 | 1) => {
+      if (allowedPages.length <= 1) return;
+      transitionDirRef.current = delta;
+      const nextIndex = (currentPageIndex + delta + allowedPages.length) % allowedPages.length;
+      const target = allowedPages[nextIndex];
+      if (target) setSelectedPageId(target.id);
+    },
+    [allowedPages, currentPageIndex],
+  );
+
+  useEffect(() => {
+    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 18;
+    sectionOpacity.setValue(0.35);
+    sectionTranslateX.setValue(startX);
+    Animated.parallel([
+      Animated.timing(sectionOpacity, {
+        toValue: 1,
+        duration: 210,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sectionTranslateX, {
+        toValue: 0,
+        duration: 210,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [activePageId, sectionOpacity, sectionTranslateX]);
+
+  const isInitialPageLoading = Boolean(
+    activePageId && loading && (!payload || payload.kind !== activePageId),
+  );
+
   const renderSection = () => {
-    if (loading && (!payload || payload.kind !== activePageId)) {
-      return <OverviewLoading label={`Đang tải ${activePage?.label ?? 'tổng quan'} từ ERP...`} />;
+    if (!activePageId) {
+      return (
+        <Card>
+          <Text style={styles.subtitle}>
+            Tài khoản hiện chưa có trang tổng quan phân hệ nào được kích hoạt.
+          </Text>
+        </Card>
+      );
+    }
+    if (isInitialPageLoading) {
+      return null;
     }
     if (error && (!payload || payload.kind !== activePageId)) {
       return <OverviewError message={error} onRetry={onRetry} />;
@@ -337,14 +391,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     }
 
     switch (payload.kind) {
-      case 'executive':
-        return (
-          <ExecutiveOverviewView
-            business={payload.business}
-            actions={payload.actions}
-            range={range}
-          />
-        );
       case 'finance':
         return (
           <FinanceOverviewView
@@ -388,8 +434,106 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     }
   };
 
+  const periodActionCtx = useMemo(
+    () => ({
+      rangeLabel: range.label,
+      openPeriodMenu,
+    }),
+    [openPeriodMenu, range.label],
+  );
+
+  const popoverTop = useMemo(() => {
+    const rawTop =
+      periodMenuAnchor && periodMenuAnchor.y > 0
+        ? periodMenuAnchor.y + periodMenuAnchor.height + 6
+        : 156;
+    const maxTop = Math.max(80, windowHeight - 290);
+    return Math.min(rawTop, maxTop);
+  }, [periodMenuAnchor, windowHeight]);
+
+  const renderPeriodIcon = (key: OverviewPeriodKey, color: string) => {
+    switch (key) {
+      case 'day':
+        return <CalendarClock size={17} strokeWidth={1.6} color={color} />;
+      case 'week':
+        return <CalendarDays size={17} strokeWidth={1.6} color={color} />;
+      case 'month':
+        return <Calendar size={17} strokeWidth={1.6} color={color} />;
+      case 'quarter':
+      case 'year':
+        return <CalendarRange size={17} strokeWidth={1.6} color={color} />;
+    }
+  };
+
   const content = (
-    <>
+    <View style={styles.backdropWrap}>
+      {/* Soft luminous icy-sky pastel gradient background with subtle geometric motifs */}
+      <Svg
+        pointerEvents="none"
+        width="100%"
+        height="100%"
+        viewBox="0 0 360 760"
+        preserveAspectRatio="none"
+        style={StyleSheet.absoluteFill}
+      >
+        <Defs>
+          <LinearGradient id="overviewBg" x1="0" y1="0" x2="0.15" y2="1">
+            <Stop offset="0" stopColor="#D8EFFC" stopOpacity="1" />
+            <Stop offset="0.32" stopColor="#EAF2FB" stopOpacity="1" />
+            <Stop offset="0.7" stopColor="#F1F5FB" stopOpacity="1" />
+            <Stop offset="1" stopColor="#F5F7FC" stopOpacity="1" />
+          </LinearGradient>
+          <RadialGradient id="overviewGlowTopRight" cx="86%" cy="7%" rx="52%" ry="24%">
+            <Stop offset="0" stopColor="#8FD3FA" stopOpacity="0.48" />
+            <Stop offset="1" stopColor="#8FD3FA" stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id="overviewGlowMidLeft" cx="10%" cy="42%" rx="48%" ry="26%">
+            <Stop offset="0" stopColor="#E4DCFF" stopOpacity="0.32" />
+            <Stop offset="1" stopColor="#E4DCFF" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="360" height="760" fill="url(#overviewBg)" />
+        <Rect x="0" y="0" width="360" height="760" fill="url(#overviewGlowTopRight)" />
+        <Rect x="0" y="0" width="360" height="760" fill="url(#overviewGlowMidLeft)" />
+        {/* Subtle geometric wave, concentric ring arcs & dot accents */}
+        <Path
+          d="M 180 155 C 235 112, 294 102, 360 74 L 360 155 Z"
+          fill="#2463EB"
+          fillOpacity={0.04}
+        />
+        <Circle
+          cx="328"
+          cy="22"
+          r="62"
+          fill="none"
+          stroke="#2463EB"
+          strokeOpacity={0.075}
+          strokeWidth={1.2}
+        />
+        <Circle
+          cx="328"
+          cy="22"
+          r="38"
+          fill="none"
+          stroke="#2463EB"
+          strokeOpacity={0.065}
+          strokeWidth={1}
+        />
+        <Circle cx="242" cy="26" r="2.2" fill="#2463EB" fillOpacity={0.11} />
+        <Circle cx="256" cy="18" r="1.8" fill="#2463EB" fillOpacity={0.08} />
+        <Circle cx="254" cy="34" r="1.6" fill="#2463EB" fillOpacity={0.09} />
+        <Circle cx="268" cy="28" r="2" fill="#2463EB" fillOpacity={0.07} />
+        <Circle
+          cx="22"
+          cy="318"
+          r="52"
+          fill="none"
+          stroke="#7C3AED"
+          strokeOpacity={0.045}
+          strokeWidth={1.1}
+        />
+      </Svg>
+
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -402,15 +546,15 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
           />
         }
       >
-        {/* Top bar */}
+        {/* Top bar: Company / Branch + Profile Avatar */}
         <View style={styles.topLine}>
           <Pressable
             disabled={branches.length <= 1}
             onPress={() => setBranchPickerOpen(true)}
             style={styles.companyWrap}
           >
-            <Text style={styles.eyebrow}>IGEN ERP</Text>
             <View style={styles.companyValueRow}>
+              <BranchAppIcon size={24} />
               <Text numberOfLines={1} style={styles.company}>
                 {user?.companyName || user?.companyCode || 'Doanh nghiệp ERP'}
                 {activeBranchName ? ` · ${activeBranchName}` : ''}
@@ -418,100 +562,134 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
               {branches.length > 1 ? <ChevronDown size={14} color={colors.ink} /> : null}
             </View>
           </Pressable>
-          <Link href="/(tabs)/profile" asChild>
-            <Pressable accessibilityRole="button" style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials(user?.displayName)}</Text>
+          <Link href="/(tabs)/ai-chat" asChild>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mở trợ lý iGen AI"
+              style={({ pressed }) => [styles.assistantBtn, pressed && styles.assistantBtnPressed]}
+            >
+              <IgenAssistantAvatarIcon size={38} />
             </Pressable>
           </Link>
         </View>
 
-        {/* Title & Switcher button */}
-        <View style={styles.titleRow}>
-          <View style={styles.titleCopy}>
-            <Text style={styles.greeting}>Tổng quan</Text>
-            <Text numberOfLines={1} style={styles.subtitle}>
-              {activePage?.subtitle ?? 'Theo dõi số liệu điều hành từ ERP'}
-            </Text>
-          </View>
-          {allowedPages.length > 1 ? (
+        {/* Top Overview Tab Switcher Bar: Left / Center Dropdown / Right */}
+        {allowedPages.length > 0 ? (
+          <View style={styles.switcherBar}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => setSwitcherOpen(true)}
-              style={styles.allPagesBtn}
+              accessibilityLabel="Trang tổng quan trước"
+              disabled={allowedPages.length <= 1}
+              onPress={() => onStepPage(-1)}
+              style={({ pressed }) => [
+                styles.switcherNavBtn,
+                allowedPages.length <= 1 && styles.switcherNavBtnDisabled,
+                pressed && styles.switcherNavBtnPressed,
+              ]}
             >
-              <View style={styles.allPagesContent}><Text style={styles.allPagesText}>Trang ({allowedPages.length})</Text><ChevronDown size={14} color={colors.primary} /></View>
+              <ChevronLeft size={18} color={colors.ink} />
             </Pressable>
-          ) : null}
-        </View>
 
-        {/* Horizontal multi-overview switcher */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.pageTabsRow}
-          style={styles.pageTabsScroll}
-        >
-          {allowedPages.map((page) => {
-            const active = page.id === activePageId;
-            const PageIcon = page.icon;
-            return (
-              <Pressable
-                key={page.id}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                onPress={() => onSelectPage(page.id)}
-                style={[styles.pagePill, active && styles.pagePillActive]}
-              >
-                <PageIcon size={14} color={active ? colors.white : page.accent} />
-                <Text style={[styles.pagePillText, active && styles.pagePillTextActive]}>
-                  {page.shortLabel}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Mở danh sách trang tổng quan"
+              disabled={allowedPages.length <= 1}
+              onPress={() => setSwitcherOpen(true)}
+              style={({ pressed }) => [
+                styles.switcherCenter,
+                pressed && allowedPages.length > 1 && styles.switcherCenterPressed,
+              ]}
+            >
+              <View style={styles.switcherTitleRow}>
+                {activePage ? <OverviewTabIcon id={activePage.id} size={24} /> : null}
+                <Text numberOfLines={1} style={styles.switcherTitle}>
+                  {activePage?.label ?? 'Tổng quan'}
                 </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                {allowedPages.length > 1 ? (
+                  <ChevronDown size={15} color={colors.muted} />
+                ) : null}
+              </View>
+              {activePage?.subtitle ? (
+                <Text numberOfLines={1} style={styles.switcherSubtitle}>
+                  {activePage.subtitle}
+                </Text>
+              ) : null}
+            </Pressable>
 
-        {/* Period filter bar */}
-        <Card style={styles.periodCard}>
-          <View style={styles.periodHeader}>
-            <Text style={styles.periodLabel}>Kỳ thống kê</Text>
-            <Text style={styles.periodRange}>
-              {formatDisplayDate(range.from)} – {formatDisplayDate(range.to)}
-            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Trang tổng quan tiếp theo"
+              disabled={allowedPages.length <= 1}
+              onPress={() => onStepPage(1)}
+              style={({ pressed }) => [
+                styles.switcherNavBtn,
+                allowedPages.length <= 1 && styles.switcherNavBtnDisabled,
+                pressed && styles.switcherNavBtnPressed,
+              ]}
+            >
+              <ChevronRight size={18} color={colors.ink} />
+            </Pressable>
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.periodChipsRow}
+        ) : null}
+
+        {/* Active overview page body */}
+        <OverviewPeriodActionContext.Provider value={periodActionCtx}>
+          <Animated.View
+            style={{
+              opacity: sectionOpacity,
+              transform: [{ translateX: sectionTranslateX }],
+            }}
           >
+            {renderSection()}
+          </Animated.View>
+        </OverviewPeriodActionContext.Provider>
+      </ScrollView>
+
+      {/* Floating dropdown popover to pick period filter */}
+      <Modal
+        visible={periodMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPeriodMenuOpen(false)}
+      >
+        <Pressable style={styles.popoverBackdrop} onPress={() => setPeriodMenuOpen(false)}>
+          <Pressable
+            style={[styles.popoverCard, { top: popoverTop }]}
+            onPress={() => {}}
+          >
+            <View style={styles.popoverHeader}>
+              <Text style={styles.popoverDateRange}>
+                {formatDisplayDate(range.from)} – {formatDisplayDate(range.to)}
+              </Text>
+              <Text style={styles.popoverCompare}>{range.comparisonLabel}</Text>
+            </View>
             {OVERVIEW_PERIOD_OPTIONS.map((opt) => {
               const active = opt.key === periodKey;
               return (
                 <Pressable
                   key={opt.key}
                   accessibilityRole="button"
-                  onPress={() => setPeriodKey(opt.key)}
-                  style={[styles.periodChip, active && styles.periodChipActive]}
+                  onPress={() => {
+                    setPeriodKey(opt.key);
+                    setPeriodMenuOpen(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.popoverItem,
+                    active && styles.popoverItemActive,
+                    pressed && styles.popoverItemPressed,
+                  ]}
                 >
-                  <Text style={[styles.periodChipText, active && styles.periodChipTextActive]}>
+                  {renderPeriodIcon(opt.key, active ? colors.primary : colors.muted)}
+                  <Text style={[styles.popoverItemText, active && styles.popoverItemTextActive]}>
                     {opt.label}
                   </Text>
+                  {active ? <Check size={15} strokeWidth={2} color={colors.primary} /> : null}
                 </Pressable>
               );
             })}
-          </ScrollView>
-          <Text style={styles.comparisonText}>{range.comparisonLabel}</Text>
-        </Card>
-
-        {/* Active overview page body */}
-        {renderSection()}
-
-        {/* Footer */}
-        <Text style={styles.footerNote}>
-          Nguồn dữ liệu trực tiếp từ Igen ERP
-          {updatedAt ? ` · Cập nhật lúc ${formatClock(updatedAt)}` : ''}
-        </Text>
-      </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Bottom sheet modal to choose among all overview pages */}
       <Modal
@@ -521,7 +699,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         onRequestClose={() => setSwitcherOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setSwitcherOpen(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
+          <Pressable style={styles.modalSheet} onPress={() => { }}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn trang tổng quan</Text>
@@ -532,16 +710,13 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {allowedPages.map((page) => {
                 const active = page.id === activePageId;
-                const PageIcon = page.icon;
                 return (
                   <Pressable
                     key={page.id}
                     onPress={() => onSelectPage(page.id)}
                     style={[styles.modalRow, active && styles.modalRowActive]}
                   >
-                    <View style={[styles.modalIcon, { backgroundColor: page.tone }]}>
-                      <PageIcon size={18} color={page.accent} />
-                    </View>
+                    <OverviewTabIcon id={page.id} size={38} />
                     <View style={styles.modalRowCopy}>
                       <Text style={styles.modalRowTitle}>{page.label}</Text>
                       <Text numberOfLines={1} style={styles.modalRowSub}>
@@ -564,7 +739,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         onRequestClose={() => setBranchPickerOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setBranchPickerOpen(false)}>
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
+          <Pressable style={styles.modalSheet} onPress={() => { }}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Chọn chi nhánh</Text>
@@ -584,9 +759,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
                     }}
                     style={[styles.modalRow, active && styles.modalRowActive]}
                   >
-                    <View style={[styles.modalIcon, { backgroundColor: '#EAF2FF' }]}>
-                      <Building2 size={18} color={colors.primary} />
-                    </View>
+                    <BranchAppIcon size={38} />
                     <View style={styles.modalRowCopy}>
                       <Text style={styles.modalRowTitle}>{branch.name}</Text>
                       {branch.code ? (
@@ -603,10 +776,11 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
           </Pressable>
         </Pressable>
       </Modal>
-    </>
+      <BrandLoadingOverlay visible={isInitialPageLoading} />
+    </View>
   );
 
-  return embedded ? content : <Screen>{content}</Screen>;
+  return embedded ? content : <Screen backgroundColor="#D8EFFC">{content}</Screen>;
 }
 
 export function EmbeddedOverviewScreen() {
@@ -614,164 +788,167 @@ export function EmbeddedOverviewScreen() {
 }
 
 const styles = StyleSheet.create({
+  backdropWrap: {
+    flex: 1,
+  },
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 12,
+    paddingHorizontal: 14,
+    paddingTop: 10,
     paddingBottom: 28,
   },
   topLine: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
+    paddingHorizontal: 2,
     gap: 12,
   },
   companyWrap: {
     flex: 1,
   },
-  eyebrow: {
-    color: colors.primary,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-  },
   company: {
     color: colors.ink,
-    fontSize: 12,
+    fontSize: 13.5,
     fontWeight: '700',
-    marginTop: 4,
+    flexShrink: 1,
   },
-  avatar: {
+  assistantBtn: {
     width: 40,
     height: 40,
-    borderRadius: 14,
-    backgroundColor: '#DCE8FF',
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {
-    color: colors.primary,
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 12,
-  },
-  titleCopy: {
-    flex: 1,
-  },
-  greeting: {
-    color: colors.ink,
-    fontSize: 24,
-    fontWeight: '800',
+  assistantBtnPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.94 }],
   },
   subtitle: {
     color: colors.muted,
     fontSize: 11,
     marginTop: 3,
   },
-  allPagesBtn: {
-    backgroundColor: '#EAF2FF',
-    borderColor: '#D6E5FF',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  allPagesText: {
-    color: colors.primary,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  allPagesContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  companyValueRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  pageTabsScroll: {
-    marginHorizontal: -18,
-    marginBottom: 14,
-  },
-  pageTabsRow: {
-    paddingHorizontal: 18,
-    gap: 8,
-  },
-  pagePill: {
+  companyValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  switcherBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     backgroundColor: colors.white,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 99,
-    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5EAF2',
+    paddingHorizontal: 6,
     paddingVertical: 8,
+    marginBottom: 12,
   },
-  pagePillActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  switcherNavBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F8FD',
   },
-  pagePillText: {
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: '700',
+  switcherNavBtnDisabled: {
+    opacity: 0.35,
   },
-  pagePillTextActive: {
-    color: colors.white,
+  switcherNavBtnPressed: {
+    backgroundColor: '#E8F0FC',
   },
-  periodCard: {
-    padding: 12,
-    marginBottom: 18,
-    gap: 8,
+  switcherCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
-  periodHeader: {
+  switcherCenterPressed: {
+    opacity: 0.72,
+  },
+  switcherTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  periodLabel: {
-    color: colors.ink,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  periodRange: {
-    color: colors.primary,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  periodChipsRow: {
+    justifyContent: 'center',
     gap: 6,
   },
-  periodChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 9,
-    backgroundColor: '#F3F6FB',
+  switcherIconBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  periodChipActive: {
-    backgroundColor: '#EAF2FF',
-    borderWidth: 1,
-    borderColor: '#BFD7FF',
+  switcherTitle: {
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: '700',
+    flexShrink: 1,
   },
-  periodChipText: {
+  switcherSubtitle: {
     color: colors.muted,
     fontSize: 10,
-    fontWeight: '700',
-  },
-  periodChipTextActive: {
-    color: colors.primary,
-  },
-  comparisonText: {
-    color: colors.muted,
-    fontSize: 9,
-  },
-  footerNote: {
-    color: colors.muted,
-    fontSize: 9,
+    marginTop: 2,
     textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 6,
+  },
+  popoverBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.14)',
+  },
+  popoverCard: {
+    position: 'absolute',
+    right: 14,
+    width: 224,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5EAF2',
+    paddingVertical: 6,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  popoverHeader: {
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EDF2F8',
+    marginBottom: 4,
+  },
+  popoverDateRange: {
+    color: colors.ink,
+    fontSize: 11.5,
+    fontWeight: '500',
+  },
+  popoverCompare: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 2,
+  },
+  popoverItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    gap: 12,
+  },
+  popoverItemActive: {
+    backgroundColor: '#F4F8FF',
+  },
+  popoverItemPressed: {
+    backgroundColor: '#EFF4FA',
+  },
+  popoverItemText: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 13.5,
+    fontWeight: '400',
+  },
+  popoverItemTextActive: {
+    color: colors.primary,
+    fontWeight: '500',
   },
   modalBackdrop: {
     flex: 1,

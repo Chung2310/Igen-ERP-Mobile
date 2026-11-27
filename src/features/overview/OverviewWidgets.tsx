@@ -1,6 +1,8 @@
+import { BrandLoader } from '@/components/BrandLoader';
+import { IgenEmptyState } from '@/components/EmptyStateIllustration';
 import { PopupError } from '@/components/PopupError';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Card } from '@/components/Card';
+import { StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, G } from 'react-native-svg';
 import { colors } from '@/theme/colors';
 
 export type KpiItem = {
@@ -17,7 +19,7 @@ export function KpiGrid({ items }: { items: KpiItem[] }) {
   return (
     <View style={styles.kpiGrid}>
       {items.map((item) => (
-        <Card key={item.id} style={styles.kpiCard}>
+        <View key={item.id} style={styles.kpiCard}>
           <View style={styles.kpiHeader}>
             <View style={[styles.kpiDotWrap, { backgroundColor: item.tone }]}>
               <View style={[styles.kpiDot, { backgroundColor: item.accent }]} />
@@ -39,7 +41,7 @@ export function KpiGrid({ items }: { items: KpiItem[] }) {
               {item.helper}
             </Text>
           ) : null}
-        </Card>
+        </View>
       ))}
     </View>
   );
@@ -51,12 +53,37 @@ export type BarDatum = {
   secondary?: number;
 };
 
+function formatChartNumber(value: number): string {
+  const abs = Math.abs(value);
+  if (abs === 0) return '0';
+  if (abs >= 1e9) {
+    return `${(value / 1e9).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}tỉ`;
+  }
+  if (abs >= 1e6) {
+    return `${(value / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}tr`;
+  }
+  if (abs >= 1e3) {
+    return `${(value / 1e3).toLocaleString('vi-VN', { maximumFractionDigits: 0 })}K`;
+  }
+  return Math.round(value).toLocaleString('vi-VN');
+}
+
+function computeNiceCeiling(rawMax: number): number {
+  if (rawMax <= 0) return 4;
+  const roughStep = rawMax / 4;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+  const residual = roughStep / magnitude;
+  const niceResidual =
+    residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 2.5 ? 2.5 : residual <= 5 ? 5 : 10;
+  return niceResidual * magnitude * 4;
+}
+
 export function VerticalBarChart({
   data,
   primaryLabel,
   secondaryLabel,
-  primaryColor = colors.primary,
-  secondaryColor = '#F2B86D',
+  primaryColor = '#18C93A',
+  secondaryColor = '#2196F3',
   emptyText = 'Chưa có phát sinh trong kỳ đã chọn.',
 }: {
   data: BarDatum[];
@@ -69,54 +96,117 @@ export function VerticalBarChart({
   const hasAny = data.some((d) => d.primary > 0 || (d.secondary ?? 0) > 0);
   if (!data.length || !hasAny) {
     return (
-      <Card style={styles.chartCard}>
-        <Text style={styles.emptyInline}>{emptyText}</Text>
-      </Card>
+      <View style={styles.chartCard}>
+        <IgenEmptyState message={emptyText} compact />
+      </View>
     );
   }
 
-  const maxValue = Math.max(
+  const rawMax = Math.max(
     1,
     ...data.flatMap((d) => [Math.max(0, d.primary), Math.max(0, d.secondary ?? 0)]),
   );
+  const ceiling = computeNiceCeiling(rawMax);
+  const yTicks = [ceiling, ceiling * 0.75, ceiling * 0.5, ceiling * 0.25, 0];
+  const plotHeight = 132;
+  const barWidth = secondaryLabel !== undefined ? 11 : 16;
 
   return (
-    <Card style={styles.chartCard}>
-      <View style={styles.chartArea}>
-        {data.map((item, idx) => {
-          const h1 = item.primary > 0 ? Math.max(6, Math.round((item.primary / maxValue) * 88)) : 2;
-          const h2 =
-            secondaryLabel !== undefined
-              ? (item.secondary ?? 0) > 0
-                ? Math.max(6, Math.round(((item.secondary ?? 0) / maxValue) * 88))
-                : 2
-              : 0;
-          return (
-            <View key={`${item.label}-${idx}`} style={styles.barGroup}>
-              <View style={styles.barsRow}>
-                <View style={[styles.bar, { height: h1, backgroundColor: primaryColor }]} />
-                {secondaryLabel !== undefined ? (
-                  <View style={[styles.bar, { height: h2, backgroundColor: secondaryColor }]} />
-                ) : null}
-              </View>
-              <Text numberOfLines={1} style={styles.barAxisLabel}>
+    <View style={styles.chartCard}>
+      <View style={styles.chartMainRow}>
+        {/* Y-axis scale ticks */}
+        <View style={[styles.yAxisCol, { height: plotHeight }]}>
+          {yTicks.map((tick, idx) => (
+            <Text key={`yt-${idx}`} numberOfLines={1} style={styles.yAxisText}>
+              {formatChartNumber(tick)}
+            </Text>
+          ))}
+        </View>
+
+        {/* Gridlines + square bars + X-axis labels */}
+        <View style={styles.chartPlotWrap}>
+          <View style={[styles.chartPlotArea, { height: plotHeight }]}>
+            <View pointerEvents="none" style={styles.chartGridLines}>
+              {yTicks.map((_, idx) => (
+                <View
+                  key={`gl-${idx}`}
+                  style={[
+                    styles.chartGridLine,
+                    idx === yTicks.length - 1 && styles.chartBaseline,
+                  ]}
+                />
+              ))}
+            </View>
+
+            <View style={styles.chartBarsRow}>
+              {data.map((item, idx) => {
+                const pVal = Math.max(0, item.primary);
+                const sVal = Math.max(0, item.secondary ?? 0);
+                const h1 = pVal > 0 ? Math.max(3, Math.round((pVal / ceiling) * plotHeight)) : 0;
+                const h2 =
+                  secondaryLabel !== undefined && sVal > 0
+                    ? Math.max(3, Math.round((sVal / ceiling) * plotHeight))
+                    : 0;
+
+                return (
+                  <View key={`${item.label}-${idx}`} style={styles.barGroup}>
+                    <View style={styles.barsRow}>
+                      <View style={styles.singleBarCol}>
+                        {pVal > 0 ? (
+                          <Text numberOfLines={1} style={styles.barValueLabel}>
+                            {formatChartNumber(pVal)}
+                          </Text>
+                        ) : null}
+                        <View
+                          style={[
+                            styles.bar,
+                            { width: barWidth, height: h1, backgroundColor: primaryColor },
+                          ]}
+                        />
+                      </View>
+                      {secondaryLabel !== undefined ? (
+                        <View style={styles.singleBarCol}>
+                          {sVal > 0 ? (
+                            <Text numberOfLines={1} style={styles.barValueLabel}>
+                              {formatChartNumber(sVal)}
+                            </Text>
+                          ) : null}
+                          <View
+                            style={[
+                              styles.bar,
+                              { width: barWidth, height: h2, backgroundColor: secondaryColor },
+                            ]}
+                          />
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.xAxisRow}>
+            {data.map((item, idx) => (
+              <Text key={`xl-${item.label}-${idx}`} numberOfLines={1} style={styles.barAxisLabel}>
                 {item.label}
               </Text>
-            </View>
-          );
-        })}
+            ))}
+          </View>
+        </View>
       </View>
+
       <View style={styles.legendRow}>
         <View style={[styles.legendDot, { backgroundColor: primaryColor }]} />
         <Text style={styles.legendText}>{primaryLabel}</Text>
         {secondaryLabel ? (
           <>
-            <View style={[styles.legendDot, { backgroundColor: secondaryColor, marginLeft: 14 }]} />
+            <View style={[styles.legendDot, { backgroundColor: secondaryColor, marginLeft: 20 }]} />
             <Text style={styles.legendText}>{secondaryLabel}</Text>
           </>
         ) : null}
       </View>
-    </Card>
+    </View>
   );
 }
 
@@ -137,43 +227,101 @@ export function BreakdownBars({
   const total = rows.reduce((sum, r) => sum + Math.max(0, r.value), 0);
   if (!rows.length || total <= 0) {
     return (
-      <Card style={styles.sectionCard}>
-        <Text style={styles.emptyInline}>{emptyText}</Text>
-      </Card>
+      <View style={styles.sectionCard}>
+        <IgenEmptyState message={emptyText} compact />
+      </View>
     );
   }
 
+  const size = 112;
+  const strokeWidth = 9;
+  const center = size / 2;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  const positiveRows = rows.filter((r) => r.value > 0);
+  const gap = positiveRows.length > 1 ? 2.5 : 0;
+
+  let accumulatedLength = 0;
+  const segments = positiveRows.map((row) => {
+    const fraction = Math.max(0, row.value) / total;
+    const rawLength = fraction * circumference;
+    const visibleLength = Math.max(2, rawLength - gap);
+    const dashOffset = -accumulatedLength;
+    accumulatedLength += rawLength;
+    return {
+      key: row.label,
+      color: row.color,
+      visibleLength,
+      dashOffset,
+    };
+  });
+
+  const leadingRow = positiveRows.reduce(
+    (best, cur) => (cur.value > best.value ? cur : best),
+    positiveRows[0],
+  );
+  const leadingPct = Math.min(100, Math.round((Math.max(0, leadingRow.value) / total) * 100));
+
   return (
-    <Card style={styles.sectionCard}>
-      <View style={styles.breakdownList}>
-        {rows.map((row) => {
-          const pct = Math.min(100, Math.round((Math.max(0, row.value) / total) * 100));
-          return (
-            <View key={row.label} style={styles.breakdownItem}>
-              <View style={styles.breakdownHeader}>
+    <View style={styles.sectionCard}>
+      <View style={styles.donutContainer}>
+        <View style={styles.donutChartWrap}>
+          <Svg width={size} height={size}>
+            <Circle
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke={CHART_TRACK_COLOR}
+              strokeWidth={strokeWidth}
+              fill="none"
+            />
+            <G rotation={-90} origin={`${center}, ${center}`}>
+              {segments.map((seg) => (
+                <Circle
+                  key={seg.key}
+                  cx={center}
+                  cy={center}
+                  r={radius}
+                  stroke={seg.color}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={`${seg.visibleLength} ${circumference}`}
+                  strokeDashoffset={seg.dashOffset}
+                  strokeLinecap="butt"
+                  fill="none"
+                />
+              ))}
+            </G>
+          </Svg>
+          <View pointerEvents="none" style={styles.donutCenter}>
+            <Text style={styles.donutCenterPct}>{leadingPct}%</Text>
+            <Text numberOfLines={1} style={styles.donutCenterLabel}>
+              {leadingRow.label}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.donutLegend}>
+          {rows.map((row) => {
+            const pct = Math.min(100, Math.round((Math.max(0, row.value) / total) * 100));
+            return (
+              <View key={row.label} style={styles.donutLegendRow}>
                 <View style={styles.breakdownLabelWrap}>
                   <View style={[styles.smallDot, { backgroundColor: row.color }]} />
                   <Text numberOfLines={1} style={styles.breakdownLabel}>
                     {row.label}
                   </Text>
                 </View>
-                <Text style={styles.breakdownValue}>
-                  {row.displayValue} · {pct}%
-                </Text>
+                <View style={styles.donutValueWrap}>
+                  <Text style={styles.breakdownSubValue}>{row.displayValue}</Text>
+                  <Text style={styles.breakdownPct}>{pct}%</Text>
+                </View>
               </View>
-              <View style={styles.progressTrack}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${Math.max(pct, row.value > 0 ? 4 : 0)}%`, backgroundColor: row.color },
-                  ]}
-                />
-              </View>
-            </View>
-          );
-        })}
+            );
+          })}
+        </View>
       </View>
-    </Card>
+    </View>
   );
 }
 
@@ -196,14 +344,14 @@ export function ListPanel({
 }) {
   if (!items.length) {
     return (
-      <Card style={styles.sectionCard}>
-        <Text style={styles.emptyInline}>{emptyText}</Text>
-      </Card>
+      <View style={styles.sectionCard}>
+        <IgenEmptyState message={emptyText} compact />
+      </View>
     );
   }
 
   return (
-    <Card style={styles.sectionCard}>
+    <View style={styles.sectionCard}>
       {items.map((item, idx) => (
         <View key={item.id} style={[styles.listRow, idx > 0 && styles.listRowBorder]}>
           <View style={[styles.rowBullet, { backgroundColor: item.dotColor ?? colors.primary }]} />
@@ -234,16 +382,15 @@ export function ListPanel({
           ) : null}
         </View>
       ))}
-    </Card>
+    </View>
   );
 }
 
 export function OverviewLoading({ label }: { label: string }) {
   return (
-    <Card style={styles.stateCard}>
-      <ActivityIndicator size="small" color={colors.primary} />
-      <Text style={styles.stateText}>{label}</Text>
-    </Card>
+    <View style={styles.stateCard}>
+      <BrandLoader size={42} label={label} />
+    </View>
   );
 }
 
@@ -259,7 +406,16 @@ export function NoticeStrip({ text }: { text: string }) {
   );
 }
 
-export const CHART_COLORS = ['#2463EB', '#16885A', '#C27617', '#7754C8', '#DC2626', '#0E7490'];
+/** Đồng bộ bảng màu biểu đồ từ web iGen ERP (dashboardPalette.ts & hr-analytics.css). */
+export const CHART_COLORS = ['#18C93A', '#2196F3', '#F5D610', '#F44336', '#8B5CF6', '#00B8F4'];
+export const CHART_TRACK_COLOR = '#E8EDF4';
+
+const HAIRLINE_CARD = {
+  backgroundColor: colors.white,
+  borderRadius: 10,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: '#E5EAF2',
+} as const;
 
 const styles = StyleSheet.create({
   kpiGrid: {
@@ -270,8 +426,9 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   kpiCard: {
+    ...HAIRLINE_CARD,
     width: '48.5%',
-    minHeight: 96,
+    minHeight: 94,
     padding: 12,
   },
   kpiHeader: {
@@ -283,7 +440,7 @@ const styles = StyleSheet.create({
   kpiDotWrap: {
     width: 22,
     height: 22,
-    borderRadius: 8,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -293,84 +450,175 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   kpiDelta: {
-    fontSize: 9,
-    fontWeight: '700',
+    fontSize: 9.5,
+    fontWeight: '500',
     flexShrink: 1,
   },
   kpiLabel: {
     color: colors.muted,
-    fontSize: 10,
+    fontSize: 10.5,
+    fontWeight: '400',
     marginTop: 8,
   },
   kpiValue: {
     color: colors.ink,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '600',
     marginTop: 3,
   },
   kpiHelper: {
     color: colors.muted,
-    fontSize: 9,
+    fontSize: 9.5,
+    fontWeight: '400',
     marginTop: 3,
   },
   chartCard: {
-    padding: 14,
+    ...HAIRLINE_CARD,
+    paddingHorizontal: 12,
+    paddingTop: 22,
+    paddingBottom: 14,
     marginBottom: 18,
   },
-  chartArea: {
-    height: 112,
+  chartMainRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  yAxisCol: {
+    width: 34,
+    paddingRight: 6,
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  yAxisText: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: '400',
+    lineHeight: 11,
+  },
+  chartPlotWrap: {
+    flex: 1,
+  },
+  chartPlotArea: {
+    position: 'relative',
+  },
+  chartGridLines: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'space-between',
+  },
+  chartGridLine: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#EDF2F8',
+  },
+  chartBaseline: {
+    backgroundColor: '#CBD5E1',
+  },
+  chartBarsRow: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     paddingHorizontal: 2,
   },
   barGroup: {
-    alignItems: 'center',
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   barsRow: {
-    height: 92,
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 3,
+    gap: 2,
+  },
+  singleBarCol: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  barValueLabel: {
+    color: colors.ink,
+    fontSize: 8.5,
+    fontWeight: '400',
+    marginBottom: 3,
   },
   bar: {
-    width: 9,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    borderRadius: 0,
+  },
+  xAxisRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    marginTop: 6,
+    paddingHorizontal: 2,
   },
   barAxisLabel: {
-    color: colors.muted,
-    fontSize: 8,
-    marginTop: 5,
+    flex: 1,
+    textAlign: 'center',
+    color: '#5B677B',
+    fontSize: 9.5,
+    fontWeight: '400',
   },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: 14,
   },
   legendDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    marginRight: 5,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    marginRight: 6,
   },
   legendText: {
-    color: colors.muted,
-    fontSize: 9,
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: '400',
   },
   sectionCard: {
+    ...HAIRLINE_CARD,
     padding: 14,
     marginBottom: 18,
   },
-  breakdownList: {
-    gap: 12,
+  donutContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
-  breakdownItem: {
-    gap: 6,
+  donutChartWrap: {
+    width: 112,
+    height: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  breakdownHeader: {
+  donutCenter: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  donutCenterPct: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  donutCenterLabel: {
+    color: colors.muted,
+    fontSize: 9.5,
+    fontWeight: '400',
+    marginTop: 1,
+  },
+  donutLegend: {
+    flex: 1,
+    gap: 10,
+  },
+  donutLegendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -380,33 +628,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 6,
+    gap: 7,
   },
   smallDot: {
     width: 7,
     height: 7,
-    borderRadius: 4,
+    borderRadius: 3.5,
   },
   breakdownLabel: {
     color: colors.ink,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '400',
     flex: 1,
   },
-  breakdownValue: {
+  donutValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  breakdownSubValue: {
     color: colors.muted,
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '400',
   },
-  progressTrack: {
-    height: 7,
-    borderRadius: 99,
-    backgroundColor: '#EDF2F9',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 99,
+  breakdownPct: {
+    color: colors.ink,
+    fontSize: 11.5,
+    fontWeight: '500',
+    minWidth: 28,
+    textAlign: 'right',
   },
   listRow: {
     flexDirection: 'row',
@@ -416,12 +666,12 @@ const styles = StyleSheet.create({
   },
   listRowBorder: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: '#EDF2F8',
   },
   rowBullet: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   rowBody: {
     flex: 1,
@@ -429,22 +679,23 @@ const styles = StyleSheet.create({
   rowTitle: {
     color: colors.ink,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   rowSubtitle: {
     color: colors.muted,
     fontSize: 10,
+    fontWeight: '400',
     marginTop: 2,
   },
   rowBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 99,
+    borderRadius: 8,
     maxWidth: 110,
   },
   rowBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   emptyInline: {
     color: colors.muted,
@@ -453,6 +704,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   stateCard: {
+    minHeight: 280,
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -462,7 +714,7 @@ const styles = StyleSheet.create({
   stateText: {
     color: colors.muted,
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   errorCard: {
     backgroundColor: '#FFF5F5',

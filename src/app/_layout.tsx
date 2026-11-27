@@ -2,18 +2,26 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { useRouter, useSegments } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppSplashScreen } from '@/components/AppSplashScreen';
+import { BrandLoader, BrandLoadingHost } from '@/components/BrandLoader';
 import { AuthProvider, useAuth } from '@/core/auth/AuthProvider';
 import { HrConfirmHost } from '@/features/hr/components/HrConfirmModal';
 import { canAccessOverview } from '@/features/overview/overviewCatalog';
 import { colors } from '@/theme/colors';
 import { Fingerprint, LogOut, ShieldCheck } from 'lucide-react-native';
 
+void SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <AuthenticatedRouter />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AuthenticatedRouter />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -24,6 +32,20 @@ function AuthenticatedRouter() {
   const isLoginRoute = segments[0] === 'login';
   const showLockScreen = !isLoading && isAppLocked;
   const redirectPending = !isLoading && !showLockScreen && ((!user && !isLoginRoute) || (Boolean(user) && isLoginRoute));
+
+  const [splashMinElapsed, setSplashMinElapsed] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(true);
+
+  useEffect(() => {
+    void SplashScreen.hideAsync().catch(() => {});
+    const timer = setTimeout(() => setSplashMinElapsed(true), 1600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const splashFadingOut = splashMinElapsed && !isLoading && !redirectPending;
+  const handleSplashComplete = useCallback(() => {
+    setSplashVisible(false);
+  }, []);
 
   useEffect(() => {
     if (isLoading || showLockScreen) return;
@@ -38,16 +60,58 @@ function AuthenticatedRouter() {
         <BiometricLockScreen />
       ) : (
         <>
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="modules/[slug]" options={{ headerShown: true, title: 'Phân hệ', headerBackTitle: 'Trở lại', headerTintColor: colors.ink }} />
-            <Stack.Screen name="profile/[section]" options={{ headerShown: true, title: 'Cài đặt cá nhân', headerBackTitle: 'Trở lại', headerTintColor: colors.ink }} />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+              animation: 'ios_from_right',
+              animationDuration: 260,
+              gestureEnabled: true,
+              fullScreenGestureEnabled: true,
+            }}
+          >
+            <Stack.Screen
+              name="login"
+              options={{ headerShown: false, animation: 'fade', animationDuration: 220 }}
+            />
+            <Stack.Screen
+              name="(tabs)"
+              options={{ animation: 'fade', animationDuration: 220 }}
+            />
+            <Stack.Screen
+              name="modules/[slug]"
+              options={{
+                headerShown: true,
+                title: 'Phân hệ',
+                headerBackTitle: 'Trở lại',
+                headerTintColor: colors.ink,
+                animation: 'ios_from_right',
+              }}
+            />
+            <Stack.Screen
+              name="profile/[section]"
+              options={{
+                headerShown: true,
+                title: 'Cài đặt cá nhân',
+                headerBackTitle: 'Trở lại',
+                headerTintColor: colors.ink,
+                animation: 'ios_from_right',
+              }}
+            />
           </Stack>
           <HrConfirmHost />
+          <BrandLoadingHost />
         </>
       )}
-      {(isLoading || redirectPending) && !showLockScreen && <View style={styles.loadingOverlay}><ActivityIndicator size="small" color={colors.primary} /></View>}
+      {(isLoading || redirectPending) && !showLockScreen && !splashVisible && (
+        <View style={styles.loadingOverlay}><BrandLoader size={52} /></View>
+      )}
+      {splashVisible && (
+        <AppSplashScreen
+          fadingOut={splashFadingOut}
+          onFadeComplete={handleSplashComplete}
+        />
+      )}
     </View>
   );
 }
@@ -95,7 +159,7 @@ function BiometricLockScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: colors.white },
   loadingOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   lockScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30, backgroundColor: colors.background },
   lockIcon: { width: 68, height: 68, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8F0FF' },

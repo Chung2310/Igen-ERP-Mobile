@@ -7,7 +7,6 @@ import {
   FileText,
   GraduationCap,
   HeartPulse,
-  LayoutDashboard,
   MessageSquare,
   Package,
   Users,
@@ -15,13 +14,14 @@ import {
 
 export const ALL_OVERVIEW_PAGES: OverviewPageDefinition[] = [
   {
-    id: 'executive',
-    label: 'Tổng hợp chung',
-    shortLabel: 'Tổng hợp',
-    subtitle: 'Toàn cảnh doanh nghiệp & việc cần xử lý hôm nay',
-    icon: LayoutDashboard,
-    accent: '#2463EB',
-    tone: '#EAF2FF',
+    id: 'hr',
+    label: 'Nhân sự',
+    shortLabel: 'Nhân sự',
+    subtitle: 'Chấm công, hợp đồng, công việc & đào tạo',
+    icon: Users,
+    accent: '#0E7490',
+    tone: '#E8F7FA',
+    moduleSlug: 'hr',
   },
   {
     id: 'finance',
@@ -32,16 +32,6 @@ export const ALL_OVERVIEW_PAGES: OverviewPageDefinition[] = [
     accent: '#16885A',
     tone: '#E9F8F1',
     moduleSlug: 'analytics',
-  },
-  {
-    id: 'hr',
-    label: 'Nhân sự',
-    shortLabel: 'Nhân sự',
-    subtitle: 'Chấm công, hợp đồng, công việc & đào tạo',
-    icon: Users,
-    accent: '#0E7490',
-    tone: '#E8F7FA',
-    moduleSlug: 'hr',
   },
   {
     id: 'quotation',
@@ -111,7 +101,7 @@ function hasPerm(user: ErpUser | null, code: string): boolean {
 }
 
 export function canAccessOverview(user: ErpUser | null): boolean {
-  return hasPerm(user, 'dashboard:read');
+  return hasPerm(user, 'dashboard:read') && resolveAllowedOverviewPages(user).length > 0;
 }
 
 /**
@@ -128,8 +118,6 @@ export function resolveAllowedOverviewPages(user: ErpUser | null): OverviewPageD
 
   return ALL_OVERVIEW_PAGES.filter((page) => {
     switch (page.id) {
-      case 'executive':
-        return true;
       case 'finance':
         return (
           hasModule('finance') &&

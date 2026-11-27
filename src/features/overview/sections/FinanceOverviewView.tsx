@@ -180,6 +180,8 @@ export function FinanceOverviewView({
         data={buildFinanceBars(report)}
         primaryLabel="Doanh thu"
         secondaryLabel="Giá vốn & chi phí"
+        primaryColor="#18C93A"
+        secondaryColor="#F44336"
       />
 
       <SectionHeading title="Cơ cấu chi phí" />

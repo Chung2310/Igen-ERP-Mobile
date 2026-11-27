@@ -1,3 +1,5 @@
+import { CenteredPageLoader } from '@/components/BrandLoader';
+import { IgenEmptyState } from '@/components/EmptyStateIllustration';
 import { PopupError } from '@/components/PopupError';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -15,8 +17,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ArrowLeft, Check, Hand, Heart, Paperclip, Pin, Plus, Smile, ThumbsUp, X } from 'lucide-react-native';
-import { Card } from '@/components/Card';
+import { ArrowLeft, Check, Hand, Heart, Paperclip, Pin, Plus, Search, Smile, ThumbsUp, X } from 'lucide-react-native';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
 import {
@@ -426,8 +428,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
 
         {messagesLoading && !messages.length ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.stateText}>Đang tải tin nhắn...</Text>
+            <CenteredPageLoader />
           </View>
         ) : messagesError && !messages.length ? (
           <View style={styles.centered}>
@@ -596,14 +597,15 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
         </View>
 
         {/* Message action modal */}
-        <Modal
-          visible={Boolean(actionMessage)}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setActionMessage(null)}
-        >
+        {actionMessage ? (
+          <Modal
+            visible
+            transparent
+            animationType="fade"
+            onRequestClose={() => setActionMessage(null)}
+          >
           <Pressable style={styles.modalBackdrop} onPress={() => setActionMessage(null)}>
-            <Pressable style={styles.actionSheet} onPress={() => {}}>
+            <Pressable style={styles.actionSheet} onPress={() => { }}>
               {actionMessage ? (
                 <>
                   <View style={styles.emojiBar}>
@@ -643,6 +645,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
             </Pressable>
           </Pressable>
         </Modal>
+        ) : null}
       </KeyboardAvoidingView>
     );
 
@@ -651,44 +654,68 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
 
   // --- Room List View ---
   const listView = (
-    <>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={roomsRefreshing}
-            onRefresh={() => {
-              setRoomsRefreshing(true);
-              void loadRooms(true);
-            }}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+    <View style={styles.listRoot}>
+      {/* Top pastel icy-aqua gradient backdrop with subtle geometric motifs */}
+      <View pointerEvents="none" style={styles.topBackdrop}>
+        <Svg width="100%" height="100%" viewBox="0 0 360 150" preserveAspectRatio="none">
+          <Defs>
+            <LinearGradient id="chatTopBg" x1="0" y1="0" x2="0.2" y2="1">
+              <Stop offset="0%" stopColor="#D8EFFC" />
+              <Stop offset="58%" stopColor="#E9F4FD" />
+              <Stop offset="100%" stopColor="#F5FAFE" />
+            </LinearGradient>
+            <RadialGradient id="chatTopGlow" cx="88%" cy="14%" rx="50%" ry="68%">
+              <Stop offset="0%" stopColor="#8FD3FA" stopOpacity="0.45" />
+              <Stop offset="100%" stopColor="#8FD3FA" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width="360" height="150" fill="url(#chatTopBg)" />
+          <Rect x="0" y="0" width="360" height="150" fill="url(#chatTopGlow)" />
+          <Path
+            d="M 185 150 C 235 106, 294 98, 360 72 L 360 150 Z"
+            fill="#2463EB"
+            fillOpacity={0.045}
           />
-        }
-      >
-        <View style={[styles.headerRow, { marginBottom: 12 }]}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.title}>Trò chuyện nội bộ</Text>
-          </View>
+          <Circle
+            cx="326"
+            cy="20"
+            r="60"
+            fill="none"
+            stroke="#2463EB"
+            strokeOpacity={0.08}
+            strokeWidth={1.2}
+          />
+          <Circle
+            cx="326"
+            cy="20"
+            r="36"
+            fill="none"
+            stroke="#2463EB"
+            strokeOpacity={0.07}
+            strokeWidth={1}
+          />
+          <Circle cx="244" cy="24" r="2.2" fill="#2463EB" fillOpacity={0.12} />
+          <Circle cx="258" cy="16" r="1.8" fill="#2463EB" fillOpacity={0.09} />
+          <Circle cx="256" cy="32" r="1.6" fill="#2463EB" fillOpacity={0.1} />
+          <Circle cx="270" cy="26" r="2" fill="#2463EB" fillOpacity={0.08} />
+        </Svg>
+      </View>
+
+      {/* Top header & pill filter chips on pastel sky area */}
+      <View style={styles.topZone}>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Trò chuyện</Text>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Cuộc trò chuyện mới"
             onPress={() => {
               void openNewChatModal();
             }}
-            style={styles.newChatBtn}
+            style={({ pressed }) => [styles.newChatBtn, pressed && styles.newChatBtnPressed]}
           >
-            <View style={styles.newChatBtnContent}><Plus size={15} color={colors.white} /><Text style={styles.newChatBtnText}>Mới</Text></View>
+            <Plus size={19} color={colors.white} strokeWidth={2.2} />
           </Pressable>
         </View>
-
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Tìm theo tên đồng nghiệp, nhóm..."
-          placeholderTextColor={colors.muted}
-          style={styles.searchInput}
-        />
 
         <View style={styles.filters}>
           {(
@@ -712,89 +739,130 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
             );
           })}
         </View>
+      </View>
 
-        {roomsLoading && !rooms.length ? (
-          <Card style={styles.stateCard}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.stateText}>Đang tải danh sách hội thoại từ ERP...</Text>
-          </Card>
-        ) : roomsError && !rooms.length ? (
-          <Card style={styles.stateCard}>
-            <PopupError error={roomsError} />
-            <Pressable
-              onPress={() => {
-                void loadRooms();
+      {/* Rounded white sheet containing search bar & flat conversation list */}
+      <View style={styles.whiteSheet}>
+        <View style={styles.searchWrap}>
+          <Search size={17} color="#94A3B8" strokeWidth={1.9} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Tìm theo tên đồng nghiệp, nhóm..."
+            placeholderTextColor="#94A3B8"
+            style={styles.searchInput}
+          />
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.sheetScrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={roomsRefreshing}
+              onRefresh={() => {
+                setRoomsRefreshing(true);
+                void loadRooms(true);
               }}
-              style={styles.retryBtn}
-            >
-              <Text style={styles.retryBtnText}>Thử tải lại</Text>
-            </Pressable>
-          </Card>
-        ) : !filteredRooms.length ? (
-          <Card style={styles.stateCard}>
-            <Text style={styles.stateText}>
-              {rooms.length
-                ? 'Không có hội thoại nào khớp bộ lọc.'
-                : 'Chưa có cuộc trò chuyện nội bộ nào. Bấm "Mới" để bắt đầu.'}
-            </Text>
-          </Card>
-        ) : (
-          <View style={styles.list}>
-            {filteredRooms.map((room, idx) => {
-              const name = getRoomDisplayName(room, myId);
-              const unread = room.unreadCount ?? 0;
-              const pinned = isRoomPinned(room, myId);
-              return (
-                <Card
-                  key={room._id}
-                  onPress={() => openRoom(room)}
-                  style={styles.row}
-                >
-                  <View
-                    style={[
-                      styles.avatar,
-                      { backgroundColor: AVATAR_TONES[idx % AVATAR_TONES.length] },
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          {roomsLoading && !rooms.length ? (
+            <CenteredPageLoader />
+          ) : roomsError && !rooms.length ? (
+            <View style={styles.stateBox}>
+              <PopupError error={roomsError} />
+              <Pressable
+                onPress={() => {
+                  void loadRooms();
+                }}
+                style={styles.retryBtn}
+              >
+                <Text style={styles.retryBtnText}>Thử tải lại</Text>
+              </Pressable>
+            </View>
+          ) : !filteredRooms.length ? (
+            <View style={styles.stateBox}>
+              <IgenEmptyState
+                message={
+                  rooms.length
+                    ? 'Không có hội thoại nào khớp bộ lọc.'
+                    : 'Chưa có cuộc trò chuyện nội bộ nào. Bấm "Mới" để bắt đầu.'
+                }
+              />
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {filteredRooms.map((room, idx) => {
+                const name = getRoomDisplayName(room, myId);
+                const unread = room.unreadCount ?? 0;
+                const pinned = isRoomPinned(room, myId);
+                return (
+                  <Pressable
+                    key={room._id}
+                    onPress={() => openRoom(room)}
+                    style={({ pressed }) => [
+                      styles.row,
+                      idx > 0 && styles.rowDivider,
+                      pressed && styles.rowPressed,
                     ]}
                   >
-                    <Text style={styles.initials}>{getInitials(name)}</Text>
-                  </View>
-                  <View style={styles.copy}>
-                    <View style={styles.nameLine}>
-                      <View style={styles.roomNameWrap}>{pinned ? <Pin size={12} color={colors.primary} /> : null}<Text numberOfLines={1} style={styles.name}>{name}</Text></View>
-                      <Text style={styles.time}>
-                        {formatMessageTime(room.lastMessage?.createdAt || room.updatedAt)}
-                      </Text>
-                    </View>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.message, unread > 0 && styles.messageUnread]}
+                    <View
+                      style={[
+                        styles.avatar,
+                        { backgroundColor: AVATAR_TONES[idx % AVATAR_TONES.length] },
+                      ]}
                     >
-                      {formatLastMessagePreview(room)}
-                    </Text>
-                  </View>
-                  {unread > 0 ? (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadBadgeText}>
-                        {unread > 99 ? '99+' : unread}
-                      </Text>
+                      <Text style={styles.initials}>{getInitials(name)}</Text>
                     </View>
-                  ) : null}
-                </Card>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
+                    <View style={styles.copy}>
+                      <View style={styles.nameLine}>
+                        <View style={styles.roomNameWrap}>
+                          {pinned ? <Pin size={12} color={colors.primary} /> : null}
+                          <Text numberOfLines={1} style={styles.name}>
+                            {name}
+                          </Text>
+                        </View>
+                        <Text style={styles.time}>
+                          {formatMessageTime(room.lastMessage?.createdAt || room.updatedAt)}
+                        </Text>
+                      </View>
+                      <View style={styles.previewLine}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.message, unread > 0 && styles.messageUnread]}
+                        >
+                          {formatLastMessagePreview(room)}
+                        </Text>
+                        {unread > 0 ? (
+                          <View style={styles.unreadBadge}>
+                            <Text style={styles.unreadBadgeText}>
+                              {unread > 99 ? '99+' : unread}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+      </View>
 
       {/* New Chat Modal */}
-      <Modal
-        visible={newChatOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setNewChatOpen(false)}
-      >
+      {newChatOpen ? (
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          onRequestClose={() => setNewChatOpen(false)}
+        >
         <Pressable style={styles.modalBackdrop} onPress={() => setNewChatOpen(false)}>
-          <Pressable style={styles.newChatSheet} onPress={() => {}}>
+          <Pressable style={styles.newChatSheet} onPress={() => { }}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Cuộc trò chuyện mới</Text>
@@ -883,10 +951,11 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
           </Pressable>
         </Pressable>
       </Modal>
-    </>
+      ) : null}
+    </View>
   );
 
-  return embedded ? listView : <Screen>{listView}</Screen>;
+  return embedded ? listView : <Screen backgroundColor="#D8EFFC">{listView}</Screen>;
 }
 
 export function EmbeddedInternalChatScreen() {
@@ -894,54 +963,85 @@ export function EmbeddedInternalChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 18, paddingTop: 14, paddingBottom: 28 },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 },
-  headerCopy: { flex: 1 },
-  eyebrow: { color: colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
-  title: { color: colors.ink, fontSize: 25, fontWeight: '800', marginTop: 4 },
-  subtitle: { color: colors.muted, fontSize: 11, marginTop: 5 },
+  listRoot: { flex: 1, backgroundColor: '#D8EFFC' },
+  topBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, height: 150 },
+  topZone: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  title: { color: colors.ink, fontSize: 21, fontWeight: '700', letterSpacing: -0.2 },
   newChatBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.primary,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  newChatBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  newChatBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
-  searchInput: {
-    backgroundColor: colors.white,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 13,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-    fontSize: 12,
-    color: colors.ink,
-    marginTop: 14,
-  },
-  filters: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 14 },
+  newChatBtnPressed: { opacity: 0.82 },
+  filters: { flexDirection: 'row', gap: 8, marginTop: 12 },
   filterPill: {
     backgroundColor: colors.white,
-    borderColor: colors.border,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 6.5,
+    borderRadius: 999,
   },
-  filterPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { color: colors.muted, fontSize: 11, fontWeight: '600' },
-  filterTextActive: { color: colors.white, fontWeight: '700' },
-  list: { gap: 9 },
-  row: { flexDirection: 'row', alignItems: 'center', padding: 12 },
-  avatar: { width: 42, height: 42, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  initials: { color: colors.ink, fontSize: 11, fontWeight: '800' },
-  copy: { flex: 1, marginLeft: 12 },
+  filterPillActive: { backgroundColor: colors.primary },
+  filterText: { color: '#334155', fontSize: 12.5, fontWeight: '400' },
+  filterTextActive: { color: colors.white, fontWeight: '500' },
+  whiteSheet: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingTop: 14,
+    overflow: 'hidden',
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F5F8',
+    borderRadius: 12,
+    height: 42,
+    paddingHorizontal: 13,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    gap: 9,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13.5,
+    color: colors.ink,
+    paddingVertical: 0,
+  },
+  sheetScrollContent: { paddingBottom: 24, flexGrow: 1 },
+  list: {},
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    backgroundColor: colors.white,
+  },
+  rowDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#F1F4F9',
+  },
+  rowPressed: { backgroundColor: '#F7F9FC' },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initials: { color: colors.ink, fontSize: 14, fontWeight: '600' },
+  copy: { flex: 1, marginLeft: 13 },
   nameLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  roomNameWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  name: { color: colors.ink, fontSize: 12, fontWeight: '700', flex: 1 },
-  time: { color: colors.muted, fontSize: 10 },
-  message: { color: colors.muted, fontSize: 11, marginTop: 4 },
-  messageUnread: { color: colors.ink, fontWeight: '700' },
+  roomNameWrap: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  name: { color: colors.ink, fontSize: 15, fontWeight: '500', flex: 1 },
+  time: { color: '#8A96A8', fontSize: 12, fontWeight: '400' },
+  previewLine: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  message: { flex: 1, color: '#64748B', fontSize: 13.5, fontWeight: '400' },
+  messageUnread: { color: colors.ink, fontWeight: '500' },
   unreadBadge: {
     minWidth: 20,
     height: 20,
@@ -950,11 +1050,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
-    marginLeft: 8,
   },
-  unreadBadgeText: { color: colors.white, fontSize: 10, fontWeight: '800' },
-  stateCard: { padding: 20, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  stateText: { color: colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 17 },
+  unreadBadgeText: { color: colors.white, fontSize: 10.5, fontWeight: '600' },
+  stateBox: { flex: 1, minHeight: 320, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  stateText: { color: colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   errorText: { color: '#B91C1C', fontSize: 12, textAlign: 'center', lineHeight: 18 },
   retryBtn: {
     backgroundColor: colors.primary,
@@ -963,7 +1062,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 4,
   },
-  retryBtnText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  retryBtnText: { color: colors.white, fontSize: 12, fontWeight: '600' },
 
   // Thread view
   threadContainer: { flex: 1, backgroundColor: colors.background },
