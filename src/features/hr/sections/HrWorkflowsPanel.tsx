@@ -875,12 +875,18 @@ export function HrWorkflowsPanel({
                     style={[styles.field, { flex: 1 }]}
                   />
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Thêm công việc con"
                     onPress={addStepSubTask}
                     disabled={!stepSubTaskDraft.trim()}
-                    style={[styles.subTaskAddBtn, !stepSubTaskDraft.trim() && styles.disabled]}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      styles.subTaskAddBtn,
+                      !stepSubTaskDraft.trim() && styles.disabled,
+                      pressed && { opacity: 0.6 },
+                    ]}
                   >
-                    <Plus size={14} color={colors.primary} />
-                    <Text style={styles.categoryAddText}>Thêm</Text>
+                    <Plus size={20} strokeWidth={2} color={colors.primary} />
                   </Pressable>
                 </View>
               </View>
@@ -1539,7 +1545,7 @@ const styles = StyleSheet.create({
   subTaskRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
   subTaskEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: '#F6F8FC' },
   subTaskAddRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  subTaskAddBtn: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#EAF2FF' },
+  subTaskAddBtn: { width: 38, height: 40, alignItems: 'center', justifyContent: 'center' },
   subDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
   subTaskText: { color: '#374151', fontSize: 13, flex: 1 },
   attachBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
