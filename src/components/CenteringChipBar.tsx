@@ -12,6 +12,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { colors } from '@/theme/colors';
 
 export type ChipBarItem<T extends string = string> = {
   key: T;
@@ -29,11 +30,13 @@ type CenteringChipBarProps<T extends string> = {
   chipActiveStyle?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   textActiveStyle?: StyleProp<TextStyle>;
+  showUnderline?: boolean;
 };
 
 /**
- * Horizontal chip/filter bar that smoothly scrolls the selected item into
- * the horizontal center of the viewport whenever the selection changes.
+ * Clean underline horizontal tab/filter bar (reference style with app primary color).
+ * Smoothly glides the bottom underline indicator to the selected item and centers
+ * the selected tab inside the horizontal ScrollView.
  */
 export function CenteringChipBar<T extends string>({
   items,
@@ -45,12 +48,41 @@ export function CenteringChipBar<T extends string>({
   chipActiveStyle,
   textStyle,
   textActiveStyle,
+  showUnderline = true,
 }: CenteringChipBarProps<T>) {
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const containerWidthRef = useRef(0);
   const contentWidthRef = useRef(0);
   const itemLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
   const hasScrolledOnceRef = useRef(false);
+
+  const indicatorX = useRef(new Animated.Value(0)).current;
+  const [indicatorWidth, setIndicatorWidth] = useState(0);
+  const indicatorInitRef = useRef(false);
+
+  const moveIndicator = useCallback(
+    (key: string, animated: boolean) => {
+      if (!showUnderline) return;
+      const layout = itemLayoutsRef.current[key];
+      if (!layout || layout.width <= 0) return;
+
+      setIndicatorWidth(layout.width);
+      if (!animated || !indicatorInitRef.current) {
+        indicatorInitRef.current = true;
+        indicatorX.setValue(layout.x);
+        return;
+      }
+
+      indicatorX.stopAnimation();
+      Animated.spring(indicatorX, {
+        toValue: layout.x,
+        useNativeDriver: true,
+        speed: 28,
+        bounciness: 2,
+      }).start();
+    },
+    [indicatorX, showUnderline],
+  );
 
   const centerItem = useCallback((key: string, animated: boolean) => {
     const layout = itemLayoutsRef.current[key];
@@ -66,9 +98,10 @@ export function CenteringChipBar<T extends string>({
   useEffect(() => {
     const animated = hasScrolledOnceRef.current;
     hasScrolledOnceRef.current = true;
+    moveIndicator(activeKey, animated);
     const frame = requestAnimationFrame(() => centerItem(activeKey, animated));
     return () => cancelAnimationFrame(frame);
-  }, [activeKey, centerItem]);
+  }, [activeKey, centerItem, moveIndicator]);
 
   const handleContainerLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -87,44 +120,69 @@ export function CenteringChipBar<T extends string>({
   );
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      onLayout={handleContainerLayout}
-      onContentSizeChange={handleContentSizeChange}
-      style={style}
-      contentContainerStyle={contentContainerStyle}
-    >
-      {items.map((item) => {
-        const active = item.key === activeKey;
-        return (
-          <Pressable
-            key={item.key}
-            onLayout={(e) => {
-              const { x, width } = e.nativeEvent.layout;
-              itemLayoutsRef.current[item.key] = { x, width };
-              if (item.key === activeKey && containerWidthRef.current > 0) {
-                centerItem(activeKey, hasScrolledOnceRef.current);
-              }
-            }}
-            onPress={() => {
-              onSelect(item.key);
-              centerItem(item.key, true);
-            }}
-            style={({ pressed }) => [
-              chipStyle,
-              item.renderPrefix ? styles.rowChip : null,
-              active && chipActiveStyle,
-              pressed && styles.chipPressed,
+    <View style={[styles.tabBarContainer, style]}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        onLayout={handleContainerLayout}
+        onContentSizeChange={handleContentSizeChange}
+        contentContainerStyle={[styles.tabBarContent, contentContainerStyle]}
+      >
+        {items.map((item) => {
+          const active = item.key === activeKey;
+          return (
+            <Pressable
+              key={item.key}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                itemLayoutsRef.current[item.key] = { x, width };
+                if (item.key === activeKey) {
+                  moveIndicator(activeKey, indicatorInitRef.current);
+                  if (containerWidthRef.current > 0) {
+                    centerItem(activeKey, hasScrolledOnceRef.current);
+                  }
+                }
+              }}
+              onPress={() => {
+                onSelect(item.key);
+                moveIndicator(item.key, true);
+                centerItem(item.key, true);
+              }}
+              style={({ pressed }) => [
+                styles.tabItem,
+                chipStyle,
+                item.renderPrefix ? styles.rowChip : null,
+                active && chipActiveStyle,
+                pressed && styles.chipPressed,
+              ]}
+            >
+              {item.renderPrefix ? item.renderPrefix(active) : null}
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.tabText,
+                  textStyle,
+                  active && styles.tabTextActive,
+                  active && textActiveStyle,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {showUnderline && indicatorWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.underlineIndicator,
+              { width: indicatorWidth, transform: [{ translateX: indicatorX }] },
             ]}
-          >
-            {item.renderPrefix ? item.renderPrefix(active) : null}
-            <Text style={[textStyle, active && textActiveStyle]}>{item.label}</Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+          />
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -140,7 +198,7 @@ type SlidingSegmentBarProps<T extends string> = {
 };
 
 /**
- * Segmented filter bar with a smooth sliding indicator pill behind the active tab.
+ * Evenly spaced underline tab bar with a smooth sliding primary-color bottom indicator.
  */
 export function SlidingSegmentBar<T extends string>({
   items,
@@ -173,8 +231,8 @@ export function SlidingSegmentBar<T extends string>({
       Animated.spring(indicatorX, {
         toValue: target.x,
         useNativeDriver: true,
-        speed: 26,
-        bounciness: 3,
+        speed: 28,
+        bounciness: 2,
       }).start();
     },
     [indicatorX],
@@ -186,16 +244,6 @@ export function SlidingSegmentBar<T extends string>({
 
   return (
     <View style={[styles.segmentWrap, style]}>
-      {indicatorWidth > 0 ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.segmentIndicator,
-            indicatorStyle,
-            { width: indicatorWidth, transform: [{ translateX: indicatorX }] },
-          ]}
-        />
-      ) : null}
       {items.map((item) => {
         const active = item.key === activeKey;
         return (
@@ -209,43 +257,35 @@ export function SlidingSegmentBar<T extends string>({
               }
             }}
             onPress={() => onSelect(item.key)}
-            style={({ pressed }) => [itemStyle, pressed && styles.segmentPressed]}
+            style={({ pressed }) => [styles.segmentItem, itemStyle, pressed && styles.segmentPressed]}
           >
-            <Text numberOfLines={1} style={[textStyle, active && textActiveStyle]}>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.tabText,
+                textStyle,
+                active && styles.tabTextActive,
+                active && textActiveStyle,
+              ]}
+            >
               {item.label}
             </Text>
           </Pressable>
         );
       })}
+      {indicatorWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.underlineIndicator,
+            indicatorStyle,
+            { width: indicatorWidth, transform: [{ translateX: indicatorX }] },
+          ]}
+        />
+      ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  rowChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  chipPressed: {
-    opacity: 0.78,
-    transform: [{ scale: 0.96 }],
-  },
-  segmentWrap: {
-    position: 'relative',
-  },
-  segmentIndicator: {
-    position: 'absolute',
-    left: 0,
-    top: 3,
-    bottom: 3,
-    borderRadius: 9,
-    backgroundColor: '#FFFFFF',
-  },
-  segmentPressed: {
-    opacity: 0.75,
-  },
-});
 
 type AnimatedFilterContentProps = {
   transitionKey: string;
@@ -305,3 +345,66 @@ export function AnimatedFilterContent({
     </Animated.View>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBarContainer: {
+    backgroundColor: colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5EAF2',
+    flexGrow: 0,
+  },
+  tabBarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  tabItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabText: {
+    color: '#374151',
+    fontSize: 13.5,
+    fontWeight: '400',
+  },
+  tabTextActive: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  underlineIndicator: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+  },
+  rowChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  chipPressed: {
+    opacity: 0.68,
+  },
+  segmentWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    backgroundColor: colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5EAF2',
+  },
+  segmentItem: {
+    flex: 1,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentPressed: {
+    opacity: 0.68,
+  },
+});

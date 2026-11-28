@@ -1447,11 +1447,7 @@ export function KanbanTasksPanel({
         ).filter((item) => canReadWork || item.key === 'all')}
         activeKey={scopeFilter}
         onSelect={setScopeFilter}
-        style={styles.scopeBar}
-        indicatorStyle={styles.scopeBtnActive}
-        itemStyle={styles.scopeBtn}
-        textStyle={styles.scopeText}
-        textActiveStyle={styles.scopeTextActive}
+        style={{ marginHorizontal: -14, marginBottom: 4 }}
       />
 
       {scopeFilter === 'kpi' && canReadWork ? (
@@ -1573,12 +1569,7 @@ export function KanbanTasksPanel({
             ]}
             activeKey={statusFilter}
             onSelect={setStatusFilter}
-            contentContainerStyle={styles.chipRow}
-            style={styles.chipScroll}
-            chipStyle={styles.chip}
-            chipActiveStyle={styles.chipActive}
-            textStyle={styles.chipText}
-            textActiveStyle={styles.chipTextActive}
+            style={{ marginHorizontal: -14, marginBottom: 8 }}
           />
 
       <AnimatedFilterContent transitionKey={`${scopeFilter}:${statusFilter}`}>

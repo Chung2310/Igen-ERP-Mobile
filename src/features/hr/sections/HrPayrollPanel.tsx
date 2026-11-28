@@ -352,11 +352,7 @@ export function HrPayrollPanel({
           items={subSections}
           activeKey={section}
           onSelect={setSection}
-          contentContainerStyle={{ gap: 6, marginBottom: 10 }}
-          chipStyle={styles.subTabPill}
-          chipActiveStyle={styles.subTabPillActive}
-          textStyle={styles.subTabText}
-          textActiveStyle={styles.subTabTextActive}
+          style={{ marginHorizontal: -14, marginBottom: 10 }}
         />
       ) : null}
 

@@ -224,16 +224,10 @@ export function HrSchedulePanel({
         items={tabs.map(({ key, label, Icon }) => ({
           key,
           label,
-          renderPrefix: (active) => <Icon size={13} color={active ? colors.white : colors.primary} />,
+          renderPrefix: (active) => <Icon size={14} color={active ? colors.primary : '#64748B'} />,
         }))}
         activeKey={subTab}
         onSelect={setSubTab}
-        style={styles.subTabScroll}
-        contentContainerStyle={styles.subTabRow}
-        chipStyle={styles.subTabPill}
-        chipActiveStyle={styles.subTabPillActive}
-        textStyle={styles.subTabText}
-        textActiveStyle={styles.subTabTextActive}
       />
 
       <AnimatedFilterContent transitionKey={subTab} style={{ flex: 1 }}>
@@ -1021,11 +1015,11 @@ function AttendanceAndCalendarSection({
                 return {
                   key: t,
                   label: `${EVENT_TYPE_LABELS[t]} (${monthTypeCounts[t]})`,
-                  renderPrefix: (active: boolean) => (
+                  renderPrefix: () => (
                     <View
                       style={[
                         styles.dot,
-                        { backgroundColor: active ? colors.white : palette.dot, width: 6, height: 6, borderRadius: 3 },
+                        { backgroundColor: palette.dot, width: 6, height: 6, borderRadius: 3 },
                       ]}
                     />
                   ),
@@ -1034,12 +1028,7 @@ function AttendanceAndCalendarSection({
             ]}
             activeKey={calFilterType}
             onSelect={setCalFilterType}
-            style={{ flexGrow: 0, marginTop: 10 }}
-            contentContainerStyle={{ gap: 6, paddingRight: 4 }}
-            chipStyle={styles.chip}
-            chipActiveStyle={styles.chipActive}
-            textStyle={styles.chipText}
-            textActiveStyle={styles.chipTextActive}
+            style={{ marginTop: 8, marginHorizontal: -14 }}
           />
 
           {/* 7-column Calendar Grid */}

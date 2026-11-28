@@ -578,11 +578,7 @@ export function HrLeavesPanel({
         ]}
         activeKey={statusFilter}
         onSelect={setStatusFilter}
-        contentContainerStyle={{ gap: 6, marginBottom: 8 }}
-        chipStyle={styles.chip}
-        chipActiveStyle={styles.chipActive}
-        textStyle={styles.chipText}
-        textActiveStyle={styles.chipTextActive}
+        style={{ marginHorizontal: -14, marginBottom: 4 }}
       />
 
       {/* Request Kind filter pills */}
@@ -593,11 +589,7 @@ export function HrLeavesPanel({
         ]}
         activeKey={kindFilter}
         onSelect={setKindFilter}
-        contentContainerStyle={{ gap: 6, marginBottom: 12 }}
-        chipStyle={styles.kindChip}
-        chipActiveStyle={styles.kindChipActive}
-        textStyle={styles.kindChipText}
-        textActiveStyle={styles.kindChipTextActive}
+        style={{ marginHorizontal: -14, marginBottom: 10 }}
       />
 
       <AnimatedFilterContent transitionKey={`${statusFilter}:${kindFilter}`}>
