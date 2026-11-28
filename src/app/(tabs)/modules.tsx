@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import {
   ActivityIndicator,
@@ -14,8 +14,16 @@ import {
 import { Check, LockKeyhole } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { ModuleAppIcon } from '@/components/ModuleAppIcons';
+import {
+  IgenAssistantAvatarIcon,
+  OverviewNotificationAvatarIcon,
+} from '@/components/OverviewTabIcons';
 import { Screen } from '@/components/Screen';
 import { useAuth } from '@/core/auth/AuthProvider';
+import {
+  getUserNotifications,
+  subscribeUnreadNotificationCount,
+} from '@/features/notifications/notificationsApi';
 import {
   authenticateBiometric,
   biometricErrorMessage,
@@ -69,6 +77,21 @@ export default function ModulesScreen() {
   const [branches, setBranches] = useState<HrBranch[]>([]);
   const [attendance, setAttendance] = useState<TodayTimekeepingData | null>(null);
   const [checking, setChecking] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    void getUserNotifications({ page: 1, limit: 1 })
+      .then((res) => {
+        if (active) setUnreadNotifications(res.unreadCount || 0);
+      })
+      .catch(() => {});
+    const sub = subscribeUnreadNotificationCount(setUnreadNotifications);
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, [user?.id, user?._id]);
 
   const isBranchSelectable = user?.role === 'admin' && !user?.branchId;
   const effectiveBranchId = user?.branchId || activeBranchId || branches[0]?._id;
@@ -306,6 +329,33 @@ export default function ModulesScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.headerRow}>
             <Text style={styles.title}>Tính năng</Text>
+            <View style={styles.topRightActions}>
+              <Link href="/assistant-chat" asChild>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Mở trợ lý iGen AI"
+                  style={({ pressed }) => [styles.assistantBtn, pressed && styles.assistantBtnPressed]}
+                >
+                  <IgenAssistantAvatarIcon size={38} />
+                </Pressable>
+              </Link>
+              <Link href="/notifications" asChild>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Mở thông báo"
+                  style={({ pressed }) => [styles.notifBtn, pressed && styles.assistantBtnPressed]}
+                >
+                  <OverviewNotificationAvatarIcon size={38} />
+                  {unreadNotifications > 0 ? (
+                    <View style={styles.notifBadge}>
+                      <Text style={styles.notifBadgeText}>
+                        {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                      </Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              </Link>
+            </View>
           </View>
 
           <View style={styles.gridCard}>
@@ -420,6 +470,50 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: '700',
     letterSpacing: -0.2,
+  },
+  topRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  notifBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: -1,
+    right: -2,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 8.5,
+    paddingHorizontal: 4,
+    backgroundColor: '#D92D20',
+    borderWidth: 1.5,
+    borderColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifBadgeText: {
+    color: colors.white,
+    fontSize: 9,
+    lineHeight: 10.5,
+    fontWeight: '700',
+  },
+  assistantBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  assistantBtnPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.94 }],
   },
   gridCard: {
     backgroundColor: colors.white,
