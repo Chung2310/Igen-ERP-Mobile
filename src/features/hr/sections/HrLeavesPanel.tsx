@@ -31,6 +31,7 @@ import {
   XCircle,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { AnimatedFilterContent, CenteringChipBar } from '@/components/CenteringChipBar';
 import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import {
@@ -568,62 +569,38 @@ export function HrLeavesPanel({
       ) : null}
 
       {/* Status filter pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <CenteringChipBar
+        items={[
+          { key: 'all', label: `Tất cả (${counts.all})` },
+          { key: 'pending', label: `Chờ duyệt (${counts.pending})` },
+          { key: 'approved', label: `Đã duyệt (${counts.approved})` },
+          { key: 'rejected', label: `Từ chối (${counts.rejected})` },
+        ]}
+        activeKey={statusFilter}
+        onSelect={setStatusFilter}
         contentContainerStyle={{ gap: 6, marginBottom: 8 }}
-      >
-        {(
-          [
-            { key: 'all', label: `Tất cả (${counts.all})` },
-            { key: 'pending', label: `Chờ duyệt (${counts.pending})` },
-            { key: 'approved', label: `Đã duyệt (${counts.approved})` },
-            { key: 'rejected', label: `Từ chối (${counts.rejected})` },
-          ] as const
-        ).map((item) => {
-          const active = statusFilter === item.key;
-          return (
-            <Pressable
-              key={item.key}
-              onPress={() => setStatusFilter(item.key)}
-              style={[styles.chip, active && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        chipStyle={styles.chip}
+        chipActiveStyle={styles.chipActive}
+        textStyle={styles.chipText}
+        textActiveStyle={styles.chipTextActive}
+      />
 
       {/* Request Kind filter pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <CenteringChipBar
+        items={[
+          { key: '', label: 'Tất cả loại' },
+          ...REQUEST_KINDS.map((k) => ({ key: k.value, label: k.label })),
+        ]}
+        activeKey={kindFilter}
+        onSelect={setKindFilter}
         contentContainerStyle={{ gap: 6, marginBottom: 12 }}
-      >
-        <Pressable
-          onPress={() => setKindFilter('')}
-          style={[styles.kindChip, !kindFilter && styles.kindChipActive]}
-        >
-          <Text style={[styles.kindChipText, !kindFilter && styles.kindChipTextActive]}>
-            Tất cả loại
-          </Text>
-        </Pressable>
-        {REQUEST_KINDS.map((k) => {
-          const active = kindFilter === k.value;
-          return (
-            <Pressable
-              key={k.value}
-              onPress={() => setKindFilter(k.value)}
-              style={[styles.kindChip, active && styles.kindChipActive]}
-            >
-              <Text style={[styles.kindChipText, active && styles.kindChipTextActive]}>
-                {k.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        chipStyle={styles.kindChip}
+        chipActiveStyle={styles.kindChipActive}
+        textStyle={styles.kindChipText}
+        textActiveStyle={styles.kindChipTextActive}
+      />
 
+      <AnimatedFilterContent transitionKey={`${statusFilter}:${kindFilter}`}>
       {loading ? (
         <Card style={styles.stateCard}>
           <ActivityIndicator size="small" color={colors.primary} />
@@ -737,6 +714,7 @@ export function HrLeavesPanel({
           })}
         </View>
       )}
+      </AnimatedFilterContent>
 
       {/* Create Application Full-Screen Page */}
       <FullScreenFormModal

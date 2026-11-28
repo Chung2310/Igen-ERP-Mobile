@@ -36,6 +36,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { AnimatedFilterContent, CenteringChipBar } from '@/components/CenteringChipBar';
 import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { HrFab } from '@/features/hr/components/HrFab';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
@@ -219,27 +220,23 @@ export function HrSchedulePanel({
   return (
     <View style={styles.root}>
       {/* Sub-navigation matching web HrScheduleTab */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <CenteringChipBar
+        items={tabs.map(({ key, label, Icon }) => ({
+          key,
+          label,
+          renderPrefix: (active) => <Icon size={13} color={active ? colors.white : colors.primary} />,
+        }))}
+        activeKey={subTab}
+        onSelect={setSubTab}
         style={styles.subTabScroll}
         contentContainerStyle={styles.subTabRow}
-      >
-        {tabs.map(({ key, label, Icon }) => {
-          const active = subTab === key;
-          return (
-            <Pressable
-              key={key}
-              onPress={() => setSubTab(key)}
-              style={[styles.subTabPill, active && styles.subTabPillActive]}
-            >
-              <Icon size={13} color={active ? colors.white : colors.primary} />
-              <Text style={[styles.subTabText, active && styles.subTabTextActive]}>{label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        chipStyle={styles.subTabPill}
+        chipActiveStyle={styles.subTabPillActive}
+        textStyle={styles.subTabText}
+        textActiveStyle={styles.subTabTextActive}
+      />
 
+      <AnimatedFilterContent transitionKey={subTab} style={{ flex: 1 }}>
       {subTab === 'attendance' ? (
         <AttendanceAndCalendarSection
           companyCode={companyCode}
@@ -254,6 +251,7 @@ export function HrSchedulePanel({
       ) : (
         <EmployeeWorkHoursSection branchId={branchId} />
       )}
+      </AnimatedFilterContent>
     </View>
   );
 }
@@ -1015,41 +1013,34 @@ function AttendanceAndCalendarSection({
           </View>
 
           {/* Monthly Type Filter & Count Pills */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
+          <CenteringChipBar
+            items={[
+              { key: 'all', label: `Tất cả (${monthAllEvents.length})` },
+              ...(['event', 'leave', 'wfh', 'exception', 'reminder'] as const).map((t) => {
+                const palette = EVENT_TYPE_COLORS[t];
+                return {
+                  key: t,
+                  label: `${EVENT_TYPE_LABELS[t]} (${monthTypeCounts[t]})`,
+                  renderPrefix: (active: boolean) => (
+                    <View
+                      style={[
+                        styles.dot,
+                        { backgroundColor: active ? colors.white : palette.dot, width: 6, height: 6, borderRadius: 3 },
+                      ]}
+                    />
+                  ),
+                };
+              }),
+            ]}
+            activeKey={calFilterType}
+            onSelect={setCalFilterType}
             style={{ flexGrow: 0, marginTop: 10 }}
             contentContainerStyle={{ gap: 6, paddingRight: 4 }}
-          >
-            <Pressable
-              onPress={() => setCalFilterType('all')}
-              style={[styles.chip, calFilterType === 'all' && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, calFilterType === 'all' && styles.chipTextActive]}>
-                Tất cả ({monthAllEvents.length})
-              </Text>
-            </Pressable>
-            {(['event', 'leave', 'wfh', 'exception', 'reminder'] as const).map((t) => {
-              const active = calFilterType === t;
-              const palette = EVENT_TYPE_COLORS[t];
-              return (
-                <Pressable
-                  key={t}
-                  onPress={() => setCalFilterType(t)}
-                  style={[
-                    styles.chip,
-                    { flexDirection: 'row', alignItems: 'center', gap: 5 },
-                    active && styles.chipActive,
-                  ]}
-                >
-                  <View style={[styles.dot, { backgroundColor: active ? colors.white : palette.dot, width: 6, height: 6, borderRadius: 3 }]} />
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {EVENT_TYPE_LABELS[t]} ({monthTypeCounts[t]})
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+            chipStyle={styles.chip}
+            chipActiveStyle={styles.chipActive}
+            textStyle={styles.chipText}
+            textActiveStyle={styles.chipTextActive}
+          />
 
           {/* 7-column Calendar Grid */}
           <Card style={styles.calCard}>

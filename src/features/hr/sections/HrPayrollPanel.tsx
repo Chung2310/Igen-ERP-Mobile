@@ -22,6 +22,7 @@ import {
   XCircle,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { AnimatedFilterContent, CenteringChipBar } from '@/components/CenteringChipBar';
 import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import {
@@ -347,28 +348,19 @@ export function HrPayrollPanel({
     >
       {/* Sub-tabs */}
       {canViewAll ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
+        <CenteringChipBar
+          items={subSections}
+          activeKey={section}
+          onSelect={setSection}
           contentContainerStyle={{ gap: 6, marginBottom: 10 }}
-        >
-          {subSections.map((item) => {
-            const active = section === item.key;
-            return (
-              <Pressable
-                key={item.key}
-                onPress={() => setSection(item.key)}
-                style={[styles.subTabPill, active && styles.subTabPillActive]}
-              >
-                <Text style={[styles.subTabText, active && styles.subTabTextActive]}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+          chipStyle={styles.subTabPill}
+          chipActiveStyle={styles.subTabPillActive}
+          textStyle={styles.subTabText}
+          textActiveStyle={styles.subTabTextActive}
+        />
       ) : null}
 
+      <AnimatedFilterContent transitionKey={section}>
       {/* Period switcher (for overview & adjustments) */}
       {canViewAll && (section === 'overview' || section === 'adjustments') ? (
         <Card style={styles.dateBar}>
@@ -749,6 +741,7 @@ export function HrPayrollPanel({
           )}
         </>
       )}
+      </AnimatedFilterContent>
 
       {/* Payslip Detail Full-Screen Page */}
       <FullScreenFormModal

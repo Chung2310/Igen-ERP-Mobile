@@ -58,6 +58,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { AnimatedFilterContent, CenteringChipBar, SlidingSegmentBar } from '@/components/CenteringChipBar';
 import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { HrFab } from '@/features/hr/components/HrFab';
@@ -1435,32 +1436,26 @@ export function KanbanTasksPanel({
       </View>
 
       {/* Scope Filter: Tất cả | Theo dự án | Không dự án | KPI tháng */}
-      <View style={styles.scopeBar}>
-        {(
+      <SlidingSegmentBar
+        items={(
           [
-            { key: 'all', label: `Tất cả` },
+            { key: 'all', label: canReadWork ? 'Tất cả' : 'Việc của tôi' },
             { key: 'with_project', label: `Dự án (${projects.length})` },
             { key: 'no_project', label: `Không DA (${unassignedTasks.length})` },
             { key: 'kpi', label: 'KPI tháng' },
           ] as const
-        ).filter((item) => canReadWork || item.key === 'all').map((item) => {
-          const active = scopeFilter === item.key;
-          return (
-            <Pressable
-              key={item.key}
-              onPress={() => setScopeFilter(item.key)}
-              style={[styles.scopeBtn, active && styles.scopeBtnActive]}
-            >
-              <Text numberOfLines={1} style={[styles.scopeText, active && styles.scopeTextActive]}>
-                {item.key === 'all' && !canReadWork ? 'Việc của tôi' : item.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+        ).filter((item) => canReadWork || item.key === 'all')}
+        activeKey={scopeFilter}
+        onSelect={setScopeFilter}
+        style={styles.scopeBar}
+        indicatorStyle={styles.scopeBtnActive}
+        itemStyle={styles.scopeBtn}
+        textStyle={styles.scopeText}
+        textActiveStyle={styles.scopeTextActive}
+      />
 
       {scopeFilter === 'kpi' && canReadWork ? (
-        <View style={styles.kpiWrap}>
+        <AnimatedFilterContent transitionKey={`${scopeFilter}:${kpiPeriod}`} style={styles.kpiWrap}>
           {/* Month selector bar */}
           <Card style={styles.kpiBar}>
             <Text style={styles.groupTitle}>KPI</Text>
@@ -1567,38 +1562,26 @@ export function KanbanTasksPanel({
               );
             })()
           )}
-        </View>
+        </AnimatedFilterContent>
       ) : (
         <>
           {/* Status Filter Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
+          <CenteringChipBar
+            items={[
+              { key: 'all', label: 'Mọi trạng thái' },
+              ...STATUS_META.map((st) => ({ key: st.key, label: st.label })),
+            ]}
+            activeKey={statusFilter}
+            onSelect={setStatusFilter}
             contentContainerStyle={styles.chipRow}
             style={styles.chipScroll}
-          >
-            <Pressable
-              onPress={() => setStatusFilter('all')}
-              style={[styles.chip, statusFilter === 'all' && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, statusFilter === 'all' && styles.chipTextActive]}>
-                Mọi trạng thái
-              </Text>
-            </Pressable>
-            {STATUS_META.map((st) => {
-              const active = statusFilter === st.key;
-              return (
-                <Pressable
-                  key={st.key}
-                  onPress={() => setStatusFilter(st.key)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{st.label}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+            chipStyle={styles.chip}
+            chipActiveStyle={styles.chipActive}
+            textStyle={styles.chipText}
+            textActiveStyle={styles.chipTextActive}
+          />
 
+      <AnimatedFilterContent transitionKey={`${scopeFilter}:${statusFilter}`}>
       {loading ? (
         <Card style={styles.stateCard}>
           <ActivityIndicator size="small" color={colors.primary} />
@@ -1732,6 +1715,7 @@ export function KanbanTasksPanel({
           ) : null}
         </View>
       )}
+      </AnimatedFilterContent>
         </>
       )}
 
