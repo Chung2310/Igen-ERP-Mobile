@@ -7,7 +7,7 @@ Repository: `Chung2310/Igen-ERP-Mobile`. Bundle ID đang cấu hình: **`com.ige
 - `.env` local: API và web staging `https://staging-erp.igentechnology.net`; app version `1.0.0`; build local `1`; Bundle ID ERP như trên. File được Git bỏ qua.
 - Workflow mặc định backend staging, version `1.0.0`, build CI = `1000 + github.run_number`; production backend phải có URL riêng.
 - Runner `macos-26`, pin Xcode `26.4.1` theo cấu hình LuxCare đã đọc. Chưa xác minh bằng một run macOS thực tế cho ERP.
-- App Store signing và Ad Hoc là hai profile riêng. Upload TestFlight mặc định tắt. Không có native push hoặc extension cần profile bổ sung trong bản hiện tại.
+- App Store signing và Ad Hoc là hai profile riêng. Push `production` tự build với backend production và upload TestFlight. Chạy thủ công mặc định bật upload, có thể tắt; signing-only và Ad Hoc không upload. Không có native push hoặc extension cần profile bổ sung trong bản hiện tại.
 
 ## Cần chủ tài khoản Apple cung cấp
 

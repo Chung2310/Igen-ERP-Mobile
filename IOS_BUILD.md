@@ -2,6 +2,8 @@
 
 Repo này là repository Git riêng **Igen-ERP-Mobile**. Hai workflow nằm trong `.github/workflows/` của repo mobile; không chạy từ repo ERP backend. Luồng dùng Expo prebuild → CocoaPods → Xcode archive/export, không dùng EAS Build hoặc EAS Submit.
 
+Mỗi lần push lên `production`, workflow IPA tự chạy với backend production, profile App Store và upload TestFlight bật. Push nhánh khác không chạy build iOS. Build có ký được xếp hàng theo thứ tự, không hủy lượt đang chạy; mỗi lượt có số build mới theo `github.run_number`. Upload TestFlight không tự gửi App Review hoặc phát hành App Store.
+
 ## Kiểm tra không cần credentials
 
 `iOS native checks` chỉ chạy khi push nhánh `production` hoặc chạy thủ công trên nhánh `production`; không build từ pull request hay `develop`. Cả hai workflow đều có điều kiện ở cấp job `github.ref == 'refs/heads/production'`, nên chọn nhánh khác trong Run workflow sẽ bị bỏ qua trước khi cấp runner hoặc đọc signing secrets. Runner `macos-26` cài Node 22, kiểm tra TypeScript, test helper, cấu hình Expo đã áp dụng plugin, sau đó build Release cho simulator và kiểm tra privacy manifest **trong app đã build**. Không cài simulator build lên iPhone; không dùng kết quả này thay cho kiểm thử thiết bị thật.
@@ -31,7 +33,7 @@ GitHub repository mobile → Settings → Secrets and variables → Actions.
 | `EXPO_PUBLIC_ERP_WEB_URL` | Web production có `/privacy-policy` và `/terms-of-service`; bỏ trống để dùng API origin |
 | `IOS_BUILD_NUMBER_BASE` | Mặc định `1000`; base + số workflow run phải lớn hơn build cao nhất đã upload |
 
-Đã tạo `.env` local từ cấu hình staging, web cùng origin, version `1.0.0`, Bundle ID `com.igen.erp`, build local `1`; `.env` được Git bỏ qua. Không có URL production hoặc team mặc định lấy từ LuxCare. Workflow tắt dotenv và chọn backend từ input `api_environment`, mặc định staging; khi chọn production phải có URL production riêng và helper từ chối URL staging ERP đã biết. Các giá trị `EXPO_PUBLIC_*` được nhúng trong app và không phải nơi lưu secret. Bản native yêu cầu HTTPS; dùng staging/tunnel HTTPS khi thử API local.
+Đã tạo `.env` local từ cấu hình staging, web cùng origin, version `1.0.0`, Bundle ID `com.igen.erp`, build local `1`; `.env` được Git bỏ qua. Không có URL production hoặc team mặc định lấy từ LuxCare. Workflow tắt dotenv; push dùng backend production, chạy thủ công mặc định production và có thể chọn staging qua `api_environment`. Production phải có URL riêng và helper từ chối URL staging ERP đã biết. Các giá trị `EXPO_PUBLIC_*` được nhúng trong app và không phải nơi lưu secret. Bản native yêu cầu HTTPS; dùng staging/tunnel HTTPS khi thử API local.
 
 | GitHub Secret | Nội dung |
 | --- | --- |
@@ -48,10 +50,10 @@ Giữ credentials ngoài repository; không gửi qua chat hoặc ghi vào log. 
 ## Chạy build có ký
 
 1. Run **Build iOS IPA (GitHub macOS)**, chọn **Use workflow from: production**, chọn `signing_check_only=true`. Nhánh Git `production` là điều kiện bắt buộc, độc lập với lựa chọn backend và signing profile. Helper kiểm tra hạn profile, team, explicit Bundle ID, certificate trong P12 có nằm trong profile và private key có sử dụng được không. Credentials chỉ vào keychain tạm trên runner và được dọn trong bước `always()`.
-2. Run mới với `api_environment=staging` cho backend thử hoặc `production` cho backend thật. Đây là lựa chọn riêng với `profile=preview` (Ad Hoc) hoặc `profile=production` (ký App Store/TestFlight). Có thể ký App Store/TestFlight nhưng dùng backend staging để thử. `upload_testflight` mặc định **false**. Không chọn signing-only nếu muốn có IPA.
+2. Run mới với `api_environment=staging` cho backend thử hoặc `production` cho backend thật. Đây là lựa chọn riêng với `profile=preview` (Ad Hoc) hoặc `profile=production` (ký App Store/TestFlight). Có thể ký App Store/TestFlight nhưng dùng backend staging để thử. `upload_testflight` mặc định **true**; có thể tắt khi chạy thủ công nếu chỉ cần tải IPA. Chế độ signing-only và profile preview không upload dù checkbox đang bật. Không chọn signing-only nếu muốn có IPA.
 3. Workflow kiểm tra backend health + DB, URL chính sách, quyền native, icon và manifest; sinh native project mới; chỉ cấu hình ký app target, không ép signing lên Pods; archive/export; xác minh arm64, JS bundle, signature, entitlements, version, SDK và manifest trong IPA.
 4. Tải artifact `ERP-ios-...`: `ERP.ipa`, dSYMs và `privacy-audit.json`. Artifact log nằm riêng; thư mục keychain/profile/API key không được upload. Artifact hết hạn sau 7 ngày.
-5. Sau khi hoàn thành checklist thiết bị và hồ sơ review trong [docs/IOS_APP_REVIEW.md](docs/IOS_APP_REVIEW.md), tạo Run mới và bật `upload_testflight=true` nếu muốn upload. Theo dõi processing trong App Store Connect; upload không tự gửi App Review hoặc phát hành công khai.
+5. Với push `production`, upload tự chạy sau khi archive/export và kiểm tra IPA thành công. Với Run workflow thủ công, giữ `upload_testflight=true` để upload. Theo dõi processing trong App Store Connect; hoàn thành checklist thiết bị và hồ sơ review trong [docs/IOS_APP_REVIEW.md](docs/IOS_APP_REVIEW.md) trước khi gửi App Review.
 
 Số build mặc định = base + `github.run_number`. Rerun cùng workflow giữ nguyên số; tạo Run mới hoặc nhập `build_number` lớn hơn để tránh duplicate. Nếu dùng override cao, tăng base cho các lần sau. Như cấu hình LuxCare hiện có, cả hai workflow chọn `macos-26` và pin `/Applications/Xcode_26.4.1.app/Contents/Developer`; build dừng nếu toolchain không tồn tại, đồng thời kiểm tra Xcode ≥26 và SDK ≥26 trong app build. Khi image runner đổi hoặc dependency cần bản Xcode cao hơn, cập nhật cả hai workflow và chạy lại native checks.
 

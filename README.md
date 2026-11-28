@@ -50,4 +50,4 @@ Kiểm tra iOS trên Windows có thể dùng `npx expo export --platform ios --n
 
 ## Build và phát hành iOS
 
-Đã có CI build native simulator và workflow build IPA có ký trên GitHub macOS bằng Expo prebuild/Xcode, kèm kiểm tra quyền sau plugin, HTTPS, icon và privacy manifest trong app đã build. Xem [IOS_BUILD.md](IOS_BUILD.md) để cấu hình variables/secrets ERP; [hồ sơ review](docs/IOS_APP_REVIEW.md) và [khai báo privacy](docs/IOS_PRIVACY.md) ghi rõ phần cần xác minh trước phát hành. Upload TestFlight mặc định tắt và không tự gửi App Review.
+Đã có CI build native simulator và workflow build IPA có ký trên GitHub macOS bằng Expo prebuild/Xcode, kèm kiểm tra quyền sau plugin, HTTPS, icon và privacy manifest trong app đã build. Push nhánh `production` tự build IPA và upload TestFlight; chạy thủ công cũng mặc định bật upload. Xem [IOS_BUILD.md](IOS_BUILD.md) để cấu hình variables/secrets ERP; [hồ sơ review](docs/IOS_APP_REVIEW.md) và [khai báo privacy](docs/IOS_PRIVACY.md) ghi rõ phần cần xác minh trước phát hành. Upload không tự gửi App Review hoặc phát hành App Store.
