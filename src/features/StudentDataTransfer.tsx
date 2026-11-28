@@ -213,11 +213,11 @@ export function StudentDataTransfer({ students, batches, scope, onImported, filt
 }
 
 const styles = StyleSheet.create({
-  actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 2, marginBottom: 10 },
-  button: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: colors.white },
-  rowButton: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
-  filterButtonActive: { borderColor: colors.primary, backgroundColor: '#EFF6FF' },
-  buttonText: { color: colors.primary, fontSize: 12, fontWeight: '600', flexShrink: 1 },
+  actionsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 14, marginTop: -2, marginBottom: 8, paddingHorizontal: 2 },
+  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 4 },
+  rowButton: { flexShrink: 1, minWidth: 0 },
+  filterButtonActive: { opacity: 0.9 },
+  buttonText: { color: colors.primary, fontSize: 13, fontWeight: '500', flexShrink: 1 },
   modal: { flex: 1, backgroundColor: colors.white },
   header: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#E8EDF4', backgroundColor: colors.white },
   title: { color: '#111827', fontSize: 15.5, fontWeight: '600' },

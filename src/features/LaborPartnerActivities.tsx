@@ -1,10 +1,11 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { PopupError } from '@/components/PopupError';
+import { IgenWorkerEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { CalendarDays, ChevronDown, CircleDollarSign, UsersRound, X } from 'lucide-react-native';
+import { CalendarDays, ChevronDown, UsersRound, X } from 'lucide-react-native';
 import { colors } from '@/theme/colors';
 import { DateTimeField } from '@/features/quotation/DateTimeField';
 import {
@@ -266,7 +267,7 @@ export function LaborPartnerActivities({ scope, partners, policies, initialTab, 
       </View>
     </FullScreenFormModal>
 
-    <Modal visible={workerPicker} transparent animationType="fade" onRequestClose={() => setWorkerPicker(false)}><Pressable style={styles.backdrop} onPress={() => setWorkerPicker(false)}><Pressable style={styles.dialog} onPress={() => {}}><ModalHeader title="Chọn lao động" onClose={() => setWorkerPicker(false)} /><ScrollView style={{ maxHeight: 430 }}>{workers.map((worker) => <Pressable key={worker._id} onPress={() => { setReferralForm((form) => ({ ...form, workerId: worker._id })); setWorkerPicker(false); }} style={styles.option}><Text style={styles.optionText}>{worker.fullName}</Text><Text style={styles.meta}>{worker.code || worker.phone || worker._id}</Text></Pressable>)}</ScrollView></Pressable></Pressable></Modal>
+    <Modal visible={workerPicker} transparent animationType="fade" onRequestClose={() => setWorkerPicker(false)}><Pressable style={styles.backdrop} onPress={() => setWorkerPicker(false)}><Pressable style={styles.dialog} onPress={() => {}}><ModalHeader title="Chọn lao động" onClose={() => setWorkerPicker(false)} /><ScrollView style={{ maxHeight: 430 }}>{workers.length > 0 ? workers.map((worker) => <Pressable key={worker._id} onPress={() => { setReferralForm((form) => ({ ...form, workerId: worker._id })); setWorkerPicker(false); }} style={styles.option}><Text style={styles.optionText}>{worker.fullName}</Text><Text style={styles.meta}>{worker.code || worker.phone || worker._id}</Text></Pressable>) : <IgenWorkerEmptyState compact message="Chưa có lao động khả dụng." />}</ScrollView></Pressable></Pressable></Modal>
 
     <FullScreenFormModal
       visible={Boolean(detail)}
@@ -308,7 +309,7 @@ export function LaborPartnerActivities({ scope, partners, policies, initialTab, 
 function PartnerPicker({ partners, value, onChange, allowAll = false }: { partners: LaborPartner[]; value: string; onChange: (value: string) => void; allowAll?: boolean }) { return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>{allowAll && <Pressable key="all" onPress={() => onChange('')} style={[styles.option, value === '' && styles.optionSelected]}><Text style={[styles.optionText, value === '' && styles.optionTextSelected]}>{'T\u1ea5t c\u1ea3 \u0111\u1ed1i t\u00e1c'}</Text></Pressable>}{partners.map((partner) => <Pressable key={partner._id} onPress={() => onChange(partner._id)} style={[styles.option, value === partner._id && styles.optionSelected]}><Text style={[styles.optionText, value === partner._id && styles.optionTextSelected]}>{partner.code} · {partner.name}</Text></Pressable>)}</ScrollView>; }
 function Action({ label, onPress, destructive = false }: { label: string; onPress: () => void; destructive?: boolean }) { return <Pressable onPress={onPress} style={[styles.action, destructive && styles.actionDanger]}><Text style={styles.actionText}>{label}</Text></Pressable>; }
 function StatusPill({ label }: { label: string }) { return <Text style={styles.status}>{label}</Text>; }
-function Empty({ text }: { text: string }) { return <View style={styles.empty}><CircleDollarSign color={colors.muted} size={22} /><Text style={styles.meta}>{text}</Text></View>; }
+function Empty({ text }: { text: string }) { return <View style={styles.empty}><IgenWorkerEmptyState message={text} /></View>; }
 function Metric({ label, value }: { label: string; value: string }) { return <View style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.meta}>{label}</Text></View>; }
 function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) { return <View style={styles.modalHeader}><Text style={styles.heading}>{title}</Text><Pressable onPress={onClose}><X size={19} color={colors.muted} /></Pressable></View>; }
 function settlementStatus(status: LaborSettlement['status']) { return ({ draft: 'Nháp', calculated: 'Đã tính', approved: 'Đã duyệt', partially_paid: 'Chi một phần', paid: 'Đã chi đủ', void: 'Đã hủy' } as const)[status]; }
@@ -352,7 +353,7 @@ const styles = StyleSheet.create({
   amount: { color: '#16885A', fontSize: 13, fontWeight: '900' },
   openDetail: { color: colors.primary, fontSize: 10, fontWeight: '800', textAlign: 'right' },
   dangerLink: { alignSelf: 'flex-end', color: '#B42318', fontSize: 10, fontWeight: '800', padding: 5 },
-  empty: { alignItems: 'center', justifyContent: 'center', gap: 7, padding: 22, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
+  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 18 },
   modalCard: { width: '100%', maxHeight: '88%', borderRadius: 24, overflow: 'hidden', backgroundColor: colors.background },
   modalHeader: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
   form: { padding: 16, gap: 9 },

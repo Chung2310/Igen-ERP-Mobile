@@ -1,10 +1,15 @@
 import { Stack } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Check, ChevronDown } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { HrTabIcon } from '@/components/HrTabIcons';
+import {
+  ModuleSectionSwitcher,
+  useModuleSectionTransition,
+  type ModuleSectionItem,
+} from '@/components/ModuleSectionSwitcher';
 import { BranchAppIcon } from '@/components/OverviewTabIcons';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { HrBranchesPanel } from '@/features/hr/sections/HrBranchesPanel';
@@ -53,7 +58,6 @@ export function HrModuleScreen() {
     setActiveBranchId: setSelectedBranchId,
   } = useAuth();
   const [activeTab, setActiveTab] = useState<HrTabId>('employees');
-  const [tabPickerOpen, setTabPickerOpen] = useState(false);
 
   const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const isManager = isAdmin || user?.role === 'manager';
@@ -100,23 +104,17 @@ export function HrModuleScreen() {
   const activeVisibleTab = visibleTabs.some((tab) => tab.key === activeTab)
     ? activeTab
     : visibleTabs[0]?.key ?? activeTab;
-  const activeTabMeta = useMemo(
-    () => visibleTabs.find((t) => t.key === activeVisibleTab) ?? visibleTabs[0],
-    [activeVisibleTab, visibleTabs],
+  const hrSwitcherItems = useMemo<ModuleSectionItem<HrTabId>[]>(
+    () =>
+      visibleTabs.map((t) => ({
+        key: t.key,
+        label: t.label,
+        subtitle: t.subtitle,
+        renderIcon: (size) => <HrTabIcon id={t.key} size={size} />,
+      })),
+    [visibleTabs],
   );
-  const currentTabIndex = useMemo(
-    () => Math.max(0, visibleTabs.findIndex((t) => t.key === activeVisibleTab)),
-    [activeVisibleTab, visibleTabs],
-  );
-  const onStepTab = useCallback(
-    (delta: -1 | 1) => {
-      if (visibleTabs.length <= 1) return;
-      const nextIndex = (currentTabIndex + delta + visibleTabs.length) % visibleTabs.length;
-      const target = visibleTabs[nextIndex];
-      if (target) setActiveTab(target.key);
-    },
-    [currentTabIndex, visibleTabs],
-  );
+  const sectionTransition = useModuleSectionTransition(activeVisibleTab);
 
   return (
     <View style={[styles.root, styles.rootWhite]}>
@@ -189,66 +187,17 @@ export function HrModuleScreen() {
       </View>
 
       {/* Compact Overview-style HR sub-module switcher bar */}
-      {activeTabMeta ? (
-        <View style={styles.switcherWrap}>
-          <View style={styles.switcherBar}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Mục nhân sự trước"
-              disabled={visibleTabs.length <= 1}
-              onPress={() => onStepTab(-1)}
-              style={({ pressed }) => [
-                styles.switcherNavBtn,
-                visibleTabs.length <= 1 && styles.switcherNavBtnDisabled,
-                pressed && styles.switcherNavBtnPressed,
-              ]}
-            >
-              <ChevronLeft size={18} color={colors.ink} />
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Chọn mục nhân sự"
-              disabled={visibleTabs.length <= 1}
-              onPress={() => setTabPickerOpen(true)}
-              style={({ pressed }) => [
-                styles.switcherCenter,
-                pressed && visibleTabs.length > 1 && styles.switcherCenterPressed,
-              ]}
-            >
-              <View style={styles.switcherTitleRow}>
-                <HrTabIcon id={activeTabMeta.key} size={24} />
-                <Text numberOfLines={1} style={styles.switcherTitle}>
-                  {activeTabMeta.label}
-                </Text>
-                {visibleTabs.length > 1 ? (
-                  <ChevronDown size={15} color={colors.muted} />
-                ) : null}
-              </View>
-              <Text numberOfLines={1} style={styles.switcherSubtitle}>
-                {activeTabMeta.subtitle}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Mục nhân sự tiếp theo"
-              disabled={visibleTabs.length <= 1}
-              onPress={() => onStepTab(1)}
-              style={({ pressed }) => [
-                styles.switcherNavBtn,
-                visibleTabs.length <= 1 && styles.switcherNavBtnDisabled,
-                pressed && styles.switcherNavBtnPressed,
-              ]}
-            >
-              <ChevronRight size={18} color={colors.ink} />
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+      <ModuleSectionSwitcher
+        items={hrSwitcherItems}
+        activeKey={activeVisibleTab}
+        transition={sectionTransition}
+        onChange={(nextKey) => setActiveTab(nextKey)}
+        modalTitle="Chọn mục nhân sự"
+        style={styles.switcherBarWrap}
+      />
 
       {/* Active panel */}
-      <View style={styles.body}>
+      <Animated.View style={[styles.body, sectionTransition.animatedStyle]}>
         {/* These reference panels use companyCode without activeBranchId by design. */}
         {activeVisibleTab === 'employees' ? (
           <OrgChartPanel companyCode={user?.companyCode} />
@@ -309,55 +258,7 @@ export function HrModuleScreen() {
             canMarkPaid={canManagePayrollPayments}
           />
         )}
-      </View>
-
-      {/* Bottom sheet modal to choose among HR sub-modules */}
-      <Modal
-        visible={tabPickerOpen}
-        transparent
-        statusBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setTabPickerOpen(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setTabPickerOpen(false)}>
-          <Pressable
-            style={[styles.modalSheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
-            onPress={() => {}}
-          >
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn nghiệp vụ nhân sự</Text>
-              <Pressable onPress={() => setTabPickerOpen(false)} hitSlop={8}>
-                <Text style={styles.modalClose}>Đóng</Text>
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
-              {visibleTabs.map((tab) => {
-                const active = tab.key === activeVisibleTab;
-                return (
-                  <Pressable
-                    key={tab.key}
-                    onPress={() => {
-                      setActiveTab(tab.key);
-                      setTabPickerOpen(false);
-                    }}
-                    style={[styles.modalRow, active && styles.modalRowActive]}
-                  >
-                    <HrTabIcon id={tab.key} size={38} />
-                    <View style={styles.modalRowCopy}>
-                      <Text style={styles.modalRowTitle}>{tab.label}</Text>
-                      <Text numberOfLines={1} style={styles.modalRowSub}>
-                        {tab.subtitle}
-                      </Text>
-                    </View>
-                    {active ? <Check size={17} color={colors.primary} /> : null}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </Animated.View>
 
       {/* Branch picker modal matching Overview style */}
       <Modal
@@ -373,12 +274,6 @@ export function HrModuleScreen() {
             onPress={() => {}}
           >
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn chi nhánh</Text>
-              <Pressable onPress={() => setBranchModalOpen(false)} hitSlop={8}>
-                <Text style={styles.modalClose}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {branches.map((branch) => {
                 const selected = branch._id === activeBranchId;
@@ -430,62 +325,7 @@ const styles = StyleSheet.create({
   },
   branchBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   branchBtnText: { color: colors.ink, fontSize: 13, fontWeight: '700', flexShrink: 1 },
-  switcherWrap: {
-    paddingHorizontal: 14,
-    paddingTop: 4,
-    paddingBottom: 10,
-  },
-  switcherBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E5EAF2',
-    paddingHorizontal: 6,
-    paddingVertical: 8,
-  },
-  switcherNavBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F5F8FD',
-  },
-  switcherNavBtnDisabled: {
-    opacity: 0.35,
-  },
-  switcherNavBtnPressed: {
-    backgroundColor: '#E8F0FC',
-  },
-  switcherCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  switcherCenterPressed: {
-    opacity: 0.72,
-  },
-  switcherTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  switcherTitle: {
-    color: colors.ink,
-    fontSize: 14.5,
-    fontWeight: '700',
-    flexShrink: 1,
-  },
-  switcherSubtitle: {
-    color: colors.muted,
-    fontSize: 10,
-    marginTop: 2,
-    textAlign: 'center',
-  },
+  switcherBarWrap: { marginHorizontal: 14, marginTop: 4, marginBottom: 10 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.35)',

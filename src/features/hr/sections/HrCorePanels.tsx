@@ -13,6 +13,7 @@ import {
 import { LogIn, LogOut, Plus, RefreshCw } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { HrFormInputRow, HrFormSectionTitle } from '@/features/hr/components/HrFormFields';
 import {
   createKanbanTask,
   createLeaveApplication,
@@ -430,29 +431,22 @@ export function TasksPanel({ branchId }: { branchId?: string }) {
         saving={saving}
         onClose={() => setCreateOpen(false)}
       >
-        <View style={{ gap: 10, paddingBottom: 12 }}>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin công việc" />
+          <HrFormInputRow
+            label="Tên công việc *"
             value={title}
             onChangeText={setTitle}
-            placeholder="Tên công việc..."
-            placeholderTextColor={colors.muted}
-            style={styles.field}
+            placeholder="Nhập tên công việc..."
           />
-          <TextInput
+          <HrFormInputRow
+            label="Mô tả chi tiết"
             value={desc}
             onChangeText={setDesc}
             placeholder="Mô tả chi tiết..."
-            placeholderTextColor={colors.muted}
             multiline
-            style={[styles.field, { minHeight: 80, textAlignVertical: 'top' }]}
+            last
           />
-          <Pressable
-            disabled={saving}
-            onPress={() => void onCreate()}
-            style={[styles.submitBtn, saving && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo công việc'}</Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
     </ScrollView>
@@ -607,45 +601,34 @@ export function LeavesPanel({
         saving={saving}
         onClose={() => setCreateOpen(false)}
       >
-        <View style={{ gap: 10, paddingBottom: 12 }}>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin đơn nghỉ phép" />
+          <HrFormInputRow
+            label="Loại đơn"
             value={leaveType}
             onChangeText={setLeaveType}
-            placeholder="Loại đơn (VD: Nghỉ phép năm)"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
+            placeholder="VD: Nghỉ phép năm"
           />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TextInput
-              value={startDate}
-              onChangeText={setStartDate}
-              placeholder="Từ ngày (YYYY-MM-DD)"
-              placeholderTextColor={colors.muted}
-              style={[styles.field, { flex: 1 }]}
-            />
-            <TextInput
-              value={endDate}
-              onChangeText={setEndDate}
-              placeholder="Đến ngày (YYYY-MM-DD)"
-              placeholderTextColor={colors.muted}
-              style={[styles.field, { flex: 1 }]}
-            />
-          </View>
-          <TextInput
+          <HrFormInputRow
+            label="Từ ngày (YYYY-MM-DD)"
+            value={startDate}
+            onChangeText={setStartDate}
+            placeholder="YYYY-MM-DD"
+          />
+          <HrFormInputRow
+            label="Đến ngày (YYYY-MM-DD)"
+            value={endDate}
+            onChangeText={setEndDate}
+            placeholder="YYYY-MM-DD"
+          />
+          <HrFormInputRow
+            label="Lý do *"
             value={reason}
             onChangeText={setReason}
-            placeholder="Lý do..."
-            placeholderTextColor={colors.muted}
+            placeholder="Nhập lý do..."
             multiline
-            style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+            last
           />
-          <Pressable
-            disabled={saving}
-            onPress={() => void onCreate()}
-            style={[styles.submitBtn, saving && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{saving ? 'Đang gửi...' : 'Gửi đơn'}</Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
     </ScrollView>

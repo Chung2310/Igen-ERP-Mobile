@@ -40,9 +40,13 @@ function scopedOptions(
 
 export async function listQuotes(
   scope: QuotationScope,
-  params: { kind: QuoteKind; status?: QuoteStatus; search?: string; page: number },
+  params: { kind: QuoteKind; status?: QuoteStatus; search?: string; page: number; limit?: number },
 ) {
-  const query = new URLSearchParams({ page: String(params.page), sort: 'newest' });
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit ?? 50),
+    sort: 'newest',
+  });
   if (params.kind === 'customer') query.set('kind', 'customer');
   if (params.status) query.set('status', params.status);
   if (params.search?.trim()) query.set('search', params.search.trim());

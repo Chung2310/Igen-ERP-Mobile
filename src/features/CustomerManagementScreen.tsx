@@ -62,11 +62,12 @@ import {
   type CustomerType,
 } from '@/features/customerManagementApi';
 import { colors } from '@/theme/colors';
+import { DEFAULT_LOAD_MORE_LIMIT, isCloseToBottom } from '@/utils/scrollLoadMore';
 
 type Tab = 'list' | 'settings';
 type DetailTab = 'overview' | 'transactions' | 'purchases' | 'repairs' | 'receivables' | 'points' | 'billing';
 
-const emptyPage: CustomerPage = { items: [], total: 0, page: 1, limit: 20 };
+const emptyPage: CustomerPage = { items: [], total: 0, page: 1, limit: DEFAULT_LOAD_MORE_LIMIT };
 const emptyInput = (): CustomerInput => ({
   name: '',
   phone: '',
@@ -531,6 +532,7 @@ function CustomerDetail({
   onStatusChange: () => void;
 }) {
   const [tab, setTab] = useState<DetailTab>('overview');
+  const [loadMoreTrigger, setLoadMoreTrigger] = useState(0);
   const tabs: Array<{ key: DetailTab; label: string; icon: LucideIcon }> = [
     { key: 'overview', label: 'Tổng quan', icon: UserRound },
     { key: 'transactions', label: 'Lịch sử giao dịch', icon: History },
@@ -553,7 +555,17 @@ function CustomerDetail({
           <Chip key={key} label={label} selected={tab === key} icon={icon} onPress={() => setTab(key)} />
         ))}
       </ScrollView>
-      <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(event) => {
+          if ((tab === 'transactions' || tab === 'repairs') && isCloseToBottom(event)) {
+            setLoadMoreTrigger((value) => value + 1);
+          }
+        }}
+      >
         <View style={styles.detailHero}>
           <View style={styles.spaceBetween}>
             <Pressable accessibilityRole="button" onPress={onBack} style={styles.backPill}>
@@ -628,9 +640,18 @@ function CustomerDetail({
         </View>
 
         {tab === 'overview' && <CustomerOverview customer={customer} branchId={branchId} />}
-        {tab === 'transactions' && <TransactionsPanel customer={customer} branchId={branchId} />}
+        {tab === 'transactions' && (
+          <TransactionsPanel customer={customer} branchId={branchId} loadMoreTrigger={loadMoreTrigger} />
+        )}
         {tab === 'purchases' && <PurchasesPanel customer={customer} branchId={branchId} />}
-        {tab === 'repairs' && <RepairsPanel customer={customer} branchId={branchId} canRead={canRepairRead} />}
+        {tab === 'repairs' && (
+          <RepairsPanel
+            customer={customer}
+            branchId={branchId}
+            canRead={canRepairRead}
+            loadMoreTrigger={loadMoreTrigger}
+          />
+        )}
         {tab === 'receivables' && (
           <ReceivablesPanel customer={customer} branchId={branchId} canRead={canRetailRead} />
         )}
@@ -877,13 +898,22 @@ function PurchasesPanel({ customer, branchId }: { customer: Customer; branchId?:
   );
 }
 
-function TransactionsPanel({ customer, branchId }: { customer: Customer; branchId?: string }) {
+function TransactionsPanel({
+  customer,
+  branchId,
+  loadMoreTrigger,
+}: {
+  customer: Customer;
+  branchId?: string;
+  loadMoreTrigger: number;
+}) {
   const [filter, setFilter] = useState('all');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<Awaited<ReturnType<typeof customerManagementApi.transactions>> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<CustomerTransactionRow | null>(null);
   const [detail, setDetail] = useState<Awaited<ReturnType<typeof customerManagementApi.transactionDetail>> | null>(null);
@@ -900,20 +930,49 @@ function TransactionsPanel({ customer, branchId }: { customer: Customer; branchI
       return;
     }
     const controller = new AbortController();
-    setBusy(true);
+    if (page === 1) setBusy(true);
+    else setLoadingMore(true);
     setError('');
     void customerManagementApi
-      .transactions(customer._id, scope, { type: filter, from: from || undefined, to: to || undefined, page, limit: 20 }, controller.signal)
-      .then(setResult)
+      .transactions(
+        customer._id,
+        scope,
+        { type: filter, from: from || undefined, to: to || undefined, page, limit: DEFAULT_LOAD_MORE_LIMIT },
+        controller.signal,
+      )
+      .then((next) => {
+        if (controller.signal.aborted) return;
+        setResult((current) =>
+          page > 1 && current
+            ? {
+                ...next,
+                items: [
+                  ...current.items,
+                  ...next.items.filter((row) => !current.items.some((existing) => existing.id === row.id)),
+                ],
+              }
+            : next,
+        );
+      })
       .catch((cause) => {
         if (!controller.signal.aborted)
           setError(cause instanceof Error ? cause.message : 'Không tải được lịch sử giao dịch.');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setBusy(false);
+        if (!controller.signal.aborted) {
+          setBusy(false);
+          setLoadingMore(false);
+        }
       });
     return () => controller.abort();
   }, [customer._id, filter, from, page, scope, to]);
+
+  useEffect(() => {
+    if (!loadMoreTrigger || busy || loadingMore || !result) return;
+    if (result.items.length < result.total) {
+      setPage((value) => value + 1);
+    }
+  }, [loadMoreTrigger]);
 
   useEffect(() => {
     if (!scope || !selected) {
@@ -1054,20 +1113,7 @@ function TransactionsPanel({ customer, branchId }: { customer: Customer; branchI
         !busy && <Text style={styles.empty}>Chưa có giao dịch phù hợp.</Text>
       )}
 
-      {result && result.total > result.limit && (
-        <View style={styles.inlinePagination}>
-          <Action compact label="‹ Trước" disabled={page <= 1} onPress={() => setPage((value) => value - 1)} />
-          <Text style={styles.pageLabel}>
-            Trang {result.page} / {Math.ceil(result.total / result.limit)}
-          </Text>
-          <Action
-            compact
-            label="Sau ›"
-            disabled={page * result.limit >= result.total}
-            onPress={() => setPage((value) => value + 1)}
-          />
-        </View>
-      )}
+      {loadingMore && <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />}
 
       <FullScreenFormModal
         visible={Boolean(selected)}
@@ -1137,29 +1183,64 @@ function TransactionsPanel({ customer, branchId }: { customer: Customer; branchI
   );
 }
 
-function RepairsPanel({ customer, branchId, canRead }: { customer: Customer; branchId?: string; canRead: boolean }) {
+function RepairsPanel({
+  customer,
+  branchId,
+  canRead,
+  loadMoreTrigger,
+}: {
+  customer: Customer;
+  branchId?: string;
+  canRead: boolean;
+  loadMoreTrigger: number;
+}) {
   const [items, setItems] = useState<Awaited<ReturnType<typeof customerManagementApi.repairs>> | null>(null);
   const [page, setPage] = useState(1);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!branchId || !canRead) return;
     const controller = new AbortController();
-    setBusy(true);
+    if (page === 1) setBusy(true);
+    else setLoadingMore(true);
     setError('');
     void customerManagementApi
-      .repairs(customer._id, { companyCode: customer.companyCode, branchId }, page, controller.signal)
-      .then(setItems)
+      .repairs(customer._id, { companyCode: customer.companyCode, branchId }, page, controller.signal, DEFAULT_LOAD_MORE_LIMIT)
+      .then((next) => {
+        if (controller.signal.aborted) return;
+        setItems((current) =>
+          page > 1 && current
+            ? {
+                ...next,
+                items: [
+                  ...current.items,
+                  ...next.items.filter((row) => !current.items.some((existing) => existing._id === row._id)),
+                ],
+              }
+            : next,
+        );
+      })
       .catch((cause) => {
         if (!controller.signal.aborted)
           setError(cause instanceof Error ? cause.message : 'Không tải được lịch sử sửa chữa.');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setBusy(false);
+        if (!controller.signal.aborted) {
+          setBusy(false);
+          setLoadingMore(false);
+        }
       });
     return () => controller.abort();
   }, [branchId, canRead, customer._id, customer.companyCode, page]);
+
+  useEffect(() => {
+    if (!loadMoreTrigger || busy || loadingMore || !items) return;
+    if (items.items.length < items.total) {
+      setPage((value) => value + 1);
+    }
+  }, [loadMoreTrigger]);
 
   if (!canRead) return <Text style={styles.infoBanner}>Tài khoản chưa có quyền xem lịch sử sửa chữa.</Text>;
   if (!branchId) return <Text style={styles.infoBanner}>Chọn chi nhánh để xem lịch sử sửa chữa và bảo hành.</Text>;
@@ -1207,20 +1288,7 @@ function RepairsPanel({ customer, branchId, canRead }: { customer: Customer; bra
       ) : (
         !busy && <Text style={styles.empty}>Chưa có phiếu sửa chữa hoặc bảo hành tại chi nhánh này.</Text>
       )}
-      {items && items.total > items.limit && (
-        <View style={styles.inlinePagination}>
-          <Action compact label="‹ Trước" disabled={page <= 1} onPress={() => setPage((value) => value - 1)} />
-          <Text style={styles.pageLabel}>
-            Trang {page} / {Math.ceil(items.total / items.limit)}
-          </Text>
-          <Action
-            compact
-            label="Sau ›"
-            disabled={page * items.limit >= items.total}
-            onPress={() => setPage((value) => value + 1)}
-          />
-        </View>
-      )}
+      {loadingMore && <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />}
     </View>
   );
 }
@@ -1897,6 +1965,7 @@ export function CustomerManagementScreen(_props: FeatureScreenProps) {
   const [selected, setSelected] = useState<Customer | null>(null);
   const [formTarget, setFormTarget] = useState<Customer | 'new' | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -1955,19 +2024,32 @@ export function CustomerManagementScreen(_props: FeatureScreenProps) {
   useEffect(() => {
     if (!companyCode || !canRead || selected || tab !== 'list') {
       setLoading(false);
+      setLoadingMore(false);
       return;
     }
     const controller = new AbortController();
-    setLoading(true);
+    if (page === 1) setLoading(true);
+    else setLoadingMore(true);
     setError('');
     void customerManagementApi
       .list(
         companyCode,
-        { q: debouncedQuery || undefined, status, type: type || undefined, page, limit: 20 },
+        { q: debouncedQuery || undefined, status, type: type || undefined, page, limit: DEFAULT_LOAD_MORE_LIMIT },
         controller.signal,
       )
       .then((value) => {
-        if (!controller.signal.aborted) setResult(value);
+        if (controller.signal.aborted) return;
+        setResult((current) =>
+          page > 1
+            ? {
+                ...value,
+                items: [
+                  ...current.items,
+                  ...value.items.filter((row) => !current.items.some((existing) => existing._id === row._id)),
+                ],
+              }
+            : value,
+        );
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
@@ -1976,6 +2058,7 @@ export function CustomerManagementScreen(_props: FeatureScreenProps) {
       .finally(() => {
         if (!controller.signal.aborted) {
           setLoading(false);
+          setLoadingMore(false);
           setRefreshing(false);
         }
       });
@@ -1988,18 +2071,30 @@ export function CustomerManagementScreen(_props: FeatureScreenProps) {
       setRefreshing(false);
       return;
     }
-    setLoading(true);
+    setPage(1);
     setError('');
     if (companyCode && !selected) {
       void customerManagementApi
-        .list(companyCode, { q: debouncedQuery || undefined, status, type: type || undefined, page, limit: 20 })
+        .list(companyCode, {
+          q: debouncedQuery || undefined,
+          status,
+          type: type || undefined,
+          page: 1,
+          limit: DEFAULT_LOAD_MORE_LIMIT,
+        })
         .then(setResult)
         .catch((cause) => setError(cause instanceof Error ? cause.message : 'Không làm mới được danh sách.'))
         .finally(() => {
           setLoading(false);
+          setLoadingMore(false);
           setRefreshing(false);
         });
     }
+  };
+
+  const loadMoreCustomers = () => {
+    if (loading || loadingMore || result.items.length >= result.total) return;
+    setPage((current) => current + 1);
   };
 
   const openCustomer = async (customer: Customer) => {
@@ -2081,7 +2176,6 @@ export function CustomerManagementScreen(_props: FeatureScreenProps) {
   };
 
   const activeFilterCount = (status !== 'active' ? 1 : 0) + (type !== '' ? 1 : 0);
-  const totalPages = Math.max(1, Math.ceil(result.total / (result.limit || 20)));
   const branchName =
     branches.find((branch) => branch._id === branchId)?.name ||
     (branchId === user?.branchId ? user?.branchName : undefined) ||
@@ -2279,6 +2373,10 @@ export function CustomerManagementScreen(_props: FeatureScreenProps) {
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+            scrollEventThrottle={16}
+            onScroll={(event) => {
+              if (isCloseToBottom(event)) loadMoreCustomers();
+            }}
           >
             {loading ? (
               <ActivityIndicator color={colors.primary} style={{ marginTop: 36 }} />
@@ -2355,25 +2453,8 @@ export function CustomerManagementScreen(_props: FeatureScreenProps) {
                 <Text style={styles.empty}>Thử thay đổi từ khóa tìm kiếm hoặc điều kiện bộ lọc.</Text>
               </View>
             )}
+            {loadingMore && <ActivityIndicator color={colors.primary} style={{ marginVertical: 14 }} />}
           </ScrollView>
-
-          {!loading && (
-            <View style={styles.pagination}>
-              <Text style={styles.pageMeta}>{result.total.toLocaleString('vi-VN')} khách</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Action compact label="‹ Trước" disabled={page <= 1} onPress={() => setPage((current) => current - 1)} />
-                <Text style={styles.pageLabel}>
-                  {page} / {totalPages}
-                </Text>
-                <Action
-                  compact
-                  label="Sau ›"
-                  disabled={page * result.limit >= result.total}
-                  onPress={() => setPage((current) => current + 1)}
-                />
-              </View>
-            </View>
-          )}
         </>
       )}
 

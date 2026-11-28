@@ -77,7 +77,7 @@ export const inventoryApi = {
   receiptAction: (id: string, action: 'submit' | 'start-receiving' | 'confirm' | 'cancel', branchId?: string, reason?: string) => envelope<GoodsReceipt>(`/inventory/receiving/receipts/${encodeURIComponent(id)}/${action}${query(branchParams(branchId))}`, { method: 'POST', headers: branchHeaders(branchId), body: action === 'cancel' ? { reason: reason || 'Hủy theo yêu cầu người dùng' } : undefined }),
 
   listDestinations: (branchId: string) => envelope<TransferDestination[]>(`/inventory/transfers/destinations${query(branchParams(branchId))}`, { headers: branchHeaders(branchId) }),
-  listTransfers: (branchId: string, page = 1, status?: string) => envelope<{ items: InventoryTransfer[]; total: number; page: number; limit: number }>(`/inventory/transfers${query({ ...branchParams(branchId), status, page })}`, { headers: branchHeaders(branchId) }),
+  listTransfers: (branchId: string, page = 1, status?: string, limit = 50) => envelope<{ items: InventoryTransfer[]; total: number; page: number; limit: number }>(`/inventory/transfers${query({ ...branchParams(branchId), status, page, limit })}`, { headers: branchHeaders(branchId) }),
   createTransfer: (branchId: string, input: Record<string, unknown>) => envelope<InventoryTransfer>(`/inventory/transfers${query(branchParams(branchId))}`, { method: 'POST', headers: branchHeaders(branchId), body: input }),
   transferAction: (branchId: string, id: string, action: 'accept' | 'cancel', reason?: string) => envelope<InventoryTransfer>(`/inventory/transfers/${encodeURIComponent(id)}/${action}${query(branchParams(branchId))}`, { method: 'POST', headers: branchHeaders(branchId), body: action === 'cancel' ? { reason: reason || 'Hủy theo yêu cầu người dùng' } : undefined }),
 

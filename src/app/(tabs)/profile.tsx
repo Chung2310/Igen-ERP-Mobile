@@ -14,6 +14,7 @@ import { ChevronRight } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import { SettingsDuotoneIcon, type SettingsIconKey } from '@/components/SettingsIcons';
 import { useAuth } from '@/core/auth/AuthProvider';
+import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { colors } from '@/theme/colors';
 
 const settings: ReadonlyArray<{ key: Exclude<SettingsIconKey, 'logout'>; label: string }> = [
@@ -95,7 +96,14 @@ export default function ProfileScreen() {
           <Pressable
             accessibilityRole="button"
             disabled={signingOut}
-            onPress={() => { void onSignOut(); }}
+            onPress={() =>
+              showHrConfirm({
+                title: 'Đăng xuất?',
+                message: 'Bạn có chắc chắn muốn đăng xuất khỏi ERP Mobile?',
+                confirmLabel: 'Đăng xuất',
+                onConfirm: onSignOut,
+              })
+            }
             style={({ pressed }) => [styles.menuRow, pressed && styles.rowPressed]}
           >
             <View style={styles.menuIconWrap}>
@@ -108,8 +116,6 @@ export default function ProfileScreen() {
             <Text style={styles.menuLabel}>Đăng xuất</Text>
           </Pressable>
         </View>
-
-        <Text style={styles.version}>ERP Mobile · Kết nối Igen ERP</Text>
       </ScrollView>
     </Screen>
   );
@@ -199,12 +205,6 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: '#EEF2F7',
     marginHorizontal: 16,
-  },
-  version: {
-    color: colors.muted,
-    fontSize: 10.5,
-    textAlign: 'center',
-    marginTop: 20,
   },
 });
 

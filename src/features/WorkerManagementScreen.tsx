@@ -1,19 +1,25 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { CenteredPageLoader } from '@/components/BrandLoader';
-import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
+import { IgenWorkerEmptyState } from '@/components/EmptyStateIllustration';
+import {
+  ModuleSectionSwitcher,
+  useModuleSectionTransition,
+  type ModuleSectionItem,
+} from '@/components/ModuleSectionSwitcher';
 import { BranchAppIcon } from '@/components/OverviewTabIcons';
-import { PASTEL_BACKDROP_TOP_COLOR, PastelBackdrop } from '@/components/PastelBackdrop';
+import { PASTEL_BACKDROP_TOP_COLOR } from '@/components/PastelBackdrop';
 import { PopupError } from '@/components/PopupError';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HrFab } from '@/features/hr/components/HrFab';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import type { FeatureScreenProps } from '@/features/modules/featureScreenRegistry';
 import { Stack } from 'expo-router';
 import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import * as DocumentPicker from 'expo-document-picker';
 import QRCode from 'react-native-qrcode-svg';
-import { Bell, Check, ChevronDown, Download, FileUp, Pencil, Plus, QrCode, Search, Send, SlidersHorizontal, Trash2, Users, X } from 'lucide-react-native';
+import { Bell, Briefcase, Check, ChevronDown, Download, FileText, FileUp, Pencil, Plus, QrCode, Search, Send, SlidersHorizontal, Trash2, Users, X } from 'lucide-react-native';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { getErpWebUrl } from '@/core/network/erpWebLinks';
 import { colors } from '@/theme/colors';
@@ -204,34 +210,15 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
     : 'Chọn chi nhánh';
   const scope = useMemo<WorkerScope | undefined>(() => companyCode ? { companyCode, ...(activeBranchId || user?.branchId ? { branchId: activeBranchId || user?.branchId } : {}) } : undefined, [activeBranchId, companyCode, user?.branchId]);
   const [tab, setTab] = useState<Tab>('projects');
-  const sectionOpacity = useRef(new Animated.Value(1)).current;
-  const sectionTranslateX = useRef(new Animated.Value(0)).current;
-  const transitionDirRef = useRef<number>(0);
-  const handleTabChange = useCallback((nextTab: Tab, direction: -1 | 0 | 1) => {
-    transitionDirRef.current = direction;
+  const sectionTransition = useModuleSectionTransition(tab);
+  const handleTabChange = useCallback((nextTab: Tab) => {
     setTab(nextTab);
   }, []);
-  useEffect(() => {
-    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 18;
-    sectionOpacity.setValue(0.35);
-    sectionTranslateX.setValue(startX);
-    Animated.parallel([
-      Animated.timing(sectionOpacity, {
-        toValue: 1,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sectionTranslateX, {
-        toValue: 0,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [tab, sectionOpacity, sectionTranslateX]);
   const [workers, setWorkers] = useState<Worker[]>([]); const [projects, setProjects] = useState<WorkerProject[]>([]);
   const [contracts, setContracts] = useState<LaborContract[]>([]); const [notifications, setNotifications] = useState<WorkerNotification[]>([]);
   const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState(''); const [statusFilter, setStatusFilter] = useState('all'); const [laborTypeFilter, setLaborTypeFilter] = useState('all'); const [workerProjectFilter, setWorkerProjectFilter] = useState('all');
+  const [projectStatusSheetOpen, setProjectStatusSheetOpen] = useState(false);
   const [registrationFrom, setRegistrationFrom] = useState(''); const [registrationTo, setRegistrationTo] = useState('');
   const [workerFiltersOpen, setWorkerFiltersOpen] = useState(false);
   const [workerModal, setWorkerModal] = useState(false); const [editingWorker, setEditingWorker] = useState<Worker | null>(null); const [workerForm, setWorkerForm] = useState<WorkerInput>(blankWorker()); const [workerDetail, setWorkerDetail] = useState<Worker | null>(null);
@@ -659,8 +646,50 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
   if (!canRead) return <View style={styles.center}><Users color={colors.primary} size={28} /><Text style={styles.heading}>Bạn chưa được cấp quyền sử dụng module Lao động</Text><Text style={styles.muted}>Cần quyền people:read hoặc people:manage.</Text></View>;
   if (!scope && tab !== 'notifications') return <ScrollView contentContainerStyle={styles.center}><Text style={styles.heading}>Chọn cơ sở lao động</Text><Text style={styles.muted}>Cần có mã công ty để tải hồ sơ, dự án và hợp đồng.</Text>{isSuperAdmin ? companies.map((item) => <Pressable key={item.code} style={[styles.card, { alignSelf: 'stretch' }]} onPress={() => setCompanyCode(item.code)}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.muted}>{item.code}</Text></Pressable>) : null}{isSuperAdmin && !companies.length && <Text style={styles.muted}>{error || 'Đang tải danh sách cơ sở…'}</Text>}</ScrollView>;
 
+  const workerFilterSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (statusFilter !== 'all') parts.push(workerStatusLabel(statusFilter));
+    if (laborTypeFilter !== 'all') parts.push(laborTypeLabel(laborTypeFilter));
+    if (workerProjectFilter !== 'all') {
+      const pName = projects.find((p) => p._id === workerProjectFilter)?.name;
+      if (pName) parts.push(pName);
+    }
+    if (registrationFrom || registrationTo) parts.push('Theo ngày tiếp nhận');
+    return parts.length ? parts.join(' · ') : 'Tất cả trạng thái & bộ lọc';
+  }, [laborTypeFilter, projects, registrationFrom, registrationTo, statusFilter, workerProjectFilter]);
+
+  const contractFilterSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (contractStatus !== 'all') parts.push(contractStatusLabel(contractStatus as LaborContractStatus));
+    if (contractAlertOnly) parts.push('Cần chú ý');
+    if (contractClient !== 'all') parts.push(contractClient);
+    return parts.length ? parts.join(' · ') : 'Tất cả trạng thái hợp đồng';
+  }, [contractAlertOnly, contractClient, contractStatus]);
+
   return <View style={styles.container}>
-    <PastelBackdrop idPrefix="worker" />
+    <View pointerEvents="none" style={styles.topZoneBackdrop}>
+      <Svg width="100%" height="100%" viewBox="0 0 360 96" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id="workerTopBg" x1="0" y1="0" x2="0.15" y2="1">
+            <Stop offset="0" stopColor="#D8EFFC" stopOpacity="1" />
+            <Stop offset="0.45" stopColor="#EAF3FC" stopOpacity="1" />
+            <Stop offset="1" stopColor="#F5FAFE" stopOpacity="1" />
+          </LinearGradient>
+          <RadialGradient id="workerGlowTR" cx="86%" cy="10%" rx="52%" ry="42%">
+            <Stop offset="0" stopColor="#8FD3FA" stopOpacity="0.48" />
+            <Stop offset="1" stopColor="#8FD3FA" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="360" height="96" fill="url(#workerTopBg)" />
+        <Rect x="0" y="0" width="360" height="96" fill="url(#workerGlowTR)" />
+        <Path d="M 190 96 C 242 66, 298 58, 360 36 L 360 96 Z" fill="#2463EB" fillOpacity={0.04} />
+        <Circle cx="328" cy="14" r="54" fill="none" stroke="#2463EB" strokeOpacity={0.075} strokeWidth={1.2} />
+        <Circle cx="328" cy="14" r="32" fill="none" stroke="#2463EB" strokeOpacity={0.065} strokeWidth={1} />
+        <Circle cx="246" cy="18" r="2.1" fill="#2463EB" fillOpacity={0.11} />
+        <Circle cx="260" cy="12" r="1.7" fill="#2463EB" fillOpacity={0.08} />
+        <Circle cx="258" cy="26" r="1.5" fill="#2463EB" fillOpacity={0.09} />
+      </Svg>
+    </View>
     {isSuperAdmin && <Pressable style={styles.companySelect} onPress={() => setCompanyPickerOpen(true)}><Text style={styles.muted}>Cơ sở: </Text><Text style={styles.companyName}>{companies.find((item) => item.code === companyCode)?.name || companyCode || 'Chọn cơ sở'}</Text></Pressable>}
     <Stack.Screen options={{
       headerStyle: { backgroundColor: PASTEL_BACKDROP_TOP_COLOR },
@@ -684,52 +713,95 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
     <ModuleSectionSwitcher
       items={workerSections}
       activeKey={tab}
+      transition={sectionTransition}
       onChange={handleTabChange}
       modalTitle="Chọn tính năng Lao động"
       style={styles.switcherBarWrap}
     />
     {error ? <PopupError error={error} /> : null}{busy ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 5 }} /> : null}
 
-    <Animated.View style={{ flex: 1, opacity: sectionOpacity, transform: [{ translateX: sectionTranslateX }] }}>
-    {tab === 'workers' && <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
-      <View style={styles.toolbar}><View style={styles.search}><Search color={colors.muted} size={15} /><TextInput value={search} onChangeText={setSearch} placeholder="Tìm tên, điện thoại, email" style={styles.searchInput} />{search ? <Pressable onPress={() => setSearch('')}><X size={14} color={colors.muted} /></Pressable> : null}</View><Action label="Lọc" icon={<SlidersHorizontal size={13} color={colors.primary} />} onPress={() => setWorkerFiltersOpen(true)} /><Action label="Thêm" icon={<Plus size={13} color={colors.primary} />} onPress={openWorkerCreate} disabled={!canManage} /></View>
+    <Animated.View style={[{ flex: 1 }, sectionTransition.animatedStyle]}>
+    {tab === 'workers' && <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 92 }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
+      <View style={styles.filterTopBar}>
+        <Pressable accessibilityRole="button" onPress={() => setWorkerFiltersOpen(true)} style={({ pressed }) => [styles.filterTriggerBtn, pressed && { opacity: 0.65 }]}>
+          <SlidersHorizontal size={17} strokeWidth={1.6} color={colors.ink} />
+          <Text numberOfLines={1} style={styles.filterTriggerText}>{workerFilterSummary}</Text>
+          <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
+        </Pressable>
+      </View>
+      <View style={styles.toolbar}><View style={styles.search}><Search color="#94A3B8" size={16} strokeWidth={1.6} /><TextInput value={search} onChangeText={setSearch} placeholder="Tìm tên, điện thoại, email" placeholderTextColor="#94A3B8" style={styles.searchInput} />{search ? <Pressable onPress={() => setSearch('')}><X size={14} color={colors.muted} /></Pressable> : null}</View></View>
       <View style={styles.actions}><Action label="Xuất CSV" icon={<Download size={13} color={colors.primary} />} onPress={() => void exportWorkers()} /><Action label="Tải mẫu CSV" icon={<Download size={13} color={colors.primary} />} onPress={() => void exportWorkerTemplate()} /><Action label="Nhập CSV" icon={<FileUp size={13} color={colors.primary} />} onPress={() => void chooseWorkerImport()} disabled={!canManage} />{selectedWorkerIds.length > 0 && canManage && <Action label={`Xóa đã chọn (${selectedWorkerIds.length})`} icon={<Trash2 size={13} color="#B42318" />} onPress={() => void deleteSelectedWorkers()} />}</View>
-      
-      {loading ? <Loading /> : visibleWorkers.map((worker) => <View key={worker._id} style={styles.card}><View style={styles.row}><Pressable disabled={!canManage} onPress={() => setSelectedWorkerIds((current) => current.includes(worker._id) ? current.filter((id) => id !== worker._id) : [...current, worker._id])} style={[styles.checkbox, selectedWorkerIds.includes(worker._id) && styles.checkboxSelected]}>{selectedWorkerIds.includes(worker._id) && <Check size={13} color={colors.white} />}</Pressable><Pressable style={{ flex: 1 }} onPress={() => setWorkerDetail(worker)}><Text style={styles.cardTitle}>{worker.fullName}</Text><Text style={styles.muted}>{worker.phone || '—'} · {laborTypeLabel(worker.laborType)}</Text><Text style={styles.muted}>{worker.email || worker.idCard || 'Chưa có thông tin định danh'}</Text></Pressable><StatusPill label={workerStatusLabel(worker.status)} /></View><View style={styles.cardActions}><Action label="Chi tiết" onPress={() => setWorkerDetail(worker)} /><Action label="Sửa" onPress={() => openWorkerEdit(worker)} disabled={!canManage} /><Action label="Xóa" danger onPress={() => confirmWorkerDelete(worker)} disabled={!canManage} /></View></View>)}
-      {!loading && !visibleWorkers.length && <Empty text="Chưa có hồ sơ lao động phù hợp." />}
+
+      {loading ? <Loading /> : visibleWorkers.length > 0 ? <View style={styles.listFlat}>{visibleWorkers.map((worker) => <View key={worker._id} style={styles.listItem}><View style={styles.row}><Pressable disabled={!canManage} onPress={() => setSelectedWorkerIds((current) => current.includes(worker._id) ? current.filter((id) => id !== worker._id) : [...current, worker._id])} style={[styles.checkbox, selectedWorkerIds.includes(worker._id) && styles.checkboxSelected]}>{selectedWorkerIds.includes(worker._id) && <Check size={13} color={colors.white} />}</Pressable><Pressable style={{ flex: 1 }} onPress={() => setWorkerDetail(worker)}><Text style={styles.cardTitle}>{worker.fullName}</Text><Text style={styles.muted}>{worker.phone || '—'} · {laborTypeLabel(worker.laborType)}</Text><Text style={styles.muted}>{worker.email || worker.idCard || 'Chưa có thông tin định danh'}</Text></Pressable><StatusPill label={workerStatusLabel(worker.status)} /></View><View style={styles.cardActions}><Action label="Chi tiết" onPress={() => setWorkerDetail(worker)} /><Action label="Sửa" onPress={() => openWorkerEdit(worker)} disabled={!canManage} /><Action label="Xóa" danger onPress={() => confirmWorkerDelete(worker)} disabled={!canManage} /></View></View>)}</View> : <Empty text="Chưa có hồ sơ lao động phù hợp." />}
     </ScrollView>}
 
-    {tab === 'projects' && <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
-      {!canManage && <Text style={styles.muted}>Tài khoản hiện có quyền xem. Cần quyền people:manage để quản lý dự án và tạo QR chấm công.</Text>}<View style={styles.toolbar}><View style={styles.search}><Search color={colors.muted} size={15} /><TextInput value={projectSearch} onChangeText={setProjectSearch} placeholder="Tìm mã, tên, địa điểm dự án" style={styles.searchInput} /></View><Action label="Thêm dự án" icon={<Plus size={13} color={colors.white} />} onPress={openProjectCreate} primary disabled={!canManage} /></View><View style={styles.chips}>{(['all', 'planned', 'active', 'completed'] as const).map((value) => <Chip key={value} label={value === 'all' ? 'Mọi trạng thái' : projectStatusLabel(value)} selected={projectStatusFilter === value} onPress={() => setProjectStatusFilter(value)} />)}</View>
-      {loading ? <Loading /> : visibleProjects.map((project) => <View key={project._id} style={styles.card}><Pressable onPress={() => setProjectDetail(project)}><View style={styles.row}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{project.name}</Text><Text style={styles.muted}>{project.code} · {project.location || 'Chưa có địa điểm'}</Text></View><StatusPill label={projectStatusLabel(project.status)} /></View><Text style={styles.muted}>{project.startDate} – {project.endDate} · {project.workerIds.length}/{project.quota || '∞'} lao động · {project.startTime}–{project.endTime}</Text></Pressable><View style={styles.cardActions}><Action label="Chi tiết" onPress={() => setProjectDetail(project)} /><Action label="Tạo QR chấm công" icon={<QrCode size={13} color={colors.primary} />} onPress={() => void openProjectQr(project)} disabled={!canManage || busy} /><Action label="Sửa" icon={<Pencil size={13} color={colors.primary} />} onPress={() => openProjectEdit(project)} disabled={!canManage} /><Action label="Xóa" danger onPress={() => confirmProjectDelete(project)} disabled={!canManage} /></View></View>)}
-      {!loading && !visibleProjects.length && <Empty text="Không có dự án phù hợp." />}
+    {tab === 'projects' && <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 92 }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
+      {!canManage && <Text style={styles.muted}>Tài khoản hiện có quyền xem. Cần quyền people:manage để quản lý dự án và tạo QR chấm công.</Text>}
+      <View style={styles.filterTopBar}>
+        <Pressable accessibilityRole="button" onPress={() => setProjectStatusSheetOpen(true)} style={({ pressed }) => [styles.filterTriggerBtn, pressed && { opacity: 0.65 }]}>
+          <Briefcase size={17} strokeWidth={1.6} color={colors.ink} />
+          <Text numberOfLines={1} style={styles.filterTriggerText}>{projectStatusFilter === 'all' ? 'Mọi trạng thái' : projectStatusLabel(projectStatusFilter)}</Text>
+          <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
+        </Pressable>
+      </View>
+      <View style={styles.toolbar}><View style={styles.search}><Search color="#94A3B8" size={16} strokeWidth={1.6} /><TextInput value={projectSearch} onChangeText={setProjectSearch} placeholder="Tìm mã, tên, địa điểm dự án" placeholderTextColor="#94A3B8" style={styles.searchInput} /></View></View>
+      {loading ? <Loading /> : visibleProjects.length > 0 ? <View style={styles.listFlat}>{visibleProjects.map((project) => <View key={project._id} style={styles.listItem}><Pressable onPress={() => setProjectDetail(project)}><View style={styles.row}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{project.name}</Text><Text style={styles.muted}>{project.code} · {project.location || 'Chưa có địa điểm'}</Text></View><StatusPill label={projectStatusLabel(project.status)} /></View><Text style={styles.muted}>{project.startDate} – {project.endDate} · {project.workerIds.length}/{project.quota || '∞'} lao động · {project.startTime}–{project.endTime}</Text></Pressable><View style={styles.cardActions}><Action label="Chi tiết" onPress={() => setProjectDetail(project)} /><Action label="Tạo QR chấm công" icon={<QrCode size={13} color={colors.primary} />} onPress={() => void openProjectQr(project)} disabled={!canManage || busy} /><Action label="Sửa" icon={<Pencil size={13} color={colors.primary} />} onPress={() => openProjectEdit(project)} disabled={!canManage} /><Action label="Xóa" danger onPress={() => confirmProjectDelete(project)} disabled={!canManage} /></View></View>)}</View> : <Empty text="Không có dự án phù hợp." />}
     </ScrollView>}
 
-    {tab === 'contracts' && <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
-      <View style={styles.toolbar}><View style={styles.search}><Search color={colors.muted} size={15} /><TextInput value={contractSearch} onChangeText={setContractSearch} placeholder="Tìm mã, lao động, khách hàng" style={styles.searchInput} /></View><Action label="Lọc" icon={<SlidersHorizontal size={13} color={colors.primary} />} onPress={() => setContractFiltersOpen(true)} /><Action label="Thêm" icon={<Plus size={13} color={colors.primary} />} onPress={openContractCreate} disabled={!canManage} /></View>
+    {tab === 'contracts' && <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 92 }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
+      <View style={styles.filterTopBar}>
+        <Pressable accessibilityRole="button" onPress={() => setContractFiltersOpen(true)} style={({ pressed }) => [styles.filterTriggerBtn, pressed && { opacity: 0.65 }]}>
+          <FileText size={17} strokeWidth={1.6} color={colors.ink} />
+          <Text numberOfLines={1} style={styles.filterTriggerText}>{contractFilterSummary}</Text>
+          <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
+        </Pressable>
+      </View>
+      <View style={styles.toolbar}><View style={styles.search}><Search color="#94A3B8" size={16} strokeWidth={1.6} /><TextInput value={contractSearch} onChangeText={setContractSearch} placeholder="Tìm mã, lao động, khách hàng" placeholderTextColor="#94A3B8" style={styles.searchInput} /></View></View>
       <View style={styles.summaryRow}><Metric label="Sắp hết hạn" value={String(contractAlerts?.expiringCount || 0)} /><Metric label="Đã hết hạn" value={String(contractAlerts?.expiredCount || 0)} /></View>
-      
       <View style={styles.actions}><Action label="Xuất CSV" icon={<Download size={13} color={colors.primary} />} onPress={() => void exportContracts()} /></View>
-      {loading ? <Loading /> : contracts.map((contract) => <View key={contract._id} style={styles.card}><View style={styles.row}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{contract.code} · {workers.find((worker) => worker._id === contract.workerId)?.fullName || contract.workerId}</Text><Text style={styles.muted}>{contract.clientName}</Text></View><StatusPill label={contractStatusLabel(contract.status)} /></View><Text style={styles.muted}>{contract.startDate.slice(0, 10)} – {contract.endDate.slice(0, 10)}{contract.alertLevel === 'expiring' ? ' · Sắp hết hạn' : contract.alertLevel === 'expired' ? ' · Đã hết hạn' : ''}</Text><View style={styles.cardActions}><Action label="Lịch sử" onPress={() => void showContractHistory(contract)} /><Action label="Sửa" onPress={() => { if (canManage) openContractEdit(contract); }} disabled={!canManage} /><Action label="Gia hạn" onPress={() => { if (canManage) openContractRenew(contract); }} disabled={!canManage} /><Action label="Xóa" danger onPress={() => confirmContractDelete(contract)} disabled={!canManage} /></View></View>)}
-      {!loading && !contracts.length && <Empty text="Không có hợp đồng phù hợp bộ lọc." />}
+      {loading ? <Loading /> : contracts.length > 0 ? <View style={styles.listFlat}>{contracts.map((contract) => <View key={contract._id} style={styles.listItem}><View style={styles.row}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{contract.code} · {workers.find((worker) => worker._id === contract.workerId)?.fullName || contract.workerId}</Text><Text style={styles.muted}>{contract.clientName}</Text></View><StatusPill label={contractStatusLabel(contract.status)} /></View><Text style={styles.muted}>{contract.startDate.slice(0, 10)} – {contract.endDate.slice(0, 10)}{contract.alertLevel === 'expiring' ? ' · Sắp hết hạn' : contract.alertLevel === 'expired' ? ' · Đã hết hạn' : ''}</Text><View style={styles.cardActions}><Action label="Lịch sử" onPress={() => void showContractHistory(contract)} /><Action label="Sửa" onPress={() => { if (canManage) openContractEdit(contract); }} disabled={!canManage} /><Action label="Gia hạn" onPress={() => { if (canManage) openContractRenew(contract); }} disabled={!canManage} /><Action label="Xóa" danger onPress={() => confirmContractDelete(contract)} disabled={!canManage} /></View></View>)}</View> : <Empty text="Không có hợp đồng phù hợp bộ lọc." />}
     </ScrollView>}
 
-    {tab === 'notifications' && <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
-      <View style={styles.notificationToolbar}><View style={{ flex: 1, gap: 3 }}><Text style={styles.heading}>Thông báo</Text><Text style={styles.muted}>{notifications.length} thông báo</Text></View>{canManage && <Action label="Gửi thông báo" icon={<Plus size={13} color={colors.white} />} onPress={() => { setNotificationError(''); setNotificationModal(true); }} primary />}</View>
-      {loading ? <Loading /> : notifications.map((item, index) => <View key={item._id || `${item.title}-${index}`} style={styles.notificationCard}><View style={styles.notificationHeader}><View style={styles.notificationIcon}><Bell size={15} color={colors.primary} /></View><View style={{ flex: 1, gap: 3 }}><Text style={styles.cardTitle}>{item.title || item.subject || 'Thông báo'}</Text><Text style={styles.notificationDate}>{formatNotificationDate(item.sentAt || item.createdAt) || 'Chưa ghi nhận thời gian'}</Text></View></View><Text style={styles.notificationBody}>{item.content || item.message || 'Không có nội dung.'}</Text></View>)}
-      {!loading && !notifications.length && <Empty text="Chưa có thông báo." />}
+    {tab === 'notifications' && <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 92 }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
+      <View style={styles.notificationToolbar}><View style={{ flex: 1, gap: 2 }}><Text style={styles.heading}>Thông báo</Text><Text style={styles.muted}>{notifications.length} thông báo</Text></View></View>
+      {loading ? <Loading /> : notifications.length > 0 ? <View style={styles.listFlat}>{notifications.map((item, index) => <View key={item._id || `${item.title}-${index}`} style={styles.listItem}><View style={styles.notificationHeader}><View style={styles.notificationIcon}><Bell size={16} strokeWidth={1.7} color={colors.primary} /></View><View style={{ flex: 1, gap: 2 }}><Text style={styles.cardTitle}>{item.title || item.subject || 'Thông báo'}</Text><Text style={styles.notificationDate}>{formatNotificationDate(item.sentAt || item.createdAt) || 'Chưa ghi nhận thời gian'}</Text></View></View><Text style={styles.notificationBody}>{item.content || item.message || 'Không có nội dung.'}</Text></View>)}</View> : <Empty text="Chưa có thông báo." />}
     </ScrollView>}
     </Animated.View>
+
+    {canManage ? (
+      <HrFab
+        label={tab === 'projects' ? 'Thêm dự án' : tab === 'workers' ? 'Thêm lao động' : tab === 'contracts' ? 'Tạo hợp đồng' : 'Gửi thông báo'}
+        onPress={() => {
+          if (tab === 'projects') openProjectCreate();
+          else if (tab === 'workers') openWorkerCreate();
+          else if (tab === 'contracts') openContractCreate();
+          else { setNotificationError(''); setNotificationModal(true); }
+        }}
+      />
+    ) : null}
+
+    <Modal visible={projectStatusSheetOpen} transparent statusBarTranslucent animationType="slide" onRequestClose={() => setProjectStatusSheetOpen(false)}>
+      <Pressable style={styles.sheetBackdrop} onPress={() => setProjectStatusSheetOpen(false)}>
+        <Pressable style={styles.sheetModal} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+            {(['all', 'planned', 'active', 'completed'] as const).map((value) => {
+              const selected = projectStatusFilter === value;
+              return (
+                <Pressable key={value} onPress={() => { setProjectStatusFilter(value); setProjectStatusSheetOpen(false); }} style={[styles.filterSheetRow, selected && styles.sheetRowActive]}>
+                  <Text style={[styles.filterSheetRowText, selected && styles.filterSheetRowTextActive]}>{value === 'all' ? 'Mọi trạng thái' : projectStatusLabel(value)}</Text>
+                  {selected ? <Check size={17} color={colors.primary} /> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
     <Modal visible={branchPickerOpen} transparent animationType="slide" onRequestClose={() => setBranchPickerOpen(false)}>
       <Pressable style={styles.sheetBackdrop} onPress={() => setBranchPickerOpen(false)}>
         <Pressable style={styles.sheetModal} onPress={() => {}}>
           <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Chọn chi nhánh</Text>
-            <Pressable onPress={() => setBranchPickerOpen(false)} hitSlop={8}>
-              <Text style={styles.sheetClose}>Đóng</Text>
-            </Pressable>
-          </View>
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>{branches.map((branch) => {
             const selected = branch._id === branchId;
             return <Pressable key={branch._id} onPress={() => {
@@ -753,17 +825,33 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
       </Pressable>
     </Modal>
     <Modal visible={companyPickerOpen} transparent animationType="fade" onRequestClose={() => setCompanyPickerOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Chọn cơ sở lao động" onClose={() => setCompanyPickerOpen(false)} /><ScrollView style={{ maxHeight: 420 }}>{companies.map((item) => <Pressable key={item.code} onPress={() => { setCompanyCode(item.code); setCompanyPickerOpen(false); }} style={styles.option}><Text style={styles.cardTitle}>{item.name}</Text><Text style={styles.muted}>{item.code}</Text></Pressable>)}</ScrollView></View></View></Modal>
-    <Modal visible={contractFiltersOpen} transparent animationType="fade" onRequestClose={() => setContractFiltersOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Bộ lọc" onClose={() => setContractFiltersOpen(false)} /><ScrollView style={{ maxHeight: 520 }} contentContainerStyle={{ gap: 8 }}>
-      <Text style={styles.section}>Trạng thái</Text><View style={styles.chips}>{(['all', 'draft', 'active', 'renewed', 'expired', 'terminated'] as const).map((value) => <Chip key={value} label={value === 'all' ? 'Mọi trạng thái' : contractStatusLabel(value)} selected={contractStatus === value} onPress={() => setContractStatus(value)} />)}</View>
-      <Chip label={contractAlertOnly ? 'Chỉ hợp đồng cần chú ý' : 'Hợp đồng cần chú ý'} selected={contractAlertOnly} onPress={() => setContractAlertOnly((value) => !value)} />
-      {contractClients.length > 0 && <View><Text style={styles.section}>Khách hàng</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}><Chip label="Mọi khách hàng" selected={contractClient === 'all'} onPress={() => setContractClient('all')} />{contractClients.map((client) => <Chip key={client} label={client} selected={contractClient === client} onPress={() => setContractClient(client)} />)}</ScrollView></View>}
-    </ScrollView><View style={styles.toolbar}><Action label="Xóa bộ lọc" onPress={() => { setContractStatus('all'); setContractAlertOnly(false); setContractClient('all'); }} /><View style={{ flex: 1 }} /><Action label="Xong" onPress={() => setContractFiltersOpen(false)} primary /></View></View></View></Modal>
-    <Modal visible={workerFiltersOpen} transparent animationType="fade" onRequestClose={() => setWorkerFiltersOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Bộ lọc" onClose={() => setWorkerFiltersOpen(false)} /><ScrollView style={{ maxHeight: 520 }} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled">
-      <Text style={styles.section}>Trạng thái</Text><View style={styles.chips}>{['all', 'active', 'inactive', 'placed'].map((value) => <Chip key={value} label={value === 'all' ? 'Tất cả' : workerStatusLabel(value)} selected={statusFilter === value} onPress={() => setStatusFilter(value)} />)}</View>
-      <Text style={styles.section}>Loại lao động</Text><View style={styles.chips}>{(['all', 'official', 'seasonal', 'foreign'] as const).map((value) => <Chip key={value} label={value === 'all' ? 'Mọi loại' : laborTypeLabel(value)} selected={laborTypeFilter === value} onPress={() => setLaborTypeFilter(value)} />)}</View>
-      <Text style={styles.section}>Dự án</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}><Chip label="Mọi dự án" selected={workerProjectFilter === 'all'} onPress={() => setWorkerProjectFilter('all')} />{projects.map((project) => <Chip key={project._id} label={project.name} selected={workerProjectFilter === project._id} onPress={() => setWorkerProjectFilter(project._id)} />)}</ScrollView>
-      <View style={styles.row}><DateTimeField label="Tiếp nhận từ" mode="date" value={registrationFrom} onChange={setRegistrationFrom} allowClear /><DateTimeField label="Đến ngày" mode="date" value={registrationTo} onChange={setRegistrationTo} allowClear /></View>
-    </ScrollView><View style={styles.toolbar}><Action label="Xóa bộ lọc" onPress={() => { setStatusFilter('all'); setLaborTypeFilter('all'); setWorkerProjectFilter('all'); setRegistrationFrom(''); setRegistrationTo(''); }} /><View style={{ flex: 1 }} /><Action label="Xong" onPress={() => setWorkerFiltersOpen(false)} primary /></View></View></View></Modal>
+    <Modal visible={contractFiltersOpen} transparent statusBarTranslucent animationType="slide" onRequestClose={() => setContractFiltersOpen(false)}>
+      <Pressable style={styles.sheetBackdrop} onPress={() => setContractFiltersOpen(false)}>
+        <Pressable style={styles.sheetModal} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ gap: 10, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
+            <Text style={styles.section}>Trạng thái</Text><View style={styles.chips}>{(['all', 'draft', 'active', 'renewed', 'expired', 'terminated'] as const).map((value) => <Chip key={value} label={value === 'all' ? 'Mọi trạng thái' : contractStatusLabel(value)} selected={contractStatus === value} onPress={() => setContractStatus(value)} />)}</View>
+            <Chip label={contractAlertOnly ? 'Chỉ hợp đồng cần chú ý' : 'Hợp đồng cần chú ý'} selected={contractAlertOnly} onPress={() => setContractAlertOnly((value) => !value)} />
+            {contractClients.length > 0 && <View style={{ gap: 6 }}><Text style={styles.section}>Khách hàng</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.chips}><Chip label="Mọi khách hàng" selected={contractClient === 'all'} onPress={() => setContractClient('all')} />{contractClients.map((client) => <Chip key={client} label={client} selected={contractClient === client} onPress={() => setContractClient(client)} />)}</ScrollView></View>}
+          </ScrollView>
+          <View style={[styles.toolbar, { marginTop: 10 }]}><Action label="Xóa bộ lọc" onPress={() => { setContractStatus('all'); setContractAlertOnly(false); setContractClient('all'); }} /><View style={{ flex: 1 }} /><Action label="Xong" onPress={() => setContractFiltersOpen(false)} primary /></View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+    <Modal visible={workerFiltersOpen} transparent statusBarTranslucent animationType="slide" onRequestClose={() => setWorkerFiltersOpen(false)}>
+      <Pressable style={styles.sheetBackdrop} onPress={() => setWorkerFiltersOpen(false)}>
+        <Pressable style={styles.sheetModal} onPress={() => {}}>
+          <View style={styles.sheetHandle} />
+          <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ gap: 10, paddingBottom: 8 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <Text style={styles.section}>Trạng thái</Text><View style={styles.chips}>{['all', 'active', 'inactive', 'placed'].map((value) => <Chip key={value} label={value === 'all' ? 'Tất cả' : workerStatusLabel(value)} selected={statusFilter === value} onPress={() => setStatusFilter(value)} />)}</View>
+            <Text style={styles.section}>Loại lao động</Text><View style={styles.chips}>{(['all', 'official', 'seasonal', 'foreign'] as const).map((value) => <Chip key={value} label={value === 'all' ? 'Mọi loại' : laborTypeLabel(value)} selected={laborTypeFilter === value} onPress={() => setLaborTypeFilter(value)} />)}</View>
+            <Text style={styles.section}>Dự án</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.chips}><Chip label="Mọi dự án" selected={workerProjectFilter === 'all'} onPress={() => setWorkerProjectFilter('all')} />{projects.map((project) => <Chip key={project._id} label={project.name} selected={workerProjectFilter === project._id} onPress={() => setWorkerProjectFilter(project._id)} />)}</ScrollView>
+            <View style={styles.row}><DateTimeField label="Tiếp nhận từ" mode="date" value={registrationFrom} onChange={setRegistrationFrom} allowClear /><DateTimeField label="Đến ngày" mode="date" value={registrationTo} onChange={setRegistrationTo} allowClear /></View>
+          </ScrollView>
+          <View style={[styles.toolbar, { marginTop: 10 }]}><Action label="Xóa bộ lọc" onPress={() => { setStatusFilter('all'); setLaborTypeFilter('all'); setWorkerProjectFilter('all'); setRegistrationFrom(''); setRegistrationTo(''); }} /><View style={{ flex: 1 }} /><Action label="Xong" onPress={() => setWorkerFiltersOpen(false)} primary /></View>
+        </Pressable>
+      </Pressable>
+    </Modal>
     <FullScreenFormModal
       visible={workerModal}
       title={editingWorker ? 'Cập nhật hồ sơ lao động' : 'Thêm lao động'}
@@ -777,7 +865,7 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
         {workerFormError ? <PopupError error={workerFormError} /> : null}
       </View>
     </FullScreenFormModal>
-    <Modal visible={laborPartnerPickerOpen} transparent animationType="fade" onRequestClose={() => setLaborPartnerPickerOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Chọn đối tác giới thiệu" onClose={() => setLaborPartnerPickerOpen(false)} /><Field label="Tìm mã hoặc tên đối tác" value={laborPartnerSearch} onChangeText={setLaborPartnerSearch} placeholder="Nhập mã hoặc tên đối tác" /><ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled"><Pressable onPress={() => { setWorkerPartnerId(''); setLaborPartnerPickerOpen(false); }} style={[styles.branchOption, !workerPartnerId && styles.branchOptionSelected]}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Không chọn đối tác</Text></View>{!workerPartnerId && <Check size={17} color={colors.primary} />}</Pressable>{activeLaborPartners.filter((partner) => !laborPartnerSearch.trim() || normalize(`${partner.code} ${partner.name} ${partner.phone}`).includes(normalize(laborPartnerSearch))).map((partner) => { const selected = workerPartnerId === partner._id; return <Pressable key={partner._id} onPress={() => { setWorkerPartnerId(partner._id); setWorkerFormError(''); setLaborPartnerPickerOpen(false); }} style={[styles.branchOption, selected && styles.branchOptionSelected]}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{partner.code} · {partner.name}</Text><Text style={styles.muted}>{partner.phone}</Text></View>{selected && <Check size={17} color={colors.primary} />}</Pressable>; })}{!activeLaborPartners.some((partner) => !laborPartnerSearch.trim() || normalize(`${partner.code} ${partner.name} ${partner.phone}`).includes(normalize(laborPartnerSearch))) && <Empty text="Không tìm thấy đối tác phù hợp." />}</ScrollView></View></View></Modal>
+    <Modal visible={laborPartnerPickerOpen} transparent animationType="fade" onRequestClose={() => setLaborPartnerPickerOpen(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Chọn đối tác giới thiệu" onClose={() => setLaborPartnerPickerOpen(false)} /><Field label="Tìm mã hoặc tên đối tác" value={laborPartnerSearch} onChangeText={setLaborPartnerSearch} placeholder="Nhập mã hoặc tên đối tác" /><ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled"><Pressable onPress={() => { setWorkerPartnerId(''); setLaborPartnerPickerOpen(false); }} style={[styles.branchOption, !workerPartnerId && styles.branchOptionSelected]}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>Không chọn đối tác</Text></View>{!workerPartnerId && <Check size={17} color={colors.primary} />}</Pressable>{activeLaborPartners.filter((partner) => !laborPartnerSearch.trim() || normalize(`${partner.code} ${partner.name} ${partner.phone}`).includes(normalize(laborPartnerSearch))).map((partner) => { const selected = workerPartnerId === partner._id; return <Pressable key={partner._id} onPress={() => { setWorkerPartnerId(partner._id); setWorkerFormError(''); setLaborPartnerPickerOpen(false); }} style={[styles.branchOption, selected && styles.branchOptionSelected]}><View style={{ flex: 1 }}><Text style={styles.cardTitle}>{partner.code} · {partner.name}</Text><Text style={styles.muted}>{partner.phone}</Text></View>{selected && <Check size={17} color={colors.primary} />}</Pressable>; })}{!activeLaborPartners.some((partner) => !laborPartnerSearch.trim() || normalize(`${partner.code} ${partner.name} ${partner.phone}`).includes(normalize(laborPartnerSearch))) && <Empty compact text="Không tìm thấy đối tác phù hợp." />}</ScrollView></View></View></Modal>
     <FullScreenFormModal
       visible={workerDetail !== null}
       title="Chi tiết lao động"
@@ -818,11 +906,11 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
     >
       <View style={{ gap: 10 }}>{projectDetail && <>
         <Detail label="Mã dự án" value={projectDetail.code} /><Detail label="Trạng thái" value={projectStatusLabel(projectDetail.status)} /><Detail label="Địa điểm" value={projectDetail.location} /><Detail label="Thời gian" value={`${projectDetail.startDate} – ${projectDetail.endDate} · ${projectDetail.startTime}–${projectDetail.endTime}`} /><Detail label="Sức chứa" value={`${projectDetail.workerIds.length}/${projectDetail.quota || '∞'}`} /><Detail label="Ngày làm" value={projectDetail.daysOfWeek.map((day) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][day]).join(', ')} />{projectDetail.geoLocation && <Detail label="Vùng chấm công GPS" value={`${projectDetail.geoLocation.latitude}, ${projectDetail.geoLocation.longitude} · bán kính ${projectDetail.geoLocation.radiusMeters} m`} />}
-        <Text style={styles.section}>Lao động trong dự án</Text>{projectDetail.workerIds.map((id) => { const worker = workers.find((item) => item._id === id); return <View key={id} style={styles.row}><Text style={[styles.muted, { flex: 1 }]}>{worker?.fullName || id} · {worker?.phone || ''}</Text>{canManage && <Pressable onPress={() => void detachWorker(projectDetail, id)}><X size={16} color="#B42318" /></Pressable>}</View>; })}
+        <Text style={styles.section}>Lao động trong dự án</Text>{projectDetail.workerIds.length > 0 ? projectDetail.workerIds.map((id) => { const worker = workers.find((item) => item._id === id); return <View key={id} style={styles.row}><Text style={[styles.muted, { flex: 1 }]}>{worker?.fullName || id} · {worker?.phone || ''}</Text>{canManage && <Pressable onPress={() => void detachWorker(projectDetail, id)}><X size={16} color="#B42318" /></Pressable>}</View>; }) : <Empty compact text="Chưa có lao động trong dự án." />}
         <View style={styles.cardActions}><Action label="Chấm công / QR" icon={<QrCode size={13} color={colors.primary} />} onPress={() => void openAttendance(projectDetail)} /><Action label="Thêm lao động" onPress={() => { setProjectWorkerSelection([]); setProjectWorkerPicker(true); }} disabled={!canManage} /><Action label="Sửa" icon={<Pencil size={13} color={colors.primary} />} onPress={() => openProjectEdit(projectDetail)} disabled={!canManage} /><Action label="Xóa" danger onPress={() => confirmProjectDelete(projectDetail)} disabled={!canManage} /></View>
       </>}</View>
     </FullScreenFormModal>
-    <Modal visible={projectWorkerPicker} transparent animationType="fade" onRequestClose={() => setProjectWorkerPicker(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Thêm lao động vào dự án" onClose={() => setProjectWorkerPicker(false)} /><ScrollView style={{ maxHeight: 400 }}>{workers.filter((worker) => !projectDetail?.workerIds.includes(worker._id)).map((worker) => <Pressable key={worker._id} onPress={() => setProjectWorkerSelection((current) => current.includes(worker._id) ? current.filter((id) => id !== worker._id) : [...current, worker._id])} style={styles.row}><View style={[styles.checkbox, projectWorkerSelection.includes(worker._id) && styles.checkboxSelected]}>{projectWorkerSelection.includes(worker._id) && <Check color={colors.white} size={13} />}</View><Text style={styles.cardTitle}>{worker.fullName} · {worker.phone}</Text></Pressable>)}</ScrollView><Action label={`Thêm ${projectWorkerSelection.length} người`} onPress={() => void saveProjectWorkers()} disabled={!projectWorkerSelection.length || busy} primary /></View></View></Modal>
+    <Modal visible={projectWorkerPicker} transparent animationType="fade" onRequestClose={() => setProjectWorkerPicker(false)}><View style={styles.backdrop}><View style={styles.dialog}><ModalHeader title="Thêm lao động vào dự án" onClose={() => setProjectWorkerPicker(false)} /><ScrollView style={{ maxHeight: 400 }}>{workers.filter((worker) => !projectDetail?.workerIds.includes(worker._id)).length > 0 ? workers.filter((worker) => !projectDetail?.workerIds.includes(worker._id)).map((worker) => <Pressable key={worker._id} onPress={() => setProjectWorkerSelection((current) => current.includes(worker._id) ? current.filter((id) => id !== worker._id) : [...current, worker._id])} style={styles.row}><View style={[styles.checkbox, projectWorkerSelection.includes(worker._id) && styles.checkboxSelected]}>{projectWorkerSelection.includes(worker._id) && <Check color={colors.white} size={13} />}</View><Text style={styles.cardTitle}>{worker.fullName} · {worker.phone}</Text></Pressable>) : <Empty compact text="Không còn lao động khả dụng để thêm." />}</ScrollView><Action label={`Thêm ${projectWorkerSelection.length} người`} onPress={() => void saveProjectWorkers()} disabled={!projectWorkerSelection.length || busy} primary /></View></View></Modal>
 
     <FullScreenFormModal
       visible={attendanceProject !== null}
@@ -873,7 +961,7 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
           <Text style={styles.muted}>Vào {item.checkIn?.time || '—'} · Ra {item.checkOut?.time || '—'} · {attendanceLabel(item.status)} · {item.workedMinutes ?? 0} phút</Text>
           {canManage && <Action label="Sửa chấm công" onPress={() => openAttendanceEdit(item)} />}
         </View>)}
-        {!attendance.length && <Empty text="Không có dữ liệu chấm công trong khoảng ngày." />}
+        {!attendance.length && <Empty compact text="Không có dữ liệu chấm công trong khoảng ngày." />}
       </View>
     </FullScreenFormModal>
     <FullScreenFormModal
@@ -902,7 +990,7 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
       title="Lịch sử hợp đồng"
       onClose={() => setContractHistory(null)}
     >
-      <View style={{ gap: 10 }}>{contractHistory?.map((item) => <View key={item._id} style={styles.card}><Text style={styles.cardTitle}>{item.code} · kỳ {item.sequence}</Text><Text style={styles.muted}>{item.startDate.slice(0, 10)} – {item.endDate.slice(0, 10)} · {contractStatusLabel(item.status)}</Text><Text style={styles.muted}>{item.clientName}</Text></View>)}</View>
+      <View style={{ gap: 10 }}>{contractHistory?.length ? contractHistory.map((item) => <View key={item._id} style={styles.card}><Text style={styles.cardTitle}>{item.code} · kỳ {item.sequence}</Text><Text style={styles.muted}>{item.startDate.slice(0, 10)} – {item.endDate.slice(0, 10)} · {contractStatusLabel(item.status)}</Text><Text style={styles.muted}>{item.clientName}</Text></View>) : <Empty compact text="Chưa có lịch sử hợp đồng." />}</View>
     </FullScreenFormModal>
     <FullScreenFormModal
       visible={notificationModal}
@@ -928,9 +1016,10 @@ function Metric({ label, value }: { label: string; value: string }) { return <Vi
 function Detail({ label, value }: { label: string; value?: string | null }) { return <View style={styles.detailRow}><Text style={styles.muted}>{label}</Text><Text style={styles.detailText}>{value || '—'}</Text></View>; }
 function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) { return <View style={styles.modalHeader}><Text style={styles.heading}>{title}</Text><Pressable onPress={onClose} style={styles.close}><X size={18} color={colors.ink} /></Pressable></View>; }
 function Loading() { return <CenteredPageLoader />; }
-function Empty({ text }: { text: string }) { return <View style={styles.center}><Text style={styles.muted}>{text}</Text></View>; }
+function Empty({ text, compact = false }: { text: string; compact?: boolean }) { return <View style={compact ? styles.emptyCompact : styles.center}><IgenWorkerEmptyState message={text} compact={compact} /></View>; }
 
 const styles = StyleSheet.create({
+  topZoneBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, height: 78, overflow: 'hidden' },
   headerBranchBtn: { paddingVertical: 4, paddingLeft: 4, maxWidth: 190 },
   branchBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   branchBtnText: { color: colors.ink, fontSize: 13, fontWeight: '700', flexShrink: 1 },
@@ -938,20 +1027,83 @@ const styles = StyleSheet.create({
   sheetModal: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 28, maxHeight: '78%' },
   sheetHandle: { width: 38, height: 4, borderRadius: 99, backgroundColor: '#D6DFEC', alignSelf: 'center', marginBottom: 12 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sheetTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  sheetClose: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  sheetTitle: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  sheetClose: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   sheetRow: { flexDirection: 'row', alignItems: 'center', padding: 11, borderRadius: 14, gap: 12, marginBottom: 6 },
   sheetRowActive: { backgroundColor: '#F0F6FF' },
-  sheetRowTitle: { color: colors.ink, fontSize: 13, fontWeight: '700' },
-  sheetRowSub: { color: colors.muted, fontSize: 10, marginTop: 2 },
-  qrLinkBox: { alignSelf: 'stretch', gap: 5, padding: 10, borderWidth: 1, borderColor: '#C9D9FF', borderRadius: 10, backgroundColor: '#F4F8FF' },
-  qrLinkLabel: { color: colors.primary, fontSize: 9, fontWeight: '800', textAlign: 'center' },
-  qrLinkText: { color: colors.ink, fontSize: 10, lineHeight: 16, textAlign: 'center' },
-  branchOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: 12, borderBottomWidth: 1, borderColor: colors.border },
-  branchOptionSelected: { backgroundColor: '#EAF2FF', borderRadius: 9 },
-  container: { flex: 1, backgroundColor: PASTEL_BACKDROP_TOP_COLOR }, content: { flexGrow: 1, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 28, gap: 9 },
-  switcherBarWrap: { marginHorizontal: 14, marginTop: 10, marginBottom: 0 },
-  partnerSelect: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white }, partnerSelectText: { flex: 1, color: colors.ink, fontSize: 9, fontWeight: '600' },
-  companySelect: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 8 }, companyName: { color: colors.ink, fontSize: 10, fontWeight: '800' }, toolbar: { flexDirection: 'row', alignItems: 'center', gap: 7 }, search: { height: 40, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 99, backgroundColor: colors.white }, searchInput: { flex: 1, minWidth: 0, color: '#111827', fontSize: 13.5, paddingVertical: 0 }, actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, row: { flexDirection: 'row', alignItems: 'center', gap: 8 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, chip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 9, backgroundColor: '#F1F3F6' }, chipSelected: { backgroundColor: '#E7F0FF', borderWidth: 1, borderColor: '#C9D9FF' }, chipText: { color: colors.ink, fontSize: 8, fontWeight: '700' }, chipTextSelected: { color: colors.primary },
-  notificationToolbar: { flexDirection: 'row', alignItems: 'center', gap: 8 }, notificationCard: { padding: 12, gap: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.white }, notificationHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 }, notificationIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#EAF2FF' }, notificationDate: { color: colors.muted, fontSize: 8 }, notificationBody: { color: colors.ink, fontSize: 9, lineHeight: 15 }, card: { padding: 11, gap: 7, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.white }, cardTitle: { color: colors.ink, fontSize: 10, fontWeight: '800' }, heading: { color: colors.ink, fontSize: 13, fontWeight: '800' }, section: { marginTop: 5, color: colors.ink, fontSize: 10, fontWeight: '800' }, muted: { color: colors.muted, fontSize: 8, lineHeight: 13 }, detailText: { color: colors.ink, fontSize: 9, lineHeight: 14 }, openDetail: { alignSelf: 'flex-end', color: colors.primary, fontSize: 8, fontWeight: '800' }, cardActions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 6, marginTop: 4 }, action: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white }, actionText: { color: colors.primary, fontSize: 8, fontWeight: '800' }, primaryButton: { borderColor: colors.primary, backgroundColor: colors.primary }, primaryText: { color: colors.white }, dangerButton: { borderColor: '#F4C9C5', backgroundColor: '#FFF1F0' }, dangerText: { color: '#B42318' }, disabled: { opacity: 0.5 }, error: { marginHorizontal: 12, color: '#B42318', fontSize: 9 }, statusPill: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 9, backgroundColor: '#EEF4FF', color: colors.primary, fontSize: 7, fontWeight: '800' }, checkbox: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 5 }, checkboxSelected: { borderColor: colors.primary, backgroundColor: colors.primary }, summaryRow: { flexDirection: 'row', gap: 7 }, metric: { flex: 1, alignItems: 'center', padding: 9, borderRadius: 10, backgroundColor: colors.white }, metricValue: { color: colors.ink, fontSize: 13, fontWeight: '900' }, detailRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#F0F2F6' }, field: { flex: 1, gap: 4, marginBottom: 7 }, label: { color: colors.ink, fontSize: 8, fontWeight: '700' }, input: { minHeight: 38, paddingHorizontal: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 9, backgroundColor: colors.white, color: colors.ink, fontSize: 9 }, multiline: { minHeight: 68, paddingTop: 8 }, form: { padding: 13, gap: 7 }, modal: { flex: 1, backgroundColor: colors.background }, modalHeader: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, borderBottomWidth: 1, borderColor: colors.border, backgroundColor: colors.white }, close: { padding: 6 }, backdrop: { flex: 1, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(15,23,42,.45)' }, dialog: { maxHeight: '88%', padding: 12, borderRadius: 14, backgroundColor: colors.background, gap: 8 }, option: { padding: 10, borderBottomWidth: 1, borderColor: colors.border }, center: { flex: 1, minHeight: 320, alignItems: 'center', justifyContent: 'center', padding: 24, paddingBottom: 160, gap: 8 }, primaryButtonWide: { alignSelf: 'stretch' },
+  sheetRowTitle: { color: '#111827', fontSize: 13.5, fontWeight: '600' },
+  sheetRowSub: { color: '#6B7280', fontSize: 11, marginTop: 2 },
+  filterTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, paddingBottom: 10, gap: 10 },
+  filterTriggerBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
+  filterTriggerText: { color: colors.ink, fontSize: 15, fontWeight: '400', flexShrink: 1 },
+  filterSheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 13, borderRadius: 12, marginBottom: 4 },
+  filterSheetRowText: { color: colors.ink, fontSize: 14.5, fontWeight: '400' },
+  filterSheetRowTextActive: { color: colors.primary, fontWeight: '500' },
+  qrLinkBox: { alignSelf: 'stretch', gap: 5, padding: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#DCE7F7', borderRadius: 10, backgroundColor: '#F5F9FF' },
+  qrLinkLabel: { color: colors.primary, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  qrLinkText: { color: '#111827', fontSize: 11.5, lineHeight: 17, textAlign: 'center' },
+  branchOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#EEF2F7' },
+  branchOptionSelected: { backgroundColor: '#F0F6FF', borderRadius: 10 },
+  container: { flex: 1, backgroundColor: colors.white },
+  content: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 28, gap: 10, backgroundColor: colors.white },
+  switcherBarWrap: { marginHorizontal: 14, marginTop: 4, marginBottom: 10 },
+  partnerSelect: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: '#F6F8FC' },
+  partnerSelectText: { flex: 1, color: '#111827', fontSize: 13.5, fontWeight: '400' },
+  companySelect: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6 },
+  companyName: { color: '#111827', fontSize: 12.5, fontWeight: '600' },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  search: { height: 40, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 99, backgroundColor: '#F6F8FC' },
+  searchInput: { flex: 1, minWidth: 0, color: '#111827', fontSize: 13.5, paddingVertical: 0 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, backgroundColor: colors.white, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2' },
+  chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { color: '#6B7280', fontSize: 11.5, fontWeight: '500' },
+  chipTextSelected: { color: colors.white, fontWeight: '600' },
+  listFlat: { marginHorizontal: -14, backgroundColor: colors.white, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#EEF2F7' },
+  listItem: { paddingHorizontal: 16, paddingVertical: 12, gap: 5, backgroundColor: colors.white, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  notificationToolbar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 4 },
+  notificationCard: { padding: 14, gap: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 10, backgroundColor: colors.white },
+  notificationHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  notificationIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#EAF2FF' },
+  notificationDate: { color: '#6B7280', fontSize: 11 },
+  notificationBody: { color: '#374151', fontSize: 12.5, lineHeight: 18 },
+  card: { padding: 14, gap: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 10, backgroundColor: colors.white },
+  cardTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  heading: { color: '#111827', fontSize: 15, fontWeight: '700' },
+  section: { marginTop: 4, color: '#111827', fontSize: 13, fontWeight: '600' },
+  muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
+  detailText: { color: '#111827', fontSize: 13.5, fontWeight: '500', lineHeight: 19 },
+  openDetail: { alignSelf: 'flex-end', color: colors.primary, fontSize: 12, fontWeight: '600' },
+  cardActions: { flexDirection: 'row', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  action: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', borderRadius: 8, backgroundColor: '#F6F8FC' },
+  actionText: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
+  primaryButton: { borderColor: colors.primary, backgroundColor: colors.primary },
+  primaryText: { color: colors.white },
+  dangerButton: { borderColor: '#FECACA', backgroundColor: '#FFF1F0' },
+  dangerText: { color: '#B42318' },
+  disabled: { opacity: 0.45 },
+  error: { marginHorizontal: 12, color: '#B42318', fontSize: 12 },
+  statusPill: { paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8, backgroundColor: '#EAF2FF', color: colors.primary, fontSize: 10.5, fontWeight: '500', overflow: 'hidden' },
+  checkbox: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 6 },
+  checkboxSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
+  summaryRow: { flexDirection: 'row', gap: 8 },
+  metric: { flex: 1, alignItems: 'center', padding: 11, borderRadius: 10, backgroundColor: '#F6F8FC', borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2' },
+  metricValue: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  field: { flex: 1, gap: 4, marginBottom: 7 },
+  label: { color: '#374151', fontSize: 12.5, fontWeight: '500' },
+  input: { minHeight: 42, paddingHorizontal: 12, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: '#F6F8FC', color: '#111827', fontSize: 13.5 },
+  multiline: { minHeight: 74, paddingTop: 10 },
+  form: { padding: 14, gap: 8 },
+  modal: { flex: 1, backgroundColor: colors.white },
+  modalHeader: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7', backgroundColor: colors.white },
+  close: { padding: 6 },
+  backdrop: { flex: 1, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(15,23,42,0.35)' },
+  dialog: { maxHeight: '88%', padding: 16, borderRadius: 20, backgroundColor: colors.white, gap: 8 },
+  option: { padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#EEF2F7' },
+  center: { flex: 1, minHeight: 320, alignItems: 'center', justifyContent: 'center', padding: 24, paddingBottom: 160, gap: 8 },
+  emptyCompact: { alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
+  primaryButtonWide: { alignSelf: 'stretch' },
 });

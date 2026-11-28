@@ -1,14 +1,20 @@
 import { BrandLoader, CenteredPageLoader } from '@/components/BrandLoader';
+import { IgenStudentEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
-import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
+import {
+  ModuleSectionSwitcher,
+  useModuleSectionTransition,
+  type ModuleSectionItem,
+} from '@/components/ModuleSectionSwitcher';
 import { BranchAppIcon } from '@/components/OverviewTabIcons';
-import { PASTEL_BACKDROP_TOP_COLOR, PastelBackdrop } from '@/components/PastelBackdrop';
+import { PASTEL_BACKDROP_TOP_COLOR } from '@/components/PastelBackdrop';
 import { StudentTabIcon } from '@/components/StudentTabIcons';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityIndicator, Alert, Animated, Modal, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import QRCode from 'react-native-qrcode-svg';
 import { Banknote, BarChart2, Bell, BookOpen, Building2, CalendarCheck, CalendarDays, Check, ChevronDown, ChevronRight, ClipboardCheck, ClipboardList, Download, Eye, GraduationCap, PauseCircle, Pencil, Plus, QrCode, RefreshCw, Route, Search, Share2, SlidersHorizontal, Tag, Trash2, UsersRound, Wrench, X } from 'lucide-react-native';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -24,6 +30,7 @@ import { BatchAssignmentsModal, BatchAttendanceHistoryModal, BatchDetailModal } 
 import { StudentDataTransfer } from '@/features/StudentDataTransfer';
 import { listStudentPartners, type StudentPartner } from '@/features/studentPartnersApi';
 import { colors } from '@/theme/colors';
+import { DEFAULT_LOAD_MORE_LIMIT, isCloseToBottom } from '@/utils/scrollLoadMore';
 import type { FeatureScreenProps } from '@/features/modules/featureScreenRegistry';
 import {
   addStudentToBatch, assignExamStudents, closeStudentQrSession, createCourseCategory, createLearningRoadmap, createPayment, createStudentResourceCategory,
@@ -156,26 +163,7 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
   const branchName = branches.find((branch) => branch._id === branchId)?.name || user?.branchName || 'Chọn chi nhánh';
 
   const [area, setArea] = useState<Area>('students');
-  const sectionOpacity = useRef(new Animated.Value(1)).current;
-  const sectionTranslateX = useRef(new Animated.Value(0)).current;
-  const transitionDirRef = useRef<number>(0);
-  useEffect(() => {
-    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 18;
-    sectionOpacity.setValue(0.35);
-    sectionTranslateX.setValue(startX);
-    Animated.parallel([
-      Animated.timing(sectionOpacity, {
-        toValue: 1,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sectionTranslateX, {
-        toValue: 0,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [area, sectionOpacity, sectionTranslateX]);
+  const sectionTransition = useModuleSectionTransition(area);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [partners, setPartners] = useState<StudentPartner[]>([]);
   const [courses, setCourses] = useState<CourseRecord[]>([]);
@@ -210,8 +198,7 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
   const [dateToFilter, setDateToFilter] = useState('');
   const [resourceTypeFilter, setResourceTypeFilter] = useState('Tất cả');
   const [sortFilter, setSortFilter] = useState('newest');
-  const [page, setPage] = useState(1);
-  const pageSize = 25;
+  const [visibleCount, setVisibleCount] = useState(DEFAULT_LOAD_MORE_LIMIT);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>();
@@ -391,12 +378,11 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
   const visibleRoadmaps = useMemo(() => roadmaps.filter((item) => (!search || normalize(`${item.code || ''} ${item.name || ''} ${item.description || ''}`).includes(normalize(search))) && (statusFilter === 'Tất cả' || (item.status === 'active' ? 'Đang áp dụng' : 'Tạm dừng') === statusFilter)), [roadmaps, search, statusFilter]);
   const visibleWaitlist = useMemo(() => waitlist.filter((item) => !search || normalize(`${item.studentName || ''} ${item.studentPhone || ''} ${item.sourceBatchCode || ''} ${item.roadmapName || ''}`).includes(normalize(search))), [waitlist, search]);
 
-  useEffect(() => { setPage(1); }, [area, search, statusFilter, courseFilter, progressFilter, batchFilter, feeFilter, dateFromFilter, dateToFilter, resourceTypeFilter]);
+  useEffect(() => { setVisibleCount(DEFAULT_LOAD_MORE_LIMIT); }, [area, search, statusFilter, courseFilter, progressFilter, batchFilter, feeFilter, dateFromFilter, dateToFilter, resourceTypeFilter]);
 
   const resetFilters = () => { setStatusFilter('Tất cả'); setCourseFilter('Tất cả'); setProgressFilter('Tất cả'); setBatchFilter('Tất cả'); setFeeFilter('Tất cả học phí'); setDateFromFilter(''); setDateToFilter(''); setResourceTypeFilter('Tất cả'); setSortFilter('newest'); };
   const activeFilterCount = Number(statusFilter !== 'Tất cả') + Number(courseFilter !== 'Tất cả') + Number(progressFilter !== 'Tất cả') + Number(batchFilter !== 'Tất cả') + Number(feeFilter !== 'Tất cả học phí') + Number(Boolean(dateFromFilter || dateToFilter)) + Number(resourceTypeFilter !== 'Tất cả');
-  const resultCount = area === 'students' ? visibleStudents.length : area === 'courses' ? visibleCourses.length : area === 'batches' ? visibleBatches.length : area === 'quality' ? visibleQuality.length : area === 'exams' ? visibleExams.length : area === 'fees' ? visiblePayments.length + visibleFeeStudents.length : area === 'retention' ? visibleEnrollments.length : area === 'notifications' ? visibleNotifications.length : area === 'roadmap' ? 0 : visibleResources.length;
-  const pageCount = Math.max(1, Math.ceil(resultCount / pageSize));
+  const resultCount = area === 'students' ? visibleStudents.length : area === 'courses' ? visibleCourses.length : area === 'batches' ? visibleBatches.length : area === 'quality' ? visibleQuality.length : area === 'exams' ? visibleExams.length : area === 'fees' ? Math.max(visiblePayments.length, visibleFeeStudents.length) : area === 'retention' ? visibleEnrollments.length : area === 'notifications' ? visibleNotifications.length : area === 'roadmap' ? Math.max(visibleRoadmaps.length, visibleWaitlist.length) : visibleResources.length;
 
   async function exportCurrentArea() {
     const csv = (headers: string[], rows: unknown[][]) => saveAndShareCsv(headers, rows, `hoc-vien-${area}-${today()}.csv`);
@@ -1093,14 +1079,39 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
     catch (cause) { Alert.alert('Không xếp được lớp', cause instanceof Error ? cause.message : 'IGen-ERP từ chối yêu cầu.'); }
   }
 
-  const navLabel = NAV.find((item) => item.key === area)?.label || 'Học viên';
+  const navMeta = NAV.find((item) => item.key === area);
+  const navLabel = navMeta?.label || 'Học viên';
+  const ActiveAreaIcon = navMeta?.Icon || UsersRound;
   const showAdd = canManage && ['students', 'courses', 'batches', 'exams', 'fees', 'notifications', 'classrooms', 'resources', 'roadmap'].includes(area);
   const actionButton = (label: string, Icon: typeof Plus, onPress: () => void, tone: 'primary' | 'secondary' | 'danger' = 'secondary') => <Pressable key={label} onPress={onPress} style={[styles.actionButton, tone === 'primary' && styles.primaryAction, tone === 'danger' && styles.dangerAction]}><Icon size={14} color={tone === 'primary' ? colors.white : tone === 'danger' ? '#B42318' : colors.primary} /><Text style={[styles.actionText, tone === 'primary' && styles.primaryActionText, tone === 'danger' && styles.dangerActionText]}>{label}</Text></Pressable>;
 
   if (!canRead) return <View style={styles.emptyState}><UsersRound size={28} color={colors.primary} /><Text style={styles.emptyTitle}>Chưa có quyền xem phân hệ Học viên</Text><Text style={styles.emptyText}>Cần quyền people:read để truy cập hồ sơ và nghiệp vụ đào tạo.</Text></View>;
 
   return <View style={styles.container}>
-    <PastelBackdrop idPrefix="student" />
+    {/* Soft icy-sky pastel top-zone gradient matching HR & Employee Directory */}
+    <View pointerEvents="none" style={styles.topZoneBackdrop}>
+      <Svg width="100%" height="100%" viewBox="0 0 360 96" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id="studentTopBg" x1="0" y1="0" x2="0.15" y2="1">
+            <Stop offset="0" stopColor="#D8EFFC" stopOpacity="1" />
+            <Stop offset="0.45" stopColor="#EAF3FC" stopOpacity="1" />
+            <Stop offset="1" stopColor="#F5FAFE" stopOpacity="1" />
+          </LinearGradient>
+          <RadialGradient id="studentTopGlow" cx="86%" cy="10%" rx="52%" ry="42%">
+            <Stop offset="0" stopColor="#8FD3FA" stopOpacity="0.48" />
+            <Stop offset="1" stopColor="#8FD3FA" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="360" height="96" fill="url(#studentTopBg)" />
+        <Rect x="0" y="0" width="360" height="96" fill="url(#studentTopGlow)" />
+        <Path d="M 190 96 C 242 66, 298 58, 360 36 L 360 96 Z" fill="#2463EB" fillOpacity={0.04} />
+        <Circle cx="328" cy="14" r="54" fill="none" stroke="#2463EB" strokeOpacity={0.075} strokeWidth={1.2} />
+        <Circle cx="328" cy="14" r="32" fill="none" stroke="#2463EB" strokeOpacity={0.065} strokeWidth={1} />
+        <Circle cx="246" cy="18" r="2.1" fill="#2463EB" fillOpacity={0.11} />
+        <Circle cx="260" cy="12" r="1.7" fill="#2463EB" fillOpacity={0.08} />
+        <Circle cx="258" cy="26" r="1.5" fill="#2463EB" fillOpacity={0.09} />
+      </Svg>
+    </View>
     <Stack.Screen
       options={{
         headerStyle: { backgroundColor: PASTEL_BACKDROP_TOP_COLOR },
@@ -1126,8 +1137,8 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
     <ModuleSectionSwitcher
       items={STUDENT_SECTIONS}
       activeKey={area}
-      onChange={(nextArea, direction) => {
-        transitionDirRef.current = direction;
+      transition={sectionTransition}
+      onChange={(nextArea) => {
         setArea(nextArea);
         setSearch('');
         resetFilters();
@@ -1136,60 +1147,80 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       style={styles.switcherBarWrap}
     />
 
-    <Animated.View style={{ flex: 1, opacity: sectionOpacity, transform: [{ translateX: sectionTranslateX }] }}>
-    <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor={colors.primary} />} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <Animated.View style={[{ flex: 1 }, sectionTransition.animatedStyle]}>
+    <ScrollView
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor={colors.primary} />}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      scrollEventThrottle={16}
+      onScroll={(event) => {
+        if (visibleCount < resultCount && isCloseToBottom(event)) {
+          setVisibleCount((current) => Math.min(resultCount, current + DEFAULT_LOAD_MORE_LIMIT));
+        }
+      }}
+    >
+      {/* Top filter & quick-actions bar matching OrgChartPanel ("Tất cả phòng ban") */}
+      <View style={styles.filterTopBar}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setFilterOpen(true)}
+          style={({ pressed }) => [styles.filterTriggerBtn, pressed && { opacity: 0.65 }]}
+        >
+          <ActiveAreaIcon size={17} strokeWidth={1.6} color={activeFilterCount > 0 ? colors.primary : colors.ink} />
+          <Text numberOfLines={1} style={[styles.filterTriggerText, activeFilterCount > 0 && styles.filterTriggerTextActive]}>
+            {activeFilterCount > 0
+              ? (statusFilter !== 'Tất cả' && activeFilterCount === 1 ? filterLabel(area, statusFilter) : `Bộ lọc (${activeFilterCount})`)
+              : defaultFilterTriggerLabel(area)}
+          </Text>
+          <ChevronDown size={15} strokeWidth={1.7} color={activeFilterCount > 0 ? colors.primary : '#64748B'} />
+        </Pressable>
+
+        <View style={styles.topActionLinks}>
+          {area === 'students' && canManage ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="QR đăng ký học viên" onPress={() => void openRegisterQr()} hitSlop={8} style={({ pressed }) => [styles.topActionLink, pressed && { opacity: 0.6 }]}>
+              <QrCode size={15} strokeWidth={1.9} color={colors.primary} />
+              <Text style={styles.topActionLinkText}>QR</Text>
+            </Pressable>
+          ) : null}
+          {area === 'courses' && canManage ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Quản lý danh mục khóa học" onPress={() => setCategoryModalOpen(true)} hitSlop={8} style={({ pressed }) => [styles.topActionLink, pressed && { opacity: 0.6 }]}>
+              <Tag size={14} strokeWidth={1.9} color={colors.primary} />
+              <Text style={styles.topActionLinkText}>Danh mục</Text>
+            </Pressable>
+          ) : null}
+          {area === 'quality' && canManage ? (
+            <Pressable onPress={() => void openQualityThresholdSettings()} hitSlop={8} style={({ pressed }) => [styles.topActionLink, pressed && { opacity: 0.6 }]}>
+              <SlidersHorizontal size={14} strokeWidth={1.9} color={colors.primary} />
+              <Text style={styles.topActionLinkText}>Ngưỡng</Text>
+            </Pressable>
+          ) : null}
+          {(area === 'classrooms' || area === 'resources') && canManage ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={area === 'classrooms' ? 'Quản lý phân loại phòng học' : 'Quản lý phân loại thiết bị'} onPress={() => setCategoryModalOpen(true)} hitSlop={8} style={({ pressed }) => [styles.topActionLink, pressed && { opacity: 0.6 }]}>
+              <Tag size={14} strokeWidth={1.9} color={colors.primary} />
+              <Text style={styles.topActionLinkText}>Phân loại</Text>
+            </Pressable>
+          ) : null}
+          {area !== 'students' && area !== 'courses' && area !== 'batches' ? (
+            <Pressable onPress={() => void exportCurrentArea()} hitSlop={8} style={({ pressed }) => [styles.topActionLink, pressed && { opacity: 0.6 }]}>
+              <Download size={14} strokeWidth={1.9} color={colors.primary} />
+              <Text style={styles.topActionLinkText}>Xuất CSV</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
       <View style={styles.toolbar}>
         <View style={styles.searchBox}><Search size={16} strokeWidth={1.7} color="#94A3B8" /><TextInput value={search} onChangeText={setSearch} placeholder={placeholderForArea(area)} placeholderTextColor="#94A3B8" style={styles.searchInput} />{search ? <Pressable onPress={() => setSearch('')} hitSlop={8}><X size={16} color="#94A3B8" /></Pressable> : null}</View>
-        {area !== 'students' && area !== 'fees' && area !== 'classrooms' && area !== 'resources' && area !== 'roadmap' && area !== 'notifications' && filterOptions(area).length > 0 && <Pressable onPress={() => setFilterOpen(true)} style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]}><SlidersHorizontal size={14} color={colors.primary} /><Text style={styles.filterButtonText}>{activeFilterCount ? `Bộ lọc (${activeFilterCount})` : 'Bộ lọc'}</Text><ChevronDown size={13} color={colors.primary} /></Pressable>}
-        {area !== 'students' && area !== 'courses' && area !== 'batches' && area !== 'fees' && area !== 'classrooms' && area !== 'resources' && area !== 'roadmap' && area !== 'notifications' ? <Pressable onPress={() => void exportCurrentArea()} style={styles.filterButton}><Download size={14} color={colors.primary} /><Text style={styles.filterButtonText}>Xuất CSV</Text></Pressable> : null}
-        {area === 'quality' && canManage ? <Pressable onPress={() => void openQualityThresholdSettings()} style={styles.filterButton}><SlidersHorizontal size={14} color={colors.primary} /><Text style={styles.filterButtonText}>Ngưỡng</Text></Pressable> : null}
-        {area === 'students' && canManage ? <Pressable accessibilityRole="button" accessibilityLabel="QR đăng ký học viên" onPress={() => void openRegisterQr()} style={styles.filterButton}><QrCode size={15} color={colors.primary} /><Text style={styles.filterButtonText}>QR</Text></Pressable> : null}
-        {area === 'courses' && canManage ? <Pressable accessibilityRole="button" accessibilityLabel="Quản lý danh mục khóa học" onPress={() => setCategoryModalOpen(true)} style={styles.filterButton}><Tag size={14} color={colors.primary} /><Text style={styles.filterButtonText}>Danh mục</Text></Pressable> : null}
       </View>
-      {(area === 'classrooms' || area === 'resources' || area === 'roadmap' || area === 'notifications') ? (
-        <View style={styles.feesActionRow}>
-          {filterOptions(area).length > 0 ? (
-            <Pressable onPress={() => setFilterOpen(true)} style={[styles.filterButton, styles.feesActionBtn, activeFilterCount > 0 && styles.filterButtonActive]}>
-              <SlidersHorizontal size={13} color={colors.primary} />
-              <Text numberOfLines={1} style={styles.filterButtonText}>{activeFilterCount ? `Bộ lọc (${activeFilterCount})` : 'Bộ lọc'}</Text>
-              <ChevronDown size={12} color={colors.primary} />
-            </Pressable>
-          ) : null}
-          <Pressable onPress={() => void exportCurrentArea()} style={[styles.filterButton, styles.feesActionBtn]}>
-            <Download size={13} color={colors.primary} />
-            <Text numberOfLines={1} style={styles.filterButtonText}>Xuất CSV</Text>
-          </Pressable>
-          {(area === 'classrooms' || area === 'resources') && canManage ? (
-            <Pressable accessibilityRole="button" accessibilityLabel={area === 'classrooms' ? 'Quản lý phân loại phòng học' : 'Quản lý phân loại thiết bị'} onPress={() => setCategoryModalOpen(true)} style={[styles.filterButton, styles.feesActionBtn]}>
-              <Tag size={13} color={colors.primary} />
-              <Text numberOfLines={1} style={styles.filterButtonText}>Phân loại</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-      {area === 'fees' ? (
-        <View style={styles.feesActionRow}>
-          <Pressable onPress={() => setFilterOpen(true)} style={[styles.filterButton, styles.feesActionBtn, activeFilterCount > 0 && styles.filterButtonActive]}>
-            <SlidersHorizontal size={13} color={colors.primary} />
-            <Text numberOfLines={1} style={styles.filterButtonText}>{activeFilterCount ? `Bộ lọc (${activeFilterCount})` : 'Bộ lọc'}</Text>
-            <ChevronDown size={12} color={colors.primary} />
-          </Pressable>
-          <Pressable onPress={() => void exportCurrentArea()} style={[styles.filterButton, styles.feesActionBtn]}>
-            <Download size={13} color={colors.primary} />
-            <Text numberOfLines={1} style={styles.filterButtonText}>Xuất CSV</Text>
-          </Pressable>
-        </View>
-      ) : null}
-      {area === 'students' && canManage ? <StudentDataTransfer students={visibleStudents} batches={batches} scope={scope} onImported={() => { void load(true); }} filterLabel={activeFilterCount ? `Bộ lọc (${activeFilterCount})` : 'Bộ lọc'} hasActiveFilter={activeFilterCount > 0} onFilterPress={() => setFilterOpen(true)} /> : null}
-      {area === 'students' && !canManage ? <Pressable onPress={() => setFilterOpen(true)} style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]}><SlidersHorizontal size={14} color={colors.primary} /><Text style={styles.filterButtonText}>{activeFilterCount ? `Bộ lọc (${activeFilterCount})` : 'Bộ lọc'}</Text><ChevronDown size={13} color={colors.primary} /></Pressable> : null}
+      {area === 'students' && canManage ? <StudentDataTransfer students={visibleStudents} batches={batches} scope={scope} onImported={() => { void load(true); }} /> : null}
       {error ? <LoadState title="Chưa có dữ liệu để hiển thị" detail="Đã mở thông báo lỗi. Hãy thử tải lại sau khi đóng thông báo." onRetry={() => void load()} /> : loading ? <LoadState title="Đang tải dữ liệu" detail={`Đang kết nối danh mục ${navLabel.toLocaleLowerCase('vi')} với IGen-ERP…`} busy /> : <>
       {renderArea(area, { students: area === 'fees' ? visibleFeeStudents : visibleStudents, courses: visibleCourses, batches: visibleBatches, allBatches: batches, exams: visibleExams, quality: visibleQuality, payments: visiblePayments, notifications: visibleNotifications, resources: visibleResources, roadmaps: visibleRoadmaps, waitlist: visibleWaitlist, enrollments: visibleEnrollments }, {
-        canManage, page, pageSize, scheduleDate: dateFromFilter || today(), openStudentDetail, openStudentPayment, openEdit, updateRoadmap: (id, input) => updateLearningRoadmap(id, input, scope), toggleResourceMaintenance: (item) => void toggleResourceMaintenance(item), confirmDelete, deleteStudentRecord: (id) => deleteStudent(id, scope), deleteCourseRecord: (id) => deleteCourse(id, scope), deleteBatchRecord: (id) => deleteBatch(id, scope), deleteExamRecord: (id) => deleteExam(id, scope), deleteResourceRecord: (id) => deleteStudentResource(id, scope), openBatchDetail: (item) => setViewingBatch(item), openBatchManager, openBatchProgression, openAttendance, openBatchHistory: (item) => setHistoryBatch(item), openBatchAssignments: (item) => setAssignmentsBatch(item), setQualityDetail: openQualityReview, openExamAssignment, openExamScores,
+        canManage, visibleCount, scheduleDate: dateFromFilter || today(), openStudentDetail, openStudentPayment, openEdit, updateRoadmap: (id, input) => updateLearningRoadmap(id, input, scope), toggleResourceMaintenance: (item) => void toggleResourceMaintenance(item), confirmDelete, deleteStudentRecord: (id) => deleteStudent(id, scope), deleteCourseRecord: (id) => deleteCourse(id, scope), deleteBatchRecord: (id) => deleteBatch(id, scope), deleteExamRecord: (id) => deleteExam(id, scope), deleteResourceRecord: (id) => deleteStudentResource(id, scope), openBatchDetail: (item) => setViewingBatch(item), openBatchManager, openBatchProgression, openAttendance, openBatchHistory: (item) => setHistoryBatch(item), openBatchAssignments: (item) => setAssignmentsBatch(item), setQualityDetail: openQualityReview, openExamAssignment, openExamScores,
         setEnrollmentAction: (batch, enrollment, student) => { setEnrollmentAction({ batch, enrollment, student }); setDraft((current) => ({ ...current, reason: enrollment.suspensionReason || '', expectedReturnAt: enrollment.expectedReturnAt || '', targetBatchId: '' })); }, openBooking: (resource) => { setBookingResource(resource); setDraft((current) => ({ ...current, purpose: '', by: user?.displayName || '', bookingDate: today(), startTime: '09:00', endTime: '10:00' })); },
         deleteNotification: (item) => confirmDelete('thông báo', () => deleteStudentNotification(String(item.id || item._id), scope)), markNotificationInstallmentPaid, deletePayment: (item) => confirmDelete('giao dịch thu học phí', () => deletePayment(String(item.id || item._id), scope)),
         placeWaitlistRow, cancelBooking: (resource, bookingId) => confirmDelete('lịch sử sử dụng', () => deleteResourceBooking(resource.id, bookingId, scope)), load,
       })}
-      {resultCount > pageSize ? <View style={styles.pagination}><Text style={styles.paginationText}>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, resultCount)} / {resultCount}</Text><Pressable disabled={page <= 1} onPress={() => setPage((value) => Math.max(1, value - 1))} style={[styles.pageButton, page <= 1 && styles.disabled]}><Text style={styles.pageButtonText}>Trước</Text></Pressable><Text style={styles.paginationText}>{page}/{pageCount}</Text><Pressable disabled={page >= pageCount} onPress={() => setPage((value) => Math.min(pageCount, value + 1))} style={[styles.pageButton, page >= pageCount && styles.disabled]}><Text style={styles.pageButtonText}>Sau</Text></Pressable></View> : null}
       </>}
     </ScrollView>
     </Animated.View>
@@ -1248,10 +1279,6 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       <Pressable style={styles.sheetBackdrop} onPress={() => setPickerOpen(false)}>
         <Pressable style={styles.sheetModal} onPress={() => {}}>
           <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Chọn thông tin</Text>
-            <Pressable onPress={() => setPickerOpen(false)} hitSlop={8}><Text style={styles.sheetClose}>Đóng</Text></Pressable>
-          </View>
           <View style={[styles.searchBox, { flex: 0, marginBottom: 10 }]}>
             <Search size={16} strokeWidth={1.7} color="#94A3B8" />
             <TextInput value={pickerSearch} onChangeText={setPickerSearch} placeholder="Tìm kiếm..." placeholderTextColor="#94A3B8" style={styles.searchInput} />
@@ -1515,10 +1542,6 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       <Pressable style={styles.sheetBackdrop} onPress={() => setFilterOpen(false)}>
         <Pressable style={[styles.sheetModal, { maxHeight: '86%', paddingHorizontal: 0 }]} onPress={() => {}}>
           <View style={styles.sheetHandle} />
-          <View style={[styles.sheetHeader, { paddingHorizontal: 18 }]}>
-            <Text style={styles.sheetTitle}>Bộ lọc</Text>
-            <Pressable onPress={() => setFilterOpen(false)} hitSlop={8}><Text style={styles.sheetClose}>Đóng</Text></Pressable>
-          </View>
           <ScrollView style={{ maxHeight: 500 }} contentContainerStyle={styles.filterModalContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {filterOptions(area).length ? <FilterChoice title="Trạng thái" value={statusFilter} options={filterOptions(area)} onChange={setStatusFilter} /> : null}
           {area === 'students' ? <>
@@ -1553,10 +1576,6 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       <Pressable style={styles.sheetBackdrop} onPress={() => setCompanyPickerOpen(false)}>
         <Pressable style={styles.sheetModal} onPress={() => {}}>
           <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Chọn cơ sở đào tạo</Text>
-            <Pressable onPress={() => setCompanyPickerOpen(false)} hitSlop={8}><Text style={styles.sheetClose}>Đóng</Text></Pressable>
-          </View>
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
             {companies.map((company) => {
               const selected = company.code === companyCode;
@@ -1579,10 +1598,6 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       <Pressable style={styles.sheetBackdrop} onPress={() => setBranchPickerOpen(false)}>
         <Pressable style={styles.sheetModal} onPress={() => {}}>
           <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Chọn chi nhánh</Text>
-            <Pressable onPress={() => setBranchPickerOpen(false)} hitSlop={8}><Text style={styles.sheetClose}>Đóng</Text></Pressable>
-          </View>
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
             {branches.map((branch) => {
               const selected = branch._id === branchId;
@@ -1606,7 +1621,7 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
 
 type Lists = { students: StudentRecord[]; courses: CourseRecord[]; batches: BatchRecord[]; allBatches?: BatchRecord[]; exams: ExamRecord[]; quality: QualityRow[]; payments: PaymentRecord[]; notifications: StudentNotification[]; resources: StudentResource[]; roadmaps: RoadmapRecord[]; waitlist: WaitlistRecord[]; enrollments: EnrolledRecord[] };
 type Actions = {
-  canManage: boolean; page: number; pageSize: number; scheduleDate: string; openStudentDetail: (item: StudentRecord) => void; openStudentPayment: (item: StudentRecord) => void; openEdit: (item: StudentRecord | CourseRecord | BatchRecord | ExamRecord | StudentResource | PaymentRecord | RoadmapRecord) => void; updateRoadmap: (id: string, input: Record<string, unknown>) => Promise<unknown>; toggleResourceMaintenance: (item: StudentResource) => void; confirmDelete: (label: string, action: () => Promise<unknown>) => void;
+  canManage: boolean; visibleCount: number; scheduleDate: string; openStudentDetail: (item: StudentRecord) => void; openStudentPayment: (item: StudentRecord) => void; openEdit: (item: StudentRecord | CourseRecord | BatchRecord | ExamRecord | StudentResource | PaymentRecord | RoadmapRecord) => void; updateRoadmap: (id: string, input: Record<string, unknown>) => Promise<unknown>; toggleResourceMaintenance: (item: StudentResource) => void; confirmDelete: (label: string, action: () => Promise<unknown>) => void;
   deleteStudentRecord: (id: string) => Promise<unknown>; deleteCourseRecord: (id: string) => Promise<unknown>; deleteBatchRecord: (id: string) => Promise<unknown>; deleteExamRecord: (id: string) => Promise<unknown>; deleteResourceRecord: (id: string) => Promise<unknown>;
   openBatchDetail: (item: BatchRecord) => void; openBatchManager: (item: BatchRecord) => void; openBatchProgression: (item: BatchRecord) => void; openAttendance: (item: BatchRecord) => void; openBatchHistory: (item: BatchRecord) => void; openBatchAssignments: (item: BatchRecord) => void; setQualityDetail: (item: QualityRow) => void; openExamAssignment: (item: ExamRecord) => void; openExamScores: (item: ExamRecord) => void;
   setEnrollmentAction: (batch: BatchRecord, enrollment: EnrolledRecord, student?: StudentRecord) => void; openBooking: (item: StudentResource) => void;
@@ -1615,7 +1630,7 @@ type Actions = {
 
 function renderArea(area: Area, lists: Lists, actions: Actions) {
   const { canManage } = actions;
-  const pageRows = <T,>(items: T[]) => items.slice((actions.page - 1) * actions.pageSize, actions.page * actions.pageSize);
+  const pageRows = <T,>(items: T[]) => items.slice(0, actions.visibleCount);
   const renderGrouped = (nodes: ReactNode[]) => (nodes.length ? <View style={styles.listGroup}>{nodes}</View> : null);
 
   if (area === 'students') {
@@ -1894,8 +1909,6 @@ function EntityCard({
                 </Pressable>
               ))}
             </View>
-          ) : onPress && !actions.length ? (
-            <ChevronRight size={16} color="#94A3B8" style={{ alignSelf: 'center' }} />
           ) : null}
         </View>
         {actions.length ? (
@@ -1920,7 +1933,7 @@ function Detail({ label, value }: { label: string; value: string }) { return <Vi
 function ModalHeader({ title, onClose }: { title: string; onClose: () => void }) { return <View style={styles.modalHeader}><Text style={styles.modalTitle}>{title}</Text><Pressable onPress={onClose} style={styles.closeButton}><X size={18} color={colors.muted} /></Pressable></View>; }
 function Field({ label, value, onChangeText, multiline, ...props }: { label: string; value: string; onChangeText: (value: string) => void; multiline?: boolean } & Omit<ComponentProps<typeof TextInput>, 'value' | 'onChangeText' | 'multiline'>) { return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><TextInput value={value} onChangeText={onChangeText} multiline={multiline} textAlignVertical={multiline ? 'top' : 'center'} placeholderTextColor={colors.muted} style={[styles.input, multiline && styles.multiline]} {...props} /></View>; }
 function LoadState({ title, detail, busy, inline, onRetry }: { title: string; detail: string; busy?: boolean; inline?: boolean; onRetry?: () => void }) { if (busy && !inline) return <CenteredPageLoader />; return <View style={styles.loadState}>{busy ? <BrandLoader size={42} /> : <><Text style={styles.emptyTitle}>{title}</Text><Text style={styles.emptyText}>{detail}</Text>{onRetry ? <Pressable onPress={onRetry} style={styles.retryButton}><Text style={styles.retryText}>Tải lại</Text></Pressable> : null}</>}</View>; }
-function empty<T>(rows: T[], label: string) { return rows.length ? null : <View style={styles.loadState}><Text style={styles.emptyTitle}>{label}</Text></View>; }
+function empty<T>(rows: T[], label: string) { return rows.length ? null : <View style={styles.emptyIllustrationWrap}><IgenStudentEmptyState message={label} /></View>; }
 function placeholderForArea(area: Area) { return ({ students: 'Tìm tên, điện thoại, email hoặc CCCD', courses: 'Tìm mã, tên khóa học hoặc danh mục', batches: 'Tìm mã lớp, khóa học hoặc giảng viên', quality: 'Tìm học viên, lớp hoặc khóa học', exams: 'Tìm tên kỳ thi, lớp hoặc địa điểm', fees: 'Tìm giao dịch học phí', retention: 'Tìm học viên bảo lưu / học lại', roadmap: 'Tìm lộ trình hoặc học viên chờ lớp', notifications: 'Tìm tiêu đề thông báo', classrooms: 'Tìm tên phòng hoặc mã phòng', resources: 'Tìm tên, loại hoặc mã thiết bị' } as const)[area]; }
 function formTitle(area: Area, editing: boolean, paymentEdit: boolean) { if (area === 'notifications') return 'Gửi thông báo qua email'; if (area === 'fees') return paymentEdit ? 'Sửa giao dịch học phí' : 'Ghi nhận thu học phí'; const label = ({ students: 'hồ sơ học viên', courses: 'khóa học', batches: 'lớp học', exams: 'kỳ thi', classrooms: 'phòng học', resources: 'thiết bị', roadmap: 'lộ trình' } as Partial<Record<Area, string>>)[area] || 'thông tin'; return `${editing ? 'Sửa' : 'Thêm'} ${label}`; }
 function filterOptions(area: Area) {
@@ -1936,6 +1949,21 @@ function filterOptions(area: Area) {
   return [];
 }
 function filterLabel(area: Area, value: string) { return filterOptions(area).find((option) => option.value === value)?.label || 'Bộ lọc'; }
+function defaultFilterTriggerLabel(area: Area) {
+  return ({
+    students: 'Tất cả học viên',
+    courses: 'Tất cả khóa học',
+    batches: 'Tất cả lớp học',
+    quality: 'Tất cả mức đánh giá',
+    exams: 'Tất cả kỳ thi',
+    fees: 'Tất cả học phí',
+    retention: 'Tất cả trạng thái',
+    roadmap: 'Tất cả lộ trình',
+    notifications: 'Tất cả thông báo',
+    classrooms: 'Tất cả phòng học',
+    resources: 'Tất cả thiết bị',
+  } as const)[area];
+}
 function resourceStatusLabel(status: string) { return ({ AVAILABLE: 'Sẵn sàng', OCCUPIED: 'Đang sử dụng', MAINTENANCE: 'Bảo trì' } as Record<string, string>)[status] || status; }
 function classroomScheduleDetails(resource: StudentResource, batches: BatchRecord[], date: string) {
   if (!normalize(resource.type).includes('phong hoc')) return [];
@@ -1968,17 +1996,25 @@ const styles = StyleSheet.create({
   sheetRowActive: { backgroundColor: '#F0F6FF' },
   sheetRowTitle: { color: '#111827', fontSize: 13.5, fontWeight: '600' },
   sheetRowSub: { color: '#6B7280', fontSize: 11.5, marginTop: 2 },
-  switcherBarWrap: { marginHorizontal: 14, marginTop: 10, marginBottom: 0 },
-  container: { flex: 1, backgroundColor: PASTEL_BACKDROP_TOP_COLOR },
-  companyScopeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 2 },
+  switcherBarWrap: { marginHorizontal: 14, marginTop: 4, marginBottom: 10 },
+  container: { flex: 1, backgroundColor: colors.white },
+  topZoneBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, height: 78, overflow: 'hidden' },
+  companyScopeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 6, paddingBottom: 2 },
   scopeLabel: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
   companyScopeButton: { flex: 1, minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: colors.white },
   companyScopeText: { flex: 1, color: '#111827', fontSize: 13, fontWeight: '600' },
-  content: { flexGrow: 1, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 92 },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  searchBox: { height: 40, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 99, backgroundColor: colors.white },
+  content: { flexGrow: 1, paddingHorizontal: 14, paddingTop: 2, paddingBottom: 92, backgroundColor: colors.white },
+  filterTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2, paddingTop: 2, paddingBottom: 10, gap: 10 },
+  filterTriggerBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
+  filterTriggerText: { color: colors.ink, fontSize: 15, fontWeight: '400', flexShrink: 1 },
+  filterTriggerTextActive: { color: colors.primary, fontWeight: '500' },
+  topActionLinks: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0 },
+  topActionLink: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingLeft: 4 },
+  topActionLinkText: { color: colors.primary, fontSize: 13.5, fontWeight: '500' },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  searchBox: { height: 40, flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 99, backgroundColor: '#F6F8FC' },
   searchInput: { flex: 1, minWidth: 0, color: '#111827', fontSize: 13.5, fontWeight: '400', paddingVertical: 0 },
-  filterButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: colors.white },
+  filterButton: { height: 38, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: '#F6F8FC' },
   filterButtonActive: { borderColor: colors.primary, backgroundColor: '#EFF6FF' },
   filterButtonText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
   addButton: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 13, borderRadius: 10, backgroundColor: colors.primary },
@@ -1989,17 +2025,17 @@ const styles = StyleSheet.create({
   filterChipText: { color: '#6B7280', fontSize: 12, fontWeight: '500' },
   filterChipTextSelected: { color: colors.white, fontWeight: '600' },
   cardList: { gap: 8, paddingBottom: 8 },
-  listGroup: { backgroundColor: colors.white, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', overflow: 'hidden' },
-  listRow: { paddingHorizontal: 13, paddingVertical: 10, backgroundColor: colors.white },
+  listGroup: { marginHorizontal: -14, backgroundColor: colors.white, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: '#EEF2F7' },
+  listRow: { paddingHorizontal: 16, paddingVertical: 11, backgroundColor: colors.white },
   listRowPressed: { backgroundColor: '#F5F8FD' },
-  listDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#EEF2F7', marginLeft: 13 },
-  listDividerInset: { marginLeft: 63 },
+  listDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#EEF2F7', marginLeft: 16 },
+  listDividerInset: { marginLeft: 66 },
   card: { ...HAIRLINE_CARD, padding: 13 },
   progressionCard: { ...HAIRLINE_CARD, padding: 13, gap: 8 },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   titleBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  entityAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F1FC', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  entityAvatarText: { color: colors.primary, fontSize: 13.5, fontWeight: '700', letterSpacing: 0.2 },
+  entityAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1EA7E1', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  entityAvatarText: { color: colors.white, fontSize: 14, fontWeight: '500', letterSpacing: 0.2 },
   cardTitle: { color: '#111827', fontSize: 14, fontWeight: '600', lineHeight: 19 },
   cardMeta: { color: '#6B7280', fontSize: 12, fontWeight: '400', lineHeight: 16.5, marginTop: 1 },
   cardDetailLine: { color: '#6B7280', fontSize: 11.5, fontWeight: '400', lineHeight: 16, marginTop: 1 },
@@ -2019,6 +2055,7 @@ const styles = StyleSheet.create({
   fab: { position: 'absolute', right: 18, bottom: 22, width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#1D4ED8', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 10, elevation: 6 },
   fabPressed: { opacity: 0.88, transform: [{ scale: 0.96 }] },
   emptyState: { flex: 1, minHeight: 270, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 25 },
+  emptyIllustrationWrap: { minHeight: 220, alignItems: 'center', justifyContent: 'center', paddingVertical: 24 },
   loadState: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', padding: 22, paddingBottom: 140, gap: 8 },
   emptyTitle: { color: '#111827', fontSize: 14.5, fontWeight: '600', textAlign: 'center' },
   emptyText: { color: '#6B7280', fontSize: 12.5, lineHeight: 18, textAlign: 'center' },

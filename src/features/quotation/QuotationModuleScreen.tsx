@@ -1,6 +1,7 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { BrandLoader, CenteredPageLoader } from '@/components/BrandLoader';
 import { PopupError } from '@/components/PopupError';
+import { DEFAULT_LOAD_MORE_LIMIT, isCloseToBottom } from '@/utils/scrollLoadMore';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -315,6 +316,7 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
   const [stats, setStats] = useState<QuoteListStats>(emptyStats);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
@@ -334,21 +336,26 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
     let active = true;
     if (!canRead || !user || !scopeReady) {
       setLoading(false);
+      setLoadingMore(false);
       return () => { active = false; };
     }
-    setLoading(true);
+    const append = page > 1;
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError('');
-    void listQuotes(scope, { kind, status, search: debouncedSearch, page })
+    void listQuotes(scope, { kind, status, search: debouncedSearch, page, limit: DEFAULT_LOAD_MORE_LIMIT })
       .then((result) => {
         if (!active) return;
-        setQuotes(result.quotes ?? []);
-        setPage(result.page || 1);
+        const incoming = result.quotes ?? [];
+        setQuotes((current) =>
+          append ? [...current, ...incoming.filter((row) => !current.some((item) => item._id === row._id))] : incoming,
+        );
         setTotalPages(result.totalPages || 1);
         setTotal(result.total || 0);
         setStats(result.stats ?? emptyStats);
       })
       .catch((cause) => { if (active) setError(errorMessage(cause)); })
-      .finally(() => { if (active) { setLoading(false); setRefreshing(false); } });
+      .finally(() => { if (active) { setLoading(false); setLoadingMore(false); setRefreshing(false); } });
     return () => { active = false; };
   }, [canRead, debouncedSearch, kind, page, reloadKey, scope, scopeReady, status, user]);
 
@@ -369,7 +376,13 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
 
   function refresh() {
     setRefreshing(true);
+    setPage(1);
     setReloadKey((value) => value + 1);
+  }
+
+  function loadMoreQuotes() {
+    if (loading || loadingMore || page >= totalPages) return;
+    setPage((value) => value + 1);
   }
 
   async function runQuoteAction(action: 'submit' | 'approve' | 'reject' | 'delete', reason?: string, changes?: Record<string, unknown>) {
@@ -430,6 +443,10 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
+        scrollEventThrottle={16}
+        onScroll={(event) => {
+          if (isCloseToBottom(event)) loadMoreQuotes();
+        }}
       >
         <View style={styles.statsRow}>
           <Card style={styles.statCard}><Text style={styles.statValue}>{stats.total}</Text><Text numberOfLines={2} style={styles.statLabel}>Tổng số</Text></Card>
@@ -443,7 +460,7 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
           {filters.map((item) => <Pressable key={item.label} onPress={() => { setStatus(item.value); setPage(1); }} style={[styles.filterChip, status === item.value && styles.filterChipActive]}><Text style={[styles.filterText, status === item.value && styles.filterTextActive]}>{item.label}</Text></Pressable>)}
         </ScrollView>
 
-        <View style={styles.listHeading}><View><Text style={styles.listTitle}>{kind === 'estimate' ? 'Danh sách dự toán' : 'Danh sách báo giá khách'}</Text><Text style={styles.listSubtitle}>{total} chứng từ trong ERP</Text></View><View style={styles.listHeadingActions}>{canCreate && <Pressable onPress={() => setCreating(true)} style={styles.primaryIconButton} accessibilityLabel="Tạo báo giá"><Plus size={19} color={colors.white} /></Pressable>}<Text style={styles.pageLabel}>{page}/{totalPages}</Text></View></View>
+        <View style={styles.listHeading}><View><Text style={styles.listTitle}>{kind === 'estimate' ? 'Danh sách dự toán' : 'Danh sách báo giá khách'}</Text><Text style={styles.listSubtitle}>{total} chứng từ trong ERP</Text></View><View style={styles.listHeadingActions}>{canCreate && <Pressable onPress={() => setCreating(true)} style={styles.primaryIconButton} accessibilityLabel="Tạo báo giá"><Plus size={19} color={colors.white} /></Pressable>}</View></View>
 
         {!scopeReady && <PopupError error="Chưa xác định được doanh nghiệp hoặc chi nhánh làm việc trong ERP." title="Chưa có phạm vi làm việc" />}
         {!!error && <PopupError error={error} title="Không tải được báo giá" onRetry={refresh} />}
@@ -451,7 +468,7 @@ function QuoteWorkspaceScreen({ kind, scope, onEstimateCreated, onCreateContract
         {loading ? <CenteredPageLoader /> : quotes.map((quote) => <QuoteRow key={quote._id} quote={quote} onPress={() => setSelectedId(quote._id)} />)}
         {scopeReady && !loading && !error && quotes.length === 0 && <Card style={styles.emptyCard}><FileText size={24} color={colors.muted} /><Text style={styles.emptyTitle}>Chưa có báo giá</Text><Text style={styles.emptyCopy}>{search || status ? 'Thử đổi bộ lọc hoặc từ khóa tìm kiếm.' : 'Báo giá được tạo trên ERP sẽ xuất hiện tại đây.'}</Text>{canCreate && <Pressable style={styles.emptyButton} onPress={() => setCreating(true)}><Plus size={15} color={colors.primary} /><Text style={styles.emptyButtonText}>Tạo báo giá</Text></Pressable>}</Card>}
 
-        {totalPages > 1 && <View style={styles.pagination}><Pressable disabled={page <= 1} onPress={() => setPage((value) => Math.max(1, value - 1))} style={[styles.pageButton, page <= 1 && styles.disabledButton]}><ChevronLeft size={17} color={page <= 1 ? '#B7C0CF' : colors.ink} /><Text style={styles.pageButtonText}>Trước</Text></Pressable><Text style={styles.pageLabel}>Trang {page} / {totalPages}</Text><Pressable disabled={page >= totalPages} onPress={() => setPage((value) => Math.min(totalPages, value + 1))} style={[styles.pageButton, page >= totalPages && styles.disabledButton]}><Text style={styles.pageButtonText}>Sau</Text><ChevronRight size={17} color={page >= totalPages ? '#B7C0CF' : colors.ink} /></Pressable></View>}
+        {loadingMore && <ActivityIndicator color={colors.primary} style={{ marginVertical: 14 }} />}
       </ScrollView>
 
       <FullScreenFormModal visible={creating} title={kind === 'estimate' ? 'Tạo dự toán' : 'Tạo báo giá khách'} onClose={() => setCreating(false)} scrollable={false}>

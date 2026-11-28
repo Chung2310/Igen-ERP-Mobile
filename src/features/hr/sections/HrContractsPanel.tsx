@@ -29,7 +29,14 @@ import {
   Upload,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import {
+  HrFormCustomRow,
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+} from '@/features/hr/components/HrFormFields';
 import { HrFab } from '@/features/hr/components/HrFab';
 import {
   createHrContractExtension,
@@ -571,9 +578,9 @@ export function HrContractsPanel({
         </Card>
       ) : subTab === 'contracts' ? (
         !contracts.length ? (
-          <Card style={styles.stateCard}>
-            <Text style={styles.muted}>Chưa có hợp đồng lao động nào.</Text>
-          </Card>
+          <View style={styles.stateCard}>
+            <IgenHrEmptyState message="Chưa có hợp đồng lao động nào." />
+          </View>
         ) : (
           <View style={styles.list}>
             {contracts.map((c) => {
@@ -644,28 +651,15 @@ export function HrContractsPanel({
                       ) : null}
                     </View>
                   ) : null}
-
-                  {canManage ? (
-                    <View style={styles.actionRow}>
-                      <Pressable onPress={() => openContractModal(c)} style={styles.smallEditBtn}>
-                        <Pencil size={12} color={colors.primary} />
-                        <Text style={styles.smallEditBtnText}>Sửa</Text>
-                      </Pressable>
-                      <Pressable onPress={() => openExtendModal(c)} style={styles.smallExtendBtn}>
-                        <RefreshCw size={12} color="#16885A" />
-                        <Text style={styles.smallExtendBtnText}>Gia hạn</Text>
-                      </Pressable>
-                    </View>
-                  ) : null}
                 </Card>
               );
             })}
           </View>
         )
       ) : !extensions.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Chưa có lịch sử gia hạn hợp đồng nào.</Text>
-        </Card>
+        <View style={styles.stateCard}>
+          <IgenHrEmptyState message="Chưa có lịch sử gia hạn hợp đồng nào." />
+        </View>
       ) : (
         <View style={styles.list}>
           {extensions.map((ext) => (
@@ -704,127 +698,95 @@ export function HrContractsPanel({
         saving={saving || Boolean(uploadingKind)}
         onClose={() => setEditing(null)}
       >
-        <View style={{ gap: 8, paddingBottom: 14 }}>
-          <Text style={styles.label}>Nhân viên *</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {employees.slice(0, 35).map((emp) => {
-              const active = cEmployeeId === emp._id;
-              return (
-                <Pressable
-                  key={emp._id}
-                  onPress={() => setCEmployeeId(emp._id)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {emp.displayName || emp.email}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          <Text style={styles.label}>Loại hợp đồng *</Text>
-          <View style={styles.wrapRow}>
-            {CONTRACT_TYPES.map((t) => (
-              <Pressable
-                key={t}
-                onPress={() => setCType(t)}
-                style={[styles.chip, cType === t && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, cType === t && styles.chipTextActive]}>{t}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Ngày bắt đầu *</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openContractDatePicker('start')}
-                style={styles.datePickerField}
-              >
-                <Text style={styles.datePickerText}>
-                  {cStartDate ? formatViDate(cStartDate) : 'Chọn ngày'}
-                </Text>
-                <CalendarDays size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Ngày kết thúc *</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openContractDatePicker('end')}
-                style={styles.datePickerField}
-              >
-                <Text style={styles.datePickerText}>
-                  {cEndDate ? formatViDate(cEndDate) : 'Chọn ngày'}
-                </Text>
-                <CalendarDays size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-          </View>
-
-          <Text style={styles.label}>Trạng thái</Text>
-          <View style={styles.wrapRow}>
-            {STATUS_OPTIONS.map((st) => (
-              <Pressable
-                key={st.value}
-                onPress={() => setCStatus(st.value)}
-                style={[styles.chip, cStatus === st.value && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, cStatus === st.value && styles.chipTextActive]}>
-                  {st.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Tệp hợp đồng (PDF / DOC / DOCX)</Text>
-          <Pressable
-            disabled={Boolean(uploadingKind)}
-            onPress={() => void pickAndUpload('contract')}
-            style={styles.uploadBtn}
-          >
-            <Upload size={13} color={colors.primary} />
-            <Text style={styles.uploadBtnText}>
-              {uploadingKind === 'contract'
-                ? 'Đang tải tệp...'
-                : cFileName || (cFileUrl ? 'Đã có tệp hợp đồng (Bấm để thay)' : 'Tải tệp hợp đồng lên')}
-            </Text>
-          </Pressable>
-
-          <Text style={styles.label}>Ảnh bản cứng đã ký (JPG / PNG)</Text>
-          <Pressable
-            disabled={Boolean(uploadingKind)}
-            onPress={() => void pickAndUpload('signed')}
-            style={styles.uploadBtn}
-          >
-            <Upload size={13} color={colors.primary} />
-            <Text style={styles.uploadBtnText}>
-              {uploadingKind === 'signed'
-                ? 'Đang tải ảnh...'
-                : cSignedName || (cSignedUrl ? 'Đã có ảnh đã ký (Bấm để thay)' : 'Tải ảnh đã ký lên')}
-            </Text>
-          </Pressable>
-
-          <Text style={styles.label}>Ghi chú</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin hợp đồng" />
+          <HrFormSelectRow
+            label="Nhân viên *"
+            sheetTitle="Chọn nhân viên"
+            value={cEmployeeId}
+            placeholder="Chọn nhân viên"
+            options={employees.map((emp) => ({
+              value: emp._id,
+              label: emp.displayName || emp.email || emp._id,
+              subtitle: [emp.department, emp.email].filter(Boolean).join(' · ') || undefined,
+            }))}
+            onSelect={setCEmployeeId}
+          />
+          <HrFormSelectRow
+            label="Loại hợp đồng *"
+            sheetTitle="Chọn loại hợp đồng"
+            value={cType}
+            placeholder="Chọn loại hợp đồng"
+            options={CONTRACT_TYPES.map((t) => ({ value: t, label: t }))}
+            onSelect={setCType}
+          />
+          <HrFormCustomRow label="Ngày bắt đầu *">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => openContractDatePicker('start')}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+            >
+              <Text style={{ color: cStartDate ? '#111827' : '#9CA3AF', fontSize: 15, fontWeight: cStartDate ? '500' : '400' }}>
+                {cStartDate ? formatViDate(cStartDate) : 'Chọn ngày'}
+              </Text>
+              <CalendarDays size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormCustomRow label="Ngày kết thúc *">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => openContractDatePicker('end')}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+            >
+              <Text style={{ color: cEndDate ? '#111827' : '#9CA3AF', fontSize: 15, fontWeight: cEndDate ? '500' : '400' }}>
+                {cEndDate ? formatViDate(cEndDate) : 'Chọn ngày'}
+              </Text>
+              <CalendarDays size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormSelectRow
+            label="Trạng thái"
+            sheetTitle="Chọn trạng thái hợp đồng"
+            value={cStatus}
+            options={STATUS_OPTIONS.map((st) => ({ value: st.value, label: st.label }))}
+            onSelect={(val) => setCStatus(val as typeof cStatus)}
+          />
+          <HrFormCustomRow label="Tệp hợp đồng (PDF / DOC / DOCX)">
+            <Pressable
+              disabled={Boolean(uploadingKind)}
+              onPress={() => void pickAndUpload('contract')}
+              style={[styles.uploadBtn, { marginTop: 4 }]}
+            >
+              <Upload size={13} color={colors.primary} />
+              <Text style={styles.uploadBtnText}>
+                {uploadingKind === 'contract'
+                  ? 'Đang tải tệp...'
+                  : cFileName || (cFileUrl ? 'Đã có tệp hợp đồng (Bấm để thay)' : 'Tải tệp hợp đồng lên')}
+              </Text>
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormCustomRow label="Ảnh bản cứng đã ký (JPG / PNG)">
+            <Pressable
+              disabled={Boolean(uploadingKind)}
+              onPress={() => void pickAndUpload('signed')}
+              style={[styles.uploadBtn, { marginTop: 4 }]}
+            >
+              <Upload size={13} color={colors.primary} />
+              <Text style={styles.uploadBtnText}>
+                {uploadingKind === 'signed'
+                  ? 'Đang tải ảnh...'
+                  : cSignedName || (cSignedUrl ? 'Đã có ảnh đã ký (Bấm để thay)' : 'Tải ảnh đã ký lên')}
+              </Text>
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormInputRow
+            label="Ghi chú"
             value={cNote}
             onChangeText={setCNote}
             multiline
             placeholder="Ghi chú thêm về hợp đồng..."
-            placeholderTextColor={colors.muted}
-            style={[styles.field, { minHeight: 60, textAlignVertical: 'top' }]}
+            last
           />
-
-          <Pressable
-            disabled={saving || Boolean(uploadingKind)}
-            onPress={() => void onSaveContract()}
-            style={[styles.submitBtn, (saving || Boolean(uploadingKind)) && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu hợp đồng'}</Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
 
@@ -880,82 +842,67 @@ export function HrContractsPanel({
         saving={saving || Boolean(uploadingKind)}
         onClose={() => setExtOpen(false)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Chọn hợp đồng *</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {activeContracts.map((c) => (
-              <Pressable
-                key={c._id}
-                onPress={() => {
-                  setExtContractId(c._id);
-                  if (!extNewEndDate && c.endDate) setExtNewEndDate(c.endDate.slice(0, 10));
-                }}
-                style={[styles.chip, extContractId === c._id && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, extContractId === c._id && styles.chipTextActive]}>
-                  {c.employeeName} ({formatViDate(c.endDate)})
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Ngày gia hạn</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openExtensionDatePicker('extensionDate')}
-                style={styles.datePickerField}
-              >
-                <Text style={styles.datePickerText}>{formatViDate(extDate)}</Text>
-                <CalendarDays size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Hạn mới *</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openExtensionDatePicker('newEndDate')}
-                style={styles.datePickerField}
-              >
-                <Text style={styles.datePickerText}>
-                  {extNewEndDate ? formatViDate(extNewEndDate) : 'Chọn ngày'}
-                </Text>
-                <CalendarDays size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-          </View>
-
-          <Text style={styles.label}>Lý do gia hạn</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin gia hạn" />
+          <HrFormSelectRow
+            label="Chọn hợp đồng *"
+            sheetTitle="Chọn hợp đồng cần gia hạn"
+            value={extContractId}
+            placeholder="Chọn hợp đồng"
+            options={activeContracts.map((c) => ({
+              value: c._id,
+              label: c.employeeName || c._id,
+              subtitle: `Hạn hiện tại: ${formatViDate(c.endDate)}`,
+            }))}
+            onSelect={(id) => {
+              setExtContractId(id);
+              const found = activeContracts.find((c) => c._id === id);
+              if (!extNewEndDate && found?.endDate) setExtNewEndDate(found.endDate.slice(0, 10));
+            }}
+          />
+          <HrFormCustomRow label="Ngày gia hạn">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => openExtensionDatePicker('extensionDate')}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+            >
+              <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{formatViDate(extDate)}</Text>
+              <CalendarDays size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormCustomRow label="Hạn mới *">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => openExtensionDatePicker('newEndDate')}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+            >
+              <Text style={{ color: extNewEndDate ? '#111827' : '#9CA3AF', fontSize: 15, fontWeight: extNewEndDate ? '500' : '400' }}>
+                {extNewEndDate ? formatViDate(extNewEndDate) : 'Chọn ngày'}
+              </Text>
+              <CalendarDays size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormInputRow
+            label="Lý do gia hạn"
             value={extReason}
             onChangeText={setExtReason}
             multiline
             placeholder="Ghi chú lý do gia hạn..."
-            style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]}
           />
-
-          <Text style={styles.label}>Phụ lục gia hạn (PDF / DOC)</Text>
-          <Pressable
-            disabled={Boolean(uploadingKind)}
-            onPress={() => void pickAndUpload('extension')}
-            style={styles.uploadBtn}
-          >
-            <Upload size={13} color={colors.primary} />
-            <Text style={styles.uploadBtnText}>
-              {uploadingKind === 'extension'
-                ? 'Đang tải...'
-                : extFileName || 'Tải file phụ lục gia hạn'}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            disabled={saving || Boolean(uploadingKind)}
-            onPress={() => void onSaveExtension()}
-            style={[styles.submitBtn, (saving || Boolean(uploadingKind)) && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Xác nhận gia hạn'}</Text>
-          </Pressable>
+          <HrFormCustomRow label="Phụ lục gia hạn (PDF / DOC)" last>
+            <Pressable
+              disabled={Boolean(uploadingKind)}
+              onPress={() => void pickAndUpload('extension')}
+              style={[styles.uploadBtn, { marginTop: 4 }]}
+            >
+              <Upload size={13} color={colors.primary} />
+              <Text style={styles.uploadBtnText}>
+                {uploadingKind === 'extension'
+                  ? 'Đang tải...'
+                  : extFileName || 'Tải file phụ lục gia hạn'}
+              </Text>
+            </Pressable>
+          </HrFormCustomRow>
         </View>
       </FullScreenFormModal>
 
@@ -1011,21 +958,16 @@ export function HrContractsPanel({
         saving={savingSettings}
         onClose={() => setSettingsOpen(false)}
       >
-        <View style={{ gap: 8 }}>
-          <Text style={styles.label}>Báo trước số ngày (1–365)</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Cấu hình cảnh báo" />
+          <HrFormInputRow
+            label="Báo trước số ngày (1–365)"
             value={settingDaysStr}
             onChangeText={setSettingDaysStr}
             keyboardType="numeric"
-            style={styles.field}
+            placeholder="30"
+            last
           />
-          <Pressable
-            disabled={savingSettings}
-            onPress={() => void onSaveSettings()}
-            style={[styles.submitBtn, savingSettings && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{savingSettings ? 'Đang lưu...' : 'Lưu cài đặt'}</Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
 
