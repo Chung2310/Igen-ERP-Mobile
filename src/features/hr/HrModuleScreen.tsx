@@ -225,6 +225,9 @@ export function HrModuleScreen() {
                   <ChevronDown size={13} color={colors.muted} />
                 ) : null}
               </View>
+              <Text numberOfLines={1} style={styles.switcherSubtitle}>
+                {activeTabMeta.subtitle}
+              </Text>
             </Pressable>
 
             <Pressable

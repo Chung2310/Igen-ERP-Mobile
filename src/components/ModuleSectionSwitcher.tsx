@@ -94,6 +94,11 @@ export function ModuleSectionSwitcher<T extends string>({
             </Text>
             {canSwitch ? <ChevronDown size={13} color={colors.muted} /> : null}
           </View>
+          {activeItem.subtitle ? (
+            <Text numberOfLines={1} style={styles.subtitle}>
+              {activeItem.subtitle}
+            </Text>
+          ) : null}
         </Pressable>
 
         <Pressable

@@ -651,6 +651,11 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
                   <ChevronDown size={13} color={colors.muted} />
                 ) : null}
               </View>
+              {activePage?.subtitle ? (
+                <Text numberOfLines={1} style={styles.switcherSubtitle}>
+                  {activePage.subtitle}
+                </Text>
+              ) : null}
             </Pressable>
 
             <Pressable
