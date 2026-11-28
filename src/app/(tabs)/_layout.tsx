@@ -76,6 +76,9 @@ export default function TabLayout() {
   const visibleTabRoutesRef = useRef(visibleTabRoutes);
   visibleTabRoutesRef.current = visibleTabRoutes;
   const currentTabRef = useRef<TabRouteKey>(showOverview ? 'index' : 'modules');
+  if (!visibleTabRoutes.includes(currentTabRef.current)) {
+    currentTabRef.current = showOverview ? 'index' : (visibleTabRoutes[0] ?? 'modules');
+  }
   const routerRef = useRef(router);
   routerRef.current = router;
   const screenWidthRef = useRef(screenWidth);
@@ -88,9 +91,10 @@ export default function TabLayout() {
         const active = currentTabRef.current;
         const routes = visibleTabRoutesRef.current;
         if (!active || routes.length <= 1) return false;
-        // Leave screen edges untouched for Android/iOS system back gesture
-        if (gesture.x0 < 20 || gesture.x0 > screenWidthRef.current - 20) return false;
-        if (Math.abs(gesture.dx) <= 18 || Math.abs(gesture.dx) <= Math.abs(gesture.dy) * 1.6) {
+        // Note: gesture.x0 is 0 before grant, so derive startX from moveX - dx
+        const startX = gesture.moveX - gesture.dx;
+        if (startX < 18 || startX > screenWidthRef.current - 18) return false;
+        if (Math.abs(gesture.dx) <= 14 || Math.abs(gesture.dx) <= Math.abs(gesture.dy) * 1.4) {
           return false;
         }
         const idx = routes.indexOf(active);
@@ -105,8 +109,8 @@ export default function TabLayout() {
         const idx = routes.indexOf(active);
         if (idx < 0) return;
         const isHorizontalSwipe =
-          (Math.abs(gesture.dx) >= 54 || Math.abs(gesture.vx) >= 0.45) &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.3;
+          (Math.abs(gesture.dx) >= 44 || Math.abs(gesture.vx) >= 0.35) &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
         if (!isHorizontalSwipe) return;
 
         const nextIdx = gesture.dx < 0 ? idx + 1 : idx - 1;
