@@ -856,7 +856,12 @@ export function HrLeavesPanel({
                       {file.name}
                     </Text>
                     <Pressable
-                      onPress={() => setAppFiles((prev) => prev.filter((_, i) => i !== idx))}
+                      onPress={() => showHrConfirm({
+                        title: 'Xóa tệp đính kèm?',
+                        message: `Bạn có chắc muốn xóa tệp "${file.name}"?`,
+                        confirmLabel: 'Xóa tệp',
+                        onConfirm: () => setAppFiles((prev) => prev.filter((_, i) => i !== idx)),
+                      })}
                       hitSlop={6}
                     >
                       <X size={12} color="#B91C1C" />

@@ -1869,7 +1869,12 @@ export function KanbanTasksPanel({
                   <Pressable
                     accessibilityLabel={`Gỡ ${attachment.name}`}
                     hitSlop={8}
-                    onPress={() => setTaskAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                    onPress={() => showHrConfirm({
+                      title: 'Xóa tệp đính kèm?',
+                      message: `Bạn có chắc muốn xóa tệp "${attachment.name}"?`,
+                      confirmLabel: 'Xóa tệp',
+                      onConfirm: () => setTaskAttachments((current) => current.filter((item) => item.id !== attachment.id)),
+                    })}
                     style={styles.attachmentRemove}
                   >
                     <X size={15} color="#B42318" />

@@ -775,7 +775,12 @@ export function HrWorkflowsPanel({
                     <View style={styles.subDot} />
                     <Text style={styles.subTaskText}>{task.title}</Text>
                     <Pressable
-                      onPress={() => removeStepSubTask(task.id)}
+                      onPress={() => showHrConfirm({
+                        title: 'Xóa công việc con?',
+                        message: `Bạn có chắc muốn xóa công việc con "${task.title}"?`,
+                        confirmLabel: 'Xóa',
+                        onConfirm: () => removeStepSubTask(task.id),
+                      })}
                       hitSlop={8}
                       accessibilityLabel={`Xóa công việc con ${task.title}`}
                     >
@@ -833,11 +838,14 @@ export function HrWorkflowsPanel({
                           {attachment.name || 'Tệp đính kèm'}
                         </Text>
                         <Pressable
-                          onPress={() =>
-                            setStepAttachments((current) =>
+                          onPress={() => showHrConfirm({
+                            title: 'Xóa tệp đính kèm?',
+                            message: `Bạn có chắc muốn xóa tệp "${attachment.name || 'Tệp đính kèm'}"?`,
+                            confirmLabel: 'Xóa tệp',
+                            onConfirm: () => setStepAttachments((current) =>
                               current.filter((_, itemIndex) => itemIndex !== index),
-                            )
-                          }
+                            ),
+                          })}
                           hitSlop={8}
                           accessibilityLabel={`Gỡ tệp ${attachment.name}`}
                         >

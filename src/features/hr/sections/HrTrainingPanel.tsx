@@ -1202,7 +1202,12 @@ export function HrTrainingPanel({
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`Xóa bài ${idx + 1}`}
-                      onPress={() => setFormLessons((prev) => prev.filter((_, i) => i !== idx))}
+                      onPress={() => showHrConfirm({
+                        title: 'Xóa bài giảng?',
+                        message: `Bạn có chắc muốn xóa bài giảng "${les.title || `Bài ${idx + 1}`}"?`,
+                        confirmLabel: 'Xóa bài giảng',
+                        onConfirm: () => setFormLessons((prev) => prev.filter((_, i) => i !== idx)),
+                      })}
                       hitSlop={8}
                       style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.55 }]}
                     >
@@ -1260,7 +1265,12 @@ export function HrTrainingPanel({
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`Xóa câu ${qIdx + 1}`}
-                      onPress={() => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx))}
+                      onPress={() => showHrConfirm({
+                        title: 'Xóa câu hỏi?',
+                        message: `Bạn có chắc muốn xóa câu hỏi "${q.question || `Câu ${qIdx + 1}`}"?`,
+                        confirmLabel: 'Xóa câu hỏi',
+                        onConfirm: () => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx)),
+                      })}
                       hitSlop={8}
                       style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.55 }]}
                     >
@@ -1370,14 +1380,19 @@ export function HrTrainingPanel({
                       />
                       {quizDraft.options.length > 2 ? (
                         <Pressable
-                          onPress={() => setQuizDraft((prev) => {
-                            const options = prev.options.filter((_, index) => index !== optionIndex);
-                            const correctOptionIndex = prev.correctOptionIndex === optionIndex
-                              ? Math.min(optionIndex, options.length - 1)
-                              : prev.correctOptionIndex > optionIndex
-                                ? prev.correctOptionIndex - 1
-                                : prev.correctOptionIndex;
-                            return { ...prev, options, correctOptionIndex };
+                          onPress={() => showHrConfirm({
+                            title: 'Xóa đáp án?',
+                            message: `Bạn có chắc muốn xóa đáp án "${option.trim() || `Đáp án ${optionIndex + 1}`}"?`,
+                            confirmLabel: 'Xóa đáp án',
+                            onConfirm: () => setQuizDraft((prev) => {
+                              const options = prev.options.filter((_, index) => index !== optionIndex);
+                              const correctOptionIndex = prev.correctOptionIndex === optionIndex
+                                ? Math.min(optionIndex, options.length - 1)
+                                : prev.correctOptionIndex > optionIndex
+                                  ? prev.correctOptionIndex - 1
+                                  : prev.correctOptionIndex;
+                              return { ...prev, options, correctOptionIndex };
+                            }),
                           })}
                           hitSlop={8}
                           style={({ pressed }) => [pressed && { opacity: 0.6 }]}
