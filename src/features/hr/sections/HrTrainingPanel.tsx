@@ -1224,7 +1224,7 @@ export function HrTrainingPanel({
 
           {/* Quiz builder */}
           <View style={styles.builderFlatHeader}>
-            <Text style={styles.builderFlatSectionTitle}>Trắc nghiệm MCQ ({formQuizzes.length})</Text>
+            <Text style={styles.builderFlatSectionTitle}>Câu hỏi trắc nghiệm ({formQuizzes.length})</Text>
             <Pressable
               onPress={() => openQuizEditor()}
               hitSlop={8}
