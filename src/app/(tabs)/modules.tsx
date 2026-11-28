@@ -246,7 +246,7 @@ export default function ModulesScreen() {
   ]);
 
   const visibleModules = moduleCatalog.filter((module) =>
-    isModuleVisibleForTenant(user, module.slug),
+    module.slug !== 'ai-plans' && isModuleVisibleForTenant(user, module.slug),
   );
   const tiles: GridTile[] = [
     { kind: 'attendance' },
