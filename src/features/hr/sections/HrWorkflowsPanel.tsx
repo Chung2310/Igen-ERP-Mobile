@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   Linking,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -15,9 +17,18 @@ import {
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Folder, Paperclip, Plus, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Folder, Paperclip, Pencil, Plus, Trash2, X } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import {
+  HrFormCustomRow,
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+} from '@/features/hr/components/HrFormFields';
 import { HrFab } from '@/features/hr/components/HrFab';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -39,6 +50,22 @@ function makeId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
+function CategoryManageIcon({ size = 19, color = colors.ink }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3.5" y="3.5" width="7" height="7" rx="2" stroke={color} strokeWidth="1.7" />
+      <Rect x="13.5" y="3.5" width="7" height="7" rx="2" stroke={color} strokeWidth="1.7" />
+      <Rect x="3.5" y="13.5" width="7" height="7" rx="2" stroke={color} strokeWidth="1.7" />
+      <Path
+        d="M17 13.75V20.25M13.75 17H20.25"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
 export function HrWorkflowsPanel({
   companyCode,
   canManage = false,
@@ -47,6 +74,7 @@ export function HrWorkflowsPanel({
   canManage?: boolean;
 }) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const creatorUid = user?._id || user?.id || '';
   const [workflows, setWorkflows] = useState<HrWorkflow[]>([]);
   const [workflowCategories, setWorkflowCategories] = useState<HrWorkflowCategory[]>([]);
@@ -88,6 +116,26 @@ export function HrWorkflowsPanel({
   const [categoryEditFrom, setCategoryEditFrom] = useState<string | null>(null);
   const [categoryNameDraft, setCategoryNameDraft] = useState('');
   const [savingCategory, setSavingCategory] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (!categoryManagerOpen) {
+      setKeyboardHeight(0);
+      return;
+    }
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardHeight(event.endCoordinates?.height || 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [categoryManagerOpen]);
 
   const load = useCallback(
     async (silent = false) => {
@@ -491,56 +539,44 @@ export function HrWorkflowsPanel({
         saving={savingWf}
         onClose={close}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Tên quy trình *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin quy trình" />
+          <HrFormInputRow
+            label="Tên quy trình *"
             value={wfName}
             onChangeText={setWfName}
             placeholder="VD: Quy trình tiếp nhận nhân sự mới"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
-          />
-          <Text style={styles.label}>Danh mục</Text>
-          <TextInput
-            value={wfCategory}
-            onChangeText={setWfCategory}
-            placeholder="VD: Nhân sự / Vận hành"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
           {categories.length > 1 ? (
-            <View style={styles.categorySuggestions}>
-              {categories.slice(1).map((category) => (
-                <Pressable
-                  key={category}
-                  onPress={() => setWfCategory(category)}
-                  style={[styles.catChip, wfCategory.trim() === category && styles.catChipActive]}
-                >
-                  <Text style={[styles.catText, wfCategory.trim() === category && styles.catTextActive]}>{category}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-          <Text style={styles.label}>Mô tả</Text>
-          <TextInput
+            <HrFormSelectRow
+              label="Danh mục"
+              sheetTitle="Chọn danh mục quy trình"
+              value={wfCategory}
+              placeholder="Chọn danh mục"
+              options={Array.from(
+                new Set([
+                  ...(wfCategory.trim() ? [wfCategory.trim()] : []),
+                  ...categories.slice(1),
+                ]),
+              ).map((cat) => ({ value: cat, label: cat }))}
+              onSelect={setWfCategory}
+            />
+          ) : (
+            <HrFormInputRow
+              label="Danh mục"
+              value={wfCategory}
+              onChangeText={setWfCategory}
+              placeholder="VD: Nhân sự / Vận hành"
+            />
+          )}
+          <HrFormInputRow
+            label="Mô tả"
             value={wfDesc}
             onChangeText={setWfDesc}
             multiline
             placeholder="Mục đích và phạm vi áp dụng..."
-            placeholderTextColor={colors.muted}
-            style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+            last
           />
-          <Pressable
-            disabled={savingWf}
-            onPress={() => void (editingWorkflow ? onUpdateWorkflow() : onCreateWorkflow())}
-            style={[styles.submitBtn, savingWf && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>
-              {savingWf
-                ? 'Đang lưu...'
-                : editingWorkflow ? 'Lưu quy trình' : 'Tạo quy trình'}
-            </Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
     );
@@ -745,70 +781,56 @@ export function HrWorkflowsPanel({
           saving={savingStep || uploadingStepAttachments}
           onClose={() => setStepModalOpen(false)}
         >
-          <View style={{ gap: 8, paddingBottom: 12 }}>
-            <Text style={styles.label}>Tên bước *</Text>
-            <TextInput value={stepTitle} onChangeText={setStepTitle} style={styles.field} />
-
-            <Text style={styles.label}>Mô tả chi tiết</Text>
-            <TextInput
-              value={stepDesc}
-              onChangeText={setStepDesc}
-              multiline
-              style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
-            />
-
-            <Text style={styles.label}>Lưu ý quan trọng</Text>
-            <TextInput value={stepNote} onChangeText={setStepNote} style={styles.field} />
-
-            <Text style={styles.label}>Kết quả cần đạt</Text>
-            <TextInput
-              value={stepDeliverable}
-              onChangeText={setStepDeliverable}
-              style={styles.field}
-            />
-
-            <Text style={styles.label}>Công việc con ({stepSubTasks.length})</Text>
-            {stepSubTasks.map((task) => (
-              <View key={task.id} style={styles.subTaskEditRow}>
-                <View style={styles.subDot} />
-                <Text style={styles.subTaskText}>{task.title}</Text>
-                <Pressable
-                  onPress={() => removeStepSubTask(task.id)}
-                  hitSlop={8}
-                  accessibilityLabel={`Xóa công việc con ${task.title}`}
-                >
-                  <X size={15} color={colors.muted} />
-                </Pressable>
+          <View>
+            <HrFormSectionTitle title="Thông tin bước thực hiện" />
+            <HrFormInputRow label="Tên bước *" value={stepTitle} onChangeText={setStepTitle} placeholder="Nhập tên bước..." />
+            <HrFormInputRow label="Mô tả chi tiết" value={stepDesc} onChangeText={setStepDesc} multiline placeholder="Mô tả chi tiết..." />
+            <HrFormInputRow label="Lưu ý quan trọng" value={stepNote} onChangeText={setStepNote} placeholder="Lưu ý quan trọng..." />
+            <HrFormInputRow label="Kết quả cần đạt" value={stepDeliverable} onChangeText={setStepDeliverable} placeholder="Kết quả đầu ra..." />
+            <HrFormCustomRow label={`Công việc con (${stepSubTasks.length})`}>
+              <View style={{ gap: 6, marginTop: 4 }}>
+                {stepSubTasks.map((task) => (
+                  <View key={task.id} style={styles.subTaskEditRow}>
+                    <View style={styles.subDot} />
+                    <Text style={styles.subTaskText}>{task.title}</Text>
+                    <Pressable
+                      onPress={() => removeStepSubTask(task.id)}
+                      hitSlop={8}
+                      accessibilityLabel={`Xóa công việc con ${task.title}`}
+                    >
+                      <X size={15} color={colors.muted} />
+                    </Pressable>
+                  </View>
+                ))}
+                <View style={styles.subTaskAddRow}>
+                  <TextInput
+                    value={stepSubTaskDraft}
+                    onChangeText={setStepSubTaskDraft}
+                    onSubmitEditing={addStepSubTask}
+                    returnKeyType="done"
+                    placeholder="Nhập tên công việc con..."
+                    placeholderTextColor="#9CA3AF"
+                    style={[styles.field, { flex: 1 }]}
+                  />
+                  <Pressable
+                    onPress={addStepSubTask}
+                    disabled={!stepSubTaskDraft.trim()}
+                    style={[styles.subTaskAddBtn, !stepSubTaskDraft.trim() && styles.disabled]}
+                  >
+                    <Plus size={14} color={colors.primary} />
+                    <Text style={styles.categoryAddText}>Thêm</Text>
+                  </Pressable>
+                </View>
               </View>
-            ))}
-            <View style={styles.subTaskAddRow}>
-              <TextInput
-                value={stepSubTaskDraft}
-                onChangeText={setStepSubTaskDraft}
-                onSubmitEditing={addStepSubTask}
-                returnKeyType="done"
-                placeholder="Nhập tên công việc con..."
-                placeholderTextColor={colors.muted}
-                style={[styles.field, { flex: 1 }]}
-              />
-              <Pressable
-                onPress={addStepSubTask}
-                disabled={!stepSubTaskDraft.trim()}
-                style={[styles.subTaskAddBtn, !stepSubTaskDraft.trim() && styles.disabled]}
-              >
-                <Plus size={14} color={colors.primary} />
-                <Text style={styles.categoryAddText}>Thêm</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.attachmentSection}>
-              <View style={styles.attachmentHeading}>
-                <Text style={styles.label}>Tệp đính kèm ({stepAttachments.length})</Text>
+            </HrFormCustomRow>
+            <HrFormCustomRow label={`Tệp đính kèm (${stepAttachments.length})`} last>
+              <View style={{ gap: 8, marginTop: 6 }}>
                 <Pressable
                   onPress={() => void pickStepAttachments()}
                   disabled={uploadingStepAttachments || savingStep}
                   style={[
                     styles.attachmentAddBtn,
+                    { alignSelf: 'flex-start' },
                     (uploadingStepAttachments || savingStep) && styles.disabled,
                   ]}
                 >
@@ -821,50 +843,33 @@ export function HrWorkflowsPanel({
                     {uploadingStepAttachments ? 'Đang tải...' : 'Thêm tệp'}
                   </Text>
                 </Pressable>
+                {stepAttachments.length ? (
+                  <View style={{ gap: 6 }}>
+                    {stepAttachments.map((attachment, index) => (
+                      <View key={attachment.id || `${attachment.url}-${index}`} style={styles.attachmentRow}>
+                        <Paperclip size={14} color={colors.primary} />
+                        <Text numberOfLines={1} style={styles.attachmentName}>
+                          {attachment.name || 'Tệp đính kèm'}
+                        </Text>
+                        <Pressable
+                          onPress={() =>
+                            setStepAttachments((current) =>
+                              current.filter((_, itemIndex) => itemIndex !== index),
+                            )
+                          }
+                          hitSlop={8}
+                          accessibilityLabel={`Gỡ tệp ${attachment.name}`}
+                        >
+                          <X size={16} color={colors.muted} />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.muted}>Chưa có tệp đính kèm.</Text>
+                )}
               </View>
-              {stepAttachments.length ? (
-                <View style={{ gap: 6 }}>
-                  {stepAttachments.map((attachment, index) => (
-                    <View key={attachment.id || `${attachment.url}-${index}`} style={styles.attachmentRow}>
-                      <Paperclip size={14} color={colors.primary} />
-                      <Text numberOfLines={1} style={styles.attachmentName}>
-                        {attachment.name || 'Tệp đính kèm'}
-                      </Text>
-                      <Pressable
-                        onPress={() =>
-                          setStepAttachments((current) =>
-                            current.filter((_, itemIndex) => itemIndex !== index),
-                          )
-                        }
-                        hitSlop={8}
-                        accessibilityLabel={`Gỡ tệp ${attachment.name}`}
-                      >
-                        <X size={16} color={colors.muted} />
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.muted}>Chưa có tệp đính kèm.</Text>
-              )}
-            </View>
-
-            <Pressable
-              disabled={savingStep || uploadingStepAttachments}
-              onPress={() => void onSaveStep()}
-              style={[
-                styles.submitBtn,
-                (savingStep || uploadingStepAttachments) && styles.disabled,
-              ]}
-            >
-              <Text style={styles.submitBtnText}>
-                {uploadingStepAttachments
-                  ? 'Đang tải tệp...'
-                  : savingStep
-                    ? 'Đang lưu...'
-                    : 'Lưu bước'}
-              </Text>
-            </Pressable>
+            </HrFormCustomRow>
           </View>
         </FullScreenFormModal>
         {renderWorkflowFormModal()}
@@ -912,9 +917,9 @@ export function HrWorkflowsPanel({
                 setCategoryManagerOpen(true);
               }}
               hitSlop={8}
-              style={({ pressed }) => [styles.catManageLink, pressed && { opacity: 0.6 }]}
+              style={({ pressed }) => [styles.catManageIconBtn, pressed && { opacity: 0.6 }]}
             >
-              <Text style={styles.catManageLinkText}>Quản lý</Text>
+              <CategoryManageIcon size={19} color={colors.ink} />
             </Pressable>
           ) : null}
         </View>
@@ -942,9 +947,9 @@ export function HrWorkflowsPanel({
           </Pressable>
         </Card>
       ) : !filtered.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Chưa có quy trình nội bộ nào.</Text>
-        </Card>
+        <View style={styles.stateCard}>
+          <IgenHrEmptyState message="Chưa có quy trình nội bộ nào." />
+        </View>
       ) : (
         <View style={styles.list}>
           {filtered.map((wf) => (
@@ -976,14 +981,11 @@ export function HrWorkflowsPanel({
         onRequestClose={() => setCategoryFilterOpen(false)}
       >
         <Pressable style={styles.catSheetBackdrop} onPress={() => setCategoryFilterOpen(false)}>
-          <Pressable style={styles.catSheet} onPress={() => {}}>
+          <Pressable
+            style={[styles.catSheet, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}
+            onPress={() => {}}
+          >
             <View style={styles.catSheetHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>Lọc theo phân loại</Text>
-              <Pressable onPress={() => setCategoryFilterOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
               {categories.map((cat) => {
                 const selected = selectedCategory === cat;
@@ -1009,17 +1011,13 @@ export function HrWorkflowsPanel({
       </Modal>
 
       {renderWorkflowFormModal()}
-      <FullScreenFormModal
+      <Modal
         visible={categoryManagerOpen}
-        title={
-          categoryManagerMode === 'list'
-            ? 'Quản lý phân loại'
-            : categoryManagerMode === 'rename' ? 'Đổi tên phân loại' : 'Tạo phân loại'
-        }
-        cancelLabel={categoryManagerMode === 'list' ? undefined : 'Hủy'}
-        onSave={categoryManagerMode === 'list' ? undefined : () => void onSaveCategory()}
-        saving={savingCategory}
-        onClose={() => {
+        transparent
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => {
+          if (savingCategory) return;
           if (categoryManagerMode === 'list') {
             setCategoryManagerOpen(false);
           } else {
@@ -1027,79 +1025,112 @@ export function HrWorkflowsPanel({
           }
         }}
       >
-        {categoryManagerMode === 'list' ? (
-          <View style={{ gap: 8, paddingBottom: 12 }}>
-            <Text style={styles.muted}>Tạo phân loại riêng và gán cho quy trình bất cứ lúc nào.</Text>
-            <Pressable onPress={openCreateCategory} style={styles.categoryAddBtn}>
-              <View style={styles.iconButtonContent}>
-                <Plus size={14} color={colors.primary} />
-                <Text style={styles.categoryAddText}>Tạo phân loại</Text>
-              </View>
-            </Pressable>
-            {categories.slice(1).length ? categories.slice(1).map((category) => {
-              const count = workflows.filter((workflow) => workflow.category?.trim() === category).length;
-              return (
-                <View key={category} style={styles.categoryRow}>
-                  <View style={styles.categoryRowCopy}>
-                    <Text style={styles.rowTitle}>{category}</Text>
-                    <Text style={styles.muted}>{count} quy trình</Text>
-                  </View>
-                  <Pressable onPress={() => openRenameCategory(category)} style={styles.categoryActionBtn}>
-                    <Text style={styles.categoryActionText}>Đổi tên</Text>
+        <Pressable
+          style={[styles.catSheetBackdrop, keyboardHeight > 0 && { paddingBottom: keyboardHeight }]}
+          onPress={() => {
+            if (savingCategory) return;
+            Keyboard.dismiss();
+            setCategoryManagerMode('list');
+            setCategoryManagerOpen(false);
+          }}
+        >
+          <Pressable
+            style={[
+              styles.catSheet,
+              { paddingBottom: keyboardHeight > 0 ? 16 : Math.max(insets.bottom, 20) + 16 },
+            ]}
+            onPress={() => {}}
+          >
+              <View style={styles.catSheetHandle} />
+              {categoryManagerMode === 'list' ? (
+                <View style={{ gap: 6 }}>
+                  <Pressable
+                    onPress={openCreateCategory}
+                    style={({ pressed }) => [styles.catSheetAddRow, pressed && { opacity: 0.65 }]}
+                  >
+                    <Plus size={17} strokeWidth={1.8} color={colors.ink} />
+                    <Text style={styles.catSheetAddRowText}>Thêm phân loại quy trình</Text>
                   </Pressable>
-                  {category !== 'Chung' ? (
+                  <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                    <View style={{ gap: 6 }}>
+                      {categories.slice(1).length ? categories.slice(1).map((category) => {
+                        const count = workflows.filter((workflow) => workflow.category?.trim() === category).length;
+                        return (
+                          <View key={category} style={styles.categoryRow}>
+                            <View style={styles.categoryRowCopy}>
+                              <Text style={styles.rowTitle}>{category}</Text>
+                              <Text style={styles.muted}>{count} quy trình</Text>
+                            </View>
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel={`Đổi tên phân loại ${category}`}
+                              onPress={() => openRenameCategory(category)}
+                              hitSlop={6}
+                              style={({ pressed }) => [styles.categoryIconBtn, pressed && { opacity: 0.6 }]}
+                            >
+                              <Pencil size={17} strokeWidth={1.6} color={colors.ink} />
+                            </Pressable>
+                            {category !== 'Chung' ? (
+                              <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={`Xóa phân loại ${category}`}
+                                disabled={savingCategory}
+                                onPress={() => onDeleteCategory(category)}
+                                hitSlop={6}
+                                style={({ pressed }) => [styles.categoryIconBtn, pressed && { opacity: 0.6 }, savingCategory && styles.disabled]}
+                              >
+                                <Trash2 size={17} strokeWidth={1.6} color="#C74848" />
+                              </Pressable>
+                            ) : null}
+                          </View>
+                        );
+                      }) : (
+                        <Text style={styles.categoryEmpty}>Chưa có phân loại nào.</Text>
+                      )}
+                    </View>
+                  </ScrollView>
+                </View>
+              ) : (
+                <View style={{ gap: 10 }}>
+                  <Text style={styles.label}>
+                    {categoryManagerMode === 'rename' ? 'Đổi tên phân loại *' : 'Tên phân loại quy trình *'}
+                  </Text>
+                  <TextInput
+                    value={categoryNameDraft}
+                    onChangeText={setCategoryNameDraft}
+                    placeholder="Ví dụ: Nhân sự / Vận hành"
+                    placeholderTextColor={colors.muted}
+                    style={styles.field}
+                    autoFocus
+                  />
+                  {categoryManagerMode === 'rename' ? (
+                    <Text style={styles.muted}>
+                      Sẽ cập nhật cho tất cả {workflows.filter((workflow) => workflow.category?.trim() === categoryEditFrom).length} quy trình đang dùng phân loại này.
+                    </Text>
+                  ) : null}
+                  <View style={styles.categoryFormActions}>
                     <Pressable
                       disabled={savingCategory}
-                      onPress={() => onDeleteCategory(category)}
-                      style={styles.categoryDeleteBtn}
+                      onPress={() => setCategoryManagerMode('list')}
+                      style={[styles.categoryCancelBtn, savingCategory && styles.disabled]}
                     >
-                      <Text style={styles.categoryDeleteText}>Xóa</Text>
+                      <Text style={styles.categoryActionText}>Hủy</Text>
                     </Pressable>
-                  ) : null}
+                    <Pressable
+                      disabled={savingCategory}
+                      onPress={() => void onSaveCategory()}
+                      style={[styles.submitBtn, styles.categorySaveBtn, savingCategory && styles.disabled]}
+                    >
+                      <Text style={styles.submitBtnText}>
+                        {savingCategory ? 'Đang lưu...' : categoryManagerMode === 'rename' ? 'Lưu thay đổi' : 'Thêm phân loại'}
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
-              );
-            }) : (
-              <Text style={styles.categoryEmpty}>Chưa có phân loại. Bạn có thể tạo danh mục trước khi có quy trình.</Text>
-            )}
-          </View>
-        ) : (
-          <View style={{ gap: 8, paddingBottom: 12 }}>
-            <Text style={styles.label}>Tên phân loại *</Text>
-            <TextInput
-              value={categoryNameDraft}
-              onChangeText={setCategoryNameDraft}
-              placeholder="Ví dụ: Nhân sự / Vận hành"
-              placeholderTextColor={colors.muted}
-              style={styles.field}
-            />
-            {categoryManagerMode === 'rename' ? (
-              <Text style={styles.muted}>
-                Tên phân loại sẽ được cập nhật cho tất cả {workflows.filter((workflow) => workflow.category?.trim() === categoryEditFrom).length} quy trình đang sử dụng.
-              </Text>
-            ) : (
-              <Text style={styles.muted}>Phân loại sẽ được lưu riêng. Bạn có thể gán vào quy trình khi tạo hoặc cập nhật quy trình.</Text>
-            )}
-            <View style={styles.categoryFormActions}>
-              <Pressable
-                disabled={savingCategory}
-                onPress={() => setCategoryManagerMode('list')}
-                style={[styles.categoryCancelBtn, savingCategory && styles.disabled]}
-              >
-                <Text style={styles.categoryActionText}>Hủy</Text>
-              </Pressable>
-              <Pressable
-                disabled={savingCategory}
-                onPress={() => void onSaveCategory()}
-                style={[styles.submitBtn, styles.categorySaveBtn, savingCategory && styles.disabled]}
-              >
-                <Text style={styles.submitBtnText}>
-                  {savingCategory ? 'Đang lưu...' : categoryManagerMode === 'rename' ? 'Lưu thay đổi' : 'Tạo phân loại'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-      </FullScreenFormModal>
+              )}
+            </Pressable>
+          </Pressable>
+      </Modal>
     </ScrollView>
     {canManage ? <HrFab label="Thêm quy trình" onPress={openCreateWorkflow} /> : null}
     </View>
@@ -1143,8 +1174,19 @@ const styles = StyleSheet.create({
   catTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 6, paddingBottom: 12, gap: 10 },
   catTriggerBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
   catTriggerText: { color: colors.ink, fontSize: 15, fontWeight: '400', flexShrink: 1 },
-  catManageLink: { paddingVertical: 4, paddingLeft: 8 },
-  catManageLinkText: { color: colors.primary, fontSize: 13.5, fontWeight: '500' },
+  catManageIconBtn: { padding: 6, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  categoryIconBtn: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  catSheetAddRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    marginBottom: 4,
+  },
+  catSheetAddRowText: { color: colors.ink, fontSize: 14.5, fontWeight: '400' },
   catSheetBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.35)', justifyContent: 'flex-end' },
   catSheet: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 26 },
   catSheetHandle: { width: 38, height: 4, borderRadius: 99, backgroundColor: '#D6DFEC', alignSelf: 'center', marginBottom: 12 },

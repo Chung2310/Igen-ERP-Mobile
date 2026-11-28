@@ -14,7 +14,14 @@ import {
 } from 'react-native';
 import { ChevronRight, Plus } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import {
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+  HrFormSwitchRow,
+} from '@/features/hr/components/HrFormFields';
 import { HrFab } from '@/features/hr/components/HrFab';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import {
@@ -305,9 +312,9 @@ export function DepartmentsPanel({
           </Pressable>
         </Card>
       ) : !filtered.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Chưa có phòng ban nào phù hợp.</Text>
-        </Card>
+        <View style={styles.stateCard}>
+          <IgenHrEmptyState message="Chưa có phòng ban nào phù hợp." />
+        </View>
       ) : (
         <View style={styles.list}>
           {filtered.map((dept) => (
@@ -346,72 +353,27 @@ export function DepartmentsPanel({
       >
         {selectedDept ? (
           isEditing ? (
-            <View style={{ gap: 8, paddingBottom: 10 }}>
-              <Text style={styles.label}>Tên phòng ban *</Text>
-              <TextInput value={name} onChangeText={setName} style={styles.field} />
-
-              <Text style={styles.label}>Mã phòng ban</Text>
-              <TextInput value={code} onChangeText={setCode} placeholder="VD: PB-KD" placeholderTextColor={colors.muted} style={styles.field} />
-
-              <Text style={styles.label}>Trưởng phòng</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
-                <Pressable
-                  onPress={() => setManagerUid('')}
-                  style={[styles.chip, !managerUid && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
-                </Pressable>
-                {employees.slice(0, 25).map((emp) => {
-                  const uid = emp.uid || emp._id || emp.id || '';
-                  const active = managerUid === uid;
-                  return (
-                    <Pressable
-                      key={uid}
-                      onPress={() => setManagerUid(uid)}
-                      style={[styles.chip, active && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                        {emp.displayName}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-
-              <Text style={styles.label}>Mô tả chức năng</Text>
-              <TextInput
-                value={desc}
-                onChangeText={setDesc}
-                multiline
-                style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
+            <View>
+              <HrFormSectionTitle title="Thông tin phòng ban" />
+              <HrFormInputRow label="Tên phòng ban *" value={name} onChangeText={setName} placeholder="Nhập tên phòng ban" />
+              <HrFormInputRow label="Mã phòng ban" value={code} onChangeText={setCode} placeholder="VD: PB-KD" />
+              <HrFormSelectRow
+                label="Trưởng phòng"
+                sheetTitle="Chọn trưởng phòng"
+                value={managerUid}
+                placeholder="Chưa chỉ định"
+                options={[
+                  { value: '', label: 'Chưa chỉ định' },
+                  ...employees.map((emp) => ({
+                    value: emp.uid || emp._id || emp.id || '',
+                    label: emp.displayName,
+                    subtitle: [emp.jobTitle || emp.position, emp.department].filter(Boolean).join(' · ') || undefined,
+                  })),
+                ]}
+                onSelect={setManagerUid}
               />
-
-              <View style={styles.switchRow}>
-                <Text style={styles.label}>Đang hoạt động</Text>
-                <Switch
-                  value={isActive}
-                  onValueChange={setIsActive}
-                  trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                />
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                <Pressable
-                  onPress={() => setIsEditing(false)}
-                  style={styles.cancelBtn}
-                >
-                  <Text style={styles.cancelBtnText}>Hủy</Text>
-                </Pressable>
-                <Pressable
-                  disabled={saving}
-                  onPress={() => void onSaveEdit()}
-                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                  </Text>
-                </Pressable>
-              </View>
+              <HrFormInputRow label="Mô tả chức năng" value={desc} onChangeText={setDesc} placeholder="Mô tả chức năng..." multiline />
+              <HrFormSwitchRow label="Đang hoạt động" value={isActive} onValueChange={setIsActive} last />
             </View>
           ) : (
             <View style={{ gap: 10, paddingBottom: 10 }}>
@@ -457,7 +419,7 @@ export function DepartmentsPanel({
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.muted}>Chưa có nhân sự nào thuộc phòng ban này.</Text>
+                  <IgenHrEmptyState compact message="Chưa có nhân sự nào thuộc phòng ban này." />
                 )}
               </View>
 
@@ -488,63 +450,26 @@ export function DepartmentsPanel({
         saving={saving}
         onClose={() => setCreateOpen(false)}
       >
-        <View style={{ gap: 8 }}>
-          <Text style={styles.label}>Tên phòng ban *</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Tên phòng ban"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
+        <View>
+          <HrFormSectionTitle title="Thông tin phòng ban" />
+          <HrFormInputRow label="Tên phòng ban *" value={name} onChangeText={setName} placeholder="Nhập tên phòng ban" />
+          <HrFormInputRow label="Mã phòng ban" value={code} onChangeText={setCode} placeholder="Mã phòng ban (tùy chọn)" />
+          <HrFormSelectRow
+            label="Trưởng phòng"
+            sheetTitle="Chọn trưởng phòng"
+            value={managerUid}
+            placeholder="Chưa chỉ định"
+            options={[
+              { value: '', label: 'Chưa chỉ định' },
+              ...employees.map((emp) => ({
+                value: emp.uid || emp._id || emp.id || '',
+                label: emp.displayName,
+                subtitle: [emp.jobTitle || emp.position, emp.department].filter(Boolean).join(' · ') || undefined,
+              })),
+            ]}
+            onSelect={setManagerUid}
           />
-          <Text style={styles.label}>Mã phòng ban</Text>
-          <TextInput
-            value={code}
-            onChangeText={setCode}
-            placeholder="Mã phòng ban (tùy chọn)"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
-          />
-          <Text style={styles.label}>Trưởng phòng</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
-            <Pressable
-              onPress={() => setManagerUid('')}
-              style={[styles.chip, !managerUid && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, !managerUid && styles.chipTextActive]}>Chưa chỉ định</Text>
-            </Pressable>
-            {employees.slice(0, 25).map((emp) => {
-              const uid = emp.uid || emp._id || emp.id || '';
-              const active = managerUid === uid;
-              return (
-                <Pressable
-                  key={uid}
-                  onPress={() => setManagerUid(uid)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {emp.displayName}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          <Text style={styles.label}>Mô tả chức năng</Text>
-          <TextInput
-            value={desc}
-            onChangeText={setDesc}
-            placeholder="Mô tả chức năng"
-            placeholderTextColor={colors.muted}
-            multiline
-            style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
-          />
-          <Pressable
-            disabled={saving}
-            onPress={() => void onCreate()}
-            style={[styles.submitBtn, saving && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Tạo phòng ban'}</Text>
-          </Pressable>
+          <HrFormInputRow label="Mô tả chức năng" value={desc} onChangeText={setDesc} placeholder="Mô tả chức năng" multiline last />
         </View>
       </FullScreenFormModal>
     </ScrollView>

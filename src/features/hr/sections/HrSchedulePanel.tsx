@@ -1,5 +1,12 @@
 import { PopupError } from '@/components/PopupError';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import {
+  HrFormCustomRow,
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+  HrFormSwitchRow,
+} from '@/features/hr/components/HrFormFields';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -29,6 +36,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { HrFab } from '@/features/hr/components/HrFab';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -805,11 +813,9 @@ function AttendanceAndCalendarSection({
               </Pressable>
             </Card>
           ) : !monthlyRows.length ? (
-            <Card style={styles.stateCard}>
-              <Text style={styles.muted}>
-                Không có dữ liệu bảng công Tháng {histMonth}/{histYear}.
-              </Text>
-            </Card>
+            <View style={styles.stateCard}>
+              <IgenHrEmptyState message={`Không có dữ liệu bảng công Tháng ${histMonth}/${histYear}.`} />
+            </View>
           ) : (
             <View style={[styles.tableWrap, styles.tableContentRow]}>
               {/* Frozen Left Columns: # | Họ và Tên | Số công */}
@@ -1137,13 +1143,15 @@ function AttendanceAndCalendarSection({
             const visibleEvents = calListScope === 'month' ? monthFilteredEvents : pickedEvents;
             if (!visibleHolidays.length && !visibleEvents.length) {
               return (
-                <Card style={styles.stateCard}>
-                  <Text style={styles.muted}>
-                    {calListScope === 'month'
-                      ? `Không có lịch trình hoặc sự kiện nào trong tháng ${calMonth + 1}/${calYear}.`
-                      : `Không có sự kiện hoặc lịch trình nào trong ngày ${formatViDate(pickedDayKey)}.`}
-                  </Text>
-                </Card>
+                <View style={styles.stateCard}>
+                  <IgenHrEmptyState
+                    message={
+                      calListScope === 'month'
+                        ? `Không có lịch trình hoặc sự kiện nào trong tháng ${calMonth + 1}/${calYear}.`
+                        : `Không có sự kiện hoặc lịch trình nào trong ngày ${formatViDate(pickedDayKey)}.`
+                    }
+                  />
+                </View>
               );
             }
             return (
@@ -1220,29 +1228,16 @@ function AttendanceAndCalendarSection({
         saving={savingRec}
         onClose={() => setEditingRec(null)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.muted}>
-            {editingRec?.employeeName || editingRec?.displayName} · {formatViDate(editingRec?.date)}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Giờ vào (HH:mm)</Text>
-              <TextInput value={editIn} onChangeText={setEditIn} placeholder="08:30" style={styles.field} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Giờ ra (HH:mm)</Text>
-              <TextInput value={editOut} onChangeText={setEditOut} placeholder="17:30" style={styles.field} />
-            </View>
+        <View>
+          <HrFormSectionTitle title="Thông tin chấm công" />
+          <View style={{ paddingVertical: 10 }}>
+            <Text style={styles.muted}>
+              {editingRec?.employeeName || editingRec?.displayName} · {formatViDate(editingRec?.date)}
+            </Text>
           </View>
-          <Text style={styles.label}>Ghi chú</Text>
-          <TextInput value={editNote} onChangeText={setEditNote} placeholder="Lý do điều chỉnh..." style={styles.field} />
-          <Pressable
-            disabled={savingRec}
-            onPress={() => void onSaveRec()}
-            style={[styles.submitBtn, savingRec && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{savingRec ? 'Đang lưu...' : 'Lưu điều chỉnh'}</Text>
-          </Pressable>
+          <HrFormInputRow label="Giờ vào (HH:mm)" value={editIn} onChangeText={setEditIn} placeholder="08:30" />
+          <HrFormInputRow label="Giờ ra (HH:mm)" value={editOut} onChangeText={setEditOut} placeholder="17:30" />
+          <HrFormInputRow label="Ghi chú" value={editNote} onChangeText={setEditNote} placeholder="Lý do điều chỉnh..." last />
         </View>
       </FullScreenFormModal>
 
@@ -1255,48 +1250,22 @@ function AttendanceAndCalendarSection({
         saving={savingEv}
         onClose={() => setEventModalOpen(false)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Loại lịch</Text>
-          <View style={styles.wrapRow}>
-            {(Object.keys(EVENT_TYPE_LABELS) as HrCalendarEventType[]).map((t) => (
-              <Pressable
-                key={t}
-                onPress={() => setEvType(t)}
-                style={[styles.chip, evType === t && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, evType === t && styles.chipTextActive]}>
-                  {EVENT_TYPE_LABELS[t]}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.label}>Tiêu đề *</Text>
-          <TextInput value={evTitle} onChangeText={setEvTitle} placeholder="VD: Họp giao ban đầu tuần" style={styles.field} />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Từ ngày (YYYY-MM-DD)</Text>
-              <TextInput value={evStart} onChangeText={setEvStart} style={styles.field} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Đến ngày</Text>
-              <TextInput value={evEnd} onChangeText={setEvEnd} style={styles.field} />
-            </View>
-          </View>
-          <Text style={styles.label}>Mô tả</Text>
-          <TextInput
-            value={evDesc}
-            onChangeText={setEvDesc}
-            multiline
-            placeholder="Ghi chú chi tiết..."
-            style={[styles.field, { minHeight: 56, textAlignVertical: 'top' }]}
+        <View>
+          <HrFormSectionTitle title="Thông tin lịch làm việc" />
+          <HrFormSelectRow
+            label="Loại lịch"
+            sheetTitle="Chọn loại lịch"
+            value={evType}
+            options={(Object.keys(EVENT_TYPE_LABELS) as HrCalendarEventType[]).map((t) => ({
+              value: t,
+              label: EVENT_TYPE_LABELS[t],
+            }))}
+            onSelect={(val) => setEvType(val as HrCalendarEventType)}
           />
-          <Pressable
-            disabled={savingEv}
-            onPress={() => void onCreateEvent()}
-            style={[styles.submitBtn, savingEv && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{savingEv ? 'Đang lưu...' : 'Tạo lịch'}</Text>
-          </Pressable>
+          <HrFormInputRow label="Tiêu đề *" value={evTitle} onChangeText={setEvTitle} placeholder="VD: Họp giao ban đầu tuần" />
+          <HrFormInputRow label="Từ ngày (YYYY-MM-DD)" value={evStart} onChangeText={setEvStart} placeholder="YYYY-MM-DD" />
+          <HrFormInputRow label="Đến ngày (YYYY-MM-DD)" value={evEnd} onChangeText={setEvEnd} placeholder="YYYY-MM-DD" />
+          <HrFormInputRow label="Mô tả" value={evDesc} onChangeText={setEvDesc} multiline placeholder="Ghi chú chi tiết..." last />
         </View>
       </FullScreenFormModal>
 
@@ -1507,9 +1476,9 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
           <ActivityIndicator size="small" color={colors.primary} />
         </Card>
       ) : !shifts.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Chưa có ca làm việc nào. Giờ chung của công ty vẫn đang áp dụng.</Text>
-        </Card>
+        <View style={styles.stateCard}>
+          <IgenHrEmptyState message="Chưa có ca làm việc nào. Giờ chung của công ty vẫn đang áp dụng." />
+        </View>
       ) : (
         <View style={styles.list}>
           {shifts.map((s) => (
@@ -1643,91 +1612,55 @@ function WorkShiftsSection({ branchId }: { branchId?: string }) {
         saving={saving}
         onClose={() => setEditing(null)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Mã ca *</Text>
-              <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="CA_SANG" style={styles.field} />
+        <View>
+          <HrFormSectionTitle title="Thông tin ca làm việc" />
+          <HrFormInputRow label="Mã ca *" value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="CA_SANG" />
+          <HrFormInputRow label="Tên ca *" value={name} onChangeText={setName} placeholder="Ca hành chính" />
+          <HrFormCustomRow label="Giờ bắt đầu">
+            <Pressable accessibilityRole="button" onPress={() => openShiftTimePicker('startTime')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+              <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{startTime}</Text>
+              <Clock3 size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormCustomRow label="Giờ kết thúc">
+            <Pressable accessibilityRole="button" onPress={() => openShiftTimePicker('endTime')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+              <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{endTime}</Text>
+              <Clock3 size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormCustomRow label="Nghỉ trưa từ">
+            <Pressable accessibilityRole="button" onPress={() => openShiftTimePicker('lunchStart')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+              <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{lunchStart}</Text>
+              <Clock3 size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormCustomRow label="Nghỉ trưa đến">
+            <Pressable accessibilityRole="button" onPress={() => openShiftTimePicker('lunchEnd')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+              <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{lunchEnd}</Text>
+              <Clock3 size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormCustomRow label="Ngày làm việc trong tuần">
+            <View style={[styles.wrapRow, { marginTop: 6 }]}>
+              {DAYS_OF_WEEK.map((d) => {
+                const active = workingDays.includes(d.v);
+                return (
+                  <Pressable
+                    key={d.v}
+                    onPress={() =>
+                      setWorkingDays((prev) =>
+                        prev.includes(d.v) ? prev.filter((x) => x !== d.v) : [...prev, d.v],
+                      )
+                    }
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Tên ca *</Text>
-              <TextInput value={name} onChangeText={setName} placeholder="Ca hành chính" style={styles.field} />
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Bắt đầu</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openShiftTimePicker('startTime')}
-                style={styles.pickerField}
-              >
-                <Text style={styles.pickerFieldText}>{startTime}</Text>
-                <Clock3 size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Kết thúc</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openShiftTimePicker('endTime')}
-                style={styles.pickerField}
-              >
-                <Text style={styles.pickerFieldText}>{endTime}</Text>
-                <Clock3 size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Nghỉ trưa từ</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openShiftTimePicker('lunchStart')}
-                style={styles.pickerField}
-              >
-                <Text style={styles.pickerFieldText}>{lunchStart}</Text>
-                <Clock3 size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Đến</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openShiftTimePicker('lunchEnd')}
-                style={styles.pickerField}
-              >
-                <Text style={styles.pickerFieldText}>{lunchEnd}</Text>
-                <Clock3 size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-          </View>
-          <Text style={styles.label}>Ngày làm việc trong tuần</Text>
-          <View style={styles.wrapRow}>
-            {DAYS_OF_WEEK.map((d) => {
-              const active = workingDays.includes(d.v);
-              return (
-                <Pressable
-                  key={d.v}
-                  onPress={() =>
-                    setWorkingDays((prev) =>
-                      prev.includes(d.v) ? prev.filter((x) => x !== d.v) : [...prev, d.v],
-                    )
-                  }
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={styles.switchRow}>
-            <Text style={styles.label}>Đặt làm ca mặc định</Text>
-            <Switch value={isDefault} onValueChange={setIsDefault} trackColor={{ true: colors.primary, false: '#CBD5E1' }} />
-          </View>
-          <Pressable disabled={saving} onPress={() => void onSaveShift()} style={[styles.submitBtn, saving && styles.disabled]}>
-            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu ca làm việc'}</Text>
-          </Pressable>
+          </HrFormCustomRow>
+          <HrFormSwitchRow label="Đặt làm ca mặc định" value={isDefault} onValueChange={setIsDefault} last />
         </View>
       </FullScreenFormModal>
 
@@ -1974,9 +1907,9 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
           <ActivityIndicator size="small" color={colors.primary} />
         </Card>
       ) : !days.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Chưa có ngày nghỉ lễ năm {year}. Bấm "Đồng bộ" để nạp lịch chuẩn.</Text>
-        </Card>
+        <View style={styles.stateCard}>
+          <IgenHrEmptyState message={`Chưa có ngày nghỉ lễ năm ${year}. Bấm "Đồng bộ" để nạp lịch chuẩn.`} />
+        </View>
       ) : (
         <View style={styles.list}>
           {days.map((day) => (
@@ -2026,31 +1959,26 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
         onSave={() => void onSaveDay()}
         onClose={() => setFormOpen(false)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Ngày *</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={openHolidayDatePicker}
-            style={styles.pickerField}
-          >
-            <Text style={styles.pickerFieldText}>{formatViDate(fDate)}</Text>
-            <CalendarDays size={15} color={colors.primary} />
-          </Pressable>
-          <Text style={styles.label}>Tên ngày *</Text>
-          <TextInput value={fName} onChangeText={setFName} placeholder="VD: Tết Dương Lịch" style={styles.field} />
-          <Text style={styles.label}>Loại ngày</Text>
-          <View style={styles.wrapRow}>
-            {(Object.keys(HOLIDAY_TYPE_LABELS) as HrWorkCalendarDayType[]).map((t) => (
-              <Pressable key={t} onPress={() => setFType(t)} style={[styles.chip, fType === t && styles.chipActive]}>
-                <Text style={[styles.chipText, fType === t && styles.chipTextActive]}>
-                  {HOLIDAY_TYPE_LABELS[t]}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Pressable onPress={() => void onSaveDay()} style={styles.submitBtn}>
-            <Text style={styles.submitBtnText}>Lưu thay đổi</Text>
-          </Pressable>
+        <View>
+          <HrFormSectionTitle title="Thông tin ngày công ty" />
+          <HrFormCustomRow label="Ngày *">
+            <Pressable accessibilityRole="button" onPress={openHolidayDatePicker} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+              <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{formatViDate(fDate)}</Text>
+              <CalendarDays size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormInputRow label="Tên ngày *" value={fName} onChangeText={setFName} placeholder="VD: Tết Dương Lịch" />
+          <HrFormSelectRow
+            label="Loại ngày"
+            sheetTitle="Chọn loại ngày"
+            value={fType}
+            options={(Object.keys(HOLIDAY_TYPE_LABELS) as HrWorkCalendarDayType[]).map((t) => ({
+              value: t,
+              label: HOLIDAY_TYPE_LABELS[t],
+            }))}
+            onSelect={(val) => setFType(val as HrWorkCalendarDayType)}
+            last
+          />
         </View>
       </FullScreenFormModal>
 
@@ -2098,18 +2026,16 @@ function WorkHolidaysSection({ branchId }: { branchId?: string }) {
         saveLabel="Xác nhận"
         onClose={() => setDisableTarget(null)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Lý do tắt áp dụng *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin tắt áp dụng" />
+          <HrFormInputRow
+            label="Lý do tắt áp dụng *"
             value={disableReason}
             onChangeText={setDisableReason}
             multiline
             placeholder="Nhập lý do chi tiết..."
-            style={[styles.field, { minHeight: 72, textAlignVertical: 'top' }]}
+            last
           />
-          <Pressable onPress={() => void onConfirmDisable()} style={styles.submitBtn}>
-            <Text style={styles.submitBtnText}>Xác nhận</Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
     </ScrollView>
@@ -2284,9 +2210,9 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
           <ActivityIndicator size="small" color={colors.primary} />
         </Card>
       ) : !filtered.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Không có nhân viên nào.</Text>
-        </Card>
+        <View style={styles.stateCard}>
+          <IgenHrEmptyState message="Không có nhân viên nào." />
+        </View>
       ) : (
         <View style={styles.list}>
           {filtered.map((emp) => {
@@ -2319,138 +2245,94 @@ function EmployeeWorkHoursSection({ branchId }: { branchId?: string }) {
         saving={saving}
         onClose={() => setEditing(null)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <View style={styles.switchRow}>
-            <Text style={styles.label}>Dùng giờ làm việc riêng</Text>
-            <Switch
-              value={form.useCustom}
-              onValueChange={(v) => setForm((f) => ({ ...f, useCustom: v }))}
-              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-            />
-          </View>
-
-          <Text style={styles.label}>Trạng thái nhân sự</Text>
-          <View style={styles.wrapRow}>
-            {(['official', 'probation', 'internship'] as const).map((st) => (
-              <Pressable
-                key={st}
-                onPress={() => setForm((f) => ({ ...f, employmentStatus: st }))}
-                style={[styles.chip, form.employmentStatus === st && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, form.employmentStatus === st && styles.chipTextActive]}>
-                  {EMPLOYMENT_STATUS_LABELS[st]}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Ngày chính thức</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openWorkHoursPicker('officialDate')}
-                style={styles.pickerField}
-              >
-                <Text style={styles.pickerFieldText}>
-                  {form.officialDate ? formatViDate(form.officialDate) : 'Chọn ngày'}
-                </Text>
-                <CalendarDays size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Phép năm riêng</Text>
-              <TextInput
-                value={form.annualLeaveDays != null ? String(form.annualLeaveDays) : ''}
-                onChangeText={(v) =>
-                  setForm((f) => ({ ...f, annualLeaveDays: v.trim() === '' ? undefined : Number(v) }))
-                }
-                keyboardType="numeric"
-                placeholder="Theo công ty"
-                style={styles.field}
-              />
-            </View>
-          </View>
+        <View>
+          <HrFormSectionTitle title="Cấu hình giờ làm việc" />
+          <HrFormSwitchRow
+            label="Dùng giờ làm việc riêng"
+            value={form.useCustom}
+            onValueChange={(v) => setForm((f) => ({ ...f, useCustom: v }))}
+          />
+          <HrFormSelectRow
+            label="Trạng thái nhân sự"
+            sheetTitle="Chọn trạng thái nhân sự"
+            value={form.employmentStatus || 'official'}
+            options={(['official', 'probation', 'internship'] as const).map((st) => ({
+              value: st,
+              label: EMPLOYMENT_STATUS_LABELS[st],
+            }))}
+            onSelect={(val) => setForm((f) => ({ ...f, employmentStatus: val as typeof f.employmentStatus }))}
+          />
+          <HrFormCustomRow label="Ngày chính thức">
+            <Pressable accessibilityRole="button" onPress={() => openWorkHoursPicker('officialDate')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+              <Text style={{ color: form.officialDate ? '#111827' : '#9CA3AF', fontSize: 15, fontWeight: form.officialDate ? '500' : '400' }}>
+                {form.officialDate ? formatViDate(form.officialDate) : 'Chọn ngày'}
+              </Text>
+              <CalendarDays size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+          <HrFormInputRow
+            label="Phép năm riêng"
+            value={form.annualLeaveDays != null ? String(form.annualLeaveDays) : ''}
+            onChangeText={(v) =>
+              setForm((f) => ({ ...f, annualLeaveDays: v.trim() === '' ? undefined : Number(v) }))
+            }
+            keyboardType="numeric"
+            placeholder="Theo công ty"
+            last={!form.useCustom}
+          />
 
           {form.useCustom ? (
             <>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Giờ vào</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => openWorkHoursPicker('checkInLimit')}
-                    style={styles.pickerField}
-                  >
-                    <Text style={styles.pickerFieldText}>{form.checkInLimit || '08:30'}</Text>
-                    <Clock3 size={15} color={colors.primary} />
-                  </Pressable>
+              <HrFormCustomRow label="Giờ vào">
+                <Pressable accessibilityRole="button" onPress={() => openWorkHoursPicker('checkInLimit')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+                  <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{form.checkInLimit || '08:30'}</Text>
+                  <Clock3 size={16} color="#9CA3AF" />
+                </Pressable>
+              </HrFormCustomRow>
+              <HrFormCustomRow label="Giờ ra">
+                <Pressable accessibilityRole="button" onPress={() => openWorkHoursPicker('checkOutLimit')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+                  <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{form.checkOutLimit || '17:30'}</Text>
+                  <Clock3 size={16} color="#9CA3AF" />
+                </Pressable>
+              </HrFormCustomRow>
+              <HrFormCustomRow label="Nghỉ trưa từ">
+                <Pressable accessibilityRole="button" onPress={() => openWorkHoursPicker('lunchBreakStart')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+                  <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{form.lunchBreakStart || '12:00'}</Text>
+                  <Clock3 size={16} color="#9CA3AF" />
+                </Pressable>
+              </HrFormCustomRow>
+              <HrFormCustomRow label="Nghỉ trưa đến">
+                <Pressable accessibilityRole="button" onPress={() => openWorkHoursPicker('lunchBreakEnd')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}>
+                  <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{form.lunchBreakEnd || '13:00'}</Text>
+                  <Clock3 size={16} color="#9CA3AF" />
+                </Pressable>
+              </HrFormCustomRow>
+              <HrFormCustomRow label="Ngày làm việc" last>
+                <View style={[styles.wrapRow, { marginTop: 6 }]}>
+                  {DAYS_OF_WEEK.map((d) => {
+                    const list = form.workingDays || [];
+                    const active = list.includes(d.v);
+                    return (
+                      <Pressable
+                        key={d.v}
+                        onPress={() =>
+                          setForm((f) => ({
+                            ...f,
+                            workingDays: active ? list.filter((x) => x !== d.v) : [...list, d.v],
+                          }))
+                        }
+                        style={[styles.chip, active && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Giờ ra</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => openWorkHoursPicker('checkOutLimit')}
-                    style={styles.pickerField}
-                  >
-                    <Text style={styles.pickerFieldText}>{form.checkOutLimit || '17:30'}</Text>
-                    <Clock3 size={15} color={colors.primary} />
-                  </Pressable>
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Nghỉ trưa từ</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => openWorkHoursPicker('lunchBreakStart')}
-                    style={styles.pickerField}
-                  >
-                    <Text style={styles.pickerFieldText}>{form.lunchBreakStart || '12:00'}</Text>
-                    <Clock3 size={15} color={colors.primary} />
-                  </Pressable>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Đến</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => openWorkHoursPicker('lunchBreakEnd')}
-                    style={styles.pickerField}
-                  >
-                    <Text style={styles.pickerFieldText}>{form.lunchBreakEnd || '13:00'}</Text>
-                    <Clock3 size={15} color={colors.primary} />
-                  </Pressable>
-                </View>
-              </View>
-              <Text style={styles.label}>Ngày làm việc</Text>
-              <View style={styles.wrapRow}>
-                {DAYS_OF_WEEK.map((d) => {
-                  const list = form.workingDays || [];
-                  const active = list.includes(d.v);
-                  return (
-                    <Pressable
-                      key={d.v}
-                      onPress={() =>
-                        setForm((f) => ({
-                          ...f,
-                          workingDays: active ? list.filter((x) => x !== d.v) : [...list, d.v],
-                        }))
-                      }
-                      style={[styles.chip, active && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{d.l}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              </HrFormCustomRow>
             </>
           ) : (
-            <Text style={styles.muted}>Nhân viên này đang áp dụng giờ làm việc chung của công ty.</Text>
+            <Text style={[styles.muted, { marginTop: 8 }]}>Nhân viên này đang áp dụng giờ làm việc chung của công ty.</Text>
           )}
-
-          <Pressable disabled={saving} onPress={() => void onSave()} style={[styles.submitBtn, saving && styles.disabled]}>
-            <Text style={styles.submitBtnText}>{saving ? 'Đang lưu...' : 'Lưu cấu hình'}</Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
 

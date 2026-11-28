@@ -31,7 +31,14 @@ import {
   XCircle,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import {
+  HrFormCustomRow,
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+} from '@/features/hr/components/HrFormFields';
 import { HrFab } from '@/features/hr/components/HrFab';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -629,9 +636,9 @@ export function HrLeavesPanel({
           </Pressable>
         </Card>
       ) : !filtered.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Chưa có đơn từ phù hợp.</Text>
-        </Card>
+        <View style={styles.stateCard}>
+          <IgenHrEmptyState message="Chưa có đơn từ phù hợp." />
+        </View>
       ) : (
         <View style={styles.list}>
           {filtered.map((app) => {
@@ -741,89 +748,62 @@ export function HrLeavesPanel({
         saving={saving}
         onClose={() => setCreateOpen(false)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
+        <View>
+          <HrFormSectionTitle title="Thông tin đơn từ" />
           {canApprove && employees.length > 0 ? (
-            <>
-              <Text style={styles.label}>Nhân viên đăng ký</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                {employees.slice(0, 30).map((emp) => {
-                  const uid = emp.uid || emp._id || emp.id || '';
-                  const active = appEmployeeId === uid;
-                  return (
-                    <Pressable
-                      key={uid}
-                      onPress={() => handleSelectFormEmployee(uid)}
-                      style={[styles.chip, active && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                        {emp.displayName}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </>
+            <HrFormSelectRow
+              label="Nhân viên đăng ký"
+              sheetTitle="Chọn nhân viên đăng ký"
+              value={appEmployeeId}
+              placeholder="Chọn nhân viên"
+              options={employees.map((emp) => ({
+                value: emp.uid || emp._id || emp.id || '',
+                label: emp.displayName,
+                subtitle: [emp.jobTitle || emp.position, emp.department].filter(Boolean).join(' · ') || undefined,
+              }))}
+              onSelect={handleSelectFormEmployee}
+            />
           ) : null}
 
           {formBalance ? (
-            <View style={styles.inlineBalance}>
+            <View style={[styles.inlineBalance, { marginVertical: 8 }]}>
               <Text style={styles.subMeta}>
                 Số dư phép năm: <Text style={{ color: colors.primary, fontWeight: '800' }}>{formBalance.remaining ?? 0}</Text> / {formBalance.entitlement ?? 0} ngày
               </Text>
             </View>
           ) : null}
 
-          <Text style={styles.label}>Nhóm yêu cầu *</Text>
-          <View style={styles.wrapRow}>
-            {REQUEST_KINDS.map((k) => {
-              const active = appRequestKind === k.value;
-              return (
-                <Pressable
-                  key={k.value}
-                  onPress={() => setAppRequestKind(k.value)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {k.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <HrFormSelectRow
+            label="Nhóm yêu cầu *"
+            sheetTitle="Chọn nhóm yêu cầu"
+            value={appRequestKind}
+            options={REQUEST_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+            onSelect={(val) => setAppRequestKind(val as typeof appRequestKind)}
+          />
 
-          <Text style={styles.label}>Loại đơn / Biểu mẫu</Text>
-          <View style={styles.wrapRow}>
-            {templates.map((tpl) => {
-              const active = appType === tpl.name;
-              return (
-                <Pressable
-                  key={tpl.id}
-                  onPress={() => {
-                    setAppType(tpl.name);
-                    if (tpl.requestKind) setAppRequestKind(tpl.requestKind);
-                  }}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {tpl.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            <Pressable
-              onPress={() => setAppType('other')}
-              style={[styles.chip, appType === 'other' && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, appType === 'other' && styles.chipTextActive]}>
-                Đơn khác
-              </Text>
-            </Pressable>
-          </View>
+          <HrFormSelectRow
+            label="Loại đơn / Biểu mẫu"
+            sheetTitle="Chọn loại đơn / biểu mẫu"
+            value={appType}
+            options={[
+              ...templates.map((tpl) => ({
+                value: tpl.name,
+                label: tpl.name,
+                subtitle: tpl.requestKind ? getKindLabel(tpl.requestKind) : undefined,
+              })),
+              { value: 'other', label: 'Đơn khác' },
+            ]}
+            onSelect={(val) => {
+              setAppType(val);
+              const tpl = templates.find((t) => t.name === val);
+              if (tpl?.requestKind) setAppRequestKind(tpl.requestKind);
+            }}
+          />
 
           {selectedTemplate?.fileUrl ? (
             <Pressable
               onPress={() => void Linking.openURL(selectedTemplate.fileUrl!)}
-              style={styles.attachChip}
+              style={[styles.attachChip, { marginTop: 8 }]}
             >
               <ExternalLink size={12} color={colors.primary} />
               <Text style={styles.attachText}>
@@ -832,77 +812,60 @@ export function HrLeavesPanel({
             </Pressable>
           ) : null}
 
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Từ ngày *</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openApplicationDatePicker('startDate')}
-                style={styles.datePickerField}
-              >
-                <Text style={styles.datePickerText}>{formatViDate(startDate)}</Text>
-                <CalendarDays size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.label}>Đến ngày *</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => openApplicationDatePicker('endDate')}
-                style={styles.datePickerField}
-              >
-                <Text style={styles.datePickerText}>{formatViDate(endDate)}</Text>
-                <CalendarDays size={15} color={colors.primary} />
-              </Pressable>
-            </View>
-          </View>
+          <HrFormCustomRow label="Từ ngày *">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => openApplicationDatePicker('startDate')}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+            >
+              <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{formatViDate(startDate)}</Text>
+              <CalendarDays size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
 
-          <Text style={styles.label}>Lý do / Nội dung chi tiết</Text>
-          <TextInput
+          <HrFormCustomRow label="Đến ngày *">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => openApplicationDatePicker('endDate')}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+            >
+              <Text style={{ color: '#111827', fontSize: 15, fontWeight: '500' }}>{formatViDate(endDate)}</Text>
+              <CalendarDays size={16} color="#9CA3AF" />
+            </Pressable>
+          </HrFormCustomRow>
+
+          <HrFormInputRow
+            label="Lý do / Nội dung chi tiết"
             value={reason}
             onChangeText={setReason}
             multiline
             placeholder="Nhập lý do xin nghỉ, WFH hoặc đề xuất..."
-            placeholderTextColor={colors.muted}
-            style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
           />
 
-          <Text style={styles.label}>Tệp đính kèm (PDF, ảnh, Word...)</Text>
-          <Pressable onPress={() => void pickAppFiles()} style={styles.uploadBtn}>
-            <Upload size={14} color={colors.primary} />
-            <Text style={styles.uploadBtnText}>Chọn tệp từ thiết bị</Text>
-          </Pressable>
-          {appFiles.length > 0 ? (
-            <View style={styles.attachWrap}>
-              {appFiles.map((file, idx) => (
-                <View key={`${file.uri}_${idx}`} style={styles.attachChip}>
-                  <Paperclip size={11} color={colors.primary} />
-                  <Text numberOfLines={1} style={[styles.attachText, { maxWidth: 180 }]}>
-                    {file.name}
-                  </Text>
-                  <Pressable
-                    onPress={() => setAppFiles((prev) => prev.filter((_, i) => i !== idx))}
-                    hitSlop={6}
-                  >
-                    <X size={12} color="#B91C1C" />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          <Pressable
-            disabled={saving}
-            onPress={() => void onCreateApp()}
-            style={[styles.submitBtn, saving && styles.disabled]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Send size={14} color={colors.white} />
-              <Text style={styles.submitBtnText}>
-                {saving ? 'Đang tải tệp & gửi...' : 'Gửi đơn ngay'}
-              </Text>
-            </View>
-          </Pressable>
+          <HrFormCustomRow label="Tệp đính kèm (PDF, ảnh, Word...)" last>
+            <Pressable onPress={() => void pickAppFiles()} style={[styles.uploadBtn, { marginTop: 4 }]}>
+              <Upload size={14} color={colors.primary} />
+              <Text style={styles.uploadBtnText}>Chọn tệp từ thiết bị</Text>
+            </Pressable>
+            {appFiles.length > 0 ? (
+              <View style={[styles.attachWrap, { marginTop: 8 }]}>
+                {appFiles.map((file, idx) => (
+                  <View key={`${file.uri}_${idx}`} style={styles.attachChip}>
+                    <Paperclip size={11} color={colors.primary} />
+                    <Text numberOfLines={1} style={[styles.attachText, { maxWidth: 180 }]}>
+                      {file.name}
+                    </Text>
+                    <Pressable
+                      onPress={() => setAppFiles((prev) => prev.filter((_, i) => i !== idx))}
+                      hitSlop={6}
+                    >
+                      <X size={12} color="#B91C1C" />
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </HrFormCustomRow>
         </View>
       </FullScreenFormModal>
 
@@ -962,27 +925,22 @@ export function HrLeavesPanel({
         saving={Boolean(decidingId)}
         onClose={() => setRejectTarget(null)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.muted}>
-            Đơn của {rejectTarget?.employeeName || rejectTarget?.applicantName} (
-            {formatViDate(rejectTarget?.startDate)} → {formatViDate(rejectTarget?.endDate)})
-          </Text>
-          <Text style={styles.label}>Lý do từ chối *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin từ chối" />
+          <View style={{ paddingVertical: 10 }}>
+            <Text style={styles.muted}>
+              Đơn của {rejectTarget?.employeeName || rejectTarget?.applicantName} (
+              {formatViDate(rejectTarget?.startDate)} → {formatViDate(rejectTarget?.endDate)})
+            </Text>
+          </View>
+          <HrFormInputRow
+            label="Lý do từ chối *"
             value={rejectReason}
             onChangeText={setRejectReason}
             multiline
             placeholder="Nhập lý do từ chối..."
-            placeholderTextColor={colors.muted}
-            style={[styles.field, { minHeight: 74, textAlignVertical: 'top' }]}
+            last
           />
-          <Pressable
-            disabled={Boolean(decidingId)}
-            onPress={() => void onConfirmReject()}
-            style={[styles.submitBtn, { backgroundColor: '#B91C1C' }, Boolean(decidingId) && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>Xác nhận từ chối</Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
 
@@ -1002,7 +960,7 @@ export function HrLeavesPanel({
       >
         <View style={{ gap: 10, paddingBottom: 12 }}>
           {!templates.length ? (
-            <Text style={styles.muted}>Chưa có biểu mẫu nào được tải lên.</Text>
+            <IgenHrEmptyState compact message="Chưa có biểu mẫu nào được tải lên." />
           ) : (
             templates.map((tpl) => (
               <View key={tpl.id} style={styles.tplCard}>
@@ -1039,61 +997,44 @@ export function HrLeavesPanel({
         saving={savingTpl}
         onClose={closeTemplateEditor}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Tên biểu mẫu *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin biểu mẫu" />
+          <HrFormInputRow
+            label="Tên biểu mẫu *"
             value={tplName}
             onChangeText={setTplName}
             placeholder="VD: Đơn xin nghỉ phép năm"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
-          <Text style={styles.label}>Nhóm yêu cầu</Text>
-          <View style={styles.wrapRow}>
-            {REQUEST_KINDS.map((kind) => (
-              <Pressable
-                key={kind.value}
-                onPress={() => setTplKind(kind.value)}
-                style={[styles.chip, tplKind === kind.value && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, tplKind === kind.value && styles.chipTextActive]}>
-                  {kind.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.label}>Tệp biểu mẫu *</Text>
-          <Pressable onPress={() => void pickTplFile()} style={styles.uploadBtn}>
-            <Upload size={14} color={colors.primary} />
-            <Text style={styles.uploadBtnText}>
-              {tplFile ? `Đã chọn: ${tplFile.name}` : 'Chọn tệp biểu mẫu từ thiết bị'}
-            </Text>
-          </Pressable>
-          {tplFile ? (
-            <Pressable onPress={() => setTplFile(null)} style={{ alignSelf: 'flex-start' }}>
-              <Text style={{ color: '#B91C1C', fontSize: 10, fontWeight: '700' }}>
-                Bỏ tệp đã chọn
+          <HrFormSelectRow
+            label="Nhóm yêu cầu"
+            sheetTitle="Chọn nhóm yêu cầu"
+            value={tplKind}
+            options={REQUEST_KINDS.map((kind) => ({ value: kind.value, label: kind.label }))}
+            onSelect={(val) => setTplKind(val as typeof tplKind)}
+          />
+          <HrFormCustomRow label="Tệp biểu mẫu *">
+            <Pressable onPress={() => void pickTplFile()} style={[styles.uploadBtn, { marginTop: 4 }]}>
+              <Upload size={14} color={colors.primary} />
+              <Text style={styles.uploadBtnText}>
+                {tplFile ? `Đã chọn: ${tplFile.name}` : 'Chọn tệp biểu mẫu từ thiết bị'}
               </Text>
             </Pressable>
-          ) : null}
-          <Text style={styles.label}>Hoặc dán link tệp (tùy chọn)</Text>
-          <TextInput
+            {tplFile ? (
+              <Pressable onPress={() => setTplFile(null)} style={{ alignSelf: 'flex-start', marginTop: 6 }}>
+                <Text style={{ color: '#B91C1C', fontSize: 11, fontWeight: '600' }}>
+                  Bỏ tệp đã chọn
+                </Text>
+              </Pressable>
+            ) : null}
+          </HrFormCustomRow>
+          <HrFormInputRow
+            label="Hoặc dán link tệp (tùy chọn)"
             value={tplUrl}
             onChangeText={setTplUrl}
             autoCapitalize="none"
             placeholder="https://..."
-            placeholderTextColor={colors.muted}
-            style={styles.field}
+            last
           />
-          <Pressable
-            disabled={savingTpl}
-            onPress={() => void onCreateTemplate()}
-            style={[styles.submitBtn, savingTpl && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>
-              {savingTpl ? 'Đang tải lên...' : 'Tải lên biểu mẫu'}
-            </Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
 

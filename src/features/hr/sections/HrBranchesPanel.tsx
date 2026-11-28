@@ -15,7 +15,14 @@ import {
 import * as Location from 'expo-location';
 import { AlertTriangle, CheckCircle2, ChevronRight, Info, LocateFixed, MapPin, Phone, Plus, Radio } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import {
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+  HrFormSwitchRow,
+} from '@/features/hr/components/HrFormFields';
 import { HrFab } from '@/features/hr/components/HrFab';
 import {
   createHrBranch,
@@ -556,30 +563,28 @@ export function HrBranchesPanel({
           </Pressable>
         </Card>
       ) : !filtered.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Chưa có chi nhánh nào.</Text>
-        </Card>
+        <View style={styles.stateCard}>
+          <IgenHrEmptyState message="Chưa có chi nhánh nào." />
+        </View>
       ) : (
         <View style={styles.list}>
           {filtered.map((branch) => {
             const isMain = branch.code?.toUpperCase() === 'MAIN';
             const active = branch.isActive !== false;
             const managerName = branch.managerId ? employeeNameById.get(branch.managerId) : undefined;
-            const cfg = branch.locationConfig;
             return (
               <Card key={branch._id} onPress={() => openDetail(branch)} style={styles.card}>
                 <View style={styles.headRow}>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.badgeRow}>
-                      <Text style={styles.codeBadge}>{branch.code}</Text>
+                  <View style={styles.titleBadgeRow}>
+                    <Text numberOfLines={1} ellipsizeMode="tail" style={styles.rowTitle}>
+                      {branch.name}
+                    </Text>
+                    <View style={styles.inlineBadges}>
                       {isMain ? <Text style={styles.mainBadge}>Trụ sở chính</Text> : null}
                       <Text style={[styles.statusBadge, !active && styles.statusInactive]}>
                         {active ? 'Hoạt động' : 'Tạm ngưng'}
                       </Text>
                     </View>
-                    <Text numberOfLines={1} style={styles.rowTitle}>
-                      {branch.name}
-                    </Text>
                   </View>
                   <ChevronRight size={16} color={colors.muted} />
                 </View>
@@ -589,12 +594,6 @@ export function HrBranchesPanel({
                 <View style={styles.metaRow}>
                   <Phone size={13} color={colors.muted} />
                   <Text style={styles.subMeta}>{branch.phone || 'Chưa có SĐT'}{managerName ? ` · QL: ${managerName}` : ''}</Text>
-                </View>
-                <View style={styles.metaRow}>
-                  {cfg ? <Radio size={13} color="#16885A" /> : <AlertTriangle size={13} color="#B45309" />}
-                  <Text style={[styles.subMeta, cfg ? styles.configOk : styles.configMissing]}>
-                    {cfg ? `Chấm công: bán kính ${cfg.allowedRadius}m · ${cfg.allowedPublicIps?.length || 0} IP` : 'Chưa cấu hình vị trí & IP chấm công'}
-                  </Text>
                 </View>
               </Card>
             );
@@ -616,73 +615,37 @@ export function HrBranchesPanel({
       >
         {selectedBranch ? (
           isEditing ? (
-            <View style={{ gap: 8, paddingBottom: 12 }}>
-              <Text style={styles.label}>Mã chi nhánh *</Text>
-              <TextInput
+            <View>
+              <HrFormSectionTitle title="Thông tin chi nhánh" />
+              <HrFormInputRow
+                label="Mã chi nhánh *"
                 value={code}
+                onChangeText={setCode}
                 editable={false}
                 autoCapitalize="characters"
-                style={[styles.field, styles.readonlyField]}
               />
+              <HrFormInputRow label="Tên chi nhánh *" value={name} onChangeText={setName} placeholder="VD: Chi nhánh Hà Nội" />
+              <HrFormInputRow label="Địa chỉ" value={address} onChangeText={setAddress} placeholder="Số nhà, đường, quận/huyện..." />
+              <HrFormInputRow label="Số điện thoại" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="0987654321" />
+              <HrFormSelectRow
+                label="Quản lý chi nhánh"
+                sheetTitle="Chọn quản lý chi nhánh"
+                value={managerId}
+                placeholder="Chưa chỉ định"
+                options={[
+                  { value: '', label: 'Chưa chỉ định' },
+                  ...employees.map((emp) => ({
+                    value: emp.uid || emp._id || emp.id || '',
+                    label: emp.displayName,
+                    subtitle: [emp.jobTitle || emp.position, emp.department].filter(Boolean).join(' · ') || undefined,
+                  })),
+                ]}
+                onSelect={setManagerId}
+              />
+              <HrFormSwitchRow label="Đang hoạt động" value={isActive} onValueChange={setIsActive} last />
 
-              <Text style={styles.label}>Tên chi nhánh *</Text>
-              <TextInput value={name} onChangeText={setName} style={styles.field} />
-
-              <Text style={styles.label}>Địa chỉ</Text>
-              <TextInput value={address} onChangeText={setAddress} style={styles.field} />
-
-              <Text style={styles.label}>Số điện thoại</Text>
-              <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.field} />
-
-              <Text style={styles.label}>Quản lý chi nhánh</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
-                <Pressable
-                  onPress={() => setManagerId('')}
-                  style={[styles.chip, !managerId && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, !managerId && styles.chipTextActive]}>Chưa chỉ định</Text>
-                </Pressable>
-                {employees.slice(0, 25).map((emp) => {
-                  const uid = emp.uid || emp._id || emp.id || '';
-                  const active = managerId === uid;
-                  return (
-                    <Pressable
-                      key={uid}
-                      onPress={() => setManagerId(uid)}
-                      style={[styles.chip, active && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                        {emp.displayName}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-
-              {renderLocationConfigEditor()}
-
-              <View style={styles.switchRow}>
-                <Text style={styles.label}>Đang hoạt động</Text>
-                <Switch
-                  value={isActive}
-                  onValueChange={setIsActive}
-                  trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                />
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                <Pressable onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
-                  <Text style={styles.cancelBtnText}>Hủy</Text>
-                </Pressable>
-                <Pressable
-                  disabled={saving}
-                  onPress={() => void onSaveEdit()}
-                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                  </Text>
-                </Pressable>
+              <View style={{ marginTop: 12 }}>
+                {renderLocationConfigEditor()}
               </View>
             </View>
           ) : (
@@ -774,51 +737,39 @@ export function HrBranchesPanel({
         saving={saving}
         onClose={() => setCreateOpen(false)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Mã chi nhánh *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin chi nhánh" />
+          <HrFormInputRow
+            label="Mã chi nhánh *"
             value={code}
             onChangeText={setCode}
             autoCapitalize="characters"
             placeholder="VD: CN_HN"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
-          <Text style={styles.label}>Tên chi nhánh *</Text>
-          <TextInput
+          <HrFormInputRow
+            label="Tên chi nhánh *"
             value={name}
             onChangeText={setName}
             placeholder="VD: Chi nhánh Hà Nội"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
-          <Text style={styles.label}>Địa chỉ</Text>
-          <TextInput
+          <HrFormInputRow
+            label="Địa chỉ"
             value={address}
             onChangeText={setAddress}
             placeholder="Số nhà, đường, quận/huyện..."
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
-          <Text style={styles.label}>Số điện thoại</Text>
-          <TextInput
+          <HrFormInputRow
+            label="Số điện thoại"
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
             placeholder="0987654321"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
+            last
           />
 
-          {renderLocationConfigEditor()}
-
-          <Pressable
-            disabled={saving}
-            onPress={() => void onCreate()}
-            style={[styles.submitBtn, saving && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo chi nhánh'}</Text>
-          </Pressable>
+          <View style={{ marginTop: 12 }}>
+            {renderLocationConfigEditor()}
+          </View>
         </View>
       </FullScreenFormModal>
 
@@ -831,24 +782,12 @@ export function HrBranchesPanel({
         saving={savingOwner}
         onClose={() => setOwnerModalOpen(false)}
       >
-        <View style={{ gap: 8 }}>
-          <Text style={styles.label}>Họ và tên *</Text>
-          <TextInput value={ownerName} onChangeText={setOwnerName} placeholder="Nguyễn Văn A" placeholderTextColor={colors.muted} style={styles.field} />
-          <Text style={styles.label}>Email đăng nhập *</Text>
-          <TextInput value={ownerEmail} onChangeText={setOwnerEmail} keyboardType="email-address" autoCapitalize="none" placeholder="quanly@congty.vn" placeholderTextColor={colors.muted} style={styles.field} />
-          <Text style={styles.label}>Mật khẩu (≥ 6 ký tự) *</Text>
-          <TextInput value={ownerPassword} onChangeText={setOwnerPassword} secureTextEntry placeholder="••••••" placeholderTextColor={colors.muted} style={styles.field} />
-          <Text style={styles.label}>Số điện thoại</Text>
-          <TextInput value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor={colors.muted} style={styles.field} />
-          <Pressable
-            disabled={savingOwner}
-            onPress={() => void onCreateOwner()}
-            style={[styles.submitBtn, savingOwner && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>
-              {savingOwner ? 'Đang tạo...' : 'Tạo tài khoản'}
-            </Text>
-          </Pressable>
+        <View>
+          <HrFormSectionTitle title="Thông tin tài khoản" />
+          <HrFormInputRow label="Họ và tên *" value={ownerName} onChangeText={setOwnerName} placeholder="Nguyễn Văn A" />
+          <HrFormInputRow label="Email đăng nhập *" value={ownerEmail} onChangeText={setOwnerEmail} keyboardType="email-address" autoCapitalize="none" placeholder="quanly@congty.vn" />
+          <HrFormInputRow label="Mật khẩu (≥ 6 ký tự) *" value={ownerPassword} onChangeText={setOwnerPassword} secureTextEntry placeholder="••••••" />
+          <HrFormInputRow label="Số điện thoại" value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad" placeholder="0987654321" last />
         </View>
       </FullScreenFormModal>
 
@@ -949,12 +888,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  titleBadgeRow: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  inlineBadges: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   codeBadge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
   mainBadge: { color: '#B45309', backgroundColor: '#FFF3E5', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
   statusBadge: { color: '#16885A', backgroundColor: '#E9F8F1', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
   statusInactive: { color: '#64748B', backgroundColor: '#F1F5F9' },
-  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600', flex: 1, minWidth: 0 },
   muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
   subMeta: { color: '#6B7280', fontSize: 11.5, fontWeight: '400', marginTop: 2 },
   configOk: { color: '#16885A', fontWeight: '500' },

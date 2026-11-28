@@ -1,5 +1,11 @@
 import { PopupError } from '@/components/PopupError';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import {
+  HrFormCustomRow,
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+} from '@/features/hr/components/HrFormFields';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -49,6 +55,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { HrFab } from '@/features/hr/components/HrFab';
 import { useAuth } from '@/core/auth/AuthProvider';
@@ -1175,9 +1182,9 @@ export function KanbanTasksPanel({
               </Pressable>
             </Card>
           ) : !kpiReport?.rows.length ? (
-            <Card style={styles.stateCard}>
-              <Text style={styles.muted}>Chưa có dữ liệu KPI nhân viên trong tháng này.</Text>
-            </Card>
+            <View style={styles.stateCard}>
+              <IgenHrEmptyState message="Chưa có dữ liệu KPI nhân viên trong tháng này." />
+            </View>
           ) : (
             (() => {
               const q = search.trim().toLowerCase();
@@ -1211,7 +1218,12 @@ export function KanbanTasksPanel({
                   </View>
 
                   <View style={styles.kpiList}>
-                    {visibleRows.map((row) => {
+                    {!visibleRows.length ? (
+                      <View style={styles.stateCard}>
+                        <IgenHrEmptyState compact message="Không tìm thấy nhân sự phù hợp." />
+                      </View>
+                    ) : (
+                      visibleRows.map((row) => {
                       const pct = row.percent;
                       const pctColor =
                         pct == null
@@ -1253,7 +1265,8 @@ export function KanbanTasksPanel({
                           </View>
                         </Card>
                       );
-                    })}
+                    })
+                    )}
                   </View>
                 </>
               );
@@ -1306,6 +1319,11 @@ export function KanbanTasksPanel({
       ) : (
         <View style={styles.groupsWrap}>
           {/* 1. Các nhóm theo Dự án */}
+          {scopeFilter === 'with_project' && !projectGroups.length ? (
+            <View style={styles.stateCard}>
+              <IgenHrEmptyState message="Chưa có dự án nào phù hợp." />
+            </View>
+          ) : null}
           {scopeFilter !== 'no_project'
             ? projectGroups.map(({ project, tasks: projTasks, totalCount, doneCount, progress }) => {
                 const collapsed = collapsedGroups.has(project.id);
@@ -1424,263 +1442,196 @@ export function KanbanTasksPanel({
           if (!savingTask && !uploadingTaskAttachment && !recordingTaskAudio) setTaskModalOpen(false);
         }}
       >
-        <View style={styles.form}>
-          <Text style={styles.label}>Tên công việc *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin công việc" />
+          <HrFormInputRow
+            label="Tên công việc *"
             value={taskTitle}
             onChangeText={setTaskTitle}
             placeholder="Nhập tiêu đề công việc..."
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
-
-          <Text style={styles.label}>Thuộc dự án</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 6, marginBottom: 4 }}
-          >
-            <Pressable
-              onPress={() => setTaskProjectId('')}
-              style={[styles.chip, !taskProjectId && styles.chipActive]}
-            >
-              <Text style={[styles.chipText, !taskProjectId && styles.chipTextActive]}>
-                Không thuộc dự án
-              </Text>
-            </Pressable>
-            {projects.map((p) => (
-              <Pressable
-                key={p.id}
-                onPress={() => setTaskProjectId(p.id)}
-                style={[styles.chip, taskProjectId === p.id && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, taskProjectId === p.id && styles.chipTextActive]}>
-                  {p.name}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          <Text style={styles.label}>Trạng thái</Text>
-          <View style={styles.wrapRow}>
-            {STATUS_META.map((st) => (
-              <Pressable
-                key={st.key}
-                onPress={() => setTaskStatus(st.key)}
-                style={[styles.chip, taskStatus === st.key && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, taskStatus === st.key && styles.chipTextActive]}>
-                  {st.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Độ ưu tiên</Text>
-          <View style={styles.wrapRow}>
-            {PRIORITY_OPTIONS.map((p) => (
-              <Pressable
-                key={p.key}
-                onPress={() => setTaskPriority(p.key)}
-                style={[styles.chip, taskPriority === p.key && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, taskPriority === p.key && styles.chipTextActive]}>
-                  {p.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Người thực hiện</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 6, marginBottom: 4 }}
-          >
-            {employees.slice(0, 25).map((emp) => {
-              const uid = emp.uid || emp._id || emp.id || '';
-              const active = taskAssigneeUid === uid;
-              return (
-                <Pressable
-                  key={uid}
-                  onPress={() => setTaskAssigneeUid(uid)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {emp.displayName}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          <Text style={styles.label}>Phân loại</Text>
-          <View style={styles.wrapRow}>
-            {TASK_CATEGORIES.map((cat) => (
-              <Pressable
-                key={cat}
-                onPress={() => setTaskCategory(cat)}
-                style={[styles.chip, taskCategory === cat && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, taskCategory === cat && styles.chipTextActive]}>
-                  {cat}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
+          <HrFormSelectRow
+            label="Thuộc dự án"
+            sheetTitle="Chọn dự án"
+            value={taskProjectId}
+            placeholder="Không thuộc dự án"
+            options={[
+              { value: '', label: 'Không thuộc dự án' },
+              ...projects.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            onSelect={setTaskProjectId}
+          />
+          <HrFormSelectRow
+            label="Trạng thái"
+            sheetTitle="Chọn trạng thái"
+            value={taskStatus}
+            options={STATUS_META.map((st) => ({ value: st.key, label: st.label }))}
+            onSelect={(val) => setTaskStatus(val as typeof taskStatus)}
+          />
+          <HrFormSelectRow
+            label="Độ ưu tiên"
+            sheetTitle="Chọn độ ưu tiên"
+            value={taskPriority}
+            options={PRIORITY_OPTIONS.map((p) => ({ value: p.key, label: p.label }))}
+            onSelect={(val) => setTaskPriority(val as typeof taskPriority)}
+          />
+          <HrFormSelectRow
+            label="Người thực hiện"
+            sheetTitle="Chọn người thực hiện"
+            value={taskAssigneeUid}
+            placeholder="Chọn nhân sự"
+            options={employees.map((emp) => ({
+              value: emp.uid || emp._id || emp.id || '',
+              label: emp.displayName,
+              subtitle: [emp.jobTitle || emp.position, emp.department].filter(Boolean).join(' · ') || undefined,
+            }))}
+            onSelect={setTaskAssigneeUid}
+          />
+          <HrFormSelectRow
+            label="Phân loại"
+            sheetTitle="Chọn phân loại"
+            value={taskCategory}
+            options={TASK_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+            onSelect={setTaskCategory}
+          />
           {taskCategory === 'Bán hàng' ? (
-            <>
-              <Text style={styles.label}>Chỉ tiêu doanh số KPI (VNĐ)</Text>
-              <TextInput
-                value={taskSalesKpiTarget}
-                onChangeText={setTaskSalesKpiTarget}
-                keyboardType="numeric"
-                placeholder="VD: 50000000"
-                placeholderTextColor={colors.muted}
-                style={styles.field}
-              />
-            </>
+            <HrFormInputRow
+              label="Chỉ tiêu doanh số KPI (VNĐ)"
+              value={taskSalesKpiTarget}
+              onChangeText={setTaskSalesKpiTarget}
+              keyboardType="numeric"
+              placeholder="VD: 50000000"
+            />
           ) : null}
-
-          <Text style={styles.label}>Hạn chót *</Text>
-          <Pressable style={styles.dateTimeField} onPress={() => openDatePicker('taskDue')}>
-            <CalendarDays size={16} color={colors.primary} />
-            <Text numberOfLines={1} style={taskDueDate ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-              {taskDueDate ? formatTaskDateTime(taskDueDate) : 'Chọn ngày và giờ'}
-            </Text>
-            <ChevronRight size={16} color={colors.muted} />
-          </Pressable>
-
-          <Text style={styles.label}>Thời gian bắt đầu</Text>
-          <View style={styles.dateTimeInputRow}>
-            <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('taskStart')}>
-              <Clock3 size={16} color={colors.primary} />
-              <Text numberOfLines={1} style={taskStartTime ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                {taskStartTime ? formatTaskDateTime(taskStartTime) : 'Chọn ngày và giờ'}
+          <HrFormCustomRow label="Hạn chót *">
+            <Pressable
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+              onPress={() => openDatePicker('taskDue')}
+            >
+              <Text numberOfLines={1} style={{ color: taskDueDate ? '#111827' : '#9CA3AF', fontSize: 15, fontWeight: taskDueDate ? '500' : '400', flex: 1 }}>
+                {taskDueDate ? formatTaskDateTime(taskDueDate) : 'Chọn ngày và giờ'}
               </Text>
-              <ChevronRight size={16} color={colors.muted} />
+              <CalendarDays size={16} color="#9CA3AF" />
             </Pressable>
-            {taskStartTime ? (
-              <Pressable onPress={() => setTaskStartTime('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa thời gian bắt đầu">
-                <X size={15} color={colors.muted} />
+          </HrFormCustomRow>
+          <HrFormCustomRow label="Thời gian bắt đầu">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Pressable
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+                onPress={() => openDatePicker('taskStart')}
+              >
+                <Text numberOfLines={1} style={{ color: taskStartTime ? '#111827' : '#9CA3AF', fontSize: 15, fontWeight: taskStartTime ? '500' : '400', flex: 1 }}>
+                  {taskStartTime ? formatTaskDateTime(taskStartTime) : 'Chọn ngày và giờ'}
+                </Text>
+                <Clock3 size={16} color="#9CA3AF" />
               </Pressable>
-            ) : null}
-          </View>
-
-          <Text style={styles.label}>Giờ dự tính</Text>
-          <TextInput
+              {taskStartTime ? (
+                <Pressable onPress={() => setTaskStartTime('')} hitSlop={8} accessibilityLabel="Xóa thời gian bắt đầu">
+                  <X size={16} color="#9CA3AF" />
+                </Pressable>
+              ) : null}
+            </View>
+          </HrFormCustomRow>
+          <HrFormInputRow
+            label="Giờ dự tính"
             value={taskEstTime}
             onChangeText={setTaskEstTime}
             keyboardType="numeric"
             placeholder="VD: 4"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
-
-          <Text style={styles.label}>Link / Ghi chú</Text>
-          <TextInput
+          <HrFormInputRow
+            label="Link / Ghi chú"
             value={taskLinkNote}
             onChangeText={setTaskLinkNote}
             placeholder="Link tài liệu hoặc ghi chú..."
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
-
-          <Text style={styles.label}>Tệp đính kèm</Text>
-          {taskAttachments.map((attachment) => (
-            <View key={attachment.id} style={styles.attachmentRow}>
-              {attachment.type === 'audio' ? <Mic size={15} color="#7754C8" /> : null}
-              {attachment.type === 'video' ? <Video size={15} color="#B42318" /> : null}
-              {attachment.type === 'link' ? <Link2 size={15} color={colors.primary} /> : null}
-              {attachment.type === 'file' || attachment.type === 'image' ? <FileText size={15} color={colors.primary} /> : null}
-              <Pressable
-                style={styles.attachmentNameButton}
-                onPress={() => void Linking.openURL(attachment.url).catch(() => Alert.alert('Không mở được tệp', 'Hãy thử lại sau.'))}
-              >
-                <Text numberOfLines={1} style={styles.attachmentName}>{attachment.name}</Text>
-                <Text style={styles.attachmentMeta}>
-                  {attachment.type.toUpperCase()}{attachment.size ? ` · ${(attachment.size / (1024 * 1024)).toFixed(1)} MB` : ''}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityLabel={`Gỡ ${attachment.name}`}
-                hitSlop={8}
-                onPress={() => setTaskAttachments((current) => current.filter((item) => item.id !== attachment.id))}
-                style={styles.attachmentRemove}
-              >
-                <X size={15} color="#B42318" />
-              </Pressable>
+          <HrFormCustomRow label="Tệp đính kèm" last>
+            <View style={{ gap: 8, marginTop: 6 }}>
+              {taskAttachments.map((attachment) => (
+                <View key={attachment.id} style={styles.attachmentRow}>
+                  {attachment.type === 'audio' ? <Mic size={15} color="#7754C8" /> : null}
+                  {attachment.type === 'video' ? <Video size={15} color="#B42318" /> : null}
+                  {attachment.type === 'link' ? <Link2 size={15} color={colors.primary} /> : null}
+                  {attachment.type === 'file' || attachment.type === 'image' ? <FileText size={15} color={colors.primary} /> : null}
+                  <Pressable
+                    style={styles.attachmentNameButton}
+                    onPress={() => void Linking.openURL(attachment.url).catch(() => Alert.alert('Không mở được tệp', 'Hãy thử lại sau.'))}
+                  >
+                    <Text numberOfLines={1} style={styles.attachmentName}>{attachment.name}</Text>
+                    <Text style={styles.attachmentMeta}>
+                      {attachment.type.toUpperCase()}{attachment.size ? ` · ${(attachment.size / (1024 * 1024)).toFixed(1)} MB` : ''}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel={`Gỡ ${attachment.name}`}
+                    hitSlop={8}
+                    onPress={() => setTaskAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                    style={styles.attachmentRemove}
+                  >
+                    <X size={15} color="#B42318" />
+                  </Pressable>
+                </View>
+              ))}
+              <View style={styles.attachmentActions}>
+                <Pressable
+                  onPress={() => void pickTaskAttachments()}
+                  disabled={uploadingTaskAttachment || recordingTaskAudio}
+                  style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+                >
+                  <Paperclip size={14} color={colors.primary} />
+                  <Text style={styles.attachmentActionText}>Chọn tệp</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void (recordingTaskAudio ? stopTaskAudioRecording() : recordTaskAudio())}
+                  disabled={uploadingTaskAttachment}
+                  style={[styles.attachmentAction, recordingTaskAudio && styles.recordingAction, uploadingTaskAttachment && styles.disabled]}
+                >
+                  {recordingTaskAudio ? <Square size={13} color="#B42318" /> : <Mic size={14} color={colors.primary} />}
+                  <Text style={[styles.attachmentActionText, recordingTaskAudio && styles.recordingActionText]}>
+                    {recordingTaskAudio ? 'Dừng ghi âm' : 'Ghi âm'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void recordTaskVideo()}
+                  disabled={uploadingTaskAttachment || recordingTaskAudio}
+                  style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+                >
+                  <Video size={14} color={colors.primary} />
+                  <Text style={styles.attachmentActionText}>Ghi hình</Text>
+                </Pressable>
+              </View>
+              <View style={styles.attachmentLinkRow}>
+                <TextInput
+                  value={taskAttachmentLinkDraft}
+                  onChangeText={setTaskAttachmentLinkDraft}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                  placeholder="Link tài liệu (https://...)"
+                  placeholderTextColor="#9CA3AF"
+                  style={[styles.field, styles.attachmentLinkInput]}
+                />
+                <Pressable
+                  onPress={addTaskAttachmentLink}
+                  disabled={uploadingTaskAttachment || recordingTaskAudio}
+                  style={[styles.addAttachmentLink, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
+                >
+                  <Link2 size={14} color={colors.white} />
+                  <Text style={styles.addAttachmentLinkText}>Thêm</Text>
+                </Pressable>
+              </View>
+              {uploadingTaskAttachment ? (
+                <View style={styles.attachmentUploading}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.attachmentMeta}>Đang tải tệp lên...</Text>
+                </View>
+              ) : null}
             </View>
-          ))}
-          <View style={styles.attachmentActions}>
-            <Pressable
-              onPress={() => void pickTaskAttachments()}
-              disabled={uploadingTaskAttachment || recordingTaskAudio}
-              style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-            >
-              <Paperclip size={14} color={colors.primary} />
-              <Text style={styles.attachmentActionText}>Chọn tệp</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => void (recordingTaskAudio ? stopTaskAudioRecording() : recordTaskAudio())}
-              disabled={uploadingTaskAttachment}
-              style={[styles.attachmentAction, recordingTaskAudio && styles.recordingAction, uploadingTaskAttachment && styles.disabled]}
-            >
-              {recordingTaskAudio ? <Square size={13} color="#B42318" /> : <Mic size={14} color={colors.primary} />}
-              <Text style={[styles.attachmentActionText, recordingTaskAudio && styles.recordingActionText]}>
-                {recordingTaskAudio ? 'Dừng ghi âm' : 'Ghi âm'}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => void recordTaskVideo()}
-              disabled={uploadingTaskAttachment || recordingTaskAudio}
-              style={[styles.attachmentAction, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-            >
-              <Video size={14} color={colors.primary} />
-              <Text style={styles.attachmentActionText}>Ghi hình</Text>
-            </Pressable>
-          </View>
-          <View style={styles.attachmentLinkRow}>
-            <TextInput
-              value={taskAttachmentLinkDraft}
-              onChangeText={setTaskAttachmentLinkDraft}
-              autoCapitalize="none"
-              keyboardType="url"
-              placeholder="Link tài liệu (https://...)"
-              placeholderTextColor={colors.muted}
-              style={[styles.field, styles.attachmentLinkInput]}
-            />
-            <Pressable
-              onPress={addTaskAttachmentLink}
-              disabled={uploadingTaskAttachment || recordingTaskAudio}
-              style={[styles.addAttachmentLink, (uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-            >
-              <Link2 size={14} color={colors.white} />
-              <Text style={styles.addAttachmentLinkText}>Thêm</Text>
-            </Pressable>
-          </View>
-          {uploadingTaskAttachment ? (
-            <View style={styles.attachmentUploading}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={styles.attachmentMeta}>Đang tải tệp lên...</Text>
-            </View>
-          ) : null}
-
-          <Pressable
-            disabled={savingTask || uploadingTaskAttachment || recordingTaskAudio}
-            onPress={() => void onSaveTask()}
-            style={[styles.submitBtn, (savingTask || uploadingTaskAttachment || recordingTaskAudio) && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>
-              {savingTask ? 'Đang lưu...' : editingTask ? 'Lưu thay đổi' : 'Tạo công việc'}
-            </Text>
-          </Pressable>
+          </HrFormCustomRow>
 
           {editingTask && canManageTasks ? (
             <Pressable
               onPress={() => onDeleteTask(editingTask)}
-              style={styles.deleteBtn}
+              style={[styles.deleteBtn, { marginTop: 12 }]}
             >
               <Text style={styles.deleteBtnText}>Xóa công việc</Text>
             </Pressable>
@@ -1697,15 +1648,12 @@ export function KanbanTasksPanel({
         saving={savingActivity}
         onClose={() => { if (!savingActivity) { setActivityMode(null); setActivityTask(null); } }}
       >
-        <View style={styles.form}>
-          {activityTask ? <Text numberOfLines={2} style={styles.activityTaskTitle}>{activityTask.title}</Text> : null}
+        <View>
+          <HrFormSectionTitle title={activityTask?.title || 'Thông tin cập nhật'} />
           {activityMode === 'progress' ? (
             <>
-              <View style={styles.progressEditorSummary}>
-                <Text style={styles.label}>Tiến độ hoàn thành</Text>
-                <Text style={styles.progressEditorPercent}>{activityProgress}%</Text>
-              </View>
-              <TextInput
+              <HrFormInputRow
+                label={`Tiến độ hoàn thành (${activityProgress}%)`}
                 value={String(activityProgress)}
                 onChangeText={(value) => {
                   const digits = value.replace(/[^0-9]/g, '').slice(0, 3);
@@ -1715,83 +1663,63 @@ export function KanbanTasksPanel({
                 keyboardType="number-pad"
                 maxLength={3}
                 selectTextOnFocus
-                accessibilityLabel="Tiến độ phần trăm"
-                style={styles.progressPercentInput}
               />
-              <View style={styles.wrapRow}>
-                {[0, 25, 50, 75, 100].map((value) => (
-                  <Pressable
-                    key={value}
-                    onPress={() => setActivityProgress(value)}
-                    style={[styles.chip, activityProgress === value && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, activityProgress === value && styles.chipTextActive]}>{value}%</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text style={styles.label}>Nội dung báo cáo *</Text>
-              <TextInput
+              <HrFormCustomRow label="Chọn nhanh">
+                <View style={[styles.wrapRow, { marginTop: 6 }]}>
+                  {[0, 25, 50, 75, 100].map((value) => (
+                    <Pressable
+                      key={value}
+                      onPress={() => setActivityProgress(value)}
+                      style={[styles.chip, activityProgress === value && styles.chipActive]}
+                    >
+                      <Text style={[styles.chipText, activityProgress === value && styles.chipTextActive]}>{value}%</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </HrFormCustomRow>
+              <HrFormInputRow
+                label={`Nội dung báo cáo * (${activityNote.length}/2000)`}
                 value={activityNote}
                 onChangeText={setActivityNote}
                 multiline
                 maxLength={2000}
                 placeholder="Mô tả kết quả đã hoàn thành hoặc vướng mắc..."
-                placeholderTextColor={colors.muted}
-                style={[styles.field, styles.activityNoteField]}
+                last
               />
             </>
           ) : (
             <>
-              <Text style={styles.label}>Chọn người hỗ trợ</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
-                <Pressable
-                  onPress={() => setActivityHelperUid('')}
-                  style={[styles.chip, !activityHelperUid && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, !activityHelperUid && styles.chipTextActive]}>Cả nhóm</Text>
-                </Pressable>
-                {employees
-                  .filter((employee) => {
-                    const uid = employee.id || employee._id || employee.uid || '';
-                    return uid && uid !== currentUid && uid !== activityTask?.assigneeUid;
-                  })
-                  .map((employee) => {
-                    const uid = employee.id || employee._id || employee.uid || '';
-                    const selected = activityHelperUid === uid;
-                    return (
-                      <Pressable
-                        key={uid}
-                        onPress={() => setActivityHelperUid(uid)}
-                        style={[styles.chip, selected && styles.chipActive]}
-                      >
-                        <Text style={[styles.chipText, selected && styles.chipTextActive]}>{employee.displayName}</Text>
-                      </Pressable>
-                    );
-                  })}
-              </ScrollView>
-              <Text style={styles.helpHint}>Để cả nhóm nhận thông báo hoặc chọn một người hỗ trợ cụ thể.</Text>
-              <Text style={styles.label}>Nguyên nhân cần trợ giúp *</Text>
-              <TextInput
+              <HrFormSelectRow
+                label="Người hỗ trợ"
+                sheetTitle="Chọn người hỗ trợ"
+                value={activityHelperUid}
+                placeholder="Cả nhóm"
+                options={[
+                  { value: '', label: 'Cả nhóm', subtitle: 'Gửi thông báo tới tất cả thành viên' },
+                  ...employees
+                    .filter((employee) => {
+                      const uid = employee.id || employee._id || employee.uid || '';
+                      return uid && uid !== currentUid && uid !== activityTask?.assigneeUid;
+                    })
+                    .map((employee) => ({
+                      value: employee.id || employee._id || employee.uid || '',
+                      label: employee.displayName,
+                      subtitle: [employee.jobTitle || employee.position, employee.department].filter(Boolean).join(' · ') || undefined,
+                    })),
+                ]}
+                onSelect={setActivityHelperUid}
+              />
+              <HrFormInputRow
+                label={`Nguyên nhân cần trợ giúp * (${activityNote.length}/2000)`}
                 value={activityNote}
                 onChangeText={setActivityNote}
                 multiline
                 maxLength={2000}
                 placeholder="Mô tả vướng mắc hoặc hỗ trợ bạn cần..."
-                placeholderTextColor={colors.muted}
-                style={[styles.field, styles.activityNoteField]}
+                last
               />
             </>
           )}
-          <Text style={styles.activityCharCount}>{activityNote.length}/2000 ký tự</Text>
-          <Pressable
-            onPress={() => void saveTaskActivity()}
-            disabled={savingActivity || !activityNote.trim()}
-            style={[styles.submitBtn, (savingActivity || !activityNote.trim()) && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>
-              {savingActivity ? 'Đang lưu...' : activityMode === 'progress' ? 'Lưu báo cáo tiến độ' : 'Gửi yêu cầu trợ giúp'}
-            </Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
 
@@ -1804,61 +1732,48 @@ export function KanbanTasksPanel({
         saving={savingProj}
         onClose={() => setProjectModalOpen(false)}
       >
-        <View style={styles.form}>
-          <Text style={styles.label}>Tên dự án *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin dự án" />
+          <HrFormInputRow
+            label="Tên dự án *"
             value={projName}
             onChangeText={setProjName}
             placeholder="VD: Triển khai ERP Q4"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
-
-          <Text style={styles.label}>Độ ưu tiên</Text>
-          <View style={styles.wrapRow}>
-            {(['high', 'medium', 'low'] as const).map((p) => (
+          <HrFormSelectRow
+            label="Độ ưu tiên"
+            sheetTitle="Chọn độ ưu tiên"
+            value={projPriority}
+            options={[
+              { value: 'high', label: 'Cao' },
+              { value: 'medium', label: 'Trung bình' },
+              { value: 'low', label: 'Thấp' },
+            ]}
+            onSelect={(val) => setProjPriority(val as typeof projPriority)}
+          />
+          <HrFormCustomRow label="Hạn hoàn thành" last>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Pressable
-                key={p}
-                onPress={() => setProjPriority(p)}
-                style={[styles.chip, projPriority === p && styles.chipActive]}
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2 }}
+                onPress={() => openDatePicker('projectDue')}
               >
-                <Text style={[styles.chipText, projPriority === p && styles.chipTextActive]}>
-                  {p === 'high' ? 'Cao' : p === 'low' ? 'Thấp' : 'Trung bình'}
+                <Text numberOfLines={1} style={{ color: projDueAt ? '#111827' : '#9CA3AF', fontSize: 15, fontWeight: projDueAt ? '500' : '400', flex: 1 }}>
+                  {projDueAt ? formatProjectDate(projDueAt) : 'Chọn ngày'}
                 </Text>
+                <CalendarDays size={16} color="#9CA3AF" />
               </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Hạn hoàn thành</Text>
-          <View style={styles.dateTimeInputRow}>
-            <Pressable style={[styles.dateTimeField, { flex: 1 }]} onPress={() => openDatePicker('projectDue')}>
-              <CalendarDays size={16} color={colors.primary} />
-              <Text numberOfLines={1} style={projDueAt ? styles.dateTimeValue : styles.dateTimePlaceholder}>
-                {projDueAt ? formatProjectDate(projDueAt) : 'Chọn ngày'}
-              </Text>
-              <ChevronRight size={16} color={colors.muted} />
-            </Pressable>
-            {projDueAt ? (
-              <Pressable onPress={() => setProjDueAt('')} hitSlop={8} style={styles.dateTimeClear} accessibilityLabel="Xóa hạn hoàn thành">
-                <X size={15} color={colors.muted} />
-              </Pressable>
-            ) : null}
-          </View>
-
-          <Pressable
-            disabled={savingProj}
-            onPress={() => void onSaveProject()}
-            style={[styles.submitBtn, savingProj && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>
-              {savingProj ? 'Đang lưu...' : editingProject ? 'Cập nhật dự án' : 'Tạo dự án'}
-            </Text>
-          </Pressable>
+              {projDueAt ? (
+                <Pressable onPress={() => setProjDueAt('')} hitSlop={8} accessibilityLabel="Xóa hạn hoàn thành">
+                  <X size={16} color="#9CA3AF" />
+                </Pressable>
+              ) : null}
+            </View>
+          </HrFormCustomRow>
 
           {editingProject && canManageTasks ? (
             <Pressable
               onPress={() => onDeleteProject(editingProject)}
-              style={styles.deleteBtn}
+              style={[styles.deleteBtn, { marginTop: 12 }]}
             >
               <Text style={styles.deleteBtnText}>Xóa dự án</Text>
             </Pressable>
