@@ -1332,7 +1332,6 @@ export function HrTrainingPanel({
           </View>
         ) : (
           <View>
-            <HrFormSectionTitle title="Nội dung câu hỏi" />
             <HrFormInputRow
               label="Nội dung câu hỏi *"
               value={quizDraft.question}
@@ -1345,11 +1344,15 @@ export function HrTrainingPanel({
                 {quizDraft.options.map((option, optionIndex) => {
                   const isCorrect = quizDraft.correctOptionIndex === optionIndex;
                   return (
-                    <View key={`option-${optionIndex}`} style={styles.quizEditorOptionRow}>
+                    <View
+                      key={`option-${optionIndex}`}
+                      style={[styles.quizOption, isCorrect && styles.quizOptionActive]}
+                    >
                       <Pressable
                         accessibilityRole="radio"
                         accessibilityState={{ checked: isCorrect }}
                         onPress={() => setQuizDraft((prev) => ({ ...prev, correctOptionIndex: optionIndex }))}
+                        hitSlop={6}
                         style={[styles.radioOuter, isCorrect && styles.radioOuterActive]}
                       >
                         {isCorrect ? <View style={styles.radioInner} /> : null}
@@ -1363,7 +1366,7 @@ export function HrTrainingPanel({
                         })}
                         placeholder={`Đáp án ${optionIndex + 1}`}
                         placeholderTextColor="#9CA3AF"
-                        style={[styles.field, styles.quizEditorOptionField]}
+                        style={[styles.quizEditorInput, isCorrect && styles.quizOptionTextActive]}
                       />
                       {quizDraft.options.length > 2 ? (
                         <Pressable
@@ -1377,18 +1380,21 @@ export function HrTrainingPanel({
                             return { ...prev, options, correctOptionIndex };
                           })}
                           hitSlop={8}
+                          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
                         >
-                          <Text style={styles.smallDelBtnText}>Xóa</Text>
+                          <Trash2 size={15} strokeWidth={1.7} color="#DC2626" />
                         </Pressable>
                       ) : null}
                     </View>
                   );
                 })}
-                <Pressable onPress={() => setQuizDraft((prev) => ({ ...prev, options: [...prev.options, ''] }))}>
-                  <View style={styles.iconButtonContent}>
-                    <Plus size={13} color={colors.primary} />
-                    <Text style={styles.addSmallBtnText}>Thêm đáp án</Text>
-                  </View>
+                <Pressable
+                  onPress={() => setQuizDraft((prev) => ({ ...prev, options: [...prev.options, ''] }))}
+                  hitSlop={6}
+                  style={({ pressed }) => [styles.builderAddLink, { marginTop: 2 }, pressed && { opacity: 0.65 }]}
+                >
+                  <Plus size={15} strokeWidth={1.9} color={colors.primary} />
+                  <Text style={styles.builderAddLinkText}>Thêm đáp án</Text>
                 </Pressable>
               </View>
             </HrFormCustomRow>
@@ -1862,8 +1868,14 @@ const styles = StyleSheet.create({
   editorTextArea: { minHeight: 90, textAlignVertical: 'top' },
   editorActionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   editorAction: { flex: 1 },
-  quizEditorOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  quizEditorOptionField: { flex: 1 },
+  quizEditorInput: {
+    flex: 1,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
+    fontSize: 14,
+    color: '#111827',
+  },
   addSmallBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   addSmallBtnText: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
   pickerRow: { padding: 12, borderRadius: 10, backgroundColor: '#F6F8FC', marginBottom: 6 },
