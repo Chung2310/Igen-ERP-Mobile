@@ -667,143 +667,145 @@ export function HrTrainingPanel({
         contentContainerStyle={[styles.content, { paddingBottom: 108 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Course Header & Progress Card */}
-        <Card style={styles.heroCard}>
-          <View style={styles.badgeRow}>
-            <Text style={styles.categoryBadge}>{selectedCourse.category || 'Đào tạo'}</Text>
-            {selectedCourse.isRequired ? <Text style={styles.requiredBadge}>Bắt buộc</Text> : null}
-          </View>
-          <Text style={styles.heroTitle}>{selectedCourse.title || selectedCourse.name}</Text>
-          <View style={styles.courseMetaRow}>
-            <UserRound size={13} color={colors.muted} />
-            <Text style={styles.subMeta}>Giảng viên: {selectedCourse.instructor || 'Chưa cập nhật'}</Text>
-            {selectedCourse.duration ? <><Clock3 size={13} color={colors.muted} /><Text style={styles.subMeta}>{selectedCourse.duration}</Text></> : null}
-          </View>
+        {/* Course Header, Syllabus & Overview (hidden once learning starts) */}
+        {activeIndex === -1 ? (
+          <>
+            <Card style={styles.heroCard}>
+              <View style={styles.badgeRow}>
+                <Text style={styles.categoryBadge}>{selectedCourse.category || 'Đào tạo'}</Text>
+                {selectedCourse.isRequired ? <Text style={styles.requiredBadge}>Bắt buộc</Text> : null}
+              </View>
+              <Text style={styles.heroTitle}>{selectedCourse.title || selectedCourse.name}</Text>
+              <View style={styles.courseMetaRow}>
+                <UserRound size={13} color={colors.muted} />
+                <Text style={styles.subMeta}>Giảng viên: {selectedCourse.instructor || 'Chưa cập nhật'}</Text>
+                {selectedCourse.duration ? <><Clock3 size={13} color={colors.muted} /><Text style={styles.subMeta}>{selectedCourse.duration}</Text></> : null}
+              </View>
 
-          <View style={styles.progressSection}>
-            <View style={styles.headRow}>
-              <Text style={styles.progressLabel}>Tiến độ hoàn thành</Text>
-              <Text style={styles.progressPct}>{progress}%</Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
-            </View>
-          </View>
+              <View style={styles.progressSection}>
+                <View style={styles.headRow}>
+                  <Text style={styles.progressLabel}>Tiến độ hoàn thành</Text>
+                  <Text style={styles.progressPct}>{progress}%</Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
+                </View>
+              </View>
 
-          {isSupervisor && progress < 100 ? (
-            <Pressable
-              disabled={submittingProgress}
-              onPress={() => void handleCompleteDirectly()}
-              style={({ pressed }) => [styles.startCourseBtn, pressed && { opacity: 0.72 }]}
-            >
-              <Text style={styles.startCourseBtnText}>Bỏ qua</Text>
-            </Pressable>
-          ) : null}
-        </Card>
+              {isSupervisor && progress < 100 ? (
+                <Pressable
+                  disabled={submittingProgress}
+                  onPress={() => void handleCompleteDirectly()}
+                  style={({ pressed }) => [styles.startCourseBtn, pressed && { opacity: 0.72 }]}
+                >
+                  <Text style={styles.startCourseBtnText}>Bỏ qua</Text>
+                </Pressable>
+              ) : null}
+            </Card>
 
-        {/* Full inline syllabus list (read-only overview; use "Bắt đầu học" to start) */}
-        <Text style={styles.sectionTitle}>Mục lục khóa học</Text>
-        <View style={styles.syllabusCard}>
-          <View style={styles.syllabusListRow}>
-            <IntroCourseIcon size={17} color={colors.ink} />
-            <Text
-              numberOfLines={1}
-              style={styles.syllabusSheetRowText}
-            >
-              Giới thiệu
-            </Text>
-          </View>
-
-          {lessons.map((les, idx) => {
-            const done = completedLessons.includes(`lesson_${idx}`);
-            const isLast = idx === lessons.length - 1 && quizzes.length === 0;
-            return (
-              <View
-                key={idx}
-                style={[
-                  styles.syllabusListRow,
-                  isLast && styles.syllabusListRowLast,
-                ]}
-              >
-                {done ? (
-                  <CircleCheck size={17} strokeWidth={1.6} color="#16885A" />
-                ) : les.type === 'video' || les.type === 'youtube' ? (
-                  <Video size={17} strokeWidth={1.6} color={colors.ink} />
-                ) : (
-                  <FileText size={17} strokeWidth={1.6} color={colors.ink} />
-                )}
+            {/* Full inline syllabus list (read-only overview; use "Bắt đầu học" to start) */}
+            <Text style={styles.sectionTitle}>Mục lục khóa học</Text>
+            <View style={styles.syllabusCard}>
+              <View style={styles.syllabusListRow}>
+                <IntroCourseIcon size={17} color={colors.ink} />
                 <Text
-                  numberOfLines={2}
+                  numberOfLines={1}
                   style={styles.syllabusSheetRowText}
                 >
-                  Bài {idx + 1}: {les.title}
+                  Giới thiệu
                 </Text>
               </View>
-            );
-          })}
 
-          {quizzes.length > 0 ? (
-            <View
-              style={[
-                styles.syllabusListRow,
-                styles.syllabusListRowLast,
-                !isLessonsDone && styles.disabled,
-              ]}
-            >
-              {isQuizPassed ? (
-                <CircleCheck size={17} strokeWidth={1.6} color="#16885A" />
-              ) : (
-                <ClipboardList size={17} strokeWidth={1.6} color={colors.ink} />
-              )}
-              <Text
-                numberOfLines={1}
-                style={styles.syllabusSheetRowText}
-              >
-                Thi trắc nghiệm ({quizzes.length})
+              {lessons.map((les, idx) => {
+                const done = completedLessons.includes(`lesson_${idx}`);
+                const isLast = idx === lessons.length - 1 && quizzes.length === 0;
+                return (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.syllabusListRow,
+                      isLast && styles.syllabusListRowLast,
+                    ]}
+                  >
+                    {done ? (
+                      <CircleCheck size={17} strokeWidth={1.6} color="#16885A" />
+                    ) : les.type === 'video' || les.type === 'youtube' ? (
+                      <Video size={17} strokeWidth={1.6} color={colors.ink} />
+                    ) : (
+                      <FileText size={17} strokeWidth={1.6} color={colors.ink} />
+                    )}
+                    <Text
+                      numberOfLines={2}
+                      style={styles.syllabusSheetRowText}
+                    >
+                      Bài {idx + 1}: {les.title}
+                    </Text>
+                  </View>
+                );
+              })}
+
+              {quizzes.length > 0 ? (
+                <View
+                  style={[
+                    styles.syllabusListRow,
+                    styles.syllabusListRowLast,
+                    !isLessonsDone && styles.disabled,
+                  ]}
+                >
+                  {isQuizPassed ? (
+                    <CircleCheck size={17} strokeWidth={1.6} color="#16885A" />
+                  ) : (
+                    <ClipboardList size={17} strokeWidth={1.6} color={colors.ink} />
+                  )}
+                  <Text
+                    numberOfLines={1}
+                    style={styles.syllabusSheetRowText}
+                  >
+                    Thi trắc nghiệm ({quizzes.length})
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Section 1: Overview / Intro */}
+            <Card style={styles.studyCard}>
+              <Text style={styles.studyHeading}>Giới thiệu khóa học</Text>
+              <Text style={styles.studyBody}>
+                {selectedCourse.description || 'Khóa học chưa có mô tả chi tiết.'}
               </Text>
-            </View>
-          ) : null}
-        </View>
 
-        {/* Section 1: Overview / Intro */}
-        {activeIndex === -1 ? (
-          <Card style={styles.studyCard}>
-            <Text style={styles.studyHeading}>Giới thiệu khóa học</Text>
-            <Text style={styles.studyBody}>
-              {selectedCourse.description || 'Khóa học chưa có mô tả chi tiết.'}
-            </Text>
-
-            <View style={styles.overviewBox}>
-              <Text style={styles.overviewTitle}>Nội dung học</Text>
-              <View style={styles.overviewBulletRow}>
-                <Circle size={5} color={colors.primary} fill={colors.primary} />
-                <Text style={styles.overviewBullet}>{lessons.length} bài giảng</Text>
+              <View style={styles.overviewBox}>
+                <Text style={styles.overviewTitle}>Nội dung học</Text>
+                <View style={styles.overviewBulletRow}>
+                  <Circle size={5} color={colors.primary} fill={colors.primary} />
+                  <Text style={styles.overviewBullet}>{lessons.length} bài giảng</Text>
+                </View>
+                <View style={styles.overviewBulletRow}>
+                  <Circle size={5} color={colors.primary} fill={colors.primary} />
+                  <Text style={styles.overviewBullet}>
+                    {quizzes.length > 0
+                      ? `Đạt 100% bài kiểm tra trắc nghiệm (${quizzes.length} câu)`
+                      : 'Hoàn thành tất cả bài giảng'}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.overviewBulletRow}>
-                <Circle size={5} color={colors.primary} fill={colors.primary} />
-                <Text style={styles.overviewBullet}>
-                  {quizzes.length > 0
-                    ? `Đạt 100% bài kiểm tra trắc nghiệm (${quizzes.length} câu)`
-                    : 'Hoàn thành tất cả bài giảng'}
-                </Text>
-              </View>
-            </View>
 
-            <Pressable
-              onPress={() => {
-                if (lessons.length > 0) {
-                  setActiveIndex(0);
-                } else if (quizzes.length > 0) {
-                  setActiveIndex(0);
-                } else {
-                  showHrNotice('Thông báo', 'Khóa học chưa có nội dung bài giảng.');
-                }
-              }}
-              style={({ pressed }) => [styles.startCourseBtn, pressed && { opacity: 0.72 }]}
-            >
-              <View style={styles.iconButtonContent}><Play size={14} color={colors.ink} /><Text style={styles.startCourseBtnText}>Bắt đầu học</Text></View>
-            </Pressable>
-          </Card>
+              <Pressable
+                onPress={() => {
+                  if (lessons.length > 0) {
+                    setActiveIndex(0);
+                  } else if (quizzes.length > 0) {
+                    setActiveIndex(0);
+                  } else {
+                    showHrNotice('Thông báo', 'Khóa học chưa có nội dung bài giảng.');
+                  }
+                }}
+                style={({ pressed }) => [styles.startCourseBtn, pressed && { opacity: 0.72 }]}
+              >
+                <View style={styles.iconButtonContent}><Play size={14} color={colors.ink} /><Text style={styles.startCourseBtnText}>Bắt đầu học</Text></View>
+              </Pressable>
+            </Card>
+          </>
         ) : null}
 
         {/* Section 2: Active Lesson */}
@@ -813,10 +815,11 @@ export function HrTrainingPanel({
           const isVideo = les.type === 'video' || les.type === 'youtube';
           return (
             <Card style={styles.studyCard}>
-              <View style={styles.courseMetaRow}>
-                <Text style={styles.lessonCounter}>Bài giảng {activeIndex + 1} / {lessons.length}</Text>
-                {isCompleted ? <View style={styles.iconButtonContent}><Check size={13} color="#16885A" /><Text style={styles.lessonCounter}>Đã hoàn thành</Text></View> : null}
-              </View>
+              {isCompleted ? (
+                <View style={styles.courseMetaRow}>
+                  <View style={styles.iconButtonContent}><Check size={13} color="#16885A" /><Text style={styles.lessonCounter}>Đã hoàn thành</Text></View>
+                </View>
+              ) : null}
               <Text style={styles.studyHeading}>{les.title}</Text>
 
               {les.url ? (
