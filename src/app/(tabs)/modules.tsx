@@ -138,7 +138,10 @@ export default function ModulesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadAttendance();
+      const timer = setTimeout(() => {
+        void loadAttendance();
+      }, 220);
+      return () => clearTimeout(timer);
     }, [loadAttendance]),
   );
 

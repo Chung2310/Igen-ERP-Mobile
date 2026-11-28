@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Tabs, useRouter, useSegments, type Href } from 'expo-router';
+import { Tabs, useRouter, type Href } from 'expo-router';
 import {
   Animated,
   Easing,
@@ -49,10 +49,13 @@ function NoRippleTabButton({
   );
 }
 
+const renderNoRippleTabButton = (props: Record<string, unknown>) => (
+  <NoRippleTabButton {...props} />
+);
+
 export default function TabLayout() {
   const { user } = useAuth();
   const router = useRouter();
-  const segments = useSegments() as string[];
   const showOverview = canAccessOverview(user);
   const showChat = canAccessModule(user, 'chat');
   const insets = useSafeAreaInsets();
@@ -70,16 +73,9 @@ export default function TabLayout() {
     return routes;
   }, [showChat, showOverview]);
 
-  const currentTab: TabRouteKey | null = useMemo(() => {
-    if (segments[0] !== '(tabs)') return null;
-    const candidate = (segments[1] ?? 'index') as TabRouteKey;
-    return visibleTabRoutes.includes(candidate) ? candidate : null;
-  }, [segments, visibleTabRoutes]);
-
   const visibleTabRoutesRef = useRef(visibleTabRoutes);
   visibleTabRoutesRef.current = visibleTabRoutes;
-  const currentTabRef = useRef(currentTab);
-  currentTabRef.current = currentTab;
+  const currentTabRef = useRef<TabRouteKey>(showOverview ? 'index' : 'modules');
   const routerRef = useRef(router);
   routerRef.current = router;
 
@@ -102,7 +98,6 @@ export default function TabLayout() {
       onPanResponderRelease: (_, gesture) => {
         const active = currentTabRef.current;
         const routes = visibleTabRoutesRef.current;
-        if (!active) return;
         const idx = routes.indexOf(active);
         if (idx < 0) return;
         const isHorizontalSwipe =
@@ -112,52 +107,84 @@ export default function TabLayout() {
 
         const nextIdx = gesture.dx < 0 ? idx + 1 : idx - 1;
         if (nextIdx >= 0 && nextIdx < routes.length) {
+          const nextTab = routes[nextIdx];
+          currentTabRef.current = nextTab;
           Keyboard.dismiss();
-          routerRef.current.navigate(TAB_HREFS[routes[nextIdx]]);
+          routerRef.current.navigate(TAB_HREFS[nextTab]);
         }
       },
     }),
   ).current;
 
-  const tabOptions = {
-    headerShown: false,
-    lazy: false,
-    transitionSpec: {
-      animation: 'timing' as const,
-      config: {
-        duration: 260,
-        easing: Easing.bezier(0.28, 0.12, 0.22, 1),
+  const tabOptions = useMemo(
+    () => ({
+      headerShown: false,
+      lazy: false,
+      freezeOnBlur: true,
+      transitionSpec: {
+        animation: 'timing' as const,
+        config: {
+          duration: 200,
+          easing: Easing.out(Easing.cubic),
+        },
       },
-    },
-    sceneStyleInterpolator: ({ current }: { current: { progress: Animated.AnimatedInterpolation<number> } }) => ({
-      sceneStyle: {
-        transform: [
-          {
-            translateX: current.progress.interpolate({
-              inputRange: [-1, 0, 1],
-              outputRange: [-screenWidth, 0, screenWidth],
-            }),
-          },
-        ],
+      sceneStyleInterpolator: ({
+        current,
+      }: {
+        current: { progress: Animated.AnimatedInterpolation<number> };
+      }) => ({
+        sceneStyle: {
+          opacity: current.progress.interpolate({
+            inputRange: [-1, 0, 1],
+            outputRange: [0, 1, 0],
+            extrapolate: 'clamp',
+          }),
+          transform: [
+            {
+              translateX: current.progress.interpolate({
+                inputRange: [-1, 0, 1],
+                outputRange: [-screenWidth * 0.24, 0, screenWidth * 0.24],
+                extrapolate: 'clamp',
+              }),
+            },
+          ],
+        },
+      }),
+      sceneStyle: { backgroundColor: colors.white },
+      tabBarActiveTintColor: colors.primary,
+      tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
+      tabBarButton: renderNoRippleTabButton,
+      tabBarStyle: {
+        height: 60 + bottomInset,
+        paddingTop: 8,
+        paddingBottom: bottomInset,
+        borderTopColor: colors.border,
+        backgroundColor: colors.white,
+      },
+      tabBarLabelStyle: { fontSize: 9.5, lineHeight: 12, fontWeight: '600' as const, marginTop: 2 },
+    }),
+    [bottomInset, screenWidth],
+  );
+
+  const screenListeners = useMemo(
+    () => ({ route }: { route: { name: string } }) => ({
+      focus: () => {
+        const routeName = route.name as TabRouteKey;
+        if (visibleTabRoutesRef.current.includes(routeName)) {
+          currentTabRef.current = routeName;
+        }
       },
     }),
-    sceneStyle: { backgroundColor: colors.white },
-    tabBarActiveTintColor: colors.primary,
-    tabBarInactiveTintColor: TAB_INACTIVE_COLOR,
-    tabBarButton: (props: Record<string, unknown>) => <NoRippleTabButton {...props} />,
-    tabBarStyle: {
-      height: 60 + bottomInset,
-      paddingTop: 8,
-      paddingBottom: bottomInset,
-      borderTopColor: colors.border,
-      backgroundColor: colors.white,
-    },
-    tabBarLabelStyle: { fontSize: 9.5, lineHeight: 12, fontWeight: '600' as const, marginTop: 2 },
-  };
+    [],
+  );
 
   return (
     <View {...panResponder.panHandlers} style={{ flex: 1 }}>
-      <Tabs detachInactiveScreens={false} screenOptions={tabOptions}>
+      <Tabs
+        detachInactiveScreens={false}
+        screenOptions={tabOptions}
+        screenListeners={screenListeners}
+      >
       <Tabs.Screen
         name="inbox"
         options={{
