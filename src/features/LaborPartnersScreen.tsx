@@ -1,4 +1,5 @@
 import { PopupError } from '@/components/PopupError';
+import { IgenWorkerEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
@@ -290,7 +291,7 @@ export function LaborPartnersScreen(_props: FeatureScreenProps) {
         <ScrollView style={styles.pickerList}>
           <Pressable style={styles.pickerOption} onPress={() => { if (picker) setForm((current) => ({ ...current, [picker]: '' })); setPicker(null); }}><Text style={styles.pickerOptionName}>Không gắn chính sách</Text></Pressable>
           {picker && policyForSlot(picker).map((policy) => <Pressable key={policy._id} style={styles.pickerOption} onPress={() => { setForm((current) => ({ ...current, [picker]: policy._id })); setPicker(null); }}><Text style={styles.pickerOptionName}>{policy.name} · v{policy.version}</Text><Text style={styles.pickerOptionDetail}>Hiệu lực từ {policy.effectiveFrom}</Text></Pressable>)}
-          {picker && policyForSlot(picker).length === 0 && <Text style={styles.emptyPicker}>Chưa có chính sách phù hợp đang hiệu lực.</Text>}
+          {picker && policyForSlot(picker).length === 0 && <IgenWorkerEmptyState compact message="Chưa có chính sách phù hợp đang hiệu lực." />}
         </ScrollView>
       </View></Pressable>
     </Modal>
@@ -315,7 +316,7 @@ function Summary({ label, value }: { label: string; value: number }) { return <V
 function Tab({ label, icon, active, onPress }: { label: string; icon: ReactNode; active: boolean; onPress: () => void }) { return <Pressable onPress={onPress} style={[styles.tab, active && styles.tabActive]}>{icon}<Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text></Pressable>; }
 function Field({ label, value, onChangeText, multiline, ...props }: { label: string; value: string; onChangeText: (value: string) => void; multiline?: boolean } & Omit<ComponentProps<typeof TextInput>, 'value' | 'onChangeText' | 'multiline'>) { return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><TextInput value={value} onChangeText={onChangeText} multiline={multiline} textAlignVertical={multiline ? 'top' : 'center'} placeholderTextColor={colors.muted} style={[styles.input, multiline && styles.multiline]} {...props} /></View>; }
 function PolicyPicker({ label, value, onPress }: { label: string; value: string; onPress: () => void }) { return <View style={styles.field}><Text style={styles.fieldLabel}>{label}</Text><Pressable onPress={onPress} style={styles.policyPicker}><Text numberOfLines={1} style={[styles.policyPickerValue, value === 'Chưa gắn chính sách' && styles.placeholder]}>{value}</Text><Text style={styles.pickerAction}>Chọn</Text></Pressable></View>; }
-function InlineState({ title, detail, onRetry }: { title: string; detail: string; onRetry?: () => void }) { return <View style={styles.state}><Text style={styles.stateTitle}>{title}</Text><Text style={styles.stateCopy}>{detail}</Text>{onRetry && <Pressable onPress={onRetry} style={styles.retry}><Text style={styles.retryText}>Tải lại</Text></Pressable>}</View>; }
+function InlineState({ title, detail, onRetry }: { title: string; detail: string; onRetry?: () => void }) { return <View style={styles.state}><IgenWorkerEmptyState message={title} detail={detail} />{onRetry && <Pressable onPress={onRetry} style={styles.retry}><Text style={styles.retryText}>Tải lại</Text></Pressable>}</View>; }
 function LoadingState() { return <View style={styles.state}><ActivityIndicator color={colors.primary} /><Text style={styles.stateCopy}>Đang tải dữ liệu...</Text></View>; }
 function PermissionState({ title, detail }: { title: string; detail: string }) { return <View style={styles.state}><UsersRound size={28} color={colors.primary} /><Text style={styles.stateTitle}>{title}</Text><Text style={styles.stateCopy}>{detail}</Text></View>; }
 

@@ -324,11 +324,11 @@ export function DepartmentsPanel({
                   {dept.name}
                   {dept.code ? ` (${dept.code})` : ''}
                 </Text>
-                <View style={styles.departmentCount}><Text style={styles.badge}>{dept.employeeCount ?? 0} nhân sự</Text><ChevronRight size={13} color={colors.muted} /></View>
+                <View style={styles.departmentCount}><Text style={styles.badge}>{dept.employeeCount ?? 0} nhân sự</Text></View>
               </View>
-              {dept.managerName ? (
-                <Text style={styles.muted}>Trưởng phòng: {dept.managerName}</Text>
-              ) : null}
+              <Text style={styles.muted}>
+                {dept.managerName ? `Trưởng phòng: ${dept.managerName}` : 'Chưa có trưởng phòng'}
+              </Text>
               {dept.description ? (
                 <Text numberOfLines={2} style={styles.subMeta}>
                   {dept.description}

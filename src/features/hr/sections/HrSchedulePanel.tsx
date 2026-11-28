@@ -990,13 +990,6 @@ function AttendanceAndCalendarSection({
               </ScrollView>
             </View>
           )}
-
-          <Text style={[styles.subMeta, { marginTop: 8, textAlign: 'center' }]}>
-            Vuốt ngang bảng để xem các ngày 1–{daysInHistMonth}
-            {canEditAttendance
-              ? ' · Chạm ô có dữ liệu để xem / chỉnh sửa'
-              : ' · Chi tiết chấm công của nhân sự khác được ẩn'}
-          </Text>
         </>
       ) : (
         <>

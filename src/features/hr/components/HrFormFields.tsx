@@ -111,16 +111,10 @@ export function HrFormSelectRow({
       >
         <Pressable style={styles.sheetBackdrop} onPress={() => setOpen(false)}>
           <Pressable
-            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
+            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}
             onPress={() => {}}
           >
             <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{sheetTitle || label}</Text>
-              <Pressable onPress={() => setOpen(false)} hitSlop={8}>
-                <Text style={styles.sheetClose}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
               {options.length === 0 ? (
                 <Text style={styles.emptyText}>Không có lựa chọn phù hợp.</Text>

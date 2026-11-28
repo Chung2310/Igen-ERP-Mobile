@@ -203,7 +203,7 @@ export function HrModuleScreen() {
                 pressed && styles.switcherNavBtnPressed,
               ]}
             >
-              <ChevronLeft size={18} color={colors.ink} />
+              <ChevronLeft size={15} color={colors.ink} />
             </Pressable>
 
             <Pressable
@@ -217,17 +217,14 @@ export function HrModuleScreen() {
               ]}
             >
               <View style={styles.switcherTitleRow}>
-                <HrTabIcon id={activeTabMeta.key} size={24} />
+                <HrTabIcon id={activeTabMeta.key} size={22} />
                 <Text numberOfLines={1} style={styles.switcherTitle}>
                   {activeTabMeta.label}
                 </Text>
                 {visibleTabs.length > 1 ? (
-                  <ChevronDown size={15} color={colors.muted} />
+                  <ChevronDown size={13} color={colors.muted} />
                 ) : null}
               </View>
-              <Text numberOfLines={1} style={styles.switcherSubtitle}>
-                {activeTabMeta.subtitle}
-              </Text>
             </Pressable>
 
             <Pressable
@@ -241,7 +238,7 @@ export function HrModuleScreen() {
                 pressed && styles.switcherNavBtnPressed,
               ]}
             >
-              <ChevronRight size={18} color={colors.ink} />
+              <ChevronRight size={15} color={colors.ink} />
             </Pressable>
           </View>
         </View>
@@ -325,12 +322,6 @@ export function HrModuleScreen() {
             onPress={() => {}}
           >
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn nghiệp vụ nhân sự</Text>
-              <Pressable onPress={() => setTabPickerOpen(false)} hitSlop={8}>
-                <Text style={styles.modalClose}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {visibleTabs.map((tab) => {
                 const active = tab.key === activeVisibleTab;
@@ -373,12 +364,6 @@ export function HrModuleScreen() {
             onPress={() => {}}
           >
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn chi nhánh</Text>
-              <Pressable onPress={() => setBranchModalOpen(false)} hitSlop={8}>
-                <Text style={styles.modalClose}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {branches.map((branch) => {
                 const selected = branch._id === activeBranchId;
@@ -443,12 +428,12 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5EAF2',
     paddingHorizontal: 6,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   switcherNavBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F5F8FD',

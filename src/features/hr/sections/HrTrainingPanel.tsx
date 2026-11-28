@@ -1,5 +1,5 @@
 import { PopupError } from '@/components/PopupError';
-import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { FullScreenFormModal, SlideInPage } from '@/components/FullScreenFormModal';
 import {
   HrFormCustomRow,
   HrFormInputRow,
@@ -597,6 +597,7 @@ export function HrTrainingPanel({
     const canEditThis = isSupervisor;
 
     return (
+      <SlideInPage key={selectedCourse.id}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Top bar */}
         <View style={styles.detailTopBar}>
@@ -893,6 +894,7 @@ export function HrTrainingPanel({
         {renderCourseFormModal()}
         <HrNoticeHost />
       </ScrollView>
+      </SlideInPage>
     );
   }
 

@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -22,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { Card } from '@/components/Card';
 import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
-import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { FullScreenFormModal, SlideInPage } from '@/components/FullScreenFormModal';
 import {
   HrFormCustomRow,
   HrFormInputRow,
@@ -116,26 +117,6 @@ export function HrWorkflowsPanel({
   const [categoryEditFrom, setCategoryEditFrom] = useState<string | null>(null);
   const [categoryNameDraft, setCategoryNameDraft] = useState('');
   const [savingCategory, setSavingCategory] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  useEffect(() => {
-    if (!categoryManagerOpen) {
-      setKeyboardHeight(0);
-      return;
-    }
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (event) => {
-      setKeyboardHeight(event.endCoordinates?.height || 0);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardHeight(0);
-    });
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [categoryManagerOpen]);
 
   const load = useCallback(
     async (silent = false) => {
@@ -586,6 +567,7 @@ export function HrWorkflowsPanel({
   if (selectedWorkflow) {
     const steps = selectedWorkflow.steps ?? [];
     return (
+      <SlideInPage key={selectedWorkflow.id}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.detailTopBar}>
           <Pressable onPress={() => setSelectedWorkflow(null)} style={styles.backBtn}>
@@ -655,7 +637,6 @@ export function HrWorkflowsPanel({
                       <Text numberOfLines={2} style={styles.stepTitle}>
                         {step.title || `Bước ${idx + 1}`}
                       </Text>
-                      <ChevronRight size={16} color={colors.muted} />
                     </View>
                     {step.description ? (
                       <Text numberOfLines={2} style={styles.muted}>
@@ -874,6 +855,7 @@ export function HrWorkflowsPanel({
         </FullScreenFormModal>
         {renderWorkflowFormModal()}
       </ScrollView>
+      </SlideInPage>
     );
   }
 
@@ -964,7 +946,6 @@ export function HrWorkflowsPanel({
                 </Text>
                 <View style={styles.stepCountRow}>
                   <Text style={styles.stepCountBadge}>{wf.steps?.length ?? 0} bước</Text>
-                  <ChevronRight size={14} color={colors.muted} />
                 </View>
               </View>
             </Card>
@@ -1025,22 +1006,26 @@ export function HrWorkflowsPanel({
           }
         }}
       >
-        <Pressable
-          style={[styles.catSheetBackdrop, keyboardHeight > 0 && { paddingBottom: keyboardHeight }]}
-          onPress={() => {
-            if (savingCategory) return;
-            Keyboard.dismiss();
-            setCategoryManagerMode('list');
-            setCategoryManagerOpen(false);
-          }}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <Pressable
-            style={[
-              styles.catSheet,
-              { paddingBottom: keyboardHeight > 0 ? 16 : Math.max(insets.bottom, 20) + 16 },
-            ]}
-            onPress={() => {}}
+            style={styles.catSheetBackdrop}
+            onPress={() => {
+              if (savingCategory) return;
+              Keyboard.dismiss();
+              setCategoryManagerMode('list');
+              setCategoryManagerOpen(false);
+            }}
           >
+            <Pressable
+              style={[
+                styles.catSheet,
+                { paddingBottom: Math.max(insets.bottom, 16) + 12 },
+              ]}
+              onPress={() => {}}
+            >
               <View style={styles.catSheetHandle} />
               {categoryManagerMode === 'list' ? (
                 <View style={{ gap: 6 }}>
@@ -1130,6 +1115,7 @@ export function HrWorkflowsPanel({
               )}
             </Pressable>
           </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
     {canManage ? <HrFab label="Thêm quy trình" onPress={openCreateWorkflow} /> : null}
@@ -1189,6 +1175,7 @@ const styles = StyleSheet.create({
   catSheetAddRowText: { color: colors.ink, fontSize: 14.5, fontWeight: '400' },
   catSheetBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.35)', justifyContent: 'flex-end' },
   catSheet: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 26 },
+  catFormDialog: { borderRadius: 20, paddingHorizontal: 18, paddingTop: 18, paddingBottom: 18 },
   catSheetHandle: { width: 38, height: 4, borderRadius: 99, backgroundColor: '#D6DFEC', alignSelf: 'center', marginBottom: 12 },
   catSheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 13, borderRadius: 12, marginBottom: 4 },
   catSheetRowActive: { backgroundColor: '#F0F6FF' },

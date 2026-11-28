@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Linking,
   Modal,
   Platform,
@@ -22,6 +23,7 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import Svg, { Circle, Path } from 'react-native-svg';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
@@ -42,6 +44,7 @@ import {
   Mic,
   Paperclip,
   Pencil,
+  Trash2,
   Plus,
   RefreshCw,
   Sliders,
@@ -117,15 +120,23 @@ function parseVietnamTaskInstant(value?: string): Date | undefined {
   return Number.isNaN(d.valueOf()) ? undefined : d;
 }
 
+function formatDateDDMMYYYY(value?: string): string {
+  const key = String(value || '').slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const date = parseVietnamTaskInstant(value);
+  if (!date) return '';
+  const vnKey = getVietnamDateKey(date);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(vnKey);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : vnKey;
+}
+
 function formatTaskDateTime(value?: string): string {
   const date = parseVietnamTaskInstant(value);
-  return date
-    ? date.toLocaleString('vi-VN', {
-        timeZone: 'Asia/Bangkok',
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      })
-    : '';
+  if (!date) return '';
+  const local = getVietnamLocalDateTime(date);
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})$/.exec(local);
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : formatDateDDMMYYYY(value);
 }
 
 function normalizeTaskDateTime(value?: string): string {
@@ -134,10 +145,251 @@ function normalizeTaskDateTime(value?: string): string {
 }
 
 function formatProjectDate(value?: string): string {
-  const date = parseVietnamDateKey(value);
-  return date
-    ? date.toLocaleDateString('vi-VN', { timeZone: 'Asia/Bangkok', dateStyle: 'long' })
-    : '';
+  return formatDateDDMMYYYY(value);
+}
+
+function progressColor(percent: number): string {
+  if (percent > 80) return '#16A34A';
+  if (percent >= 50) return colors.primary;
+  return '#DC2626';
+}
+
+function getInitials(name?: string): string {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function AddTaskIcon({ size = 18, color = colors.ink }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M9 4.5H7.2C5.98 4.5 5 5.48 5 6.7V18.3C5 19.52 5.98 20.5 7.2 20.5H12.5"
+        stroke={color}
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M15 4.5H16.8C18.02 4.5 19 5.48 19 6.7V11.5"
+        stroke={color}
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M9.5 3.25H14.5C15.05 3.25 15.5 3.7 15.5 4.25V5.75C15.5 6.3 15.05 6.75 14.5 6.75H9.5C8.95 6.75 8.5 6.3 8.5 5.75V4.25C8.5 3.7 8.95 3.25 9.5 3.25Z"
+        stroke={color}
+        strokeWidth="1.6"
+      />
+      <Path
+        d="M8.5 11H14.5M8.5 14.75H12"
+        stroke={color}
+        strokeWidth="1.65"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M17.5 14.25V20.25M14.5 17.25H20.5"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+function TaskItemIcon({ size = 18 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M6.2 3.75H14.4L18.5 7.85V18.1C18.5 19.3 17.55 20.25 16.35 20.25H6.2C5 20.25 4.05 19.3 4.05 18.1V5.9C4.05 4.7 5 3.75 6.2 3.75Z"
+        fill="#DBEAFE"
+        stroke="#1E7CE8"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M14.2 3.75V8.05H18.5"
+        fill="#FFFFFF"
+        stroke="#1E7CE8"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M7.6 11.5H13.6M7.6 15.2H11.4"
+        stroke="#1E7CE8"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <Circle cx="17.2" cy="17" r="4.3" fill="#FFFFFF" stroke="#1E7CE8" strokeWidth="1.5" />
+      <Path
+        d="M15.4 17.05L16.65 18.3L19.1 15.85"
+        stroke="#1E7CE8"
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function ReportProgressIcon({ size = 18, color = '#1E7CE8' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4.5 19.5H19.5"
+        stroke={color}
+        strokeWidth="1.65"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M7 16V12.5M12 16V9.5M17 16V6.5"
+        stroke={color}
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M14.5 6.5H17V9"
+        stroke={color}
+        strokeWidth="1.65"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function RequestHelpIcon({ size = 18, color = '#C74848' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="8.25" stroke={color} strokeWidth="1.65" />
+      <Circle cx="12" cy="12" r="3.6" stroke={color} strokeWidth="1.6" />
+      <Path
+        d="M6.2 6.2L9.4 9.4M14.6 14.6L17.8 17.8M17.8 6.2L14.6 9.4M9.4 14.6L6.2 17.8"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+function ResolveHelpIcon({ size = 18, color = '#16A34A' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="8.25" stroke={color} strokeWidth="1.65" />
+      <Path
+        d="M8.5 12.2L10.9 14.6L15.7 9.6"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function JoinHelpIcon({ size = 18, color = '#1E7CE8' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="9.5" cy="8" r="3.25" stroke={color} strokeWidth="1.65" />
+      <Path
+        d="M3.75 18.75C4.5 15.6 6.75 14 9.5 14C12.25 14 14.5 15.6 15.25 18.75"
+        stroke={color}
+        strokeWidth="1.65"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M18 10.5V15.5M15.5 13H20.5"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+function OnTimeIcon({ size = 12, color = '#15803D' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="8.5" stroke={color} strokeWidth="1.8" />
+      <Path
+        d="M8.5 12.2L10.9 14.6L15.8 9.6"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function LateDeadlineIcon({ size = 12, color = '#B91C1C' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12.5" r="8" stroke={color} strokeWidth="1.8" />
+      <Path d="M12 8.2V12.5L14.8 14.2" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M5.2 5.8L7.8 3.6M18.8 5.8L16.2 3.6" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function WithinEstimateIcon({ size = 12, color = colors.primary }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M7 4H17M7 20H17M8.5 4V7.2C8.5 8.8 10.1 10.1 12 11.5C13.9 10.1 15.5 8.8 15.5 7.2V4M8.5 20V16.8C8.5 15.2 10.1 13.9 12 12.5C13.9 13.9 15.5 15.2 15.5 16.8V20"
+        stroke={color}
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function OverEstimateIcon({ size = 12, color = '#B91C1C' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4.5 17.5L10 12L13.5 15.5L19.5 7.5"
+        stroke={color}
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M15.2 7.5H19.5V11.8"
+        stroke={color}
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function SosAlertIcon({ size = 14, color = '#B42318' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M6.5 18.5V13.5C6.5 10.46 8.96 8 12 8C15.04 8 17.5 10.46 17.5 13.5V18.5"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <Path d="M4.5 18.5H19.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <Path
+        d="M12 3.2V5.2M5.2 6.2L6.6 7.6M18.8 6.2L17.4 7.6M3.2 12.5H5M19 12.5H20.8"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
 }
 
 type DatePickerTarget = 'taskDue' | 'taskStart' | 'projectDue';
@@ -235,9 +487,10 @@ export function KanbanTasksPanel({
   const { user } = useAuth();
   const taskAudioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const permissions = user?.permissions ?? [];
+  const isManagerRole = ['admin', 'superadmin', 'manager', 'branch_owner'].includes(String(user?.role || '').toLowerCase());
   const hasPermission = (permission: string) => permissions.includes('*') || permissions.includes(permission);
-  const canReadWork = hasPermission('work:read');
-  const canManageTasks = hasPermission('work:manage');
+  const canReadWork = isManagerRole || hasPermission('work:read');
+  const canManageTasks = isManagerRole || hasPermission('work:manage');
   const currentUid = user?._id || user?.id || '';
 
   const [projects, setProjects] = useState<HrKanbanProject[]>([]);
@@ -251,7 +504,7 @@ export function KanbanTasksPanel({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | BoardStatus>('all');
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Monthly KPI state
   const currentMonthKey = useMemo(() => getTodayKey().slice(0, 7), []);
@@ -350,7 +603,7 @@ export function KanbanTasksPanel({
   }, [canReadWork, scopeFilter]);
 
   const toggleGroup = useCallback((groupId: string) => {
-    setCollapsedGroups((prev) => {
+    setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
@@ -928,12 +1181,19 @@ export function KanbanTasksPanel({
     [branchId],
   );
 
-  const renderTaskRow = (task: HrKanbanTask) => {
+  const renderTaskRow = (task: HrKanbanTask, index: number, list: HrKanbanTask[]) => {
     const st = getStatusMeta(task.status);
     const pr = getPriorityMeta(task.priority);
     const deadlineKpi = calculateTaskDeadlineKpi(task);
     const estProgress = calculateEstimatedTimeProgress(task);
     const progress = taskProgress(task);
+    const assigneeLabel = task.assignee || task.assigneeName || 'Chưa phân công';
+    const assigneeEmp = employees.find(
+      (emp) =>
+        (task.assigneeUid && (emp.uid === task.assigneeUid || emp._id === task.assigneeUid || emp.id === task.assigneeUid)) ||
+        (assigneeLabel !== 'Chưa phân công' && emp.displayName === assigneeLabel),
+    );
+    const assigneeAvatar = assigneeEmp?.photoURL?.trim() || '';
     const closed = task.status === 'Archived';
     const isActivityOwner = canManageTasks || task.assigneeUid === currentUid;
     const canJoinHelp = task.helpRequested
@@ -941,65 +1201,71 @@ export function KanbanTasksPanel({
       && (!task.requestedHelperUid || task.requestedHelperUid === currentUid)
       && task.assigneeUid !== currentUid
       && !task.helpers?.some((helper) => helper.uid === currentUid);
+    const isLast = index === list.length - 1;
     return (
       <Pressable
         key={task.id}
         onPress={canManageTasks ? () => openEditTask(task) : undefined}
-        style={styles.taskRow}
+        style={[styles.taskRow, isLast && styles.taskRowLast]}
       >
         <View style={styles.taskRowTop}>
-          <Text numberOfLines={2} style={styles.taskTitle}>
-            {task.title}
-          </Text>
-          {canManageTasks ? (
-            <Pressable
-              hitSlop={6}
-              onPress={() => void onQuickAdvanceStatus(task)}
-              style={[styles.statusBadge, { backgroundColor: st.tone }]}
-            >
-              <View style={styles.iconButtonContent}>
-                <Text style={[styles.statusBadgeText, { color: st.color }]}>{st.label}</Text>
-                <RefreshCw size={11} color={st.color} />
-              </View>
-            </Pressable>
-          ) : (
-            <View style={[styles.statusBadge, { backgroundColor: st.tone }]}>
-              <Text style={[styles.statusBadgeText, { color: st.color }]}>{st.label}</Text>
+          <View style={styles.taskTitleWrap}>
+            <View style={styles.taskIconWrap}>
+              <TaskItemIcon size={18} />
             </View>
-          )}
+            <Text numberOfLines={1} ellipsizeMode="tail" style={styles.taskTitle}>
+              {task.title}
+            </Text>
+          </View>
+          <View style={styles.taskAssigneeInline}>
+            {assigneeAvatar ? (
+              <Image source={{ uri: assigneeAvatar }} style={styles.taskAvatarImg} />
+            ) : (
+              <View style={styles.taskAvatarFallback}>
+                <Text style={styles.taskAvatarInitials}>{getInitials(assigneeLabel)}</Text>
+              </View>
+            )}
+            <Text numberOfLines={1} style={styles.taskAssigneeNameText}>{assigneeLabel}</Text>
+          </View>
         </View>
         <View style={styles.taskRowMeta}>
-          <View style={styles.taskMetaGroup}>
-            <UserRound size={12} color={colors.muted} />
-            <Text numberOfLines={1} style={styles.taskMetaText}>{task.assignee || task.assigneeName || 'Chưa phân công'}</Text>
-            {task.dueDate && task.dueDate !== 'Chưa cập nhật' ? (
-              <View style={styles.taskMetaGroup}>
-                <CalendarDays size={12} color={colors.muted} />
-                <Text style={styles.taskMetaText}>{task.dueDate.slice(0, 10)}</Text>
+          <View style={styles.taskBadgesRow}>
+            {canManageTasks ? (
+              <Pressable
+                hitSlop={6}
+                onPress={() => void onQuickAdvanceStatus(task)}
+                style={[styles.statusBadge, { backgroundColor: st.tone }]}
+              >
+                <Text style={[styles.statusBadgeText, { color: st.color }]}>{st.label}</Text>
+              </Pressable>
+            ) : (
+              <View style={[styles.statusBadge, { backgroundColor: st.tone }]}>
+                <Text style={[styles.statusBadgeText, { color: st.color }]}>{st.label}</Text>
               </View>
-            ) : null}
+            )}
+            <Text style={[styles.priorityTag, { color: pr.color, backgroundColor: pr.tone }]}>
+              {pr.label}
+            </Text>
           </View>
-          <Text style={[styles.priorityTag, { color: pr.color, backgroundColor: pr.tone }]}>
-            {pr.label}
-          </Text>
+          {task.dueDate && task.dueDate !== 'Chưa cập nhật' ? (
+            <View style={styles.taskDueWrap}>
+              <CalendarDays size={12} color={colors.muted} />
+              <Text numberOfLines={1} style={styles.taskDueText}>Hạn{'\u00A0'}{formatDateDDMMYYYY(task.dueDate)}</Text>
+            </View>
+          ) : null}
         </View>
         <View style={styles.taskProgressSummary}>
-          <View style={styles.progressLabelRow}>
-            <Text style={styles.taskProgressLabel}>Tiến độ</Text>
-            <Text style={styles.taskProgressPercent}>{progress}%</Text>
-          </View>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+            <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: progressColor(progress) }]} />
           </View>
           {task.progressNote ? <Text numberOfLines={2} style={styles.progressNote}>💬 {task.progressNote}</Text> : null}
         </View>
         {task.helpRequested ? (
           <View style={styles.helpNotice}>
-            <LifeBuoy size={13} color="#B42318" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.helpNoticeTitle}>Đang cần trợ giúp</Text>
-              {task.helpReason ? <Text style={styles.helpNoticeText}>{task.helpReason}</Text> : null}
-            </View>
+            <SosAlertIcon size={14} color="#B42318" />
+            <Text style={styles.helpNoticeText}>
+              Đang cần trợ giúp{task.helpReason ? `: ${task.helpReason}` : ''}
+            </Text>
           </View>
         ) : null}
         {task.helpers?.length ? (
@@ -1008,70 +1274,107 @@ export function KanbanTasksPanel({
             <Text style={styles.taskMetaText}>Người hỗ trợ: {task.helpers.map((helper) => helper.name).join(', ')}</Text>
           </View>
         ) : null}
-        {((isActivityOwner && !closed) || canJoinHelp) ? (
+        <View style={styles.taskFooterRow}>
           <View style={styles.taskActivityActions}>
             {isActivityOwner && !closed ? (
               <>
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Báo cáo tiến độ"
+                  hitSlop={6}
                   onPress={(event) => { event.stopPropagation(); openTaskActivity(task, 'progress'); }}
-                  style={styles.taskActivityBtn}
+                  style={({ pressed }) => [styles.taskActionLinkBtn, pressed && { opacity: 0.55 }]}
                 >
-                  <Sliders size={13} color={colors.primary} />
-                  <Text style={styles.taskActivityBtnText}>Báo cáo tiến độ</Text>
+                  <ReportProgressIcon size={15} />
+                  <Text style={styles.taskActionLinkBlue}>Tiến độ</Text>
                 </Pressable>
                 {!task.helpRequested && progress < 100 ? (
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Yêu cầu trợ giúp"
+                    hitSlop={6}
                     onPress={(event) => { event.stopPropagation(); openTaskActivity(task, 'help'); }}
-                    style={styles.taskHelpBtn}
+                    style={({ pressed }) => [styles.taskActionLinkBtn, pressed && { opacity: 0.55 }]}
                   >
-                    <LifeBuoy size={13} color="#B42318" />
-                    <Text style={styles.taskHelpBtnText}>Yêu cầu trợ giúp</Text>
+                    <RequestHelpIcon size={15} />
+                    <Text style={styles.taskActionLinkRed}>Trợ giúp</Text>
                   </Pressable>
                 ) : null}
                 {task.helpRequested ? (
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Đã giải quyết trợ giúp"
+                    hitSlop={6}
                     onPress={(event) => { event.stopPropagation(); void runTaskActivity(task, 'resolve'); }}
                     disabled={savingActivity}
-                    style={styles.taskResolveBtn}
+                    style={({ pressed }) => [styles.taskActionLinkBtn, pressed && { opacity: 0.55 }, savingActivity && styles.disabled]}
                   >
-                    <CheckCircle2 size={13} color="#16885A" />
-                    <Text style={styles.taskResolveBtnText}>Đã giải quyết</Text>
+                    <ResolveHelpIcon size={15} />
+                    <Text style={styles.taskActionLinkGreen}>Đã xong</Text>
                   </Pressable>
                 ) : null}
               </>
             ) : null}
             {canJoinHelp ? (
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Tham gia hỗ trợ"
+                hitSlop={6}
                 onPress={(event) => { event.stopPropagation(); void runTaskActivity(task, 'join'); }}
                 disabled={savingActivity}
-                style={styles.taskJoinBtn}
+                style={({ pressed }) => [styles.taskActionLinkBtn, pressed && { opacity: 0.55 }, savingActivity && styles.disabled]}
               >
-                <UserPlus size={13} color={colors.white} />
-                <Text style={styles.taskJoinBtnText}>Tham gia hỗ trợ</Text>
+                <JoinHelpIcon size={15} />
+                <Text style={styles.taskActionLinkBlue}>Hỗ trợ</Text>
               </Pressable>
             ) : null}
           </View>
-        ) : null}
-        {deadlineKpi || estProgress || (task.salesKpiTarget && task.salesKpiTarget > 0) ? (
-          <View style={styles.kpiTagRow}>
-            {deadlineKpi ? (
-              <View style={[styles.kpiTagBox, deadlineKpi.status === 'ontime' ? styles.kpiTagOk : styles.kpiTagLate]}>
-                {deadlineKpi.status === 'ontime' ? <Check size={11} color="#15803D" /> : <AlertTriangle size={11} color="#B91C1C" />}
-                <Text style={[styles.kpiTag, deadlineKpi.status === 'ontime' ? styles.kpiTagOkText : styles.kpiTagLateText]}>{deadlineKpi.text}</Text>
-              </View>
-            ) : null}
-            {estProgress ? (
-              <View style={[styles.kpiTagBox, estProgress.status === 'within' ? styles.kpiTagInfo : styles.kpiTagLate]}>
-                {estProgress.status === 'within' ? <Clock3 size={11} color={colors.primary} /> : <AlertTriangle size={11} color="#B91C1C" />}
-                <Text style={[styles.kpiTag, estProgress.status === 'within' ? styles.kpiTagInfoText : styles.kpiTagLateText]}>{estProgress.text}</Text>
-              </View>
-            ) : null}
+          <View style={styles.taskFooterRight}>
             {task.salesKpiTarget && task.salesKpiTarget > 0 ? (
-              <View style={[styles.kpiTagBox, styles.kpiTagInfo]}>
-                <Target size={11} color={colors.primary} />
-                <Text style={[styles.kpiTag, styles.kpiTagInfoText]}>{formatCompactMoney(task.salesKpiTarget)}</Text>
+              <View style={styles.salesKpiInlineWrap}>
+                <Target size={12} color={colors.primary} />
+                <Text numberOfLines={1} style={styles.salesKpiInlineText}>
+                  {formatCompactMoney(task.salesKpiTarget)}
+                </Text>
               </View>
             ) : null}
+            {canManageTasks ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Sửa công việc ${task.title}`}
+                  hitSlop={6}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    openEditTask(task);
+                  }}
+                  style={({ pressed }) => [styles.tinyIconBtn, pressed && { opacity: 0.55 }]}
+                >
+                  <Pencil size={14} strokeWidth={1.65} color={colors.ink} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Xóa công việc ${task.title}`}
+                  hitSlop={6}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    onDeleteTask(task);
+                  }}
+                  style={({ pressed }) => [styles.tinyIconBtn, pressed && { opacity: 0.55 }]}
+                >
+                  <Trash2 size={14} strokeWidth={1.65} color="#C74848" />
+                </Pressable>
+              </>
+            ) : null}
+            <Text style={[styles.taskProgressPercent, { color: progressColor(progress) }]}>{progress}%</Text>
+          </View>
+        </View>
+        {deadlineKpi ? (
+          <View style={styles.kpiTagRow}>
+            <View style={[styles.kpiTagBox, deadlineKpi.status === 'ontime' ? styles.kpiTagOk : styles.kpiTagLate]}>
+              {deadlineKpi.status === 'ontime' ? <OnTimeIcon size={12} /> : <LateDeadlineIcon size={12} />}
+              <Text style={[styles.kpiTag, deadlineKpi.status === 'ontime' ? styles.kpiTagOkText : styles.kpiTagLateText]}>{deadlineKpi.text}</Text>
+            </View>
           </View>
         ) : null}
       </Pressable>
@@ -1105,8 +1408,28 @@ export function KanbanTasksPanel({
           style={styles.search}
         />
         {canManageTasks ? (
-          <Pressable onPress={openCreateProject} style={styles.secondaryActionBtn}>
-            <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.secondaryActionText}>Dự án</Text></View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tạo dự án mới"
+            onPress={openCreateProject}
+            style={({ pressed }) => [styles.addProjectIconBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Svg width={21} height={21} viewBox="0 0 24 24" fill="none">
+              <Path
+                d="M3.5 6.8C3.5 5.55 4.5 4.5 5.8 4.5H9.4C10.1 4.5 10.75 4.82 11.18 5.38L12.1 6.6H18.2C19.5 6.6 20.5 7.62 20.5 8.9V17.2C20.5 18.48 19.5 19.5 18.2 19.5H5.8C4.5 19.5 3.5 18.48 3.5 17.2V6.8Z"
+                fill="#DBEAFE"
+                stroke="#1E7CE8"
+                strokeWidth="1.65"
+                strokeLinejoin="round"
+              />
+              <Circle cx="17.5" cy="17" r="4.6" fill="#FFFFFF" stroke="#1E7CE8" strokeWidth="1.5" />
+              <Path
+                d="M17.5 14.9V19.1M15.4 17H19.6"
+                stroke="#1E7CE8"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+              />
+            </Svg>
           </Pressable>
         ) : null}
       </View>
@@ -1140,12 +1463,7 @@ export function KanbanTasksPanel({
         <View style={styles.kpiWrap}>
           {/* Month selector bar */}
           <Card style={styles.kpiBar}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.groupTitle}>KPI công việc theo tháng</Text>
-              <Text style={styles.groupSub}>
-                {kpiReport?.periodStatus === 'closed' ? 'Đã chốt kỳ KPI' : 'Số liệu tạm tính trong kỳ'}
-              </Text>
-            </View>
+            <Text style={styles.groupTitle}>KPI</Text>
             <View style={styles.monthNav}>
               <Pressable
                 onPress={() => setKpiPeriod((p) => shiftMonth(p, -1))}
@@ -1191,32 +1509,9 @@ export function KanbanTasksPanel({
               const visibleRows = q
                 ? kpiReport.rows.filter((r) => r.employeeName.toLowerCase().includes(q))
                 : kpiReport.rows;
-              const totalAll = visibleRows.reduce((s, r) => s + r.totalTasks, 0);
-              const doneAll = visibleRows.reduce((s, r) => s + r.completedTasks, 0);
-              const pendingAll = visibleRows.reduce((s, r) => s + r.pendingTasks, 0);
-              const avgPct = totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
 
               return (
                 <>
-                  <View style={styles.kpiSummaryRow}>
-                    <Card style={styles.kpiSummaryBox}>
-                      <Text style={styles.kpiSummaryVal}>{totalAll}</Text>
-                      <Text style={styles.groupSub}>Tổng việc</Text>
-                    </Card>
-                    <Card style={styles.kpiSummaryBox}>
-                      <Text style={[styles.kpiSummaryVal, { color: '#16885A' }]}>{doneAll}</Text>
-                      <Text style={styles.groupSub}>Đạt KPI</Text>
-                    </Card>
-                    <Card style={styles.kpiSummaryBox}>
-                      <Text style={[styles.kpiSummaryVal, { color: '#C27617' }]}>{pendingAll}</Text>
-                      <Text style={styles.groupSub}>Chưa đạt</Text>
-                    </Card>
-                    <Card style={styles.kpiSummaryBox}>
-                      <Text style={[styles.kpiSummaryVal, { color: colors.primary }]}>{avgPct}%</Text>
-                      <Text style={styles.groupSub}>Tỷ lệ chung</Text>
-                    </Card>
-                  </View>
-
                   <View style={styles.kpiList}>
                     {!visibleRows.length ? (
                       <View style={styles.stateCard}>
@@ -1239,7 +1534,7 @@ export function KanbanTasksPanel({
                             <Text numberOfLines={1} style={styles.groupTitle}>
                               {row.employeeName}
                             </Text>
-                            <Text style={[styles.kpiPctText, { color: pctColor }]}>
+                            <Text style={[styles.kpiPctText, pct == null && styles.kpiEmptyText, { color: pctColor }]}>
                               {pct == null ? 'Chưa có việc' : `${pct}%`}
                             </Text>
                           </View>
@@ -1326,50 +1621,58 @@ export function KanbanTasksPanel({
           ) : null}
           {scopeFilter !== 'no_project'
             ? projectGroups.map(({ project, tasks: projTasks, totalCount, doneCount, progress }) => {
-                const collapsed = collapsedGroups.has(project.id);
+                const expanded = expandedGroups.has(project.id);
                 return (
                   <View key={project.id} style={styles.groupCard}>
                     <Pressable
                       onPress={() => toggleGroup(project.id)}
                       style={styles.groupHeader}
                     >
-                      <View style={styles.folderIcon}>
-                        <Folder size={16} color={colors.primary} />
-                      </View>
-                      <View style={{ flex: 1 }}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
                         <Text numberOfLines={1} style={styles.groupTitle}>
                           {project.name}
                         </Text>
-                        <Text style={styles.groupSub}>
-                          {doneCount}/{totalCount} hoàn thành ({progress}%)
-                          {project.dueAt ? ` · Hạn ${project.dueAt.slice(0, 10)}` : ''}
+                        {project.dueAt ? (
+                          <Text numberOfLines={1} style={styles.groupSubDue}>
+                            Hạn{'\u00A0'}{formatDateDDMMYYYY(project.dueAt)}
+                          </Text>
+                        ) : null}
+                        <Text numberOfLines={1} style={styles.groupSubDue}>
+                          Số công việc: {doneCount}/{totalCount}{' '}
+                          <Text style={{ color: progressColor(progress), fontWeight: '400' }}>({progress}%)</Text>
                         </Text>
                         <View style={styles.progressTrack}>
-                          <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                          <View style={[styles.progressFill, { width: `${progress}%`, backgroundColor: progressColor(progress) }]} />
                         </View>
                       </View>
                       <View style={styles.groupHeaderRight}>
-                        {canManageTasks ? <Pressable
-                          hitSlop={6}
-                          onPress={() => openCreateTask(project.id)}
-                          style={styles.tinyAddBtn}
-                        >
-                          <View style={styles.iconButtonContent}><Plus size={11} color={colors.primary} /><Text style={styles.tinyAddText}>Việc</Text></View>
-                        </Pressable> : null}
                         {canManageTasks ? (
                           <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Thêm công việc vào dự án"
                             hitSlop={6}
-                            onPress={() => openEditProject(project)}
-                            style={styles.tinyIconBtn}
+                            onPress={() => openCreateTask(project.id)}
+                            style={({ pressed }) => [styles.tinyIconBtn, pressed && { opacity: 0.55 }]}
                           >
-                            <Pencil size={13} color={colors.muted} />
+                            <AddTaskIcon size={18} color={colors.ink} />
                           </Pressable>
                         ) : null}
-                        {collapsed ? <ChevronDown size={15} color={colors.muted} /> : <ChevronUp size={15} color={colors.muted} />}
+                        {canManageTasks ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Sửa dự án"
+                            hitSlop={6}
+                            onPress={() => openEditProject(project)}
+                            style={({ pressed }) => [styles.tinyIconBtn, pressed && { opacity: 0.55 }]}
+                          >
+                            <Pencil size={15} strokeWidth={1.65} color={colors.ink} />
+                          </Pressable>
+                        ) : null}
+                        {expanded ? <ChevronUp size={15} color={colors.muted} /> : <ChevronDown size={15} color={colors.muted} />}
                       </View>
                     </Pressable>
 
-                    {!collapsed ? (
+                    {expanded ? (
                       <View style={styles.groupBody}>
                         {projTasks.length > 0 ? (
                           projTasks.map(renderTaskRow)
@@ -1392,9 +1695,6 @@ export function KanbanTasksPanel({
                 onPress={() => toggleGroup('__UNASSIGNED__')}
                 style={styles.groupHeader}
               >
-                <View style={[styles.folderIcon, { backgroundColor: '#F1F5F9' }]}>
-                  <FolderOpen size={16} color={colors.muted} />
-                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.groupTitle}>{canReadWork ? 'Công việc không thuộc dự án' : 'Việc của tôi'}</Text>
                   <Text style={styles.groupSub}>
@@ -1402,18 +1702,22 @@ export function KanbanTasksPanel({
                   </Text>
                 </View>
                 <View style={styles.groupHeaderRight}>
-                  {canManageTasks ? <Pressable
-                    hitSlop={6}
-                    onPress={() => openCreateTask('')}
-                    style={styles.tinyAddBtn}
-                  >
-                    <View style={styles.iconButtonContent}><Plus size={11} color={colors.primary} /><Text style={styles.tinyAddText}>Việc</Text></View>
-                  </Pressable> : null}
-                  {collapsedGroups.has('__UNASSIGNED__') ? <ChevronDown size={15} color={colors.muted} /> : <ChevronUp size={15} color={colors.muted} />}
+                  {canManageTasks ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Thêm công việc độc lập"
+                      hitSlop={6}
+                      onPress={() => openCreateTask('')}
+                      style={({ pressed }) => [styles.tinyIconBtn, pressed && { opacity: 0.55 }]}
+                    >
+                      <AddTaskIcon size={18} color={colors.ink} />
+                    </Pressable>
+                  ) : null}
+                  {expandedGroups.has('__UNASSIGNED__') ? <ChevronUp size={15} color={colors.muted} /> : <ChevronDown size={15} color={colors.muted} />}
                 </View>
               </Pressable>
 
-              {!collapsedGroups.has('__UNASSIGNED__') ? (
+              {expandedGroups.has('__UNASSIGNED__') ? (
                 <View style={styles.groupBody}>
                   {unassignedTasks.length > 0 ? (
                     unassignedTasks.map(renderTaskRow)
@@ -1863,6 +2167,16 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: colors.white, fontSize: 12.5, fontWeight: '600' },
   iconButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   secondaryActionBtn: { ...HAIRLINE_CARD, minHeight: 40, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center' },
+  addProjectIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DCE5F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   secondaryActionText: { color: colors.primary, fontSize: 12, fontWeight: '600' },
   scopeBar: { flexDirection: 'row', backgroundColor: '#EAF1FA', borderRadius: 10, padding: 3, gap: 3, marginBottom: 10 },
   scopeBtn: { flex: 1, paddingVertical: 7.5, borderRadius: 8, alignItems: 'center' },
@@ -1880,24 +2194,23 @@ const styles = StyleSheet.create({
   errorText: { color: '#B91C1C', fontSize: 12.5, textAlign: 'center' },
   groupsWrap: {
     marginHorizontal: -14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: '#EEF2F7',
     gap: 0,
   },
   groupCard: {
     backgroundColor: colors.white,
     borderRadius: 0,
     borderWidth: 0,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#EEF2F7',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8EDF2',
     overflow: 'hidden',
   },
   groupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 13,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     gap: 10,
-    backgroundColor: '#FAFBFD',
+    backgroundColor: colors.white,
   },
   folderIcon: {
     width: 34,
@@ -1911,39 +2224,100 @@ const styles = StyleSheet.create({
   groupSub: { color: '#6B7280', fontSize: 11.5, fontWeight: '400', marginTop: 2 },
   progressTrack: { height: 5, borderRadius: 99, backgroundColor: '#E8EDF4', marginTop: 6, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: '#16885A', borderRadius: 99 },
-  groupHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  groupHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   tinyAddBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8 },
   tinyAddText: { color: colors.primary, fontSize: 11, fontWeight: '600' },
-  tinyIconBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  tinyIconBtn: { width: 24, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   tinyIconText: { color: '#374151', fontSize: 12, fontWeight: '600' },
   caret: { color: '#6B7280', fontSize: 14, fontWeight: '600', paddingHorizontal: 2 },
   groupBody: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EDF2F8' },
   emptyGroupText: { color: '#6B7280', fontSize: 12, textAlign: 'center', paddingVertical: 14 },
+  taskTimelineWrap: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: colors.white,
+    paddingLeft: 14,
+  },
+  taskTimelineRail: {
+    width: 24,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  taskTimelineLine: {
+    flex: 1,
+    width: 1.5,
+    backgroundColor: '#93C5FD',
+  },
+  taskTimelineLineHidden: {
+    opacity: 0,
+  },
+  taskStepCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  taskStepNum: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '600',
+  },
   taskRow: {
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#EDF2F8',
+    paddingLeft: 28,
+    paddingRight: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DCE3EC',
+    backgroundColor: colors.white,
     gap: 6,
   },
-  taskRowTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
+  taskRowLast: {
+    borderBottomWidth: 0,
+  },
+  taskRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  taskTitleWrap: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 },
+  taskIconWrap: { flexShrink: 0 },
   taskTitle: { color: '#111827', fontSize: 13.5, fontWeight: '500', flex: 1, lineHeight: 19 },
+  taskAssigneeInline: { flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: '42%', flexShrink: 0 },
+  taskAssigneeNameText: { color: '#6B7280', fontSize: 11.5, flexShrink: 1 },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 8 },
-  statusBadgeText: { fontSize: 10.5, fontWeight: '500' },
+  statusBadgeText: { fontSize: 10.5, fontWeight: '400' },
   taskRowMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  taskMetaGroup: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
-  taskMetaText: { color: '#6B7280', fontSize: 11.5, flex: 1 },
-  priorityTag: { fontSize: 10, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 8, overflow: 'hidden' },
+  taskMetaGroup: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
+  taskAssigneeWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
+  taskAvatarImg: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#E8EDF4' },
+  taskAvatarFallback: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#EAF2FF', alignItems: 'center', justifyContent: 'center' },
+  taskAvatarInitials: { color: colors.primary, fontSize: 9, fontWeight: '600' },
+  taskBadgesRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: 1 },
+  taskDueWrap: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
+  taskMetaText: { color: '#6B7280', fontSize: 11.5, flexShrink: 1 },
+  taskDueText: { color: '#6B7280', fontSize: 11.5, flexShrink: 0 },
+  groupSubRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 2 },
+  groupTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  groupPercent: { color: colors.primary, fontSize: 12, fontWeight: '600', flexShrink: 0 },
+  groupSubDue: { color: '#6B7280', fontSize: 11.5, flexShrink: 0, marginTop: 2 },
+  priorityTag: { fontSize: 10, fontWeight: '400', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 8, overflow: 'hidden' },
   taskProgressSummary: { gap: 2, marginTop: 1 },
   progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   taskProgressLabel: { color: '#6B7280', fontSize: 10.5, fontWeight: '500' },
-  taskProgressPercent: { color: colors.primary, fontSize: 11, fontWeight: '600' },
+  taskProgressPercent: { color: colors.primary, fontSize: 11.5, fontWeight: '400' },
   progressNote: { color: '#6B7280', fontSize: 10.5, lineHeight: 15, marginTop: 2 },
-  helpNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, padding: 10, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#FECACA', backgroundColor: '#FFF1F0' },
-  helpNoticeTitle: { color: '#B42318', fontSize: 11, fontWeight: '600' },
-  helpNoticeText: { color: '#7F1D1D', fontSize: 11, lineHeight: 16, marginTop: 2 },
+  helpNotice: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
+  helpNoticeTitle: { color: '#B42318', fontSize: 11.5, fontWeight: '400' },
+  helpNoticeText: { color: '#B42318', fontSize: 11.5, fontWeight: '400', lineHeight: 16, flex: 1 },
   helpersLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  taskActivityActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  taskFooterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 },
+  taskFooterRight: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
+  salesKpiInlineWrap: { flexDirection: 'row', alignItems: 'center', gap: 3, marginRight: 2 },
+  salesKpiInlineText: { color: colors.primary, fontSize: 11, fontWeight: '400' },
+  taskActivityActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, flex: 1 },
+  taskActionIconBtn: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  taskActionLinkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
+  taskActionLinkBlue: { color: '#1E7CE8', fontSize: 11.5, fontWeight: '400' },
+  taskActionLinkRed: { color: '#C74848', fontSize: 11.5, fontWeight: '400' },
+  taskActionLinkGreen: { color: '#16A34A', fontSize: 11.5, fontWeight: '400' },
   taskActivityBtn: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#EAF2FF' },
   taskActivityBtnText: { color: colors.primary, fontSize: 10.5, fontWeight: '600' },
   taskHelpBtn: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#FFF1F0' },
@@ -1952,9 +2326,9 @@ const styles = StyleSheet.create({
   taskResolveBtnText: { color: '#16885A', fontSize: 10.5, fontWeight: '600' },
   taskJoinBtn: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#B42318' },
   taskJoinBtnText: { color: colors.white, fontSize: 10.5, fontWeight: '600' },
-  kpiTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 },
+  kpiTagRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 5, marginTop: 2 },
   kpiTagBox: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
-  kpiTag: { fontSize: 10, fontWeight: '500' },
+  kpiTag: { fontSize: 10, fontWeight: '400' },
   kpiTagOk: { backgroundColor: '#DCFCE7' },
   kpiTagOkText: { color: '#15803D' },
   kpiTagLate: { backgroundColor: '#FEE2E2' },
@@ -1965,14 +2339,11 @@ const styles = StyleSheet.create({
   // Monthly KPI
   kpiWrap: { gap: 9 },
   kpiBar: { ...HAIRLINE_CARD, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, gap: 10 },
-  monthNav: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  monthBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#F5F8FD', alignItems: 'center', justifyContent: 'center' },
+  monthNav: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  monthBtn: { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   monthBtnText: { color: '#111827', fontSize: 16, fontWeight: '600', lineHeight: 18 },
-  monthLabelBox: { paddingHorizontal: 10, height: 30, borderRadius: 8, backgroundColor: '#EAF2FF', alignItems: 'center', justifyContent: 'center' },
-  monthLabelText: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
-  kpiSummaryRow: { flexDirection: 'row', gap: 8 },
-  kpiSummaryBox: { ...HAIRLINE_CARD, flex: 1, paddingVertical: 11, paddingHorizontal: 6, alignItems: 'center' },
-  kpiSummaryVal: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  monthLabelBox: { paddingHorizontal: 6, height: 30, alignItems: 'center', justifyContent: 'center' },
+  monthLabelText: { color: '#111827', fontSize: 13, fontWeight: '400' },
   kpiList: {
     marginHorizontal: -14,
     backgroundColor: colors.white,
@@ -1995,6 +2366,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   kpiPctText: { fontSize: 14, fontWeight: '600' },
+  kpiEmptyText: { fontSize: 12.5, fontWeight: '400' },
   kpiRowMetrics: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
   kpiMetricText: { color: '#6B7280', fontSize: 11, fontWeight: '500' },
 

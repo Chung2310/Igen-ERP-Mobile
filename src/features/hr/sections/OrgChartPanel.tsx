@@ -851,12 +851,6 @@ export function OrgChartPanel({
             onPress={() => {}}
           >
             <View style={styles.deptSheetHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>Lọc theo phòng ban</Text>
-              <Pressable onPress={() => setDeptFilterOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
               {departmentOptions.map((dept) => {
                 const selected = filterDepartment === dept;
@@ -1049,18 +1043,6 @@ export function OrgChartPanel({
                     onPress={() => {}}
                   >
                     <View style={styles.deptSheetHandle} />
-                    <View style={styles.modalHeader}>
-                      <Text style={styles.sheetTitle}>
-                        {formPicker === 'editDepartment'
-                          ? 'Chọn phòng ban'
-                          : formPicker === 'editDivision'
-                            ? 'Chọn khối chức năng'
-                            : 'Chọn quản lý trực tiếp'}
-                      </Text>
-                      <Pressable onPress={() => setFormPicker(null)} hitSlop={8}>
-                        <Text style={styles.closeText}>Đóng</Text>
-                      </Pressable>
-                    </View>
                     <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
                       {formPicker === 'editDepartment' ? (
                         <>
@@ -1394,14 +1376,6 @@ export function OrgChartPanel({
                 onPress={() => {}}
               >
                 <View style={styles.deptSheetHandle} />
-                <View style={styles.modalHeader}>
-                  <Text style={styles.sheetTitle}>
-                    {formPicker === 'addDepartment' ? 'Chọn phòng ban' : 'Chọn quản lý trực tiếp'}
-                  </Text>
-                  <Pressable onPress={() => setFormPicker(null)} hitSlop={8}>
-                    <Text style={styles.closeText}>Đóng</Text>
-                  </Pressable>
-                </View>
                 <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
                   {formPicker === 'addDepartment' ? (
                     <>

@@ -74,7 +74,7 @@ export function ModuleSectionSwitcher<T extends string>({
             pressed && styles.navBtnPressed,
           ]}
         >
-          <ChevronLeft size={18} color={colors.ink} />
+          <ChevronLeft size={15} color={colors.ink} />
         </Pressable>
 
         <Pressable
@@ -88,17 +88,12 @@ export function ModuleSectionSwitcher<T extends string>({
           ]}
         >
           <View style={styles.titleRow}>
-            {activeItem.renderIcon(24)}
+            {activeItem.renderIcon(22)}
             <Text numberOfLines={1} style={styles.title}>
               {activeItem.label}
             </Text>
-            {canSwitch ? <ChevronDown size={15} color={colors.muted} /> : null}
+            {canSwitch ? <ChevronDown size={13} color={colors.muted} /> : null}
           </View>
-          {activeItem.subtitle ? (
-            <Text numberOfLines={1} style={styles.subtitle}>
-              {activeItem.subtitle}
-            </Text>
-          ) : null}
         </Pressable>
 
         <Pressable
@@ -112,7 +107,7 @@ export function ModuleSectionSwitcher<T extends string>({
             pressed && styles.navBtnPressed,
           ]}
         >
-          <ChevronRight size={18} color={colors.ink} />
+          <ChevronRight size={15} color={colors.ink} />
         </Pressable>
       </View>
 
@@ -125,12 +120,6 @@ export function ModuleSectionSwitcher<T extends string>({
         <Pressable style={styles.modalBackdrop} onPress={() => setOpen(false)}>
           <Pressable style={styles.modalSheet} onPress={() => {}}>
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{modalTitle}</Text>
-              <Pressable onPress={() => setOpen(false)} hitSlop={8}>
-                <Text style={styles.modalClose}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {items.map((item) => {
                 const active = item.key === activeItem.key;
@@ -170,12 +159,12 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5EAF2',
     paddingHorizontal: 6,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   navBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F5F8FD',

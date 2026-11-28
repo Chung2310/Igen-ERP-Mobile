@@ -26,7 +26,7 @@ import {
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
 import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
-import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { FullScreenFormModal, SlideInPage } from '@/components/FullScreenFormModal';
 import {
   HrFormCustomRow,
   HrFormInputRow,
@@ -538,7 +538,7 @@ export function HrRecruitmentPanel({
         setApplicants((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
         setSelectedApp(updated);
         setTransitionNote('');
-        void listRecruitmentApplicantHistory(updated.id).then(setAppHistory).catch(() => {});
+        void listRecruitmentApplicantHistory(updated.id).then(setAppHistory).catch(() => { });
         Alert.alert('Đã chuyển vòng', `Ứng viên đã chuyển sang "${stageMap.get(stageId)?.name || stageId}".`);
       } catch (err) {
         Alert.alert('Lỗi chuyển vòng', err instanceof Error ? err.message : 'Vui lòng thử lại.');
@@ -660,6 +660,7 @@ export function HrRecruitmentPanel({
     const ivApp = appMap.get(selectedInterview.applicantId);
     const ivJob = jobMap.get(selectedInterview.jobId);
     return (
+      <SlideInPage key={selectedInterview.id}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.detailHeader}>
           <Pressable onPress={() => setSelectedInterview(null)} style={styles.backBtn}>
@@ -832,6 +833,7 @@ export function HrRecruitmentPanel({
           )}
         </Card>
       </ScrollView>
+      </SlideInPage>
     );
   }
 
@@ -842,6 +844,7 @@ export function HrRecruitmentPanel({
     const linkedInterviews = interviews.filter((iv) => iv.applicantId === selectedApp.id);
 
     return (
+      <SlideInPage key={selectedApp.id}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.detailHeader}>
           <Pressable onPress={() => setSelectedApp(null)} style={styles.backBtn}>
@@ -1055,6 +1058,7 @@ export function HrRecruitmentPanel({
 
         {renderApplicantModal()}
       </ScrollView>
+      </SlideInPage>
     );
   }
 
@@ -1129,546 +1133,546 @@ export function HrRecruitmentPanel({
 
   return (
     <View style={{ flex: 1 }}>
-    <ScrollView
-      contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            void load(true);
-          }}
-          tintColor={colors.primary}
-          colors={[colors.primary]}
-        />
-      }
-    >
-      {/* 3 Sub-tabs matching web RecruitmentTab */}
-      <View style={styles.segmentRow}>
-        {(
-          [
-            { key: 'jobs', label: `Tin (${jobs.length})`, Icon: BriefcaseBusiness },
-            { key: 'applicants', label: `Ứng viên (${applicants.length})`, Icon: Users },
-            { key: 'interviews', label: `Phỏng vấn (${interviews.length})`, Icon: CalendarClock },
-          ] as const
-        ).map(({ key, label, Icon }) => {
-          const active = view === key;
-          return (
-            <Pressable
-              key={key}
-              onPress={() => setView(key)}
-              style={[styles.segmentBtn, active && styles.segmentBtnActive]}
-            >
-              <Icon size={12} color={active ? colors.primary : colors.muted} />
-              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Filter trigger matching Employee Directory "Tất cả phòng ban" */}
-      {view === 'jobs' || (view === 'applicants' && stages.length > 0) || view === 'interviews' ? (
-        <View style={styles.filterTopBar}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setFilterSheetOpen(true)}
-            style={({ pressed }) => [styles.filterTriggerBtn, pressed && { opacity: 0.65 }]}
-          >
-            {view === 'jobs' ? (
-              <BriefcaseBusiness size={17} strokeWidth={1.6} color={colors.ink} />
-            ) : view === 'applicants' ? (
-              <Users size={17} strokeWidth={1.6} color={colors.ink} />
-            ) : (
-              <CalendarClock size={17} strokeWidth={1.6} color={colors.ink} />
-            )}
-            <Text numberOfLines={1} style={styles.filterTriggerText}>
-              {view === 'jobs'
-                ? jobStatusFilter
-                  ? JOB_STATUS_LABELS[jobStatusFilter] || jobStatusFilter
-                  : 'Tất cả trạng thái'
-                : view === 'applicants'
-                  ? stageFilter
-                    ? stageMap.get(stageFilter)?.name || 'Tất cả vòng'
-                    : 'Tất cả vòng'
-                  : ivStatusFilter
-                    ? INTERVIEW_STATUS_LABELS[ivStatusFilter as keyof typeof INTERVIEW_STATUS_LABELS] || ivStatusFilter
-                    : 'Tất cả trạng thái'}
-            </Text>
-            <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
-          </Pressable>
-        </View>
-      ) : null}
-
-      {/* Search */}
-      {view !== 'interviews' ? (
-        <View style={styles.searchRow}>
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder={view === 'jobs' ? 'Tìm tin tuyển dụng...' : 'Tìm ứng viên, email, SĐT...'}
-            placeholderTextColor="#94A3B8"
-            style={styles.searchField}
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              void load(true);
+            }}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
+        }
+      >
+        {/* 3 Sub-tabs matching web RecruitmentTab */}
+        <View style={styles.segmentRow}>
+          {(
+            [
+              { key: 'jobs', label: `Tin (${jobs.length})`, Icon: BriefcaseBusiness },
+              { key: 'applicants', label: `Ứng viên (${applicants.length})`, Icon: Users },
+              { key: 'interviews', label: `Phỏng vấn (${interviews.length})`, Icon: CalendarClock },
+            ] as const
+          ).map(({ key, label, Icon }) => {
+            const active = view === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => setView(key)}
+                style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+              >
+                <Icon size={12} color={active ? colors.primary : colors.muted} />
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
-      ) : null}
 
-      {loading ? (
-        <Card style={styles.stateCard}>
-          <ActivityIndicator size="small" color={colors.primary} />
-        </Card>
-      ) : error ? (
-        <Card style={styles.stateCard}>
-          <PopupError error={error} />
-          <Pressable onPress={() => void load()} style={styles.primaryBtn}>
-            <Text style={styles.primaryBtnText}>Thử lại</Text>
-          </Pressable>
-        </Card>
-      ) : view === 'jobs' ? (
-        !filteredJobs.length ? (
-          <View style={styles.stateCard}>
-            <IgenHrEmptyState message="Chưa có tin tuyển dụng phù hợp." />
+        {/* Filter trigger matching Employee Directory "Tất cả phòng ban" */}
+        {view === 'jobs' || (view === 'applicants' && stages.length > 0) || view === 'interviews' ? (
+          <View style={styles.filterTopBar}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setFilterSheetOpen(true)}
+              style={({ pressed }) => [styles.filterTriggerBtn, pressed && { opacity: 0.65 }]}
+            >
+              {view === 'jobs' ? (
+                <BriefcaseBusiness size={17} strokeWidth={1.6} color={colors.ink} />
+              ) : view === 'applicants' ? (
+                <Users size={17} strokeWidth={1.6} color={colors.ink} />
+              ) : (
+                <CalendarClock size={17} strokeWidth={1.6} color={colors.ink} />
+              )}
+              <Text numberOfLines={1} style={styles.filterTriggerText}>
+                {view === 'jobs'
+                  ? jobStatusFilter
+                    ? JOB_STATUS_LABELS[jobStatusFilter] || jobStatusFilter
+                    : 'Tất cả trạng thái'
+                  : view === 'applicants'
+                    ? stageFilter
+                      ? stageMap.get(stageFilter)?.name || 'Tất cả vòng'
+                      : 'Tất cả vòng'
+                    : ivStatusFilter
+                      ? INTERVIEW_STATUS_LABELS[ivStatusFilter as keyof typeof INTERVIEW_STATUS_LABELS] || ivStatusFilter
+                      : 'Tất cả trạng thái'}
+              </Text>
+              <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
+            </Pressable>
           </View>
-        ) : (
-          <View style={styles.list}>
-            {filteredJobs.map((job) => (
-              <Card key={job.id} onPress={() => setSelectedJob(job)} style={styles.listItem}>
-                <View style={styles.headRow}>
-                  <Text numberOfLines={2} style={[styles.rowTitle, { flex: 1 }]}>
-                    {job.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.badge,
-                      job.status === 'open' && styles.badgeGreen,
-                      job.status === 'closed' && styles.badgeGray,
-                    ]}
-                  >
-                    {JOB_STATUS_LABELS[job.status || 'open'] || job.status}
-                  </Text>
-                </View>
-                <Text style={styles.subMeta}>
-                  {job.department || 'Chung'} · {job.location || 'Văn phòng'}
-                  {job.workplaceType ? ` · ${WORKPLACE_LABELS[job.workplaceType]}` : ''}
-                </Text>
-                <Text style={styles.subMeta}>
-                  Số lượng: {job.headcount ?? 1}
-                  {job.showSalary && (job.salaryMin || job.salaryMax)
-                    ? ` · Lương: ${formatCompactMoney(job.salaryMin ?? 0)}–${formatCompactMoney(job.salaryMax ?? 0)}`
-                    : ''}
-                </Text>
-              </Card>
-            ))}
+        ) : null}
+
+        {/* Search */}
+        {view !== 'interviews' ? (
+          <View style={styles.searchRow}>
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder={view === 'jobs' ? 'Tìm tin tuyển dụng...' : 'Tìm ứng viên, email, SĐT...'}
+              placeholderTextColor="#94A3B8"
+              style={styles.searchField}
+            />
           </View>
-        )
-      ) : view === 'applicants' ? (
-        !filteredApplicants.length ? (
-          <View style={styles.stateCard}>
-            <IgenHrEmptyState message="Chưa có hồ sơ ứng viên phù hợp." />
-          </View>
-        ) : (
-          <View style={styles.list}>
-            {filteredApplicants.map((app) => {
-              const stage = app.stageId ? stageMap.get(app.stageId) : undefined;
-              const job = app.jobId ? jobMap.get(app.jobId) : undefined;
-              return (
-                <Card key={app.id} onPress={() => openApplicantDetail(app)} style={styles.listItem}>
+        ) : null}
+
+        {loading ? (
+          <Card style={styles.stateCard}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </Card>
+        ) : error ? (
+          <Card style={styles.stateCard}>
+            <PopupError error={error} />
+            <Pressable onPress={() => void load()} style={styles.primaryBtn}>
+              <Text style={styles.primaryBtnText}>Thử lại</Text>
+            </Pressable>
+          </Card>
+        ) : view === 'jobs' ? (
+          !filteredJobs.length ? (
+            <View style={styles.stateCard}>
+              <IgenHrEmptyState message="Chưa có tin tuyển dụng phù hợp." />
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {filteredJobs.map((job) => (
+                <Card key={job.id} onPress={() => setSelectedJob(job)} style={styles.listItem}>
                   <View style={styles.headRow}>
-                    <Text numberOfLines={1} style={[styles.rowTitle, { flex: 1 }]}>
-                      {app.fullName}
+                    <Text numberOfLines={2} style={[styles.rowTitle, { flex: 1 }]}>
+                      {job.title}
                     </Text>
-                    <Text style={styles.badge}>
-                      {stage?.name || app.stageName || OUTCOME_LABELS[app.outcome || 'active'] || 'Đang xử lý'}
+                    <Text
+                      style={[
+                        styles.badge,
+                        job.status === 'open' && styles.badgeGreen,
+                        job.status === 'closed' && styles.badgeGray,
+                      ]}
+                    >
+                      {JOB_STATUS_LABELS[job.status || 'open'] || job.status}
                     </Text>
                   </View>
                   <Text style={styles.subMeta}>
-                    {job?.title || app.jobTitle || 'Vị trí tuyển dụng'}
-                    {app.source ? ` · Nguồn: ${app.source}` : ''}
+                    {job.department || 'Chung'} · {job.location || 'Văn phòng'}
+                    {job.workplaceType ? ` · ${WORKPLACE_LABELS[job.workplaceType]}` : ''}
                   </Text>
                   <Text style={styles.subMeta}>
-                    {[app.email, app.phone].filter(Boolean).join(' · ') || 'Chưa có liên hệ'}
+                    Số lượng: {job.headcount ?? 1}
+                    {job.showSalary && (job.salaryMin || job.salaryMax)
+                      ? ` · Lương: ${formatCompactMoney(job.salaryMin ?? 0)}–${formatCompactMoney(job.salaryMax ?? 0)}`
+                      : ''}
                   </Text>
+                </Card>
+              ))}
+            </View>
+          )
+        ) : view === 'applicants' ? (
+          !filteredApplicants.length ? (
+            <View style={styles.stateCard}>
+              <IgenHrEmptyState message="Chưa có hồ sơ ứng viên phù hợp." />
+            </View>
+          ) : (
+            <View style={styles.list}>
+              {filteredApplicants.map((app) => {
+                const stage = app.stageId ? stageMap.get(app.stageId) : undefined;
+                const job = app.jobId ? jobMap.get(app.jobId) : undefined;
+                return (
+                  <Card key={app.id} onPress={() => openApplicantDetail(app)} style={styles.listItem}>
+                    <View style={styles.headRow}>
+                      <Text numberOfLines={1} style={[styles.rowTitle, { flex: 1 }]}>
+                        {app.fullName}
+                      </Text>
+                      <Text style={styles.badge}>
+                        {stage?.name || app.stageName || OUTCOME_LABELS[app.outcome || 'active'] || 'Đang xử lý'}
+                      </Text>
+                    </View>
+                    <Text style={styles.subMeta}>
+                      {job?.title || app.jobTitle || 'Vị trí tuyển dụng'}
+                      {app.source ? ` · Nguồn: ${app.source}` : ''}
+                    </Text>
+                    <Text style={styles.subMeta}>
+                      {[app.email, app.phone].filter(Boolean).join(' · ') || 'Chưa có liên hệ'}
+                    </Text>
+                  </Card>
+                );
+              })}
+            </View>
+          )
+        ) : !filteredInterviews.length ? (
+          <View style={styles.stateCard}>
+            <IgenHrEmptyState message="Chưa có lịch phỏng vấn nào." />
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {filteredInterviews.map((iv) => {
+              const app = appMap.get(iv.applicantId);
+              const job = jobMap.get(iv.jobId);
+              return (
+                <Card
+                  key={iv.id}
+                  onPress={() => {
+                    setSelectedInterview(iv);
+                    setIvResultDraft(iv.result || '');
+                    setIvNotesDraft(iv.notes || '');
+                  }}
+                  style={styles.listItem}
+                >
+                  <View style={styles.headRow}>
+                    <Text numberOfLines={1} style={[styles.rowTitle, { flex: 1 }]}>
+                      {app?.fullName || 'Ứng viên'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.badge,
+                        iv.status === 'completed' && styles.badgeGreen,
+                        iv.status === 'cancelled' && styles.badgeRed,
+                      ]}
+                    >
+                      {INTERVIEW_STATUS_LABELS[iv.status]}
+                    </Text>
+                  </View>
+                  <Text style={styles.subMeta}>{job?.title || 'Vị trí tuyển dụng'}</Text>
+                  <Text style={styles.subMeta}>
+                    🕒 {formatDateTime(iv.scheduledStart)} · {INTERVIEW_FORMAT_LABELS[iv.format]}
+                  </Text>
+                  {iv.location ? <Text style={styles.subMeta}>📍 {iv.location}</Text> : null}
+                  {iv.meetingLink ? (
+                    <Pressable onPress={() => void Linking.openURL(iv.meetingLink!)} style={styles.linkChip}>
+                      <ExternalLink size={11} color={colors.primary} />
+                      <Text numberOfLines={1} style={styles.linkText}>
+                        Mở link phỏng vấn
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {iv.notes ? <Text style={styles.muted}>{iv.notes}</Text> : null}
                 </Card>
               );
             })}
           </View>
-        )
-      ) : !filteredInterviews.length ? (
-        <View style={styles.stateCard}>
-          <IgenHrEmptyState message="Chưa có lịch phỏng vấn nào." />
-        </View>
-      ) : (
-        <View style={styles.list}>
-          {filteredInterviews.map((iv) => {
-            const app = appMap.get(iv.applicantId);
-            const job = jobMap.get(iv.jobId);
-            return (
-              <Card
-                key={iv.id}
-                onPress={() => {
-                  setSelectedInterview(iv);
-                  setIvResultDraft(iv.result || '');
-                  setIvNotesDraft(iv.notes || '');
-                }}
-                style={styles.listItem}
-              >
-                <View style={styles.headRow}>
-                  <Text numberOfLines={1} style={[styles.rowTitle, { flex: 1 }]}>
-                    {app?.fullName || 'Ứng viên'}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.badge,
-                      iv.status === 'completed' && styles.badgeGreen,
-                      iv.status === 'cancelled' && styles.badgeRed,
-                    ]}
-                  >
-                    {INTERVIEW_STATUS_LABELS[iv.status]}
-                  </Text>
-                </View>
-                <Text style={styles.subMeta}>{job?.title || 'Vị trí tuyển dụng'}</Text>
-                <Text style={styles.subMeta}>
-                  🕒 {formatDateTime(iv.scheduledStart)} · {INTERVIEW_FORMAT_LABELS[iv.format]}
-                </Text>
-                {iv.location ? <Text style={styles.subMeta}>📍 {iv.location}</Text> : null}
-                {iv.meetingLink ? (
-                  <Pressable onPress={() => void Linking.openURL(iv.meetingLink!)} style={styles.linkChip}>
-                    <ExternalLink size={11} color={colors.primary} />
-                    <Text numberOfLines={1} style={styles.linkText}>
-                      Mở link phỏng vấn
-                    </Text>
-                  </Pressable>
-                ) : null}
-                {iv.notes ? <Text style={styles.muted}>{iv.notes}</Text> : null}
-              </Card>
-            );
-          })}
-        </View>
-      )}
+        )}
 
-      {/* Job Detail Full-Screen Page */}
-      <FullScreenFormModal
-        visible={Boolean(selectedJob) && !jobModalMode}
-        title={selectedJob?.title || 'Chi tiết tin tuyển dụng'}
-        onClose={() => setSelectedJob(null)}
-        rightAction={
-          selectedJob && canManage ? (
-            <Pressable onPress={() => openJobEditor(selectedJob)} hitSlop={8} style={{ padding: 4 }}>
-              <Pencil size={19} color="#526071" strokeWidth={1.9} />
-            </Pressable>
-          ) : undefined
-        }
-      >
-        {selectedJob ? (
-          <View style={{ gap: 8, paddingBottom: 12 }}>
-            <Text style={styles.subMeta}>
-              {selectedJob.department} · {selectedJob.location} · SL: {selectedJob.headcount ?? 1}
-            </Text>
-            <Text style={styles.subMeta}>
-              Hạn ứng tuyển: {selectedJob.applicationDeadline
-                ? new Date(selectedJob.applicationDeadline).toLocaleDateString('vi-VN')
-                : 'Chưa thiết lập'}
-            </Text>
-            {selectedJob.description ? (
-              <>
-                <Text style={styles.label}>Mô tả công việc</Text>
-                <Text style={styles.muted}>{selectedJob.description}</Text>
-              </>
-            ) : null}
-            {selectedJob.requirements ? (
-              <>
-                <Text style={styles.label}>Yêu cầu</Text>
-                <Text style={styles.muted}>{selectedJob.requirements}</Text>
-              </>
-            ) : null}
-            {selectedJob.benefits ? (
-              <>
-                <Text style={styles.label}>Quyền lợi</Text>
-                <Text style={styles.muted}>{selectedJob.benefits}</Text>
-              </>
-            ) : null}
-            {selectedJob.jdFileUrl ? (
-              <Pressable
-                onPress={() => void Linking.openURL(selectedJob.jdFileUrl!)}
-                style={styles.linkChip}
-              >
-                <ExternalLink size={12} color={colors.primary} />
-                <Text style={styles.linkText}>Xem file JD đính kèm</Text>
+        {/* Job Detail Full-Screen Page */}
+        <FullScreenFormModal
+          visible={Boolean(selectedJob) && !jobModalMode}
+          title={selectedJob?.title || 'Chi tiết tin tuyển dụng'}
+          onClose={() => setSelectedJob(null)}
+          rightAction={
+            selectedJob && canManage ? (
+              <Pressable onPress={() => openJobEditor(selectedJob)} hitSlop={8} style={{ padding: 4 }}>
+                <Pencil size={19} color="#526071" strokeWidth={1.9} />
               </Pressable>
-            ) : null}
+            ) : undefined
+          }
+        >
+          {selectedJob ? (
+            <View style={{ gap: 8, paddingBottom: 12 }}>
+              <Text style={styles.subMeta}>
+                {selectedJob.department} · {selectedJob.location} · SL: {selectedJob.headcount ?? 1}
+              </Text>
+              <Text style={styles.subMeta}>
+                Hạn ứng tuyển: {selectedJob.applicationDeadline
+                  ? new Date(selectedJob.applicationDeadline).toLocaleDateString('vi-VN')
+                  : 'Chưa thiết lập'}
+              </Text>
+              {selectedJob.description ? (
+                <>
+                  <Text style={styles.label}>Mô tả công việc</Text>
+                  <Text style={styles.muted}>{selectedJob.description}</Text>
+                </>
+              ) : null}
+              {selectedJob.requirements ? (
+                <>
+                  <Text style={styles.label}>Yêu cầu</Text>
+                  <Text style={styles.muted}>{selectedJob.requirements}</Text>
+                </>
+              ) : null}
+              {selectedJob.benefits ? (
+                <>
+                  <Text style={styles.label}>Quyền lợi</Text>
+                  <Text style={styles.muted}>{selectedJob.benefits}</Text>
+                </>
+              ) : null}
+              {selectedJob.jdFileUrl ? (
+                <Pressable
+                  onPress={() => void Linking.openURL(selectedJob.jdFileUrl!)}
+                  style={styles.linkChip}
+                >
+                  <ExternalLink size={12} color={colors.primary} />
+                  <Text style={styles.linkText}>Xem file JD đính kèm</Text>
+                </Pressable>
+              ) : null}
 
-            {canManage ? (
-              <>
-                <Text style={styles.label}>Đổi trạng thái tin</Text>
-                <View style={styles.wrapRow}>
-                  {(['open', 'draft', 'paused', 'closed'] as const).map((st) => (
+              {canManage ? (
+                <>
+                  <Text style={styles.label}>Đổi trạng thái tin</Text>
+                  <View style={styles.wrapRow}>
+                    {(['open', 'draft', 'paused', 'closed'] as const).map((st) => (
+                      <Pressable
+                        key={st}
+                        onPress={() => void onChangeJobStatus(selectedJob, st)}
+                        style={[styles.chip, selectedJob.status === st && styles.chipActive]}
+                      >
+                        <Text style={[styles.chipText, selectedJob.status === st && styles.chipTextActive]}>
+                          {JOB_STATUS_LABELS[st]}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <View style={styles.actionRow}>
                     <Pressable
-                      key={st}
-                      onPress={() => void onChangeJobStatus(selectedJob, st)}
-                      style={[styles.chip, selectedJob.status === st && styles.chipActive]}
+                      onPress={() => openJobEditor(selectedJob)}
+                      style={[styles.submitBtn, { flex: 1, marginTop: 0 }]}
                     >
-                      <Text style={[styles.chipText, selectedJob.status === st && styles.chipTextActive]}>
-                        {JOB_STATUS_LABELS[st]}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <Pencil size={13} color={colors.white} />
+                        <Text style={styles.submitBtnText}>Chỉnh sửa</Text>
+                      </View>
                     </Pressable>
-                  ))}
-                </View>
-                <View style={styles.actionRow}>
-                  <Pressable
-                    onPress={() => openJobEditor(selectedJob)}
-                    style={[styles.submitBtn, { flex: 1, marginTop: 0 }]}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                      <Pencil size={13} color={colors.white} />
-                      <Text style={styles.submitBtnText}>Chỉnh sửa</Text>
-                    </View>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => onDeleteJob(selectedJob)}
-                    style={styles.deleteBtn}
-                  >
-                    <Text style={styles.smallRedText}>Xóa</Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : null}
-          </View>
-        ) : null}
-      </FullScreenFormModal>
-
-      {/* Create / Edit Job Full-Screen Page */}
-      <FullScreenFormModal
-        visible={Boolean(jobModalMode)}
-        title={jobModalMode === 'edit' ? 'Sửa tin tuyển dụng' : 'Tạo tin tuyển dụng mới'}
-        cancelLabel="Hủy"
-        onSave={() => void onSaveJob()}
-        saving={saving}
-        onClose={() => setJobModalMode(null)}
-      >
-        <View>
-          <HrFormSectionTitle title="Thông tin vị trí tuyển dụng" />
-          <HrFormInputRow label="Tiêu đề vị trí *" value={jTitle} onChangeText={setJTitle} placeholder="VD: Chuyên viên Kinh doanh" />
-          <HrFormSelectRow
-            label="Phòng ban"
-            sheetTitle="Chọn phòng ban"
-            value={jDept}
-            placeholder="Chọn phòng ban"
-            options={[
-              { value: 'Chung', label: 'Chung' },
-              ...departments.map((department) => ({
-                value: department.name,
-                label: department.name,
-              })),
-            ]}
-            onSelect={setJDept}
-          />
-          <HrFormInputRow label="Số lượng" value={jHeadcount} onChangeText={setJHeadcount} keyboardType="numeric" placeholder="1" />
-          <HrFormInputRow label="Địa điểm làm việc" value={jLocation} onChangeText={setJLocation} placeholder="Hà Nội / TP.HCM" />
-          <HrFormCustomRow label="Hạn ứng tuyển">
-            <View style={{ marginTop: 4 }}>
-              <DateTimeField
-                label="Hạn ứng tuyển"
-                mode="date"
-                value={jApplicationDeadline}
-                onChange={setJApplicationDeadline}
-                allowClear
-                placeholder="Chọn hạn nhận hồ sơ"
-              />
+                    <Pressable
+                      onPress={() => onDeleteJob(selectedJob)}
+                      style={styles.deleteBtn}
+                    >
+                      <Text style={styles.smallRedText}>Xóa</Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : null}
             </View>
-          </HrFormCustomRow>
-          <HrFormSelectRow
-            label="Hình thức làm việc"
-            sheetTitle="Chọn hình thức làm việc"
-            value={jWorkplace}
-            options={(['onsite', 'hybrid', 'remote'] as const).map((wp) => ({
-              value: wp,
-              label: WORKPLACE_LABELS[wp],
-            }))}
-            onSelect={(val) => setJWorkplace(val as typeof jWorkplace)}
-          />
-          <HrFormInputRow label="Mô tả công việc" value={jDesc} onChangeText={setJDesc} multiline placeholder="Nhập mô tả công việc..." />
-          <HrFormInputRow label="Yêu cầu ứng viên" value={jReq} onChangeText={setJReq} multiline placeholder="Nhập yêu cầu ứng viên..." />
-          <HrFormInputRow label="Quyền lợi" value={jBenefits} onChangeText={setJBenefits} multiline placeholder="Nhập quyền lợi..." last />
-        </View>
-      </FullScreenFormModal>
+          ) : null}
+        </FullScreenFormModal>
 
-      {renderApplicantModal()}
-
-      {/* Create Interview Full-Screen Page */}
-      <FullScreenFormModal
-        visible={ivModalOpen}
-        title="Lên lịch phỏng vấn"
-        cancelLabel="Hủy"
-        onSave={() => void onCreateInterview()}
-        saving={saving}
-        onClose={() => setIvModalOpen(false)}
-      >
-        <View>
-          <HrFormSectionTitle title="Thông tin lịch phỏng vấn" />
-          <HrFormSelectRow
-            label="Chọn ứng viên *"
-            sheetTitle="Chọn ứng viên"
-            value={ivApplicantId}
-            placeholder="Chọn ứng viên"
-            options={applicants.map((a) => ({
-              value: a.id,
-              label: a.fullName,
-              subtitle: jobMap.get(a.jobId || '')?.title || a.phone || undefined,
-            }))}
-            onSelect={setIvApplicantId}
-          />
-          <HrFormInputRow
-            label="Vị trí"
-            value={jobMap.get(appMap.get(ivApplicantId)?.jobId || '')?.title || 'Tự động theo ứng viên'}
-            onChangeText={() => {}}
-            editable={false}
-          />
-          <HrFormCustomRow label="Thời gian phỏng vấn *">
-            <View style={{ gap: 8, marginTop: 4 }}>
-              <DateTimeField label="Ngày phỏng vấn *" mode="date" value={ivDate} onChange={setIvDate} />
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <DateTimeField label="Giờ bắt đầu" mode="time" value={ivStart} onChange={setIvStart} />
-                <DateTimeField label="Giờ kết thúc" mode="time" value={ivEnd} onChange={setIvEnd} />
+        {/* Create / Edit Job Full-Screen Page */}
+        <FullScreenFormModal
+          visible={Boolean(jobModalMode)}
+          title={jobModalMode === 'edit' ? 'Sửa tin tuyển dụng' : 'Tạo tin tuyển dụng mới'}
+          cancelLabel="Hủy"
+          onSave={() => void onSaveJob()}
+          saving={saving}
+          onClose={() => setJobModalMode(null)}
+        >
+          <View>
+            <HrFormSectionTitle title="Thông tin vị trí tuyển dụng" />
+            <HrFormInputRow label="Tiêu đề vị trí *" value={jTitle} onChangeText={setJTitle} placeholder="VD: Chuyên viên Kinh doanh" />
+            <HrFormSelectRow
+              label="Phòng ban"
+              sheetTitle="Chọn phòng ban"
+              value={jDept}
+              placeholder="Chọn phòng ban"
+              options={[
+                { value: 'Chung', label: 'Chung' },
+                ...departments.map((department) => ({
+                  value: department.name,
+                  label: department.name,
+                })),
+              ]}
+              onSelect={setJDept}
+            />
+            <HrFormInputRow label="Số lượng" value={jHeadcount} onChangeText={setJHeadcount} keyboardType="numeric" placeholder="1" />
+            <HrFormInputRow label="Địa điểm làm việc" value={jLocation} onChangeText={setJLocation} placeholder="Hà Nội / TP.HCM" />
+            <HrFormCustomRow label="Hạn ứng tuyển">
+              <View style={{ marginTop: 4 }}>
+                <DateTimeField
+                  label="Hạn ứng tuyển"
+                  mode="date"
+                  value={jApplicationDeadline}
+                  onChange={setJApplicationDeadline}
+                  allowClear
+                  placeholder="Chọn hạn nhận hồ sơ"
+                />
               </View>
-            </View>
-          </HrFormCustomRow>
-          <HrFormSelectRow
-            label="Hình thức"
-            sheetTitle="Chọn hình thức phỏng vấn"
-            value={ivFormat}
-            options={(['onsite', 'online', 'phone'] as const).map((f) => ({
-              value: f,
-              label: INTERVIEW_FORMAT_LABELS[f],
-            }))}
-            onSelect={(val) => setIvFormat(val as typeof ivFormat)}
-          />
-          {ivFormat === 'online' ? (
-            <HrFormInputRow label="Link họp" value={ivLink} onChangeText={setIvLink} autoCapitalize="none" placeholder="https://meet.google.com/..." />
-          ) : (
-            <HrFormInputRow label="Địa điểm" value={ivLocation} onChangeText={setIvLocation} placeholder="Phòng họp tầng 3..." />
-          )}
-          <HrFormSelectRow
-            label="Trạng thái"
-            sheetTitle="Chọn trạng thái"
-            value={ivStatus}
-            options={(['scheduled', 'completed', 'cancelled'] as const).map((st) => ({
-              value: st,
-              label: INTERVIEW_STATUS_LABELS[st],
-            }))}
-            onSelect={(val) => setIvStatus(val as typeof ivStatus)}
-          />
-          <HrFormInputRow label="Kết quả" value={ivResult} onChangeText={setIvResult} placeholder="VD: Đạt / Cần phỏng vấn vòng 2..." />
-          <HrFormCustomRow label={`Người phỏng vấn (${ivInterviewerIds.length})`}>
-            <View style={[styles.wrapRow, { marginTop: 6 }]}>
-              {employees.length ? employees.map((emp) => {
-                const empId = emp.uid || emp.id || emp._id || '';
-                if (!empId) return null;
-                const selected = ivInterviewerIds.includes(empId);
-                return (
-                  <Pressable
-                    key={empId}
-                    onPress={() => toggleInterviewer(empId)}
-                    style={[styles.chip, selected && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, selected && styles.chipTextActive]}>
-                      {emp.displayName || emp.email || empId}
-                    </Text>
-                  </Pressable>
-                );
-              }) : (
-                <Text style={styles.muted}>Chưa có danh sách người phỏng vấn</Text>
-              )}
-            </View>
-          </HrFormCustomRow>
-          <HrFormInputRow label="Ghi chú" value={ivNotes} onChangeText={setIvNotes} multiline placeholder="Nhập ghi chú..." last />
-        </View>
-      </FullScreenFormModal>
+            </HrFormCustomRow>
+            <HrFormSelectRow
+              label="Hình thức làm việc"
+              sheetTitle="Chọn hình thức làm việc"
+              value={jWorkplace}
+              options={(['onsite', 'hybrid', 'remote'] as const).map((wp) => ({
+                value: wp,
+                label: WORKPLACE_LABELS[wp],
+              }))}
+              onSelect={(val) => setJWorkplace(val as typeof jWorkplace)}
+            />
+            <HrFormInputRow label="Mô tả công việc" value={jDesc} onChangeText={setJDesc} multiline placeholder="Nhập mô tả công việc..." />
+            <HrFormInputRow label="Yêu cầu ứng viên" value={jReq} onChangeText={setJReq} multiline placeholder="Nhập yêu cầu ứng viên..." />
+            <HrFormInputRow label="Quyền lợi" value={jBenefits} onChangeText={setJBenefits} multiline placeholder="Nhập quyền lợi..." last />
+          </View>
+        </FullScreenFormModal>
 
-      {/* Filter bottom sheet matching Employee Directory */}
-      <Modal
-        visible={filterSheetOpen}
-        transparent
-        statusBarTranslucent
-        animationType="slide"
-        onRequestClose={() => setFilterSheetOpen(false)}
-      >
-        <Pressable style={styles.filterSheetBackdrop} onPress={() => setFilterSheetOpen(false)}>
-          <Pressable style={styles.filterSheet} onPress={() => {}}>
-            <View style={styles.filterSheetHandle} />
-            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
-              {view === 'jobs' ? (
-                (['', 'open', 'draft', 'paused', 'closed'] as const).map((st) => {
-                  const selected = jobStatusFilter === st;
+        {renderApplicantModal()}
+
+        {/* Create Interview Full-Screen Page */}
+        <FullScreenFormModal
+          visible={ivModalOpen}
+          title="Lên lịch phỏng vấn"
+          cancelLabel="Hủy"
+          onSave={() => void onCreateInterview()}
+          saving={saving}
+          onClose={() => setIvModalOpen(false)}
+        >
+          <View>
+            <HrFormSectionTitle title="Thông tin lịch phỏng vấn" />
+            <HrFormSelectRow
+              label="Chọn ứng viên *"
+              sheetTitle="Chọn ứng viên"
+              value={ivApplicantId}
+              placeholder="Chọn ứng viên"
+              options={applicants.map((a) => ({
+                value: a.id,
+                label: a.fullName,
+                subtitle: jobMap.get(a.jobId || '')?.title || a.phone || undefined,
+              }))}
+              onSelect={setIvApplicantId}
+            />
+            <HrFormInputRow
+              label="Vị trí"
+              value={jobMap.get(appMap.get(ivApplicantId)?.jobId || '')?.title || 'Tự động theo ứng viên'}
+              onChangeText={() => { }}
+              editable={false}
+            />
+            <HrFormCustomRow label="Thời gian phỏng vấn *">
+              <View style={{ gap: 8, marginTop: 4 }}>
+                <DateTimeField label="Ngày phỏng vấn *" mode="date" value={ivDate} onChange={setIvDate} />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <DateTimeField label="Giờ bắt đầu" mode="time" value={ivStart} onChange={setIvStart} />
+                  <DateTimeField label="Giờ kết thúc" mode="time" value={ivEnd} onChange={setIvEnd} />
+                </View>
+              </View>
+            </HrFormCustomRow>
+            <HrFormSelectRow
+              label="Hình thức"
+              sheetTitle="Chọn hình thức phỏng vấn"
+              value={ivFormat}
+              options={(['onsite', 'online', 'phone'] as const).map((f) => ({
+                value: f,
+                label: INTERVIEW_FORMAT_LABELS[f],
+              }))}
+              onSelect={(val) => setIvFormat(val as typeof ivFormat)}
+            />
+            {ivFormat === 'online' ? (
+              <HrFormInputRow label="Link họp" value={ivLink} onChangeText={setIvLink} autoCapitalize="none" placeholder="https://meet.google.com/..." />
+            ) : (
+              <HrFormInputRow label="Địa điểm" value={ivLocation} onChangeText={setIvLocation} placeholder="Phòng họp tầng 3..." />
+            )}
+            <HrFormSelectRow
+              label="Trạng thái"
+              sheetTitle="Chọn trạng thái"
+              value={ivStatus}
+              options={(['scheduled', 'completed', 'cancelled'] as const).map((st) => ({
+                value: st,
+                label: INTERVIEW_STATUS_LABELS[st],
+              }))}
+              onSelect={(val) => setIvStatus(val as typeof ivStatus)}
+            />
+            <HrFormInputRow label="Kết quả" value={ivResult} onChangeText={setIvResult} placeholder="VD: Đạt / Cần phỏng vấn vòng 2..." />
+            <HrFormCustomRow label={`Người phỏng vấn (${ivInterviewerIds.length})`}>
+              <View style={[styles.wrapRow, { marginTop: 6 }]}>
+                {employees.length ? employees.map((emp) => {
+                  const empId = emp.uid || emp.id || emp._id || '';
+                  if (!empId) return null;
+                  const selected = ivInterviewerIds.includes(empId);
                   return (
                     <Pressable
-                      key={st || 'all'}
-                      onPress={() => {
-                        setJobStatusFilter(st);
-                        setFilterSheetOpen(false);
-                      }}
-                      style={[styles.filterSheetRow, selected && styles.filterSheetRowActive]}
+                      key={empId}
+                      onPress={() => toggleInterviewer(empId)}
+                      style={[styles.chip, selected && styles.chipActive]}
                     >
-                      <Text style={[styles.filterSheetRowText, selected && styles.filterSheetRowTextActive]}>
-                        {st ? JOB_STATUS_LABELS[st] : 'Tất cả trạng thái'}
+                      <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                        {emp.displayName || emp.email || empId}
                       </Text>
-                      {selected ? <Check size={17} color={colors.primary} /> : null}
                     </Pressable>
                   );
-                })
-              ) : view === 'applicants' ? (
-                [{ id: '', name: 'Tất cả vòng' }, ...stages].map((st) => {
-                  const selected = stageFilter === st.id;
-                  return (
-                    <Pressable
-                      key={st.id || 'all'}
-                      onPress={() => {
-                        setStageFilter(st.id);
-                        setFilterSheetOpen(false);
-                      }}
-                      style={[styles.filterSheetRow, selected && styles.filterSheetRowActive]}
-                    >
-                      <Text style={[styles.filterSheetRowText, selected && styles.filterSheetRowTextActive]}>
-                        {st.name}
-                      </Text>
-                      {selected ? <Check size={17} color={colors.primary} /> : null}
-                    </Pressable>
-                  );
-                })
-              ) : (
-                (['', 'scheduled', 'completed', 'cancelled'] as const).map((st) => {
-                  const selected = ivStatusFilter === st;
-                  return (
-                    <Pressable
-                      key={st || 'all'}
-                      onPress={() => {
-                        setIvStatusFilter(st);
-                        setFilterSheetOpen(false);
-                      }}
-                      style={[styles.filterSheetRow, selected && styles.filterSheetRowActive]}
-                    >
-                      <Text style={[styles.filterSheetRowText, selected && styles.filterSheetRowTextActive]}>
-                        {st ? INTERVIEW_STATUS_LABELS[st] : 'Tất cả trạng thái'}
-                      </Text>
-                      {selected ? <Check size={17} color={colors.primary} /> : null}
-                    </Pressable>
-                  );
-                })
-              )}
-            </ScrollView>
+                }) : (
+                  <Text style={styles.muted}>Chưa có danh sách người phỏng vấn</Text>
+                )}
+              </View>
+            </HrFormCustomRow>
+            <HrFormInputRow label="Ghi chú" value={ivNotes} onChangeText={setIvNotes} multiline placeholder="Nhập ghi chú..." last />
+          </View>
+        </FullScreenFormModal>
+
+        {/* Filter bottom sheet matching Employee Directory */}
+        <Modal
+          visible={filterSheetOpen}
+          transparent
+          statusBarTranslucent
+          animationType="slide"
+          onRequestClose={() => setFilterSheetOpen(false)}
+        >
+          <Pressable style={styles.filterSheetBackdrop} onPress={() => setFilterSheetOpen(false)}>
+            <Pressable style={styles.filterSheet} onPress={() => { }}>
+              <View style={styles.filterSheetHandle} />
+              <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+                {view === 'jobs' ? (
+                  (['', 'open', 'draft', 'paused', 'closed'] as const).map((st) => {
+                    const selected = jobStatusFilter === st;
+                    return (
+                      <Pressable
+                        key={st || 'all'}
+                        onPress={() => {
+                          setJobStatusFilter(st);
+                          setFilterSheetOpen(false);
+                        }}
+                        style={[styles.filterSheetRow, selected && styles.filterSheetRowActive]}
+                      >
+                        <Text style={[styles.filterSheetRowText, selected && styles.filterSheetRowTextActive]}>
+                          {st ? JOB_STATUS_LABELS[st] : 'Tất cả trạng thái'}
+                        </Text>
+                        {selected ? <Check size={17} color={colors.primary} /> : null}
+                      </Pressable>
+                    );
+                  })
+                ) : view === 'applicants' ? (
+                  [{ id: '', name: 'Tất cả vòng' }, ...stages].map((st) => {
+                    const selected = stageFilter === st.id;
+                    return (
+                      <Pressable
+                        key={st.id || 'all'}
+                        onPress={() => {
+                          setStageFilter(st.id);
+                          setFilterSheetOpen(false);
+                        }}
+                        style={[styles.filterSheetRow, selected && styles.filterSheetRowActive]}
+                      >
+                        <Text style={[styles.filterSheetRowText, selected && styles.filterSheetRowTextActive]}>
+                          {st.name}
+                        </Text>
+                        {selected ? <Check size={17} color={colors.primary} /> : null}
+                      </Pressable>
+                    );
+                  })
+                ) : (
+                  (['', 'scheduled', 'completed', 'cancelled'] as const).map((st) => {
+                    const selected = ivStatusFilter === st;
+                    return (
+                      <Pressable
+                        key={st || 'all'}
+                        onPress={() => {
+                          setIvStatusFilter(st);
+                          setFilterSheetOpen(false);
+                        }}
+                        style={[styles.filterSheetRow, selected && styles.filterSheetRowActive]}
+                      >
+                        <Text style={[styles.filterSheetRowText, selected && styles.filterSheetRowTextActive]}>
+                          {st ? INTERVIEW_STATUS_LABELS[st] : 'Tất cả trạng thái'}
+                        </Text>
+                        {selected ? <Check size={17} color={colors.primary} /> : null}
+                      </Pressable>
+                    );
+                  })
+                )}
+              </ScrollView>
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-    </ScrollView>
-    {canManage ? (
-      <HrFab
-        label={view === 'jobs' ? 'Thêm tin tuyển dụng' : view === 'applicants' ? 'Thêm ứng viên' : 'Thêm lịch phỏng vấn'}
-        onPress={() => {
-          if (view === 'jobs') openJobEditor();
-          else if (view === 'applicants') openApplicantEditor();
-          else openCreateInterview();
-        }}
-      />
-    ) : null}
+        </Modal>
+      </ScrollView>
+      {canManage ? (
+        <HrFab
+          label={view === 'jobs' ? 'Thêm tin tuyển dụng' : view === 'applicants' ? 'Thêm ứng viên' : 'Thêm lịch phỏng vấn'}
+          onPress={() => {
+            if (view === 'jobs') openJobEditor();
+            else if (view === 'applicants') openApplicantEditor();
+            else openCreateInterview();
+          }}
+        />
+      ) : null}
     </View>
   );
 }

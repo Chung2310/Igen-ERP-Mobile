@@ -629,7 +629,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
                 pressed && styles.switcherNavBtnPressed,
               ]}
             >
-              <ChevronLeft size={18} color={colors.ink} />
+              <ChevronLeft size={15} color={colors.ink} />
             </Pressable>
 
             <Pressable
@@ -643,19 +643,14 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
               ]}
             >
               <View style={styles.switcherTitleRow}>
-                {activePage ? <OverviewTabIcon id={activePage.id} size={24} /> : null}
+                {activePage ? <OverviewTabIcon id={activePage.id} size={22} /> : null}
                 <Text numberOfLines={1} style={styles.switcherTitle}>
                   {activePage?.label ?? 'Tổng quan'}
                 </Text>
                 {allowedPages.length > 1 ? (
-                  <ChevronDown size={15} color={colors.muted} />
+                  <ChevronDown size={13} color={colors.muted} />
                 ) : null}
               </View>
-              {activePage?.subtitle ? (
-                <Text numberOfLines={1} style={styles.switcherSubtitle}>
-                  {activePage.subtitle}
-                </Text>
-              ) : null}
             </Pressable>
 
             <Pressable
@@ -669,7 +664,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
                 pressed && styles.switcherNavBtnPressed,
               ]}
             >
-              <ChevronRight size={18} color={colors.ink} />
+              <ChevronRight size={15} color={colors.ink} />
             </Pressable>
           </View>
         ) : null}
@@ -743,12 +738,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         <Pressable style={styles.modalBackdrop} onPress={() => setSwitcherOpen(false)}>
           <Pressable style={styles.modalSheet} onPress={() => { }}>
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn trang tổng quan</Text>
-              <Pressable onPress={() => setSwitcherOpen(false)} hitSlop={8}>
-                <Text style={styles.modalClose}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {allowedPages.map((page) => {
                 const active = page.id === activePageId;
@@ -783,12 +772,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
         <Pressable style={styles.modalBackdrop} onPress={() => setBranchPickerOpen(false)}>
           <Pressable style={styles.modalSheet} onPress={() => { }}>
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Chọn chi nhánh</Text>
-              <Pressable onPress={() => setBranchPickerOpen(false)} hitSlop={8}>
-                <Text style={styles.modalClose}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView showsVerticalScrollIndicator={false} style={styles.modalList}>
               {branches.map((branch) => {
                 const active = branch._id === activeBranchId;
@@ -913,13 +896,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5EAF2',
     paddingHorizontal: 6,
-    paddingVertical: 8,
+    paddingVertical: 6,
     marginBottom: 12,
   },
   switcherNavBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F5F8FD',

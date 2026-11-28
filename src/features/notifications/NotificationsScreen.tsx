@@ -35,7 +35,7 @@ import {
 } from '@/features/notifications/notificationsApi';
 import { colors } from '@/theme/colors';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 const TYPE_FILTERS: Array<{ key: NotificationType | 'all'; label: string }> = [
   { key: 'all', label: 'Tất cả' },
   { key: 'kho', label: 'Kho' },
