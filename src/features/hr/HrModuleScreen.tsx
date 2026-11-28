@@ -1,11 +1,15 @@
 import { Stack } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Check, ChevronDown } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { HrTabIcon } from '@/components/HrTabIcons';
-import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
+import {
+  ModuleSectionSwitcher,
+  useModuleSectionTransition,
+  type ModuleSectionItem,
+} from '@/components/ModuleSectionSwitcher';
 import { BranchAppIcon } from '@/components/OverviewTabIcons';
 import { useAuth } from '@/core/auth/AuthProvider';
 import { HrBranchesPanel } from '@/features/hr/sections/HrBranchesPanel';
@@ -110,34 +114,7 @@ export function HrModuleScreen() {
       })),
     [visibleTabs],
   );
-  const sectionOpacity = useRef(new Animated.Value(1)).current;
-  const sectionTranslateX = useRef(new Animated.Value(0)).current;
-  const transitionDirRef = useRef<-1 | 0 | 1>(0);
-  const hasMountedRef = useRef(false);
-
-  useEffect(() => {
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true;
-      return;
-    }
-    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 22;
-    sectionOpacity.stopAnimation();
-    sectionTranslateX.stopAnimation();
-    sectionOpacity.setValue(0.4);
-    sectionTranslateX.setValue(startX);
-    Animated.parallel([
-      Animated.timing(sectionOpacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sectionTranslateX, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [activeVisibleTab, sectionOpacity, sectionTranslateX]);
+  const sectionTransition = useModuleSectionTransition(activeVisibleTab);
 
   return (
     <View style={[styles.root, styles.rootWhite]}>
@@ -213,21 +190,14 @@ export function HrModuleScreen() {
       <ModuleSectionSwitcher
         items={hrSwitcherItems}
         activeKey={activeVisibleTab}
-        onChange={(nextKey, direction) => {
-          transitionDirRef.current = direction;
-          setActiveTab(nextKey);
-        }}
+        transition={sectionTransition}
+        onChange={(nextKey) => setActiveTab(nextKey)}
         modalTitle="Chọn mục nhân sự"
         style={styles.switcherBarWrap}
       />
 
       {/* Active panel */}
-      <Animated.View
-        style={[
-          styles.body,
-          { opacity: sectionOpacity, transform: [{ translateX: sectionTranslateX }] },
-        ]}
-      >
+      <Animated.View style={[styles.body, sectionTransition.animatedStyle]}>
         {/* These reference panels use companyCode without activeBranchId by design. */}
         {activeVisibleTab === 'employees' ? (
           <OrgChartPanel companyCode={user?.companyCode} />

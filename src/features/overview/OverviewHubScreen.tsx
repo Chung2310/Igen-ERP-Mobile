@@ -22,7 +22,11 @@ import {
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { BrandLoadingOverlay } from '@/components/BrandLoader';
 import { Card } from '@/components/Card';
-import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
+import {
+  ModuleSectionSwitcher,
+  useModuleSectionTransition,
+  type ModuleSectionItem,
+} from '@/components/ModuleSectionSwitcher';
 import {
   BranchAppIcon,
   IgenAssistantAvatarIcon,
@@ -344,9 +348,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
     setReloadTick((t) => t + 1);
   }, []);
 
-  const sectionOpacity = useRef(new Animated.Value(1)).current;
-  const sectionTranslateX = useRef(new Animated.Value(0)).current;
-  const transitionDirRef = useRef<number>(0);
+  const sectionTransition = useModuleSectionTransition(activePageId);
 
   const overviewSwitcherItems = useMemo<ModuleSectionItem<OverviewPageId>[]>(
     () =>
@@ -360,7 +362,6 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   );
 
   const onSelectPage = useCallback((id: OverviewPageId) => {
-    transitionDirRef.current = 0;
     setSelectedPageId(id);
   }, []);
 
@@ -372,31 +373,12 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
   const onStepPage = useCallback(
     (delta: -1 | 1) => {
       if (allowedPages.length <= 1) return;
-      transitionDirRef.current = delta;
       const nextIndex = (currentPageIndex + delta + allowedPages.length) % allowedPages.length;
       const target = allowedPages[nextIndex];
       if (target) setSelectedPageId(target.id);
     },
     [allowedPages, currentPageIndex],
   );
-
-  useEffect(() => {
-    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 18;
-    sectionOpacity.setValue(0.35);
-    sectionTranslateX.setValue(startX);
-    Animated.parallel([
-      Animated.timing(sectionOpacity, {
-        toValue: 1,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sectionTranslateX, {
-        toValue: 0,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [activePageId, sectionOpacity, sectionTranslateX]);
 
   const isInitialPageLoading = Boolean(
     activePageId && loading && (!payload || payload.kind !== activePageId),
@@ -628,6 +610,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
           <ModuleSectionSwitcher
             items={overviewSwitcherItems}
             activeKey={activePageId}
+            transition={sectionTransition}
             onChange={(nextKey, dir) => {
               if (dir === 0) onSelectPage(nextKey);
               else onStepPage(dir);
@@ -639,12 +622,7 @@ export function OverviewHubScreen({ embedded = false }: { embedded?: boolean } =
 
         {/* Active overview page body */}
         <OverviewPeriodActionContext.Provider value={periodActionCtx}>
-          <Animated.View
-            style={{
-              opacity: sectionOpacity,
-              transform: [{ translateX: sectionTranslateX }],
-            }}
-          >
+          <Animated.View style={sectionTransition.animatedStyle}>
             {renderSection()}
           </Animated.View>
         </OverviewPeriodActionContext.Provider>

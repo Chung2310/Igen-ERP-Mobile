@@ -1,13 +1,17 @@
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { CenteredPageLoader } from '@/components/BrandLoader';
 import { IgenWorkerEmptyState } from '@/components/EmptyStateIllustration';
-import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
+import {
+  ModuleSectionSwitcher,
+  useModuleSectionTransition,
+  type ModuleSectionItem,
+} from '@/components/ModuleSectionSwitcher';
 import { BranchAppIcon } from '@/components/OverviewTabIcons';
 import { PASTEL_BACKDROP_TOP_COLOR } from '@/components/PastelBackdrop';
 import { PopupError } from '@/components/PopupError';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { HrFab } from '@/features/hr/components/HrFab';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import type { FeatureScreenProps } from '@/features/modules/featureScreenRegistry';
 import { Stack } from 'expo-router';
@@ -206,30 +210,10 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
     : 'Chọn chi nhánh';
   const scope = useMemo<WorkerScope | undefined>(() => companyCode ? { companyCode, ...(activeBranchId || user?.branchId ? { branchId: activeBranchId || user?.branchId } : {}) } : undefined, [activeBranchId, companyCode, user?.branchId]);
   const [tab, setTab] = useState<Tab>('projects');
-  const sectionOpacity = useRef(new Animated.Value(1)).current;
-  const sectionTranslateX = useRef(new Animated.Value(0)).current;
-  const transitionDirRef = useRef<number>(0);
-  const handleTabChange = useCallback((nextTab: Tab, direction: -1 | 0 | 1) => {
-    transitionDirRef.current = direction;
+  const sectionTransition = useModuleSectionTransition(tab);
+  const handleTabChange = useCallback((nextTab: Tab) => {
     setTab(nextTab);
   }, []);
-  useEffect(() => {
-    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 18;
-    sectionOpacity.setValue(0.35);
-    sectionTranslateX.setValue(startX);
-    Animated.parallel([
-      Animated.timing(sectionOpacity, {
-        toValue: 1,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sectionTranslateX, {
-        toValue: 0,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [tab, sectionOpacity, sectionTranslateX]);
   const [workers, setWorkers] = useState<Worker[]>([]); const [projects, setProjects] = useState<WorkerProject[]>([]);
   const [contracts, setContracts] = useState<LaborContract[]>([]); const [notifications, setNotifications] = useState<WorkerNotification[]>([]);
   const [loading, setLoading] = useState(true); const [refreshing, setRefreshing] = useState(false); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
@@ -729,13 +713,14 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
     <ModuleSectionSwitcher
       items={workerSections}
       activeKey={tab}
+      transition={sectionTransition}
       onChange={handleTabChange}
       modalTitle="Chọn tính năng Lao động"
       style={styles.switcherBarWrap}
     />
     {error ? <PopupError error={error} /> : null}{busy ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 5 }} /> : null}
 
-    <Animated.View style={{ flex: 1, opacity: sectionOpacity, transform: [{ translateX: sectionTranslateX }] }}>
+    <Animated.View style={[{ flex: 1 }, sectionTransition.animatedStyle]}>
     {tab === 'workers' && <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 92 }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
       <View style={styles.filterTopBar}>
         <Pressable accessibilityRole="button" onPress={() => setWorkerFiltersOpen(true)} style={({ pressed }) => [styles.filterTriggerBtn, pressed && { opacity: 0.65 }]}>

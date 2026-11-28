@@ -1,11 +1,15 @@
 import { BrandLoader, CenteredPageLoader } from '@/components/BrandLoader';
 import { IgenStudentEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
-import { ModuleSectionSwitcher, type ModuleSectionItem } from '@/components/ModuleSectionSwitcher';
+import {
+  ModuleSectionSwitcher,
+  useModuleSectionTransition,
+  type ModuleSectionItem,
+} from '@/components/ModuleSectionSwitcher';
 import { BranchAppIcon } from '@/components/OverviewTabIcons';
 import { PASTEL_BACKDROP_TOP_COLOR } from '@/components/PastelBackdrop';
 import { StudentTabIcon } from '@/components/StudentTabIcons';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -159,26 +163,7 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
   const branchName = branches.find((branch) => branch._id === branchId)?.name || user?.branchName || 'Chọn chi nhánh';
 
   const [area, setArea] = useState<Area>('students');
-  const sectionOpacity = useRef(new Animated.Value(1)).current;
-  const sectionTranslateX = useRef(new Animated.Value(0)).current;
-  const transitionDirRef = useRef<number>(0);
-  useEffect(() => {
-    const startX = transitionDirRef.current === 0 ? 0 : transitionDirRef.current * 18;
-    sectionOpacity.setValue(0.35);
-    sectionTranslateX.setValue(startX);
-    Animated.parallel([
-      Animated.timing(sectionOpacity, {
-        toValue: 1,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sectionTranslateX, {
-        toValue: 0,
-        duration: 210,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [area, sectionOpacity, sectionTranslateX]);
+  const sectionTransition = useModuleSectionTransition(area);
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [partners, setPartners] = useState<StudentPartner[]>([]);
   const [courses, setCourses] = useState<CourseRecord[]>([]);
@@ -1152,8 +1137,8 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
     <ModuleSectionSwitcher
       items={STUDENT_SECTIONS}
       activeKey={area}
-      onChange={(nextArea, direction) => {
-        transitionDirRef.current = direction;
+      transition={sectionTransition}
+      onChange={(nextArea) => {
         setArea(nextArea);
         setSearch('');
         resetFilters();
@@ -1162,7 +1147,7 @@ export function StudentManagementScreen(_props: FeatureScreenProps) {
       style={styles.switcherBarWrap}
     />
 
-    <Animated.View style={{ flex: 1, opacity: sectionOpacity, transform: [{ translateX: sectionTranslateX }] }}>
+    <Animated.View style={[{ flex: 1 }, sectionTransition.animatedStyle]}>
     <ScrollView
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor={colors.primary} />}
