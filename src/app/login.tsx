@@ -17,6 +17,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Redirect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Eye, EyeOff, Fingerprint, Lock, Mail } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -26,6 +27,7 @@ import {
   ERP_PRIVACY_POLICY_URL,
   ERP_TERMS_OF_SERVICE_URL,
 } from '@/core/network/erpWebLinks';
+import { canAccessOverview } from '@/features/overview/overviewCatalog';
 import { colors } from '@/theme/colors';
 
 const IGEN_FULL_LOGO = require('../../assets/images/logo-igenerp-transparent.png');
@@ -33,6 +35,9 @@ const IGEN_FULL_LOGO = require('../../assets/images/logo-igenerp-transparent.png
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const {
+    user,
+    isLoading,
+    isAppLocked,
     signIn,
     signInWithBiometrics,
     canSignInWithBiometrics,
@@ -124,6 +129,10 @@ export default function LoginScreen() {
     Platform.OS === 'android' ? (RnStatusBar.currentHeight ?? 24) : 0,
   );
   const bottomInset = Math.max(insets.bottom + 18, 28);
+
+  if (!isLoading && !isAppLocked && user) {
+    return <Redirect href={canAccessOverview(user) ? '/(tabs)' : '/(tabs)/modules'} />;
+  }
 
   return (
     <View style={styles.root}>

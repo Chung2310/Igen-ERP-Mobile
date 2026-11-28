@@ -49,8 +49,13 @@ function AuthenticatedRouter() {
 
   useEffect(() => {
     if (isLoading || showLockScreen) return;
-    if (!user && !isLoginRoute) router.replace('/login');
-    else if (user && isLoginRoute) router.replace(canAccessOverview(user) ? '/(tabs)' : '/(tabs)/modules');
+    if (!user && !isLoginRoute) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/login');
+    } else if (user && isLoginRoute) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace(canAccessOverview(user) ? '/(tabs)' : '/(tabs)/modules');
+    }
   }, [user, isLoading, isLoginRoute, router, showLockScreen]);
 
   return (
@@ -72,11 +77,22 @@ function AuthenticatedRouter() {
           >
             <Stack.Screen
               name="login"
-              options={{ headerShown: false, animation: 'fade', animationDuration: 220 }}
+              options={{
+                headerShown: false,
+                animation: 'fade',
+                animationDuration: 220,
+                gestureEnabled: false,
+                fullScreenGestureEnabled: false,
+              }}
             />
             <Stack.Screen
               name="(tabs)"
-              options={{ animation: 'fade', animationDuration: 220 }}
+              options={{
+                animation: 'fade',
+                animationDuration: 220,
+                gestureEnabled: false,
+                fullScreenGestureEnabled: false,
+              }}
             />
             <Stack.Screen
               name="assistant-chat"

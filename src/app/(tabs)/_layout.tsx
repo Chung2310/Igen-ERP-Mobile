@@ -78,6 +78,8 @@ export default function TabLayout() {
   const currentTabRef = useRef<TabRouteKey>(showOverview ? 'index' : 'modules');
   const routerRef = useRef(router);
   routerRef.current = router;
+  const screenWidthRef = useRef(screenWidth);
+  screenWidthRef.current = screenWidth;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -86,6 +88,8 @@ export default function TabLayout() {
         const active = currentTabRef.current;
         const routes = visibleTabRoutesRef.current;
         if (!active || routes.length <= 1) return false;
+        // Leave screen edges untouched for Android/iOS system back gesture
+        if (gesture.x0 < 20 || gesture.x0 > screenWidthRef.current - 20) return false;
         if (Math.abs(gesture.dx) <= 18 || Math.abs(gesture.dx) <= Math.abs(gesture.dy) * 1.6) {
           return false;
         }
@@ -181,6 +185,7 @@ export default function TabLayout() {
   return (
     <View {...panResponder.panHandlers} style={{ flex: 1 }}>
       <Tabs
+        backBehavior="initialRoute"
         detachInactiveScreens={false}
         screenOptions={tabOptions}
         screenListeners={screenListeners}
