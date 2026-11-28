@@ -1161,71 +1161,124 @@ export function HrTrainingPanel({
             label="Tự động giao khi có nhân sự mới"
             value={formAutoOnboarding}
             onValueChange={setFormAutoOnboarding}
+            last
           />
 
           {/* Lessons builder */}
-          <View style={[styles.builderHeader, { marginTop: 12 }]}>
-            <Text style={styles.label}>Bài giảng ({formLessons.length})</Text>
+          <View style={styles.builderFlatHeader}>
+            <Text style={styles.builderFlatSectionTitle}>Bài giảng ({formLessons.length})</Text>
             <Pressable
               onPress={() => openLessonEditor()}
-              style={styles.addSmallBtn}
+              hitSlop={8}
+              style={({ pressed }) => [styles.builderAddLink, pressed && { opacity: 0.65 }]}
             >
-              <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm bài</Text></View>
+              <Plus size={15} strokeWidth={1.9} color={colors.primary} />
+              <Text style={styles.builderAddLinkText}>Thêm bài</Text>
             </Pressable>
           </View>
-          {formLessons.map((les, idx) => (
-            <View key={`lesson-${idx}`} style={[styles.builderEntry, { marginTop: 8 }]}>
-              <Pressable onPress={() => openLessonEditor(idx)} style={[styles.builderCard, styles.builderEntryMain]}>
-                <View style={styles.headRow}>
-                  <Text style={styles.codeBadge}>Bài {idx + 1}</Text>
-                  <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
+          {formLessons.length === 0 ? (
+            <Text style={[styles.muted, { paddingVertical: 10 }]}>Chưa có bài giảng nào.</Text>
+          ) : (
+            formLessons.map((les, idx) => {
+              const isLast = idx === formLessons.length - 1;
+              return (
+                <View
+                  key={`lesson-${idx}`}
+                  style={[styles.builderFlatRow, isLast && styles.builderFlatRowLast]}
+                >
+                  <Pressable
+                    onPress={() => openLessonEditor(idx)}
+                    style={({ pressed }) => [styles.builderFlatCopy, pressed && { opacity: 0.65 }]}
+                  >
+                    <Text numberOfLines={1} style={styles.builderFlatTitle}>
+                      Bài {idx + 1}: {les.title || 'Chưa có tên bài giảng'}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.builderFlatSub}>
+                      {les.type === 'video' || les.type === 'youtube' ? 'Video' : 'Văn bản / Tài liệu'}
+                      {les.url ? ` · ${les.url}` : ''}
+                    </Text>
+                  </Pressable>
+                  <View style={styles.builderFlatActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xóa bài ${idx + 1}`}
+                      onPress={() => setFormLessons((prev) => prev.filter((_, i) => i !== idx))}
+                      hitSlop={8}
+                      style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.55 }]}
+                    >
+                      <Trash2 size={16} strokeWidth={1.7} color="#DC2626" />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Sửa bài ${idx + 1}`}
+                      onPress={() => openLessonEditor(idx)}
+                      hitSlop={8}
+                    >
+                      <ChevronRight size={16} strokeWidth={1.7} color="#9CA3AF" />
+                    </Pressable>
+                  </View>
                 </View>
-                <Text numberOfLines={1} style={styles.rowTitle}>{les.title || 'Chưa có tên bài giảng'}</Text>
-                <Text numberOfLines={1} style={styles.muted}>
-                  {les.type === 'video' || les.type === 'youtube' ? 'Video' : 'Văn bản / Tài liệu'}
-                  {les.url ? ` · ${les.url}` : ''}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setFormLessons((prev) => prev.filter((_, i) => i !== idx))}
-                style={styles.deleteEntryBtn}
-              >
-                <Text style={styles.smallDelBtnText}>Xóa</Text>
-              </Pressable>
-            </View>
-          ))}
+              );
+            })
+          )}
 
           {/* Quiz builder */}
-          <View style={[styles.builderHeader, { marginTop: 14 }]}>
-            <Text style={styles.label}>Trắc nghiệm MCQ ({formQuizzes.length})</Text>
+          <View style={styles.builderFlatHeader}>
+            <Text style={styles.builderFlatSectionTitle}>Trắc nghiệm MCQ ({formQuizzes.length})</Text>
             <Pressable
               onPress={() => openQuizEditor()}
-              style={styles.addSmallBtn}
+              hitSlop={8}
+              style={({ pressed }) => [styles.builderAddLink, pressed && { opacity: 0.65 }]}
             >
-              <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm câu hỏi</Text></View>
+              <Plus size={15} strokeWidth={1.9} color={colors.primary} />
+              <Text style={styles.builderAddLinkText}>Thêm câu hỏi</Text>
             </Pressable>
           </View>
-          {formQuizzes.map((q, qIdx) => (
-            <View key={`quiz-${qIdx}`} style={[styles.builderEntry, { marginTop: 8 }]}>
-              <Pressable onPress={() => openQuizEditor(qIdx)} style={[styles.builderCard, styles.builderEntryMain]}>
-                <View style={styles.headRow}>
-                  <Text style={styles.codeBadge}>Câu {qIdx + 1}</Text>
-                  <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
+          {formQuizzes.length === 0 ? (
+            <Text style={[styles.muted, { paddingVertical: 10 }]}>Chưa có câu hỏi trắc nghiệm nào.</Text>
+          ) : (
+            formQuizzes.map((q, qIdx) => {
+              const isLast = qIdx === formQuizzes.length - 1;
+              return (
+                <View
+                  key={`quiz-${qIdx}`}
+                  style={[styles.builderFlatRow, isLast && styles.builderFlatRowLast]}
+                >
+                  <Pressable
+                    onPress={() => openQuizEditor(qIdx)}
+                    style={({ pressed }) => [styles.builderFlatCopy, pressed && { opacity: 0.65 }]}
+                  >
+                    <Text numberOfLines={2} style={styles.builderFlatTitle}>
+                      Câu {qIdx + 1}: {q.question || 'Chưa có nội dung câu hỏi'}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.builderFlatSub}>
+                      {q.options.filter((option) => option.trim()).length} đáp án
+                      {q.options[q.correctOptionIndex]?.trim() ? ` · Đúng: ${q.options[q.correctOptionIndex].trim()}` : ''}
+                    </Text>
+                  </Pressable>
+                  <View style={styles.builderFlatActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xóa câu ${qIdx + 1}`}
+                      onPress={() => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx))}
+                      hitSlop={8}
+                      style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.55 }]}
+                    >
+                      <Trash2 size={16} strokeWidth={1.7} color="#DC2626" />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Sửa câu ${qIdx + 1}`}
+                      onPress={() => openQuizEditor(qIdx)}
+                      hitSlop={8}
+                    >
+                      <ChevronRight size={16} strokeWidth={1.7} color="#9CA3AF" />
+                    </Pressable>
+                  </View>
                 </View>
-                <Text numberOfLines={2} style={styles.rowTitle}>{q.question || 'Chưa có nội dung câu hỏi'}</Text>
-                <Text numberOfLines={1} style={styles.muted}>
-                  {q.options.filter((option) => option.trim()).length} đáp án
-                  {q.options[q.correctOptionIndex]?.trim() ? ` · Đúng: ${q.options[q.correctOptionIndex].trim()}` : ''}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx))}
-                style={styles.deleteEntryBtn}
-              >
-                <Text style={styles.smallDelBtnText}>Xóa</Text>
-              </Pressable>
-            </View>
-          ))}
+              );
+            })
+          )}
         </View>
       </FullScreenFormModal>
       <FullScreenFormModal
@@ -1777,6 +1830,34 @@ const styles = StyleSheet.create({
   builderEntry: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   builderEntryMain: { flex: 1 },
   deleteEntryBtn: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 8 },
+  builderFlatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#EEF2F7',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  builderFlatSectionTitle: { color: '#111827', fontSize: 15, fontWeight: '600' },
+  builderAddLink: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 2 },
+  builderAddLinkText: { color: colors.primary, fontSize: 13.5, fontWeight: '500' },
+  builderFlatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  builderFlatRowLast: { borderBottomWidth: 0 },
+  builderFlatCopy: { flex: 1, gap: 3 },
+  builderFlatTitle: { color: '#111827', fontSize: 14.5, fontWeight: '500', lineHeight: 20 },
+  builderFlatSub: { color: '#6B7280', fontSize: 12.5, fontWeight: '400' },
+  builderFlatActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   editorForm: { gap: 8, paddingBottom: 14 },
   editorTextArea: { minHeight: 90, textAlignVertical: 'top' },
   editorActionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
