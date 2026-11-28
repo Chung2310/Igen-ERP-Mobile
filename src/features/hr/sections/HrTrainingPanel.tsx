@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Linking,
   Modal,
   Pressable,
@@ -79,6 +80,14 @@ function formatDate(value?: string): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('vi-VN');
+}
+
+function getYoutubeThumbnailUrl(rawUrl?: string): string | null {
+  if (!rawUrl) return null;
+  const match = rawUrl
+    .trim()
+    .match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/))([A-Za-z0-9_-]{11})/i);
+  return match?.[1] ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null;
 }
 
 function IntroCourseIcon({ size = 17, color = colors.ink }: { size?: number; color?: string }) {
@@ -840,6 +849,14 @@ export function HrTrainingPanel({
         {activeIndex >= 0 && activeIndex < lessons.length ? (() => {
           const les = lessons[activeIndex];
           const isVideo = les.type === 'video' || les.type === 'youtube';
+          const youtubeThumb = les.url ? getYoutubeThumbnailUrl(les.url) : null;
+          const showVideoCard = isVideo || Boolean(youtubeThumb);
+          const openLessonLink = () => {
+            if (!les.url) return;
+            void Linking.openURL(les.url).catch(() =>
+              showHrNotice('Không mở được liên kết', 'Vui lòng kiểm tra lại đường dẫn bài giảng.', 'error'),
+            );
+          };
           return (
             <View style={styles.lessonFlatWrap}>
               <View style={styles.lessonHeaderBar}>
@@ -883,24 +900,47 @@ export function HrTrainingPanel({
               </View>
 
               {les.url ? (
-                <Pressable
-                  onPress={() => void Linking.openURL(les.url!)}
-                  style={styles.resourceBox}
-                >
-                  <View style={styles.iconButtonContent}>
-                    {isVideo ? (
-                      <Video size={15} color={colors.primary} />
-                    ) : (
-                      <Paperclip size={15} color={colors.primary} />
-                    )}
-                    <Text style={styles.resourceTitle}>
-                      {isVideo ? 'Mở video bài giảng' : 'Mở tài liệu đính kèm'}
-                    </Text>
+                showVideoCard ? (
+                  <View style={styles.videoCard}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Mở video bài giảng"
+                      onPress={openLessonLink}
+                      style={({ pressed }) => [styles.videoThumbWrap, pressed && { opacity: 0.9 }]}
+                    >
+                      {youtubeThumb ? (
+                        <Image
+                          source={{ uri: youtubeThumb }}
+                          style={styles.videoThumbImage}
+                          resizeMode="cover"
+                        />
+                      ) : null}
+                      <View style={styles.videoThumbOverlay}>
+                        <View style={styles.videoPlayCircle}>
+                          <Play size={22} color={colors.white} fill={colors.white} />
+                        </View>
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={openLessonLink}
+                      style={({ pressed }) => [styles.videoOpenBtn, pressed && { opacity: 0.85 }]}
+                    >
+                      <Video size={16} color={colors.white} />
+                      <Text style={styles.videoOpenBtnText}>Mở video bài giảng</Text>
+                    </Pressable>
                   </View>
-                  <Text numberOfLines={2} style={styles.resourceUrl}>
-                    {les.fileName || les.url}
-                  </Text>
-                </Pressable>
+                ) : (
+                  <Pressable onPress={openLessonLink} style={styles.resourceBox}>
+                    <View style={styles.iconButtonContent}>
+                      <Paperclip size={15} color={colors.primary} />
+                      <Text style={styles.resourceTitle}>Mở tài liệu đính kèm</Text>
+                    </View>
+                    <Text numberOfLines={2} style={styles.resourceUrl}>
+                      {les.fileName || les.url}
+                    </Text>
+                  </Pressable>
+                )
               ) : null}
 
               {les.content ? (
@@ -1798,6 +1838,48 @@ const styles = StyleSheet.create({
   resourceBox: { backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, gap: 4 },
   resourceTitle: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   resourceUrl: { color: '#6B7280', fontSize: 11.5 },
+  videoCard: { gap: 10 },
+  videoThumbWrap: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    position: 'relative',
+  },
+  videoThumbImage: { width: '100%', height: '100%' },
+  videoThumbOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 3,
+  },
+  videoOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    minHeight: 42,
+    paddingHorizontal: 14,
+  },
+  videoOpenBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
   lessonContentBox: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12 },
   lessonFlatWrap: { gap: 12, paddingTop: 2 },
   lessonHeaderBar: {
