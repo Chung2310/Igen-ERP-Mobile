@@ -609,7 +609,6 @@ export function HrBranchesPanel({
                         {branch.name}
                       </Text>
                       <View style={styles.inlineBadges}>
-                        {isMain ? <Text style={styles.mainBadge}>Trụ sở chính</Text> : null}
                         <Text style={[styles.statusBadge, !active && styles.statusInactive]}>
                           {active ? 'Hoạt động' : 'Tạm ngưng'}
                         </Text>
