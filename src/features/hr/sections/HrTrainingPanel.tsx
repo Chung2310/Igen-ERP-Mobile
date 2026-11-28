@@ -31,14 +31,19 @@ import {
   ChevronDown,
   ClipboardList,
   Clock3,
+  Ellipsis,
   Eye,
   FileText,
   Paperclip,
+  Pencil,
   Play,
   Plus,
+  Trash2,
   UserRound,
   Video,
 } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { Card } from '@/components/Card';
 import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
@@ -74,6 +79,63 @@ function formatDate(value?: string): string {
   return d.toLocaleDateString('vi-VN');
 }
 
+function IntroCourseIcon({ size = 17, color = colors.ink }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Clean course overview card with info dot & structured intro lines */}
+      <Rect
+        x="3.5"
+        y="4"
+        width="17"
+        height="16"
+        rx="3"
+        stroke={color}
+        strokeWidth="1.65"
+      />
+      {/* Top header divider */}
+      <Path d="M3.5 9H20.5" stroke={color} strokeWidth="1.5" />
+      {/* Mini header dots */}
+      <Path d="M6.8 6.5H7.2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <Path d="M9.8 6.5H10.2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      {/* Small info "i" mark on left + intro text lines on right */}
+      <Path d="M7.5 12.2H7.55" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <Path d="M7.5 14.6V17" stroke={color} strokeWidth="1.65" strokeLinecap="round" />
+      <Path d="M11 13H17.2" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <Path d="M11 16.3H15.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function LessonCountIcon({ size = 14, color = colors.muted }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Stacked book / lesson cover with bookmark & page detail lines */}
+      <Rect
+        x="4"
+        y="3.5"
+        width="16"
+        height="17"
+        rx="2.4"
+        stroke={color}
+        strokeWidth="1.85"
+      />
+      {/* Left binding spine */}
+      <Path d="M8 3.5V20.5" stroke={color} strokeWidth="1.75" />
+      {/* Bookmark tab at top-right */}
+      <Path
+        d="M14.5 3.5V9.2L16.25 7.9L18 9.2V3.5"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Crisp lesson text lines */}
+      <Path d="M11 12.2H17" stroke={color} strokeWidth="1.65" strokeLinecap="round" />
+      <Path d="M11 15.6H15.5" stroke={color} strokeWidth="1.65" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function HrTrainingPanel({
   companyCode,
   canManage,
@@ -107,8 +169,10 @@ export function HrTrainingPanel({
   const [monitorModalOpen, setMonitorModalOpen] = useState(false);
 
   // Study / Detail screen state
+  const insets = useSafeAreaInsets();
   const [selectedCourse, setSelectedCourse] = useState<HrTrainingCourse | null>(null);
   const [activeIndex, setActiveIndex] = useState<number>(-1); // -1 = intro, 0..n-1 = lesson, n = quiz
+  const [actionSheetOpen, setActionSheetOpen] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizErrors, setQuizErrors] = useState<Record<number, boolean>>({});
@@ -598,24 +662,11 @@ export function HrTrainingPanel({
 
     return (
       <SlideInPage key={selectedCourse.id}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Top bar */}
-        <View style={styles.detailTopBar}>
-          <Pressable onPress={() => setSelectedCourse(null)} style={styles.backBtn}>
-            <View style={styles.iconButtonContent}><ArrowLeft size={14} color={colors.ink} /><Text style={styles.backBtnText}>Danh sách</Text></View>
-          </Pressable>
-          {canEditThis ? (
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <Pressable onPress={() => openEditCourse(selectedCourse)} style={styles.smallEditBtn}>
-                <Text style={styles.smallEditBtnText}>Sửa</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDeleteCourse(selectedCourse)} style={styles.smallDelBtn}>
-                <Text style={styles.smallDelBtnText}>Xóa</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-
+      <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: 108 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Course Header & Progress Card */}
         <Card style={styles.heroCard}>
           <View style={styles.badgeRow}>
@@ -643,33 +694,43 @@ export function HrTrainingPanel({
             <Pressable
               disabled={submittingProgress}
               onPress={() => void handleCompleteDirectly()}
-              style={styles.bypassBtn}
+              style={({ pressed }) => [styles.startCourseBtn, pressed && { opacity: 0.72 }]}
             >
-              <Text style={styles.bypassBtnText}>Bỏ qua & Hoàn thành học (Quản lý)</Text>
+              <Text style={styles.startCourseBtnText}>Bỏ qua</Text>
             </Pressable>
           ) : null}
         </Card>
 
-        {/* Syllabus navigation pills */}
+        {/* Full inline syllabus list */}
         <Text style={styles.sectionTitle}>Mục lục khóa học</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 7, paddingBottom: 10 }}
-        >
+        <View style={styles.syllabusCard}>
           <Pressable
             onPress={() => {
               setActiveIndex(-1);
               setQuizSubmitted(false);
             }}
-            style={[styles.syllabusPill, activeIndex === -1 && styles.syllabusPillActive]}
+            style={[
+              styles.syllabusListRow,
+              activeIndex === -1 && styles.syllabusSheetRowActive,
+            ]}
           >
-            <View style={styles.iconButtonContent}><BookOpen size={13} color={activeIndex === -1 ? colors.white : colors.primary} /><Text style={[styles.syllabusText, activeIndex === -1 && styles.syllabusTextActive]}>Giới thiệu</Text></View>
+            <IntroCourseIcon size={17} color={colors.ink} />
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.syllabusSheetRowText,
+                activeIndex === -1 && styles.syllabusSheetRowTextActive,
+              ]}
+            >
+              Giới thiệu
+            </Text>
+            {activeIndex === -1 ? <Check size={16} color={colors.primary} /> : null}
           </Pressable>
 
           {lessons.map((les, idx) => {
             const done = completedLessons.includes(`lesson_${idx}`);
             const active = activeIndex === idx;
+            const isLast = idx === lessons.length - 1 && quizzes.length === 0;
             return (
               <Pressable
                 key={idx}
@@ -677,12 +738,29 @@ export function HrTrainingPanel({
                   setActiveIndex(idx);
                   setQuizSubmitted(false);
                 }}
-                style={[styles.syllabusPill, active && styles.syllabusPillActive]}
+                style={[
+                  styles.syllabusListRow,
+                  active && styles.syllabusSheetRowActive,
+                  isLast && styles.syllabusListRowLast,
+                ]}
               >
-                <View style={styles.iconButtonContent}>
-                  {done ? <CircleCheck size={13} color={active ? colors.white : '#16885A'} /> : les.type === 'video' || les.type === 'youtube' ? <Video size={13} color={active ? colors.white : colors.primary} /> : <FileText size={13} color={active ? colors.white : colors.primary} />}
-                  <Text style={[styles.syllabusText, active && styles.syllabusTextActive]} numberOfLines={1}>Bài {idx + 1}: {les.title}</Text>
-                </View>
+                {done ? (
+                  <CircleCheck size={17} strokeWidth={1.6} color="#16885A" />
+                ) : les.type === 'video' || les.type === 'youtube' ? (
+                  <Video size={17} strokeWidth={1.6} color={colors.ink} />
+                ) : (
+                  <FileText size={17} strokeWidth={1.6} color={colors.ink} />
+                )}
+                <Text
+                  numberOfLines={2}
+                  style={[
+                    styles.syllabusSheetRowText,
+                    active && styles.syllabusSheetRowTextActive,
+                  ]}
+                >
+                  Bài {idx + 1}: {les.title}
+                </Text>
+                {active ? <Check size={16} color={colors.primary} /> : null}
               </Pressable>
             );
           })}
@@ -697,25 +775,30 @@ export function HrTrainingPanel({
                 setActiveIndex(lessons.length);
               }}
               style={[
-                styles.syllabusPill,
-                activeIndex === lessons.length && styles.syllabusPillActive,
+                styles.syllabusListRow,
+                styles.syllabusListRowLast,
+                activeIndex === lessons.length && styles.syllabusSheetRowActive,
                 !isLessonsDone && styles.disabled,
               ]}
             >
-              <View style={styles.iconButtonContent}>
-                {isQuizPassed ? <CircleCheck size={13} color={activeIndex === lessons.length ? colors.white : '#16885A'} /> : <ClipboardList size={13} color={activeIndex === lessons.length ? colors.white : colors.primary} />}
+              {isQuizPassed ? (
+                <CircleCheck size={17} strokeWidth={1.6} color="#16885A" />
+              ) : (
+                <ClipboardList size={17} strokeWidth={1.6} color={colors.ink} />
+              )}
               <Text
+                numberOfLines={1}
                 style={[
-                  styles.syllabusText,
-                  activeIndex === lessons.length && styles.syllabusTextActive,
+                  styles.syllabusSheetRowText,
+                  activeIndex === lessons.length && styles.syllabusSheetRowTextActive,
                 ]}
               >
                 Thi trắc nghiệm ({quizzes.length})
               </Text>
-              </View>
+              {activeIndex === lessons.length ? <Check size={16} color={colors.primary} /> : null}
             </Pressable>
           ) : null}
-        </ScrollView>
+        </View>
 
         {/* Section 1: Overview / Intro */}
         {activeIndex === -1 ? (
@@ -751,9 +834,9 @@ export function HrTrainingPanel({
                   showHrNotice('Thông báo', 'Khóa học chưa có nội dung bài giảng.');
                 }
               }}
-              style={styles.submitBtn}
+              style={({ pressed }) => [styles.startCourseBtn, pressed && { opacity: 0.72 }]}
             >
-              <View style={styles.iconButtonContent}><Play size={14} color={colors.white} /><Text style={styles.submitBtnText}>Bắt đầu học</Text></View>
+              <View style={styles.iconButtonContent}><Play size={14} color={colors.ink} /><Text style={styles.startCourseBtnText}>Bắt đầu học</Text></View>
             </Pressable>
           </Card>
         ) : null}
@@ -894,6 +977,90 @@ export function HrTrainingPanel({
         {renderCourseFormModal()}
         <HrNoticeHost />
       </ScrollView>
+
+      {/* Floating action widget for course actions */}
+      <HrFab
+        label="Tùy chọn khóa học"
+        icon={<Ellipsis size={24} strokeWidth={2.2} color={colors.white} />}
+        onPress={() => setActionSheetOpen(true)}
+      />
+
+      {/* Bottom Sheet: Thao tác khóa học (Quay lại danh sách / Sửa / Xóa) */}
+      <Modal
+        visible={actionSheetOpen}
+        transparent
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => setActionSheetOpen(false)}
+      >
+        <Pressable
+          style={styles.bottomSheetBackdrop}
+          onPress={() => setActionSheetOpen(false)}
+        >
+          <Pressable
+            style={[
+              styles.bottomSheetCard,
+              { paddingBottom: Math.max(insets.bottom + 14, 24) },
+            ]}
+            onPress={() => {}}
+          >
+            <View style={styles.bottomSheetHandle} />
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Quay lại danh sách"
+              onPress={() => {
+                setActionSheetOpen(false);
+                setSelectedCourse(null);
+              }}
+              style={({ pressed }) => [
+                styles.actionSheetRow,
+                pressed && styles.actionSheetRowPressed,
+              ]}
+            >
+              <ArrowLeft size={18} strokeWidth={1.6} color={colors.ink} />
+              <Text style={styles.actionSheetRowText}>Quay lại danh sách</Text>
+            </Pressable>
+
+            {canEditThis ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Sửa khóa học"
+                  onPress={() => {
+                    setActionSheetOpen(false);
+                    openEditCourse(selectedCourse);
+                  }}
+                  style={({ pressed }) => [
+                    styles.actionSheetRow,
+                    pressed && styles.actionSheetRowPressed,
+                  ]}
+                >
+                  <Pencil size={18} strokeWidth={1.6} color={colors.ink} />
+                  <Text style={styles.actionSheetRowText}>Sửa khóa học</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Xóa khóa học"
+                  onPress={() => {
+                    setActionSheetOpen(false);
+                    handleDeleteCourse(selectedCourse);
+                  }}
+                  style={({ pressed }) => [
+                    styles.actionSheetRow,
+                    pressed && styles.actionSheetRowPressed,
+                  ]}
+                >
+                  <Trash2 size={18} strokeWidth={1.6} color={colors.ink} />
+                  <Text style={styles.actionSheetRowText}>Xóa khóa học</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+      </View>
       </SlideInPage>
     );
   }
@@ -1228,8 +1395,7 @@ export function HrTrainingPanel({
 
                 <View style={styles.headRow}>
                   <View style={[styles.courseMetaRow, { flex: 1 }]}>
-                    <UserRound size={13} color={colors.muted} /><Text numberOfLines={1} style={styles.subMeta}>{course.instructor || 'Chưa cập nhật'}</Text>
-                    <BookOpen size={13} color={colors.muted} /><Text style={styles.subMeta}>{course.lessons?.length ?? 0} bài học</Text>
+                    <LessonCountIcon size={14} color={colors.muted} /><Text style={styles.subMeta}>{course.lessons?.length ?? 0} bài học</Text>
                     {(course.quizzes?.length ?? 0) > 0 ? <><ClipboardList size={13} color={colors.muted} /><Text style={styles.subMeta}>{course.quizzes?.length} câu thi</Text></> : null}
                   </View>
                   {createdLabel ? <Text style={styles.subMeta}>{createdLabel}</Text> : null}
@@ -1401,6 +1567,107 @@ const styles = StyleSheet.create({
   syllabusPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   syllabusText: { color: '#111827', fontSize: 12, fontWeight: '500' },
   syllabusTextActive: { color: colors.white, fontWeight: '600' },
+  syllabusTrigger: {
+    ...HAIRLINE_CARD,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 12,
+    gap: 10,
+  },
+  syllabusTriggerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+  },
+  syllabusTriggerCaption: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '400',
+  },
+  syllabusTriggerValue: {
+    color: '#111827',
+    fontSize: 13.5,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  bottomSheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+  },
+  bottomSheetCard: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  bottomSheetHandle: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 12,
+  },
+  bottomSheetTitle: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '600',
+    paddingHorizontal: 6,
+    marginBottom: 8,
+  },
+  syllabusCard: {
+    ...HAIRLINE_CARD,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  syllabusListRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  syllabusListRowLast: {
+    borderBottomWidth: 0,
+  },
+  syllabusSheetRowActive: {
+    backgroundColor: '#EFF6FF',
+  },
+  syllabusSheetRowText: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: '400',
+  },
+  syllabusSheetRowTextActive: {
+    color: colors.ink,
+    fontWeight: '500',
+  },
+  actionSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  actionSheetRowPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  actionSheetRowText: {
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: '400',
+  },
   studyCard: { ...HAIRLINE_CARD, padding: 15, gap: 10 },
   lessonCounter: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
   studyHeading: { color: '#111827', fontSize: 15, fontWeight: '600', lineHeight: 21 },
@@ -1459,6 +1726,18 @@ const styles = StyleSheet.create({
   pickerRowActive: { backgroundColor: '#EAF2FF' },
   submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 6, paddingHorizontal: 14 },
   submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
+  startCourseBtn: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minHeight: 36,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    paddingHorizontal: 12,
+  },
+  startCourseBtnText: { color: colors.ink, fontSize: 12.5, fontWeight: '500' },
   cancelBtn: { backgroundColor: '#F1F5F9', minHeight: 44, paddingHorizontal: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   cancelBtnText: { color: '#374151', fontSize: 13, fontWeight: '600' },
   disabled: { opacity: 0.45 },
