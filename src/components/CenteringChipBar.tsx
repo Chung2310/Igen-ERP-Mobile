@@ -152,10 +152,9 @@ export function SlidingSegmentBar<T extends string>({
   textStyle,
   textActiveStyle,
 }: SlidingSegmentBarProps<T>) {
-  const layoutsRef = useRef<Record<string, { x: number; width: number; height: number }>>({});
+  const layoutsRef = useRef<Record<string, { x: number; width: number }>>({});
   const indicatorX = useRef(new Animated.Value(0)).current;
-  const indicatorW = useRef(new Animated.Value(0)).current;
-  const [indicatorReady, setIndicatorReady] = useState(false);
+  const [indicatorWidth, setIndicatorWidth] = useState(0);
   const initializedRef = useRef(false);
 
   const moveIndicator = useCallback(
@@ -163,30 +162,22 @@ export function SlidingSegmentBar<T extends string>({
       const target = layoutsRef.current[key];
       if (!target || target.width <= 0) return;
 
+      setIndicatorWidth(target.width);
       if (!animated || !initializedRef.current) {
         initializedRef.current = true;
         indicatorX.setValue(target.x);
-        indicatorW.setValue(target.width);
-        setIndicatorReady(true);
         return;
       }
 
-      Animated.parallel([
-        Animated.timing(indicatorX, {
-          toValue: target.x,
-          duration: 210,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }),
-        Animated.timing(indicatorW, {
-          toValue: target.width,
-          duration: 210,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }),
-      ]).start();
+      indicatorX.stopAnimation();
+      Animated.spring(indicatorX, {
+        toValue: target.x,
+        useNativeDriver: true,
+        speed: 26,
+        bounciness: 3,
+      }).start();
     },
-    [indicatorW, indicatorX],
+    [indicatorX],
   );
 
   useEffect(() => {
@@ -195,13 +186,13 @@ export function SlidingSegmentBar<T extends string>({
 
   return (
     <View style={[styles.segmentWrap, style]}>
-      {indicatorReady ? (
+      {indicatorWidth > 0 ? (
         <Animated.View
           pointerEvents="none"
           style={[
             styles.segmentIndicator,
             indicatorStyle,
-            { left: indicatorX, width: indicatorW },
+            { width: indicatorWidth, transform: [{ translateX: indicatorX }] },
           ]}
         />
       ) : null}
@@ -211,8 +202,8 @@ export function SlidingSegmentBar<T extends string>({
           <Pressable
             key={item.key}
             onLayout={(e) => {
-              const { x, width, height } = e.nativeEvent.layout;
-              layoutsRef.current[item.key] = { x, width, height };
+              const { x, width } = e.nativeEvent.layout;
+              layoutsRef.current[item.key] = { x, width };
               if (item.key === activeKey) {
                 moveIndicator(activeKey, initializedRef.current);
               }
@@ -245,6 +236,7 @@ const styles = StyleSheet.create({
   },
   segmentIndicator: {
     position: 'absolute',
+    left: 0,
     top: 3,
     bottom: 3,
     borderRadius: 9,
@@ -281,24 +273,30 @@ export function AnimatedFilterContent({
     }
     opacity.stopAnimation();
     translateY.stopAnimation();
-    opacity.setValue(0.15);
-    translateY.setValue(8);
-    const anim = Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 210,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 210,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]);
-    anim.start();
-    return () => anim.stop();
+    opacity.setValue(0.45);
+    translateY.setValue(6);
+    let anim: Animated.CompositeAnimation | null = null;
+    const raf = requestAnimationFrame(() => {
+      anim = Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]);
+      anim.start();
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      anim?.stop();
+    };
   }, [opacity, transitionKey, translateY]);
 
   return (

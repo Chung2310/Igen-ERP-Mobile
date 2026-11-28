@@ -81,8 +81,10 @@ export default function TabLayout() {
   }
   const routerRef = useRef(router);
   routerRef.current = router;
+  const tabNavRef = useRef<{ navigate: (name: string) => void } | null>(null);
   const screenWidthRef = useRef(screenWidth);
   screenWidthRef.current = screenWidth;
+  const dragX = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -103,23 +105,48 @@ export default function TabLayout() {
         if (gesture.dx < 0 && idx >= routes.length - 1) return false;
         return true;
       },
+      onPanResponderMove: (_, gesture) => {
+        dragX.setValue(Math.max(-28, Math.min(28, gesture.dx * 0.2)));
+      },
       onPanResponderRelease: (_, gesture) => {
         const active = currentTabRef.current;
         const routes = visibleTabRoutesRef.current;
         const idx = routes.indexOf(active);
-        if (idx < 0) return;
         const isHorizontalSwipe =
+          idx >= 0 &&
           (Math.abs(gesture.dx) >= 44 || Math.abs(gesture.vx) >= 0.35) &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
-        if (!isHorizontalSwipe) return;
 
-        const nextIdx = gesture.dx < 0 ? idx + 1 : idx - 1;
-        if (nextIdx >= 0 && nextIdx < routes.length) {
-          const nextTab = routes[nextIdx];
-          currentTabRef.current = nextTab;
-          Keyboard.dismiss();
-          routerRef.current.navigate(TAB_HREFS[nextTab]);
+        if (isHorizontalSwipe) {
+          const nextIdx = gesture.dx < 0 ? idx + 1 : idx - 1;
+          if (nextIdx >= 0 && nextIdx < routes.length) {
+            const nextTab = routes[nextIdx];
+            currentTabRef.current = nextTab;
+            dragX.setValue(0);
+            Keyboard.dismiss();
+            if (tabNavRef.current) {
+              tabNavRef.current.navigate(nextTab);
+            } else {
+              routerRef.current.navigate(TAB_HREFS[nextTab]);
+            }
+            return;
+          }
         }
+
+        Animated.spring(dragX, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 28,
+          bounciness: 3,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(dragX, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 28,
+          bounciness: 3,
+        }).start();
       },
     }),
   ).current;
@@ -128,11 +155,10 @@ export default function TabLayout() {
     () => ({
       headerShown: false,
       lazy: false,
-      freezeOnBlur: true,
       transitionSpec: {
         animation: 'timing' as const,
         config: {
-          duration: 200,
+          duration: 185,
           easing: Easing.out(Easing.cubic),
         },
       },
@@ -151,7 +177,7 @@ export default function TabLayout() {
             {
               translateX: current.progress.interpolate({
                 inputRange: [-1, 0, 1],
-                outputRange: [-screenWidth * 0.24, 0, screenWidth * 0.24],
+                outputRange: [-screenWidth * 0.18, 0, screenWidth * 0.18],
                 extrapolate: 'clamp',
               }),
             },
@@ -175,8 +201,15 @@ export default function TabLayout() {
   );
 
   const screenListeners = useMemo(
-    () => ({ route }: { route: { name: string } }) => ({
+    () => ({
+      route,
+      navigation,
+    }: {
+      route: { name: string };
+      navigation: { navigate: (name: string) => void };
+    }) => ({
       focus: () => {
+        tabNavRef.current = navigation;
         const routeName = route.name as TabRouteKey;
         if (visibleTabRoutesRef.current.includes(routeName)) {
           currentTabRef.current = routeName;
@@ -187,7 +220,10 @@ export default function TabLayout() {
   );
 
   return (
-    <View {...panResponder.panHandlers} style={{ flex: 1 }}>
+    <Animated.View
+      {...panResponder.panHandlers}
+      style={{ flex: 1, transform: [{ translateX: dragX }] }}
+    >
       <Tabs
         backBehavior="initialRoute"
         detachInactiveScreens={false}
@@ -248,6 +284,6 @@ export default function TabLayout() {
         }}
       />
       </Tabs>
-    </View>
+    </Animated.View>
   );
 }
