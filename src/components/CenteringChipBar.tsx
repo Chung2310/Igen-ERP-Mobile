@@ -371,14 +371,14 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   underlineIndicator: {
     position: 'absolute',
     left: 0,
     bottom: 0,
-    height: 2.5,
-    borderRadius: 2,
+    height: 1.5,
+    borderRadius: 1,
     backgroundColor: colors.primary,
   },
   rowChip: {
