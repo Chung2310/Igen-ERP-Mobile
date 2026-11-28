@@ -1485,11 +1485,6 @@ export function HrTrainingPanel({
             </Text>
             <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
           </Pressable>
-          {monitorUid ? (
-            <Pressable onPress={() => setMonitorUid('')} hitSlop={8} style={styles.clearMonitorBtn}>
-              <Text style={styles.clearMonitorText}>Xem của tôi</Text>
-            </Pressable>
-          ) : null}
         </View>
       ) : null}
 
@@ -1650,8 +1645,6 @@ const styles = StyleSheet.create({
   monitorTriggerText: { color: colors.ink, fontSize: 15, fontWeight: '400', flexShrink: 1 },
   monitorChip: { backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   monitorChipText: { color: colors.primary, fontSize: 12, fontWeight: '500' },
-  clearMonitorBtn: { paddingVertical: 4, paddingLeft: 8 },
-  clearMonitorText: { color: colors.primary, fontSize: 13.5, fontWeight: '500' },
   monitorSheetBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.35)', justifyContent: 'flex-end' },
   monitorSheet: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 26 },
   monitorSheetHandle: { width: 38, height: 4, borderRadius: 99, backgroundColor: '#D6DFEC', alignSelf: 'center', marginBottom: 12 },
