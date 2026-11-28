@@ -592,7 +592,7 @@ export function OrgChartPanel({
     setAddQualification('');
     setAddSalary('');
     setAddJdLink('');
-    setAddDepartmentOpen(false);
+    setFormPicker(null);
     const defaultMgr =
       orgNodes.find((n) => n.role === 'manager') ||
       orgNodes.find((n) => n.role === 'branch_owner') ||
