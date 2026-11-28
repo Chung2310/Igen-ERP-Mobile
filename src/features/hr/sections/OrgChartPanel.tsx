@@ -16,6 +16,7 @@ import {
 import { Building2, Check, ChevronDown, ChevronRight, Crown, FileText, Pencil, Phone, Plus, Search } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { HrFab } from '@/features/hr/components/HrFab';
@@ -755,7 +756,7 @@ export function OrgChartPanel({
         </View>
       ) : !filteredNodes.length ? (
         <View style={styles.directoryStateWrap}>
-          <Text style={styles.muted}>Không có nhân sự nào khớp điều kiện lọc.</Text>
+          <IgenHrEmptyState message="Không có nhân sự nào khớp điều kiện lọc." />
         </View>
       ) : (
         <View style={styles.directoryListFlat}>
@@ -905,78 +906,128 @@ export function OrgChartPanel({
       >
         {selectedNode ? (
           isEditing ? (
-            <View style={styles.form}>
-              <Text style={styles.label}>Họ và tên *</Text>
-              <TextInput value={editName} onChangeText={setEditName} style={styles.field} />
+            <View style={styles.editBody}>
+              <Text style={styles.detailSectionTitle}>Thông tin chung</Text>
 
-              <Text style={styles.label}>Chức danh</Text>
-              <TextInput value={editJobTitle} onChangeText={setEditJobTitle} placeholder="VD: Trưởng phòng Kinh doanh" placeholderTextColor={colors.muted} style={styles.field} />
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Họ và tên *</Text>
+                <TextInput
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Nhập họ và tên"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
 
-              <Text style={styles.label}>Phòng ban</Text>
-              <TextInput value={editDepartment} onChangeText={setEditDepartment} placeholder="Tên phòng ban" placeholderTextColor={colors.muted} style={styles.field} />
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Chức danh</Text>
+                <TextInput
+                  value={editJobTitle}
+                  onChangeText={setEditJobTitle}
+                  placeholder="VD: Trưởng phòng Kinh doanh"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
 
-              <Text style={styles.label}>Khối chức năng</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
-                {DIVISIONS.map((div) => (
-                  <Pressable
-                    key={div}
-                    onPress={() => setEditDivision(div)}
-                    style={[styles.deptChip, editDivision === div && styles.deptChipActive]}
-                  >
-                    <Text style={[styles.deptText, editDivision === div && styles.deptTextActive]}>{div}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Phòng ban</Text>
+                <TextInput
+                  value={editDepartment}
+                  onChangeText={setEditDepartment}
+                  placeholder="Tên phòng ban"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
 
-              <Text style={styles.label}>Quản lý trực tiếp</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
-                <Pressable
-                  onPress={() => setEditParentId('')}
-                  style={[styles.deptChip, !editParentId && styles.deptChipActive]}
-                >
-                  <Text style={[styles.deptText, !editParentId && styles.deptTextActive]}>Không có</Text>
-                </Pressable>
-                {orgNodes
-                  .filter((n) => n.nodeId !== selectedNode.nodeId)
-                  .slice(0, 20)
-                  .map((cand) => (
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Khối chức năng</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.editChipRow}>
+                  {DIVISIONS.map((div) => (
                     <Pressable
-                      key={cand.nodeId}
-                      onPress={() => setEditParentId(cand.nodeId)}
-                      style={[styles.deptChip, editParentId === cand.nodeId && styles.deptChipActive]}
+                      key={div}
+                      onPress={() => setEditDivision(div)}
+                      style={[styles.editChip, editDivision === div && styles.editChipActive]}
                     >
-                      <Text style={[styles.deptText, editParentId === cand.nodeId && styles.deptTextActive]}>
-                        {cand.displayName}
-                      </Text>
+                      <Text style={[styles.editChipText, editDivision === div && styles.editChipTextActive]}>{div}</Text>
                     </Pressable>
                   ))}
-              </ScrollView>
+                </ScrollView>
+              </View>
 
-              <Text style={styles.label}>Số điện thoại</Text>
-              <TextInput value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" style={styles.field} />
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Quản lý trực tiếp</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.editChipRow}>
+                  <Pressable
+                    onPress={() => setEditParentId('')}
+                    style={[styles.editChip, !editParentId && styles.editChipActive]}
+                  >
+                    <Text style={[styles.editChipText, !editParentId && styles.editChipTextActive]}>Không có</Text>
+                  </Pressable>
+                  {orgNodes
+                    .filter((n) => n.nodeId !== selectedNode.nodeId)
+                    .slice(0, 20)
+                    .map((cand) => (
+                      <Pressable
+                        key={cand.nodeId}
+                        onPress={() => setEditParentId(cand.nodeId)}
+                        style={[styles.editChip, editParentId === cand.nodeId && styles.editChipActive]}
+                      >
+                        <Text style={[styles.editChipText, editParentId === cand.nodeId && styles.editChipTextActive]}>
+                          {cand.displayName}
+                        </Text>
+                      </Pressable>
+                    ))}
+                </ScrollView>
+              </View>
 
-              <Text style={styles.label}>Trình độ chuyên môn</Text>
-              <TextInput value={editQualification} onChangeText={setEditQualification} style={styles.field} />
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Số điện thoại</Text>
+                <TextInput
+                  value={editPhone}
+                  onChangeText={setEditPhone}
+                  keyboardType="phone-pad"
+                  placeholder="Nhập số điện thoại"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
 
-              <Text style={styles.label}>Lương tháng (VNĐ)</Text>
-              <TextInput value={editSalary} onChangeText={setEditSalary} keyboardType="numeric" style={styles.field} />
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Trình độ chuyên môn</Text>
+                <TextInput
+                  value={editQualification}
+                  onChangeText={setEditQualification}
+                  placeholder="VD: Đại học / Thạc sĩ"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
 
-              <Text style={styles.label}>Link mô tả công việc (JD)</Text>
-              <TextInput value={editJdLink} onChangeText={setEditJdLink} autoCapitalize="none" style={styles.field} />
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Lương tháng (VNĐ)</Text>
+                <TextInput
+                  value={editSalary}
+                  onChangeText={setEditSalary}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
 
-              <View style={styles.actionRow}>
-                <Pressable onPress={() => setIsEditing(false)} style={styles.secondaryBtn}>
-                  <Text style={styles.secondaryBtnText}>Hủy</Text>
-                </Pressable>
-                <Pressable
-                  disabled={savingEdit}
-                  onPress={() => void onSaveEdit()}
-                  style={[styles.submitBtn, { flex: 1 }, savingEdit && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
-                  </Text>
-                </Pressable>
+              <View style={[styles.editRow, styles.editRowLast]}>
+                <Text style={styles.infoLabel}>Link mô tả công việc (JD)</Text>
+                <TextInput
+                  value={editJdLink}
+                  onChangeText={setEditJdLink}
+                  autoCapitalize="none"
+                  placeholder="https://..."
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
               </View>
             </View>
           ) : (
@@ -1084,102 +1135,114 @@ export function OrgChartPanel({
         saving={adding}
         onClose={() => setAddOpen(false)}
       >
-        <View style={styles.form}>
-          <Text style={styles.label}>Họ và tên *</Text>
-          <TextInput value={addName} onChangeText={setAddName} placeholder="Nguyễn Văn A" placeholderTextColor={colors.muted} style={styles.field} />
+        <View style={styles.editBody}>
+          <Text style={styles.detailSectionTitle}>Thông tin chung</Text>
 
-          <Text style={styles.label}>Email đăng nhập *</Text>
-          <TextInput value={addEmail} onChangeText={setAddEmail} keyboardType="email-address" autoCapitalize="none" placeholder="email@congty.vn" placeholderTextColor={colors.muted} style={styles.field} />
-
-          <Text style={styles.label}>Mật khẩu (tối thiểu 6 ký tự) *</Text>
-          <TextInput value={addPassword} onChangeText={setAddPassword} secureTextEntry placeholder="••••••" placeholderTextColor={colors.muted} style={styles.field} />
-
-          <Text style={styles.label}>Vai trò</Text>
-          <View style={styles.relList}>
-            {(['user', 'manager', 'branch_owner', 'admin'] as const).map((r) => (
-              <Pressable
-                key={r}
-                onPress={() => setAddRole(r)}
-                style={[styles.deptChip, addRole === r && styles.deptChipActive]}
-              >
-                <Text style={[styles.deptText, addRole === r && styles.deptTextActive]}>
-                  {ROLE_LABELS[r]}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Họ và tên *</Text>
+            <TextInput value={addName} onChangeText={setAddName} placeholder="Nguyễn Văn A" placeholderTextColor="#9CA3AF" style={styles.editInput} />
           </View>
 
-          <Text style={styles.label}>Phòng ban</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: addDepartmentOpen }}
-            onPress={() => setAddDepartmentOpen((open) => !open)}
-            style={styles.departmentSelector}
-          >
-            <Text style={[styles.departmentSelectorText, !addDepartment && styles.departmentPlaceholder]}>
-              {addDepartment || 'Chọn phòng ban'}
-            </Text>
-            <ChevronDown size={16} color={colors.muted} />
-          </Pressable>
-          {addDepartmentOpen ? (
-            <View style={styles.departmentDropdown}>
-              {departmentOptions.length > 1 ? (
-                <ScrollView nestedScrollEnabled style={styles.departmentOptions}>
-                  {departmentOptions.slice(1).map((department) => (
-                    <Pressable
-                      key={department}
-                      onPress={() => {
-                        setAddDepartment(department);
-                        setAddDepartmentOpen(false);
-                      }}
-                      style={styles.departmentOption}
-                    >
-                      <Text style={styles.departmentOptionText}>{department}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              ) : (
-                <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>
-              )}
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Email đăng nhập *</Text>
+            <TextInput value={addEmail} onChangeText={setAddEmail} keyboardType="email-address" autoCapitalize="none" placeholder="email@congty.vn" placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
+
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Mật khẩu (tối thiểu 6 ký tự) *</Text>
+            <TextInput value={addPassword} onChangeText={setAddPassword} secureTextEntry placeholder="••••••" placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
+
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Vai trò</Text>
+            <View style={styles.editChipWrap}>
+              {(['user', 'manager', 'branch_owner', 'admin'] as const).map((r) => (
+                <Pressable
+                  key={r}
+                  onPress={() => setAddRole(r)}
+                  style={[styles.editChip, addRole === r && styles.editChipActive]}
+                >
+                  <Text style={[styles.editChipText, addRole === r && styles.editChipTextActive]}>
+                    {ROLE_LABELS[r]}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
-          ) : null}
+          </View>
 
-          <Text style={styles.label}>Quản lý trực tiếp</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
-            {orgNodes.slice(0, 20).map((cand) => (
-              <Pressable
-                key={cand.nodeId}
-                onPress={() => setAddParentId(cand.nodeId)}
-                style={[styles.deptChip, addParentId === cand.nodeId && styles.deptChipActive]}
-              >
-                <Text style={[styles.deptText, addParentId === cand.nodeId && styles.deptTextActive]}>
-                  {cand.displayName}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Phòng ban</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: addDepartmentOpen }}
+              onPress={() => setAddDepartmentOpen((open) => !open)}
+              style={styles.editSelectRow}
+            >
+              <Text style={[styles.editInput, !addDepartment && styles.editPlaceholder]}>
+                {addDepartment || 'Chọn phòng ban'}
+              </Text>
+              <ChevronDown size={16} color="#6B7280" />
+            </Pressable>
+            {addDepartmentOpen ? (
+              <View style={styles.departmentDropdown}>
+                {departmentOptions.length > 1 ? (
+                  <ScrollView nestedScrollEnabled style={styles.departmentOptions}>
+                    {departmentOptions.slice(1).map((department) => (
+                      <Pressable
+                        key={department}
+                        onPress={() => {
+                          setAddDepartment(department);
+                          setAddDepartmentOpen(false);
+                        }}
+                        style={styles.departmentOption}
+                      >
+                        <Text style={styles.departmentOptionText}>{department}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>
+                )}
+              </View>
+            ) : null}
+          </View>
 
-          <Text style={styles.label}>Số điện thoại</Text>
-          <TextInput value={addPhone} onChangeText={setAddPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor={colors.muted} style={styles.field} />
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Quản lý trực tiếp</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.editChipRow}>
+              {orgNodes.slice(0, 20).map((cand) => (
+                <Pressable
+                  key={cand.nodeId}
+                  onPress={() => setAddParentId(cand.nodeId)}
+                  style={[styles.editChip, addParentId === cand.nodeId && styles.editChipActive]}
+                >
+                  <Text style={[styles.editChipText, addParentId === cand.nodeId && styles.editChipTextActive]}>
+                    {cand.displayName}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
 
-          <Text style={styles.label}>Trình độ chuyên môn</Text>
-          <TextInput value={addQualification} onChangeText={setAddQualification} placeholder="Đại học / Thạc sĩ..." placeholderTextColor={colors.muted} style={styles.field} />
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Số điện thoại</Text>
+            <TextInput value={addPhone} onChangeText={setAddPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
 
-          <Text style={styles.label}>Lương tháng (VNĐ)</Text>
-          <TextInput value={addSalary} onChangeText={setAddSalary} keyboardType="numeric" placeholder="15.000.000" placeholderTextColor={colors.muted} style={styles.field} />
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Trình độ chuyên môn</Text>
+            <TextInput value={addQualification} onChangeText={setAddQualification} placeholder="Đại học / Thạc sĩ..." placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
 
-          <Text style={styles.label}>Link mô tả công việc (JD)</Text>
-          <TextInput value={addJdLink} onChangeText={setAddJdLink} autoCapitalize="none" placeholder="https://..." placeholderTextColor={colors.muted} style={styles.field} />
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Lương tháng (VNĐ)</Text>
+            <TextInput value={addSalary} onChangeText={setAddSalary} keyboardType="numeric" placeholder="15.000.000" placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
 
-          <Pressable
-            disabled={adding}
-            onPress={() => void onAddEmployee()}
-            style={[styles.submitBtn, adding && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>
-              {adding ? 'Đang thêm...' : 'Thêm vào danh sách nhân sự'}
-            </Text>
-          </Pressable>
+          <View style={[styles.editRow, styles.editRowLast]}>
+            <Text style={styles.infoLabel}>Link mô tả công việc (JD)</Text>
+            <TextInput value={addJdLink} onChangeText={setAddJdLink} autoCapitalize="none" placeholder="https://..." placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
         </View>
       </FullScreenFormModal>
     </ScrollView>
@@ -1367,6 +1430,63 @@ const styles = StyleSheet.create({
   leaderBtnText: { color: '#B45309', fontSize: 12, fontWeight: '800' },
   deleteBtn: { backgroundColor: '#FCEBEC', minHeight: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   deleteBtnText: { color: '#C74848', fontSize: 12, fontWeight: '700' },
+  editBody: { gap: 0 },
+  editRow: {
+    paddingVertical: 12,
+    gap: 5,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  editRowLast: {
+    borderBottomWidth: 0,
+  },
+  editInput: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '500',
+    paddingHorizontal: 0,
+    paddingVertical: 2,
+    backgroundColor: 'transparent',
+  },
+  editPlaceholder: {
+    color: '#9CA3AF',
+    fontWeight: '400',
+  },
+  editSelectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  editChipRow: {
+    gap: 8,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
+  editChipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingTop: 4,
+  },
+  editChip: {
+    backgroundColor: '#F4F6FA',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 99,
+  },
+  editChipActive: {
+    backgroundColor: '#EAF2FF',
+  },
+  editChipText: {
+    color: '#4B5563',
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  editChipTextActive: {
+    color: colors.primary,
+    fontWeight: '500',
+  },
   form: { gap: 8, paddingBottom: 12 },
   label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
