@@ -701,16 +701,10 @@ export function HrTrainingPanel({
           ) : null}
         </Card>
 
-        {/* Full inline syllabus list */}
+        {/* Full inline syllabus list (read-only overview; use "Bắt đầu học" to start) */}
         <Text style={styles.sectionTitle}>Mục lục khóa học</Text>
         <View style={styles.syllabusCard}>
-          <Pressable
-            onPress={() => {
-              setActiveIndex(-1);
-              setQuizSubmitted(false);
-            }}
-            style={styles.syllabusListRow}
-          >
+          <View style={styles.syllabusListRow}>
             <IntroCourseIcon size={17} color={colors.ink} />
             <Text
               numberOfLines={1}
@@ -718,18 +712,14 @@ export function HrTrainingPanel({
             >
               Giới thiệu
             </Text>
-          </Pressable>
+          </View>
 
           {lessons.map((les, idx) => {
             const done = completedLessons.includes(`lesson_${idx}`);
             const isLast = idx === lessons.length - 1 && quizzes.length === 0;
             return (
-              <Pressable
+              <View
                 key={idx}
-                onPress={() => {
-                  setActiveIndex(idx);
-                  setQuizSubmitted(false);
-                }}
                 style={[
                   styles.syllabusListRow,
                   isLast && styles.syllabusListRowLast,
@@ -748,19 +738,12 @@ export function HrTrainingPanel({
                 >
                   Bài {idx + 1}: {les.title}
                 </Text>
-              </Pressable>
+              </View>
             );
           })}
 
           {quizzes.length > 0 ? (
-            <Pressable
-              onPress={() => {
-                if (!isLessonsDone) {
-                  showHrNotice('Chưa mở khóa', 'Bạn cần hoàn thành tất cả bài giảng trước khi thi sát hạch.');
-                  return;
-                }
-                setActiveIndex(lessons.length);
-              }}
+            <View
               style={[
                 styles.syllabusListRow,
                 styles.syllabusListRowLast,
@@ -778,7 +761,7 @@ export function HrTrainingPanel({
               >
                 Thi trắc nghiệm ({quizzes.length})
               </Text>
-            </Pressable>
+            </View>
           ) : null}
         </View>
 
