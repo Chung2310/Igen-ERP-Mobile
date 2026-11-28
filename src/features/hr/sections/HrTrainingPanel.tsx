@@ -29,6 +29,8 @@ import {
   Circle,
   CircleCheck,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Clock3,
   Ellipsis,
@@ -814,20 +816,67 @@ export function HrTrainingPanel({
           const isCompleted = completedLessons.includes(`lesson_${activeIndex}`);
           const isVideo = les.type === 'video' || les.type === 'youtube';
           return (
-            <Card style={styles.studyCard}>
+            <View style={styles.lessonFlatWrap}>
+              <View style={styles.lessonHeaderBar}>
+                <View style={styles.lessonHeaderLeft}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Quay lại bài trước"
+                    onPress={() => setActiveIndex((prev) => prev - 1)}
+                    hitSlop={10}
+                    style={({ pressed }) => [styles.lessonBackBtn, pressed && { opacity: 0.6 }]}
+                  >
+                    <ChevronLeft size={21} strokeWidth={2} color={colors.ink} />
+                  </Pressable>
+                  <Text numberOfLines={2} style={styles.lessonHeaderTitle}>
+                    {les.title}
+                  </Text>
+                </View>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={submittingProgress}
+                  onPress={() => void handleMarkLessonComplete(activeIndex)}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.lessonNextBtn,
+                    submittingProgress && styles.disabled,
+                    pressed && { opacity: 0.65 },
+                  ]}
+                >
+                  <Text style={styles.lessonNextText}>
+                    {submittingProgress ? 'Đang lưu...' : 'Tiếp theo'}
+                  </Text>
+                  {!submittingProgress ? (
+                    <ChevronRight size={17} strokeWidth={2} color={colors.primary} />
+                  ) : null}
+                </Pressable>
+              </View>
+
               {isCompleted ? (
                 <View style={styles.courseMetaRow}>
-                  <View style={styles.iconButtonContent}><Check size={13} color="#16885A" /><Text style={styles.lessonCounter}>Đã hoàn thành</Text></View>
+                  <View style={styles.iconButtonContent}>
+                    <Check size={13} color="#16885A" />
+                    <Text style={styles.lessonCounter}>Đã hoàn thành</Text>
+                  </View>
                 </View>
               ) : null}
-              <Text style={styles.studyHeading}>{les.title}</Text>
 
               {les.url ? (
                 <Pressable
                   onPress={() => void Linking.openURL(les.url!)}
                   style={styles.resourceBox}
                 >
-                  <View style={styles.iconButtonContent}>{isVideo ? <Video size={15} color={colors.primary} /> : <Paperclip size={15} color={colors.primary} />}<Text style={styles.resourceTitle}>{isVideo ? 'Mở video bài giảng' : 'Mở tài liệu đính kèm'}</Text></View>
+                  <View style={styles.iconButtonContent}>
+                    {isVideo ? (
+                      <Video size={15} color={colors.primary} />
+                    ) : (
+                      <Paperclip size={15} color={colors.primary} />
+                    )}
+                    <Text style={styles.resourceTitle}>
+                      {isVideo ? 'Mở video bài giảng' : 'Mở tài liệu đính kèm'}
+                    </Text>
+                  </View>
                   <Text numberOfLines={2} style={styles.resourceUrl}>
                     {les.fileName || les.url}
                   </Text>
@@ -835,34 +884,11 @@ export function HrTrainingPanel({
               ) : null}
 
               {les.content ? (
-                <View style={styles.lessonContentBox}>
-                  <Text style={styles.studyBody}>{les.content}</Text>
-                </View>
+                <Text style={styles.lessonBodyText}>{les.content}</Text>
               ) : !les.url ? (
                 <Text style={styles.muted}>Bài giảng này chưa có nội dung hoặc tài liệu đính kèm.</Text>
               ) : null}
-
-              <View style={styles.studyFooter}>
-                <Pressable
-                  onPress={() => setActiveIndex((prev) => prev - 1)}
-                  style={styles.cancelBtn}
-                >
-                  <View style={styles.iconButtonContent}><ArrowLeft size={14} color={colors.ink} /><Text style={styles.cancelBtnText}>Bài trước</Text></View>
-                </Pressable>
-                <Pressable
-                  disabled={submittingProgress}
-                  onPress={() => void handleMarkLessonComplete(activeIndex)}
-                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, submittingProgress && styles.disabled]}
-                >
-                  <View style={styles.iconButtonContent}>
-                    {!submittingProgress ? <>{activeIndex === lessons.length - 1 && quizzes.length === 0 ? <Check size={14} color={colors.white} /> : <ArrowRight size={14} color={colors.white} />}</> : null}
-                    <Text style={styles.submitBtnText}>
-                      {submittingProgress ? 'Đang lưu...' : activeIndex === lessons.length - 1 ? quizzes.length > 0 ? 'Hoàn thành & Làm bài thi' : 'Hoàn thành khóa học' : 'Hoàn thành bài & Tiếp tục'}
-                    </Text>
-                  </View>
-                </Pressable>
-              </View>
-            </Card>
+            </View>
           );
         })() : null}
 
@@ -1641,6 +1667,22 @@ const styles = StyleSheet.create({
   resourceTitle: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   resourceUrl: { color: '#6B7280', fontSize: 11.5 },
   lessonContentBox: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12 },
+  lessonFlatWrap: { gap: 12, paddingTop: 2 },
+  lessonHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5EAF2',
+  },
+  lessonHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  lessonBackBtn: { paddingVertical: 2, paddingRight: 2 },
+  lessonHeaderTitle: { flex: 1, color: '#111827', fontSize: 16, fontWeight: '600', lineHeight: 22 },
+  lessonNextBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingLeft: 6 },
+  lessonNextText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  lessonBodyText: { color: '#1F2937', fontSize: 14.5, lineHeight: 23 },
   studyFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EEF2F7' },
 
   // Quiz
