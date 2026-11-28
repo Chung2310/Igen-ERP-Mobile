@@ -683,10 +683,19 @@ export function HrTrainingPanel({
                 {selectedCourse.isRequired ? <Text style={styles.requiredBadge}>Bắt buộc</Text> : null}
               </View>
               <Text style={styles.heroTitle}>{selectedCourse.title || selectedCourse.name}</Text>
-              <View style={styles.courseMetaRow}>
-                <UserRound size={13} color={colors.muted} />
-                <Text style={styles.subMeta}>Giảng viên: {selectedCourse.instructor || 'Chưa cập nhật'}</Text>
-                {selectedCourse.duration ? <><Clock3 size={13} color={colors.muted} /><Text style={styles.subMeta}>{selectedCourse.duration}</Text></> : null}
+              <View style={styles.headRow}>
+                <View style={[styles.courseMetaRow, { flex: 1 }]}>
+                  <UserRound size={13} color={colors.muted} />
+                  <Text numberOfLines={1} style={[styles.subMeta, { flexShrink: 1 }]}>
+                    Giảng viên: {selectedCourse.instructor || 'Chưa cập nhật'}
+                  </Text>
+                </View>
+                {selectedCourse.duration ? (
+                  <View style={styles.courseMetaRow}>
+                    <Clock3 size={13} color={colors.muted} />
+                    <Text style={styles.subMeta}>{selectedCourse.duration}</Text>
+                  </View>
+                ) : null}
               </View>
 
               <View style={styles.progressSection}>
