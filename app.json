@@ -4,6 +4,7 @@
     "slug": "erp-mobile",
     "scheme": "erpmobile",
     "version": "1.0.0",
+    "icon": "./assets/images/app-icon-ios.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "plugins": [
@@ -11,16 +12,16 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Cho phép ERP Mobile truy cập ảnh bạn chọn để cập nhật ảnh đại diện hoặc tạo Lead bằng OCR.",
-          "cameraPermission": "Cho phép ERP Mobile chụp tài liệu để tạo Lead bằng OCR.",
-          "microphonePermission": false
+          "photosPermission": "Cho phép ERP Mobile dùng ảnh hoặc video bạn chọn để cập nhật ảnh đại diện, tạo Lead bằng OCR hoặc đính kèm vào công việc.",
+          "cameraPermission": "Cho phép ERP Mobile chụp ảnh hoặc quay video đính kèm công việc, chụp tài liệu tạo Lead bằng OCR và quét mã vạch kiểm kê kho.",
+          "microphonePermission": "Cho phép ERP Mobile thu âm khi bạn ghi chú thoại hoặc quay video đính kèm công việc."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Cho phép ERP Mobile dùng camera để quét mã vạch khi kiểm kê kho.",
-          "microphonePermission": false,
+          "cameraPermission": "Cho phép ERP Mobile chụp ảnh hoặc quay video đính kèm công việc, chụp tài liệu tạo Lead bằng OCR và quét mã vạch kiểm kê kho.",
+          "microphonePermission": "Cho phép ERP Mobile thu âm khi bạn ghi chú thoại hoặc quay video đính kèm công việc.",
           "recordAudioAndroid": false
         }
       ],
@@ -34,7 +35,11 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Cho phép ERP Mobile truy cập vị trí để cấu hình chi nhánh."
+          "locationWhenInUsePermission": "Cho phép ERP Mobile dùng vị trí để chấm công tại nơi làm việc và cấu hình tọa độ chi nhánh.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "motionUsagePermission": false,
+          "locationFullAccuracyPermission": "Cho phép ERP Mobile xác định vị trí chính xác để kiểm tra phạm vi chấm công tại nơi làm việc."
         }
       ],
       "expo-sharing",
@@ -42,7 +47,9 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Cho phép ERP Mobile ghi âm cho công việc."
+          "microphonePermission": "Cho phép ERP Mobile thu âm khi bạn ghi chú thoại hoặc quay video đính kèm công việc.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
         }
       ]
     ],
@@ -51,7 +58,30 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "vn.igen.erp.mobile"
+      "bundleIdentifier": "vn.igen.erp.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {}
+        }
+      },
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyAccessedAPITypes": [],
+        "NSPrivacyCollectedDataTypes": [
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeName", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeEmailAddress", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhoneNumber", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhysicalAddress", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeUserID", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePreciseLocation", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePhotosorVideos", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeAudioData", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] },
+          { "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherUserContent", "NSPrivacyCollectedDataTypeLinked": true, "NSPrivacyCollectedDataTypeTracking": false, "NSPrivacyCollectedDataTypePurposes": ["NSPrivacyCollectedDataTypePurposeAppFunctionality"] }
+        ]
+      }
     },
     "android": {
       "package": "vn.igen.erp.mobile"

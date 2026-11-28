@@ -1,3 +1,4 @@
+import { PrivacyControls } from "@/features/privacy/PrivacyControls";
 import { PopupError } from '@/components/PopupError';
 import { withAppLockSuspended } from '@/core/auth/appLockSuspension';
 import { useCallback, useEffect, useState } from 'react';
@@ -832,6 +833,7 @@ function PrivacyDetailSection() {
 
   return (
     <View style={styles.stack}>
+      <PrivacyControls />
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Dữ liệu cá nhân trong Igen ERP</Text>
         <Text style={styles.muted}>
@@ -861,7 +863,7 @@ function PrivacyDetailSection() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Yêu cầu xuất hoặc xóa dữ liệu</Text>
         <Text style={styles.muted}>
-          Để yêu cầu trích xuất bản sao dữ liệu hoặc xóa tài khoản khỏi hệ thống, vui lòng gửi yêu
+          Để xóa tài khoản, dùng mục Xóa tài khoản phía trên. Để trích xuất dữ liệu, vui lòng gửi yêu
           cầu tới quản trị viên doanh nghiệp hoặc bộ phận hỗ trợ Igen ERP.
         </Text>
         <Pressable

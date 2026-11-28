@@ -334,8 +334,7 @@ export default function LoginScreen() {
             </View>
 
             <Text style={styles.signupPrompt}>
-              Bạn chưa có tài khoản?{' '}
-              <Text style={styles.signupLink}>Tạo tài khoản</Text>
+              Sử dụng tài khoản do doanh nghiệp cung cấp.
             </Text>
           </View>
 

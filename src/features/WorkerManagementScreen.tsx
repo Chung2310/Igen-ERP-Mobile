@@ -464,10 +464,10 @@ export function WorkerManagementScreen(_props: FeatureScreenProps) {
       const cell = (row: string[], index: number) => index < 0 ? '' : String(row[index] || '').trim();
       const preview = rows.map((row, index) => {
         const laborTypeRaw = normalize(cell(row, columns.laborType));
-        const laborType = laborTypeRaw.includes('thoi vu') || laborTypeRaw === 'seasonal' ? 'seasonal' : laborTypeRaw.includes('nuoc ngoai') || laborTypeRaw === 'foreign' ? 'foreign' : 'official';
+        const laborType: 'official' | 'seasonal' | 'foreign' = laborTypeRaw.includes('thoi vu') || laborTypeRaw === 'seasonal' ? 'seasonal' : laborTypeRaw.includes('nuoc ngoai') || laborTypeRaw === 'foreign' ? 'foreign' : 'official';
         const commissionRaw = normalize(cell(row, columns.commissionScheme));
         const commissionInvalid = Boolean(commissionRaw) && !['chinh thuc', 'official_monthly', 'thoi vu', 'seasonal_hourly'].some((value) => commissionRaw.includes(value));
-        const commissionScheme = commissionRaw ? (commissionRaw.includes('thoi vu') || commissionRaw === 'seasonal_hourly' ? 'seasonal_hourly' : 'official_monthly') : undefined;
+        const commissionScheme: 'seasonal_hourly' | 'official_monthly' | undefined = commissionRaw ? (commissionRaw.includes('thoi vu') || commissionRaw === 'seasonal_hourly' ? 'seasonal_hourly' : 'official_monthly') : undefined;
         const worker = {
           fullName: cell(row, nameIndex), phone: cell(row, phoneIndex), partnerCode: cell(row, columns.partnerCode).toUpperCase(),
           email: cell(row, columns.email), idCard: cell(row, columns.idCard), birthday: cell(row, columns.birthday), address: cell(row, columns.address),

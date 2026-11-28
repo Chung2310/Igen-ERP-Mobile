@@ -1,0 +1,59 @@
+name: iOS native checks
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulator:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_NO_DOTENV: '1'
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check source and effective iOS configuration
+        run: |
+          npm run typecheck
+          npm run test:ios-release
+          npm run ios:readiness
+      - name: Build native simulator app without signing credentials
+        run: |
+          set -euo pipefail
+          npx --no-install expo prebuild --platform ios --no-install
+          pod install --project-directory=ios
+          shopt -s nullglob
+          workspaces=(ios/*.xcworkspace)
+          [[ ${#workspaces[@]} -eq 1 ]]
+          scheme="$(basename "${workspaces[0]}" .xcworkspace)"
+          xcodebuild -workspace "${workspaces[0]}" -scheme "$scheme" -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/erp-ios-simulator" CODE_SIGNING_ALLOWED=NO build \
+            2>&1 | tee "$RUNNER_TEMP/erp-ios-simulator.log"
+          apps=("$RUNNER_TEMP/erp-ios-simulator/Build/Products/Release-iphonesimulator/"*.app)
+          [[ ${#apps[@]} -eq 1 ]]
+          python3 scripts/verify-ios-bundle.py "${apps[0]}" --simulator | tee "$RUNNER_TEMP/erp-ios-privacy-audit.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iOS-native-check-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/erp-ios-simulator.log
+            ${{ runner.temp }}/erp-ios-privacy-audit.json
+          if-no-files-found: ignore
+          retention-days: 7

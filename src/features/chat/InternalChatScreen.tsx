@@ -34,6 +34,9 @@ import {
 } from '@/features/chat/chatApi';
 import type { ChatColleague, ChatMessage, ChatRoom } from '@/features/chat/types';
 import { colors } from '@/theme/colors';
+import { privacyApi } from '@/features/privacy/privacyApi';
+import { ChatReportForm } from '@/features/privacy/ChatReportForm';
+import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 
 type RoomFilter = 'all' | 'unread' | 'group';
 
@@ -123,6 +126,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [actionMessage, setActionMessage] = useState<ChatMessage | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ roomId: string; messageId: string } | null>(null);
 
   // --- New chat modal state ---
   const [newChatOpen, setNewChatOpen] = useState(false);
@@ -482,6 +486,9 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
               );
               return (
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Tùy chọn tin nhắn của ${item.senderName}`}
+                  onPress={() => { if (!item.isDeleted) setActionMessage(item); }}
                   onLongPress={() => {
                     if (!item.isDeleted) setActionMessage(item);
                   }}
@@ -630,6 +637,16 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
                   >
                     <Text style={styles.actionRowText}>Trả lời tin nhắn</Text>
                   </Pressable>
+                  {getSenderId(actionMessage) !== myId ? <>
+                    <Pressable accessibilityRole="button" style={styles.actionRow} onPress={() => { setReportTarget({ roomId: activeRoom._id, messageId: actionMessage._id }); setActionMessage(null); }}><Text style={styles.actionRowText}>Báo cáo vi phạm</Text></Pressable>
+                    <Pressable accessibilityRole="button" style={styles.actionRow} onPress={() => {
+                      const senderId = getSenderId(actionMessage); setActionMessage(null);
+                      showHrConfirm({ title: 'Chặn người dùng?', message: 'Hai người sẽ không nhắn tin riêng được. Trong nhóm chung, nội dung của người bị chặn được ẩn và bạn không nhận thông báo từ họ. Có thể bỏ chặn trong Quyền riêng tư.', confirmLabel: 'Chặn', destructive: true, onConfirm: async () => {
+                        try { await privacyApi.block(senderId); setReplyTo(null); setMessages([]); await loadMessages(activeRoom._id); await loadRooms(true); }
+                        catch (cause) { Alert.alert('Chưa chặn được', cause instanceof Error ? cause.message : 'Vui lòng thử lại.'); }
+                      } });
+                    }}><Text style={styles.actionRowDanger}>Chặn người dùng</Text></Pressable>
+                  </> : null}
                   {getSenderId(actionMessage) === myId ? (
                     <Pressable
                       onPress={() => {
@@ -646,6 +663,7 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
           </Pressable>
         </Modal>
         ) : null}
+        <ChatReportForm target={reportTarget} onClose={() => setReportTarget(null)} />
       </KeyboardAvoidingView>
     );
 
