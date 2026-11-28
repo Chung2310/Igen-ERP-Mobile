@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, type AlertButton, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { AlertTriangle, CheckCircle2, Info } from 'lucide-react-native';
+import { PopupStatusIcon, type PopupIconVariant } from '@/components/PopupStatusIcons';
 import { colors } from '@/theme/colors';
 
 export type HrConfirmTone = 'danger' | 'success' | 'info';
@@ -18,6 +18,7 @@ export type HrConfirmOptions = {
   cancelLabel?: string;
   destructive?: boolean;
   tone?: HrConfirmTone;
+  icon?: PopupIconVariant;
   singleButton?: boolean;
   actions?: HrConfirmAction[];
   onConfirm: () => void | Promise<void>;
@@ -28,6 +29,7 @@ export type AppAlertOptions = {
   title: string;
   message: string;
   tone?: HrConfirmTone;
+  icon?: PopupIconVariant;
   buttonLabel?: string;
 };
 
@@ -47,15 +49,33 @@ function detectTone(title: string, message?: string, buttons?: AlertButton[]): H
   return 'info';
 }
 
+function resolvePopupIcon(state: HrConfirmOptions | null, tone: HrConfirmTone): PopupIconVariant {
+  if (state?.icon) return state.icon;
+  if (tone === 'success') return 'success';
+  const combined = `${state?.title ?? ''} ${state?.confirmLabel ?? ''} ${state?.message ?? ''}`;
+  if (tone === 'danger') {
+    const isDeleteConfirm =
+      !state?.singleButton &&
+      (/xóa|gỡ|hủy bỏ/i.test(combined) ||
+        !/lỗi|không thể|thất bại|chưa |thiếu |không hợp lệ|không khớp|quá ngắn|vượt |hết hạn|từ chối/i.test(combined));
+    return isDeleteConfirm ? 'delete' : 'error';
+  }
+  if (!state?.singleButton && /lưu|cập nhật|duyệt|ký|gửi|xác nhận|hoàn tất|bỏ qua|chuyển/i.test(combined)) {
+    return 'save';
+  }
+  return 'info';
+}
+
 export function showHrConfirm(options: HrConfirmOptions) {
   currentListener?.(options);
 }
 
-export function showAppAlert({ title, message, tone = 'info', buttonLabel = 'Đóng' }: AppAlertOptions) {
+export function showAppAlert({ title, message, tone = 'info', icon, buttonLabel = 'Đóng' }: AppAlertOptions) {
   currentListener?.({
     title,
     message,
     tone,
+    icon,
     singleButton: true,
     destructive: tone === 'danger',
     confirmLabel: buttonLabel,
@@ -168,21 +188,15 @@ export function HrConfirmHost() {
   };
 
   const tone: HrConfirmTone = state?.tone ?? (state?.destructive === false ? 'info' : 'danger');
-  const iconBg = tone === 'success' ? '#DCFCE7' : tone === 'info' ? '#DBEAFE' : '#FEE2E2';
+  const iconVariant = resolvePopupIcon(state, tone);
   const confirmBg = tone === 'success' ? '#16A34A' : tone === 'info' ? colors.primary : '#DC2626';
 
   return (
     <Modal visible={Boolean(state)} transparent animationType="fade" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close}>
         <Pressable style={styles.card} onPress={() => {}}>
-          <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-            {tone === 'success' ? (
-              <CheckCircle2 size={24} color="#16A34A" />
-            ) : tone === 'info' ? (
-              <Info size={22} color={colors.primary} />
-            ) : (
-              <AlertTriangle size={22} color="#DC2626" />
-            )}
+          <View style={styles.iconWrap}>
+            <PopupStatusIcon variant={iconVariant} size={46} />
           </View>
           <Text style={styles.title}>{state?.title}</Text>
           {!!state?.message && <Text style={styles.message}>{state.message}</Text>}
@@ -270,10 +284,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
   },
   iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FEE2E2',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
