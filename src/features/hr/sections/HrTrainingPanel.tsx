@@ -709,10 +709,7 @@ export function HrTrainingPanel({
               setActiveIndex(-1);
               setQuizSubmitted(false);
             }}
-            style={[
-              styles.syllabusListRow,
-              activeIndex === -1 && styles.syllabusSheetRowActive,
-            ]}
+            style={styles.syllabusListRow}
           >
             <IntroCourseIcon size={17} color={colors.ink} />
             <Text
@@ -740,7 +737,6 @@ export function HrTrainingPanel({
                 }}
                 style={[
                   styles.syllabusListRow,
-                  active && styles.syllabusSheetRowActive,
                   isLast && styles.syllabusListRowLast,
                 ]}
               >
@@ -777,7 +773,6 @@ export function HrTrainingPanel({
               style={[
                 styles.syllabusListRow,
                 styles.syllabusListRowLast,
-                activeIndex === lessons.length && styles.syllabusSheetRowActive,
                 !isLessonsDone && styles.disabled,
               ]}
             >
@@ -1638,9 +1633,6 @@ const styles = StyleSheet.create({
   },
   syllabusListRowLast: {
     borderBottomWidth: 0,
-  },
-  syllabusSheetRowActive: {
-    backgroundColor: '#EFF6FF',
   },
   syllabusSheetRowText: {
     flex: 1,
