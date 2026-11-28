@@ -884,20 +884,73 @@ export function HrTrainingPanel({
 
         {/* Section 3: Quiz */}
         {activeIndex === lessons.length && quizzes.length > 0 ? (
-          <Card style={styles.studyCard}>
-            <Text style={styles.quizTag}>ĐÁNH GIÁ SÁT HẠCH TRẮC NGHIỆM</Text>
-            <Text style={styles.studyHeading}>Bài thi cuối khóa</Text>
+          <View style={styles.lessonFlatWrap}>
+            <View style={styles.lessonHeaderBar}>
+              <View style={styles.lessonHeaderLeft}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Quay lại"
+                  onPress={() => setActiveIndex(lessons.length > 0 ? lessons.length - 1 : -1)}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.lessonBackBtn, pressed && { opacity: 0.6 }]}
+                >
+                  <ChevronLeft size={18} strokeWidth={1.8} color={colors.ink} />
+                </Pressable>
+                <Text numberOfLines={2} style={styles.lessonHeaderTitle}>
+                  Bài thi cuối khóa
+                </Text>
+              </View>
+
+              {isQuizPassed ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setSelectedCourse(null);
+                    void load(true);
+                  }}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.lessonNextBtn, pressed && { opacity: 0.65 }]}
+                >
+                  <Text style={[styles.lessonNextText, { color: '#16885A' }]}>Hoàn thành</Text>
+                  <ChevronRight size={18} strokeWidth={1.8} color="#16885A" />
+                </Pressable>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={submittingProgress}
+                  onPress={() => void handleSubmitQuiz()}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.lessonNextBtn,
+                    submittingProgress && styles.disabled,
+                    pressed && { opacity: 0.65 },
+                  ]}
+                >
+                  <Text style={styles.lessonNextText}>
+                    {submittingProgress ? 'Đang chấm...' : 'Nộp bài'}
+                  </Text>
+                  {!submittingProgress ? (
+                    <ChevronRight size={18} strokeWidth={1.8} color={colors.primary} />
+                  ) : null}
+                </Pressable>
+              )}
+            </View>
+
             <Text style={styles.muted}>
               Trả lời đúng 100% số câu hỏi ({quizzes.length} câu) để hoàn thành khóa học.
             </Text>
 
-            <View style={{ gap: 12, marginTop: 6 }}>
+            <View style={{ gap: 4 }}>
               {quizzes.map((q, qIdx) => {
                 const isErr = quizSubmitted && quizErrors[qIdx];
+                const isLast = qIdx === quizzes.length - 1;
                 return (
-                  <View key={qIdx} style={[styles.quizBox, isErr && styles.quizBoxError]}>
-                    <Text style={styles.quizQuestion}>
-                      Q{qIdx + 1}: {q.question}
+                  <View
+                    key={qIdx}
+                    style={[styles.quizFlatItem, isLast && styles.quizFlatItemLast]}
+                  >
+                    <Text style={[styles.quizQuestion, isErr && { color: '#B91C1C' }]}>
+                      Câu {qIdx + 1}: {q.question}
                     </Text>
                     <View style={{ gap: 6, marginTop: 8 }}>
                       {q.options.map((opt, oIdx) => {
@@ -924,38 +977,14 @@ export function HrTrainingPanel({
                         );
                       })}
                     </View>
+                    {isErr ? (
+                      <Text style={styles.quizErrorText}>Câu trả lời chưa đúng</Text>
+                    ) : null}
                   </View>
                 );
               })}
             </View>
-
-            <View style={styles.studyFooter}>
-              {lessons.length > 0 ? (
-                <Pressable onPress={() => setActiveIndex(lessons.length - 1)} style={styles.cancelBtn}>
-                  <View style={styles.iconButtonContent}><ArrowLeft size={14} color={colors.ink} /><Text style={styles.cancelBtnText}>Bài giảng</Text></View>
-                </Pressable>
-              ) : null}
-              {isQuizPassed ? (
-                <Pressable
-                  onPress={() => {
-                    setSelectedCourse(null);
-                    void load(true);
-                  }}
-                  style={[styles.submitBtn, { flex: 1, marginTop: 0, backgroundColor: '#16885A' }]}
-                >
-                  <View style={styles.iconButtonContent}><Check size={14} color={colors.white} /><Text style={styles.submitBtnText}>Hoàn thành khóa học</Text></View>
-                </Pressable>
-              ) : (
-                <Pressable
-                  disabled={submittingProgress}
-                  onPress={() => void handleSubmitQuiz()}
-                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, submittingProgress && styles.disabled]}
-                >
-                  <View style={styles.iconButtonContent}>{!submittingProgress ? <ArrowRight size={14} color={colors.white} /> : null}<Text style={styles.submitBtnText}>{submittingProgress ? 'Đang chấm điểm...' : 'Nộp bài thi & Đánh giá'}</Text></View>
-                </Pressable>
-              )}
-            </View>
-          </Card>
+          </View>
         ) : null}
 
         {renderCourseFormModal()}
@@ -1679,6 +1708,8 @@ const styles = StyleSheet.create({
   quizTag: { color: '#16885A', fontSize: 10.5, fontWeight: '600', letterSpacing: 0.3 },
   quizBox: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12 },
   quizBoxError: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  quizFlatItem: { paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  quizFlatItemLast: { borderBottomWidth: 0 },
   quizQuestion: { color: '#111827', fontSize: 13, fontWeight: '600', lineHeight: 19 },
   quizOption: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: 1, borderRadius: 10, padding: 10 },
   quizOptionActive: { backgroundColor: '#EAF2FF', borderColor: colors.primary },
