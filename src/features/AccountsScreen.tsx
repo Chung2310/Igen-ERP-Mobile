@@ -205,6 +205,7 @@ export function AccountManagementScreen(_props: FeatureScreenProps) {
           ...(form.permissions.trim() ? { permissions: splitValues(form.permissions) } : {}),
         });
       } else {
+        if (!editing) throw new Error("Không tìm thấy tài khoản cần cập nhật.");
         const id = accountId(editing);
         if (!id) throw new Error('Tài khoản không có mã định danh để cập nhật.');
         if (editingSelf && form.role !== editing.role) {

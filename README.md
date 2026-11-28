@@ -38,3 +38,16 @@ Các service gọi API ERP qua `src/core/network/apiClient.ts`. `EXPO_PUBLIC_API
 ## Phạm vi hiện tại
 
 Đăng nhập và kiểm tra kết nối máy chủ ERP đã được nối. Các màn hình nghiệp vụ CRM, Kho tri thức, Tổng quan và những phân hệ còn lại vẫn đang được tích hợp lần lượt; các màn hình chưa hoàn tất API tiếp tục hiển thị dữ liệu mẫu. Tài liệu phạm vi gốc nằm tại `docs/Pham-vi-trien-khai-app-mobile-ERP.docx`.
+
+
+## Quyền riêng tư và kiểm duyệt
+
+Bản mobile có form báo cáo/chặn từ menu tin nhắn, danh sách bỏ chặn, đồng ý/rút đồng ý chia sẻ AI và yêu cầu xóa tài khoản trong **Tài khoản → Quyền riêng tư**. Quản trị viên có thể xử lý báo cáo và rà soát yêu cầu xóa theo quyền backend. Cần deploy backend privacy tương ứng trước khi phát hành mobile.
+
+Tệp chat mới tạm bị từ chối cho đến khi có dịch vụ kiểm duyệt tệp. Xóa tài khoản gồm xử lý tự động và rà soát tệp ngoài hệ thống/chứng từ/backup trước khi đánh dấu hoàn tất. Màn Gói AI chưa hoàn thiện được ẩn khỏi danh mục mobile. Đọc `server/privacy/README.md` trong repo ERP backend để cấu hình nhân sự phụ trách, phân quyền, chính sách lưu trữ và chạy kiểm thử.
+
+Kiểm tra iOS trên Windows có thể dùng `npx expo export --platform ios --no-bytecode` để kiểm tra JavaScript/assets khi Hermes không chạy được; bước này không tạo IPA hay xác minh native signing. Không thay đổi cấu hình Hermes của bản phát hành vì giới hạn kiểm thử Windows.
+
+## Build và phát hành iOS
+
+Đã có CI build native simulator và workflow build IPA có ký trên GitHub macOS bằng Expo prebuild/Xcode, kèm kiểm tra quyền sau plugin, HTTPS, icon và privacy manifest trong app đã build. Xem [IOS_BUILD.md](IOS_BUILD.md) để cấu hình variables/secrets ERP; [hồ sơ review](docs/IOS_APP_REVIEW.md) và [khai báo privacy](docs/IOS_PRIVACY.md) ghi rõ phần cần xác minh trước phát hành. Upload TestFlight mặc định tắt và không tự gửi App Review.

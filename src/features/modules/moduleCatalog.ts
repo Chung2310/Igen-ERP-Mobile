@@ -113,7 +113,8 @@ export function isModuleVisibleForTenant(user: ErpUser | null, slug: string): bo
   if (!user) return false;
   const isAdmin = user.role === 'admin' || user.role === 'superadmin';
   if (slug === 'users') return isAdmin;
-  if (slug === 'ai-plans') return true;
+  // Keep unfinished billing screens out of the mobile release.
+  if (slug === 'ai-plans') return false;
   const requiredModules = MODULE_KEYS_BY_SLUG[slug];
   return !requiredModules || requiredModules.every((key) => isTenantModuleEnabled(user, key));
 }

@@ -1,0 +1,130 @@
+name: Build iOS IPA (GitHub macOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_environment:
+        description: 'Backend: staging for testing; production requires an explicit production API URL'
+        type: choice
+        options: [staging, production]
+        default: staging
+      profile:
+        description: 'production: App Store/TestFlight; preview: registered iPhones'
+        type: choice
+        options: [production, preview]
+        default: production
+      signing_check_only:
+        description: 'Validate signing only; no build or upload'
+        type: boolean
+        default: false
+      upload_testflight:
+        description: 'Upload production IPA to TestFlight'
+        type: boolean
+        default: false
+      build_number:
+        description: 'Optional integer greater than the latest App Store Connect build'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: erp-ios-signed
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/production'
+    runs-on: macos-26
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_NO_DOTENV: '1'
+      DEVELOPER_DIR: /Applications/Xcode_26.4.1.app/Contents/Developer
+      IOS_API_ENVIRONMENT: ${{ inputs.api_environment }}
+      BUILD_PROFILE: ${{ inputs.profile }}
+      APP_VERSION: ${{ vars.APP_VERSION || '1.0.0' }}
+      BUILD_NUMBER_INPUT: ${{ inputs.build_number }}
+      IOS_BUILD_NUMBER_BASE: ${{ vars.IOS_BUILD_NUMBER_BASE || '1000' }}
+      ERP_IOS_BUNDLE_IDENTIFIER: com.igen.erp
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_environment == 'staging' && (vars.STAGING_API_URL || 'https://staging-erp.igentechnology.net') || inputs.api_environment == 'production' && vars.EXPO_PUBLIC_API_URL || '' }}
+      EXPO_PUBLIC_ERP_WEB_URL: ${{ inputs.api_environment == 'staging' && vars.STAGING_WEB_URL || inputs.api_environment == 'production' && vars.EXPO_PUBLIC_ERP_WEB_URL || '' }}
+      UPLOAD_TESTFLIGHT: ${{ inputs.profile == 'production' && inputs.upload_testflight && !inputs.signing_check_only && 'true' || 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Validate settings and Xcode
+        run: |
+          node scripts/prepare-ios-build.cjs
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+          python3 -c 'import subprocess; assert int(subprocess.check_output(["xcodebuild", "-version"]).decode().split()[1].split(".")[0]) >= 26, "Xcode 26+ required"'
+      - name: Install dependencies
+        if: ${{ !inputs.signing_check_only }}
+        run: npm ci
+      - name: Typecheck and release helper tests
+        if: ${{ !inputs.signing_check_only }}
+        run: |
+          npm run typecheck
+          npm run test:ios-release
+          bash -n scripts/build-signed-ios.sh
+      - name: Verify effective permissions, privacy declarations and public URLs
+        if: ${{ !inputs.signing_check_only }}
+        run: npm run ios:readiness -- --online
+      - name: Install temporary signing credentials
+        env:
+          IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ inputs.profile == 'production' && secrets.IOS_APP_STORE_PROFILE_BASE64 || inputs.profile == 'preview' && secrets.IOS_ADHOC_PROFILE_BASE64 }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: python3 scripts/ios-signing.py install
+      - name: Generate native project and install CocoaPods
+        if: ${{ !inputs.signing_check_only }}
+        run: |
+          npx --no-install expo prebuild --platform ios --no-install
+          pod install --project-directory=ios
+      - name: Sign, archive, export and inspect IPA
+        if: ${{ !inputs.signing_check_only }}
+        run: |
+          node scripts/configure-ios-signing.cjs
+          bash scripts/build-signed-ios.sh
+      - name: Save IPA, symbols and privacy audit
+        if: ${{ !inputs.signing_check_only }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ERP-ios-${{ inputs.api_environment }}-${{ inputs.profile }}-${{ github.run_number }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/erp-ios-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload to TestFlight
+        if: inputs.profile == 'production' && inputs.upload_testflight && !inputs.signing_check_only
+        run: |
+          API_PRIVATE_KEYS_DIR="$RUNNER_TEMP/erp-ios-signing/asc" \
+            xcrun altool --upload-app --type ios \
+            --file "$RUNNER_TEMP/erp-ios-artifacts/ERP.ipa" \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+      - name: Save native build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ERP-ios-logs-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/erp-ios-archive.log
+            ${{ runner.temp }}/erp-ios-export.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Remove signing credentials
+        if: always()
+        run: python3 scripts/ios-signing.py cleanup

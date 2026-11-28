@@ -1,6 +1,7 @@
 import { clearAccessToken, getAccessToken, saveAccessToken } from '@/core/auth/authSession';
 import { notifySessionInvalidation } from '@/core/auth/sessionInvalidation';
 import { updateAuthSessionSocketToken } from '@/core/auth/sessionSocket';
+import { requestAiConsentPrompt, type AiDisclosure } from './aiConsentPrompt';
 
 export class ApiError extends Error {
   constructor(
@@ -21,6 +22,8 @@ type ApiRequestOptions = Omit<RequestInit, 'body'> & {
   skipAuth?: boolean;
   /** Do not attempt refresh-token renewal after a 401 response. */
   skipRefresh?: boolean;
+  /** Internal replay guard; only a pre-handler consent rejection may be retried. */
+  consentRetried?: boolean;
 };
 
 const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/+$/, '');
@@ -114,7 +117,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
 /** Shared API entry point for the ERP server. EXPO_PUBLIC_API_URL may be an origin or end in /api/v1. */
 export async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  const { accessToken, skipAuth = false, skipRefresh = false, responseType = 'json', body, headers: requestHeaders, ...requestOptions } = options;
+  const { accessToken, skipAuth = false, skipRefresh = false, responseType = 'json', consentRetried = false, body, headers: requestHeaders, ...requestOptions } = options;
 
   const send = (token?: string) => {
     const headers = new Headers(requestHeaders);
@@ -141,6 +144,16 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   };
 
   const currentToken = skipAuth ? undefined : (accessToken ?? getAccessToken() ?? undefined);
+  const needsQuotationConsent = /^\/quotation\//.test(path) && /\/(?:analyze|suggest)(?:\?|$)/.test(path) && requestOptions.method === 'POST';
+  if (needsQuotationConsent) {
+    const state = await apiRequest<{ data: { accepted: boolean } }>('/privacy/ai-consents');
+    if (!state.data.accepted) {
+      const disclosure = await apiRequest<{ data: AiDisclosure }>('/privacy/ai-disclosures');
+      const accepted = await requestAiConsentPrompt(disclosure.data);
+      if (!accepted) throw new ApiError('Bạn chưa đồng ý chia sẻ dữ liệu AI. Chưa gửi yêu cầu phân tích.', 428);
+    }
+    if (!currentToken || currentToken !== getAccessToken() || requestOptions.signal?.aborted) throw new ApiError('Phiên đăng nhập đã thay đổi hoặc yêu cầu đã hủy. Hãy thử lại.', 401);
+  }
   let response = await send(currentToken);
 
   if (response.status === 401 && !skipAuth && !skipRefresh && !/\/auth\/(login|refresh-token|logout)\b/i.test(path)) {
@@ -150,6 +163,15 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
   if (!response.ok) {
     const result = await parseResponse(response);
+    if (response.status === 428 && !consentRetried && (result as { code?: string })?.code === 'AI_CONSENT_REQUIRED') {
+      const originalToken = getAccessToken();
+      const accepted = await requestAiConsentPrompt((result as { disclosure?: AiDisclosure }).disclosure);
+      if (accepted && originalToken && getAccessToken() === originalToken && !requestOptions.signal?.aborted) {
+        // A disclosure in the response proves rejection occurred in the pre-handler middleware.
+        if ((result as { disclosure?: AiDisclosure }).disclosure) return apiRequest<T>(path, { ...options, consentRetried: true });
+        throw new ApiError('Đã lưu đồng ý. Hãy gửi lại yêu cầu sau khi kiểm tra kết quả trước đó.', 428);
+      }
+    }
     const invalidation = sessionInvalidationFrom(result);
     if (invalidation) notifySessionInvalidation(invalidation);
     throw new ApiError(messageFrom(result, `ERP API trả về lỗi (${response.status})`), response.status, result);

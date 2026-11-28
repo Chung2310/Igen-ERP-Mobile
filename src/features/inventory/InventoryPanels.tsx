@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
   lastScannedNotice: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 9, marginTop: 8, borderRadius: 9, backgroundColor: '#EEF4FF' },
   lastScannedText: { flex: 1, color: colors.primary, fontSize: 9, fontWeight: '700' },
   scannerRoot: { flex: 1, backgroundColor: '#000' },
-  scannerOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', alignItems: 'center', paddingTop: 52, paddingBottom: 44, paddingHorizontal: 20 },
+  scannerOverlay: { ...StyleSheet.absoluteFill, justifyContent: 'space-between', alignItems: 'center', paddingTop: 52, paddingBottom: 44, paddingHorizontal: 20 },
   scannerHeader: { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 12 },
   scannerTitle: { color: colors.white, fontSize: 17, fontWeight: '800' },
   scannerSubtitle: { color: '#E5E7EB', fontSize: 11, marginTop: 4 },

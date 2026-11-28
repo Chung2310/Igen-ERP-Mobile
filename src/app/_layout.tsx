@@ -12,6 +12,7 @@ import { HrConfirmHost } from '@/features/hr/components/HrConfirmModal';
 import { canAccessOverview } from '@/features/overview/overviewCatalog';
 import { colors } from '@/theme/colors';
 import { Fingerprint, LogOut, ShieldCheck } from 'lucide-react-native';
+import { AiConsentHost } from '@/features/privacy/AiConsentHost';
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -124,6 +125,7 @@ function AuthenticatedRouter() {
             />
           </Stack>
           <HrConfirmHost />
+          <AiConsentHost />
           <BrandLoadingHost />
         </>
       )}
