@@ -901,35 +901,25 @@ export function HrTrainingPanel({
 
               {les.url ? (
                 showVideoCard ? (
-                  <View style={styles.videoCard}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Mở video bài giảng"
-                      onPress={openLessonLink}
-                      style={({ pressed }) => [styles.videoThumbWrap, pressed && { opacity: 0.9 }]}
-                    >
-                      {youtubeThumb ? (
-                        <Image
-                          source={{ uri: youtubeThumb }}
-                          style={styles.videoThumbImage}
-                          resizeMode="cover"
-                        />
-                      ) : null}
-                      <View style={styles.videoThumbOverlay}>
-                        <View style={styles.videoPlayCircle}>
-                          <Play size={22} color={colors.white} fill={colors.white} />
-                        </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Mở video bài giảng"
+                    onPress={openLessonLink}
+                    style={({ pressed }) => [styles.videoThumbWrap, pressed && { opacity: 0.9 }]}
+                  >
+                    {youtubeThumb ? (
+                      <Image
+                        source={{ uri: youtubeThumb }}
+                        style={styles.videoThumbImage}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+                    <View style={styles.videoThumbOverlay}>
+                      <View style={styles.videoPlayCircle}>
+                        <Play size={22} color={colors.white} fill={colors.white} />
                       </View>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={openLessonLink}
-                      style={({ pressed }) => [styles.videoOpenBtn, pressed && { opacity: 0.85 }]}
-                    >
-                      <Video size={16} color={colors.white} />
-                      <Text style={styles.videoOpenBtnText}>Mở video bài giảng</Text>
-                    </Pressable>
-                  </View>
+                    </View>
+                  </Pressable>
                 ) : (
                   <Pressable onPress={openLessonLink} style={styles.resourceBox}>
                     <View style={styles.iconButtonContent}>
@@ -1838,7 +1828,6 @@ const styles = StyleSheet.create({
   resourceBox: { backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, gap: 4 },
   resourceTitle: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   resourceUrl: { color: '#6B7280', fontSize: 11.5 },
-  videoCard: { gap: 10 },
   videoThumbWrap: {
     width: '100%',
     aspectRatio: 16 / 9,
@@ -1869,17 +1858,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: 3,
   },
-  videoOpenBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 10,
-    minHeight: 42,
-    paddingHorizontal: 14,
-  },
-  videoOpenBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
   lessonContentBox: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12 },
   lessonFlatWrap: { gap: 12, paddingTop: 2 },
   lessonHeaderBar: {
