@@ -2130,7 +2130,7 @@ const HAIRLINE_CARD = {
 } as const;
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 14, paddingBottom: 28, backgroundColor: colors.white },
+  content: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 28, backgroundColor: colors.white },
   topActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   search: {
     flex: 1,
