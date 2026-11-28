@@ -156,12 +156,13 @@ export default function TabLayout() {
   const tabOptions = useMemo(
     () => ({
       headerShown: false,
+      lazy: false,
       freezeOnBlur: true,
       transitionSpec: {
         animation: 'timing' as const,
         config: {
-          duration: 210,
-          easing: Easing.out(Easing.cubic),
+          duration: 280,
+          easing: Easing.bezier(0.22, 1, 0.36, 1),
         },
       },
       sceneStyleInterpolator: ({
@@ -223,6 +224,7 @@ export default function TabLayout() {
     >
       <Tabs
         backBehavior="initialRoute"
+        detachInactiveScreens={false}
         screenOptions={tabOptions}
         screenListeners={screenListeners}
       >
