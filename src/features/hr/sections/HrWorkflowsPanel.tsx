@@ -93,6 +93,7 @@ export function HrWorkflowsPanel({
     null,
   );
   const [actionSheetOpen, setActionSheetOpen] = useState(false);
+  const [stepActionSheetOpen, setStepActionSheetOpen] = useState(false);
   const [expandedStepIds, setExpandedStepIds] = useState<Record<string, boolean>>({});
 
   const toggleStepSubTasks = useCallback((stepKey: string) => {
@@ -696,84 +697,133 @@ export function HrWorkflowsPanel({
               ? `Bước ${selectedStep.index + 1}: ${selectedStep.step.title || `Bước ${selectedStep.index + 1}`}`
               : 'Chi tiết bước'
           }
-          onClose={() => setSelectedStep(null)}
+          scrollable={false}
+          onClose={() => {
+            setStepActionSheetOpen(false);
+            setSelectedStep(null);
+          }}
         >
           {selectedStep ? (
-            <View style={{ gap: 12, paddingBottom: 12 }}>
-              {selectedStep.step.description ? (
-                <Text style={styles.bodyText}>{selectedStep.step.description}</Text>
-              ) : (
-                <Text style={styles.muted}>Chưa có mô tả chi tiết cho bước này.</Text>
-              )}
+            <View style={{ flex: 1 }}>
+              <ScrollView
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 108, gap: 12 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {selectedStep.step.description ? (
+                  <Text style={styles.bodyText}>{selectedStep.step.description}</Text>
+                ) : (
+                  <Text style={styles.muted}>Chưa có mô tả chi tiết cho bước này.</Text>
+                )}
 
-              {selectedStep.step.note ? (
-                <View style={styles.noteBox}>
-                  <Text style={styles.noteTitle}>Lưu ý</Text>
-                  <Text style={styles.noteText}>{selectedStep.step.note}</Text>
-                </View>
-              ) : null}
+                {selectedStep.step.note ? (
+                  <View style={styles.noteBox}>
+                    <Text style={styles.noteTitle}>Lưu ý</Text>
+                    <Text style={styles.noteText}>{selectedStep.step.note}</Text>
+                  </View>
+                ) : null}
 
-              {selectedStep.step.deliverable ? (
-                <View style={styles.deliverableBox}>
-                  <Text style={styles.deliverableTitle}>Kết quả cần đạt</Text>
-                  <Text style={styles.deliverableText}>
-                    {selectedStep.step.deliverable}
-                  </Text>
-                </View>
-              ) : null}
+                {selectedStep.step.deliverable ? (
+                  <View style={styles.deliverableBox}>
+                    <Text style={styles.deliverableTitle}>Kết quả cần đạt</Text>
+                    <Text style={styles.deliverableText}>
+                      {selectedStep.step.deliverable}
+                    </Text>
+                  </View>
+                ) : null}
 
-              {selectedStep.step.subTasks?.length ? (
-                <View style={{ gap: 6 }}>
-                  <Text style={styles.subSectionLabel}>
-                    Công việc con ({selectedStep.step.subTasks.length})
-                  </Text>
-                  {selectedStep.step.subTasks.map((sub, i) => (
-                    <View key={sub.id || i} style={styles.subTaskRow}>
-                      <View style={styles.subDot} />
-                      <Text style={styles.subTaskText}>{sub.title}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-
-              {selectedStep.step.attachments?.length ? (
-                <View style={{ gap: 6 }}>
-                  <Text style={styles.subSectionLabel}>
-                    Tệp đính kèm ({selectedStep.step.attachments.length})
-                  </Text>
-                  {selectedStep.step.attachments.map((att, i) => (
-                    <Pressable
-                      key={att.id || i}
-                      onPress={() => {
-                        if (att.url) void Linking.openURL(att.url);
-                      }}
-                      style={styles.attachBtn}
-                    >
-                      <View style={styles.attachBtnContent}>
-                        <Paperclip size={14} color={colors.primary} />
-                        <Text numberOfLines={1} style={styles.attachBtnText}>{att.name || 'Mở tệp đính kèm'}</Text>
-                        <ChevronRight size={14} color={colors.primary} />
+                {selectedStep.step.subTasks?.length ? (
+                  <View style={{ gap: 6 }}>
+                    <Text style={styles.subSectionLabel}>
+                      Công việc con ({selectedStep.step.subTasks.length})
+                    </Text>
+                    {selectedStep.step.subTasks.map((sub, i) => (
+                      <View key={sub.id || i} style={styles.subTaskRow}>
+                        <View style={styles.subDot} />
+                        <Text style={styles.subTaskText}>{sub.title}</Text>
                       </View>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
+                    ))}
+                  </View>
+                ) : null}
+
+                {selectedStep.step.attachments?.length ? (
+                  <View style={{ gap: 6 }}>
+                    <Text style={styles.subSectionLabel}>
+                      Tệp đính kèm ({selectedStep.step.attachments.length})
+                    </Text>
+                    {selectedStep.step.attachments.map((att, i) => (
+                      <Pressable
+                        key={att.id || i}
+                        onPress={() => {
+                          if (att.url) void Linking.openURL(att.url);
+                        }}
+                        style={styles.attachBtn}
+                      >
+                        <View style={styles.attachBtnContent}>
+                          <Paperclip size={14} color={colors.primary} />
+                          <Text numberOfLines={1} style={styles.attachBtnText}>{att.name || 'Mở tệp đính kèm'}</Text>
+                          <ChevronRight size={14} color={colors.primary} />
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+              </ScrollView>
 
               {canManage ? (
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                <HrFab
+                  label="Tùy chọn bước"
+                  icon={<Ellipsis size={24} strokeWidth={2.2} color={colors.white} />}
+                  onPress={() => setStepActionSheetOpen(true)}
+                />
+              ) : null}
+
+              {stepActionSheetOpen ? (
+                <Pressable
+                  style={styles.inlineSheetBackdrop}
+                  onPress={() => setStepActionSheetOpen(false)}
+                >
                   <Pressable
-                    onPress={() => openEditStep(selectedStep.step)}
-                    style={[styles.submitBtn, { flex: 1 }]}
+                    style={[
+                      styles.bottomSheetCard,
+                      { paddingBottom: Math.max(insets.bottom + 14, 24) },
+                    ]}
+                    onPress={() => {}}
                   >
-                    <Text style={styles.submitBtnText}>Chỉnh sửa bước</Text>
+                    <View style={styles.bottomSheetHandle} />
+
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Chỉnh sửa bước"
+                      onPress={() => {
+                        setStepActionSheetOpen(false);
+                        openEditStep(selectedStep.step);
+                      }}
+                      style={({ pressed }) => [
+                        styles.actionSheetRow,
+                        pressed && styles.actionSheetRowPressed,
+                      ]}
+                    >
+                      <Pencil size={18} strokeWidth={1.6} color={colors.ink} />
+                      <Text style={styles.actionSheetRowText}>Chỉnh sửa bước</Text>
+                    </Pressable>
+
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Xóa bước"
+                      onPress={() => {
+                        setStepActionSheetOpen(false);
+                        onDeleteStep(selectedStep.step);
+                      }}
+                      style={({ pressed }) => [
+                        styles.actionSheetRow,
+                        pressed && styles.actionSheetRowPressed,
+                      ]}
+                    >
+                      <Trash2 size={18} strokeWidth={1.6} color={colors.ink} />
+                      <Text style={styles.actionSheetRowText}>Xóa bước</Text>
+                    </Pressable>
                   </Pressable>
-                  <Pressable
-                    onPress={() => onDeleteStep(selectedStep.step)}
-                    style={styles.deleteBtn}
-                  >
-                    <Text style={styles.deleteBtnText}>Xóa</Text>
-                  </Pressable>
-                </View>
+                </Pressable>
               ) : null}
             </View>
           ) : null}
@@ -1412,6 +1462,16 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(15, 23, 42, 0.42)',
   },
+  inlineSheetBackdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 50,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+  },
   bottomSheetCard: {
     backgroundColor: colors.white,
     borderTopLeftRadius: 22,
@@ -1483,7 +1543,7 @@ const styles = StyleSheet.create({
   subDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary },
   subTaskText: { color: '#374151', fontSize: 13, flex: 1 },
   attachBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
-  attachBtnText: { color: colors.primary, fontSize: 12.5, fontWeight: '600' },
+  attachBtnText: { flex: 1, color: colors.primary, fontSize: 12.5, fontWeight: '400' },
   attachmentSection: { gap: 8, marginTop: 2, padding: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: '#E5EAF2', backgroundColor: colors.white },
   attachmentHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   attachmentAddBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#EAF2FF' },
