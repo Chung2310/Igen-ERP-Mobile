@@ -2011,7 +2011,7 @@ const styles = StyleSheet.create({
   sheetRowActive: { backgroundColor: '#F0F6FF' },
   sheetRowTitle: { color: '#111827', fontSize: 13.5, fontWeight: '600' },
   sheetRowSub: { color: '#6B7280', fontSize: 11.5, marginTop: 2 },
-  switcherBarWrap: { marginHorizontal: 14, marginTop: 4, marginBottom: 8 },
+  switcherBarWrap: { marginHorizontal: 14, marginTop: 4, marginBottom: 10 },
   container: { flex: 1, backgroundColor: colors.white },
   topZoneBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, height: 78, overflow: 'hidden' },
   companyScopeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 6, paddingBottom: 2 },

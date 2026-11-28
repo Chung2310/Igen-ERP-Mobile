@@ -1061,7 +1061,7 @@ const styles = StyleSheet.create({
   branchOptionSelected: { backgroundColor: '#F0F6FF', borderRadius: 10 },
   container: { flex: 1, backgroundColor: colors.white },
   content: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 28, gap: 10, backgroundColor: colors.white },
-  switcherBarWrap: { marginHorizontal: 14, marginTop: 4, marginBottom: 6 },
+  switcherBarWrap: { marginHorizontal: 14, marginTop: 4, marginBottom: 10 },
   partnerSelect: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: '#DCE5F2', borderRadius: 10, backgroundColor: '#F6F8FC' },
   partnerSelectText: { flex: 1, color: '#111827', fontSize: 13.5, fontWeight: '400' },
   companySelect: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6 },
