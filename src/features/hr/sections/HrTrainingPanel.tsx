@@ -813,7 +813,6 @@ export function HrTrainingPanel({
         {/* Section 2: Active Lesson */}
         {activeIndex >= 0 && activeIndex < lessons.length ? (() => {
           const les = lessons[activeIndex];
-          const isCompleted = completedLessons.includes(`lesson_${activeIndex}`);
           const isVideo = les.type === 'video' || les.type === 'youtube';
           return (
             <View style={styles.lessonFlatWrap}>
@@ -852,15 +851,6 @@ export function HrTrainingPanel({
                   ) : null}
                 </Pressable>
               </View>
-
-              {isCompleted ? (
-                <View style={styles.courseMetaRow}>
-                  <View style={styles.iconButtonContent}>
-                    <Check size={13} color="#16885A" />
-                    <Text style={styles.lessonCounter}>Đã hoàn thành</Text>
-                  </View>
-                </View>
-              ) : null}
 
               {les.url ? (
                 <Pressable
