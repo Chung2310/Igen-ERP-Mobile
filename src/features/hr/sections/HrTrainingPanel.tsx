@@ -1400,9 +1400,14 @@ export function HrTrainingPanel({
                     {course.title || course.name}
                   </Text>
                   <View style={styles.badgeRow}>
-                    <Text style={styles.categoryBadge}>{course.category || 'Đào tạo'}</Text>
-                    {course.isRequired ? <Text style={styles.requiredBadge}>Bắt buộc</Text> : null}
-                    {isDone ? <View style={styles.iconButtonContent}><Check size={12} color="#16885A" /><Text style={styles.doneBadge}>Hoàn thành</Text></View> : null}
+                    {isDone ? (
+                      <Text style={styles.doneBadge}>Hoàn thành</Text>
+                    ) : (
+                      <>
+                        <Text style={styles.categoryBadge}>{course.category || 'Đào tạo'}</Text>
+                        {course.isRequired ? <Text style={styles.requiredBadge}>Bắt buộc</Text> : null}
+                      </>
+                    )}
                   </View>
                 </View>
 
