@@ -714,19 +714,14 @@ export function HrTrainingPanel({
             <IntroCourseIcon size={17} color={colors.ink} />
             <Text
               numberOfLines={1}
-              style={[
-                styles.syllabusSheetRowText,
-                activeIndex === -1 && styles.syllabusSheetRowTextActive,
-              ]}
+              style={styles.syllabusSheetRowText}
             >
               Giới thiệu
             </Text>
-            {activeIndex === -1 ? <Check size={16} color={colors.primary} /> : null}
           </Pressable>
 
           {lessons.map((les, idx) => {
             const done = completedLessons.includes(`lesson_${idx}`);
-            const active = activeIndex === idx;
             const isLast = idx === lessons.length - 1 && quizzes.length === 0;
             return (
               <Pressable
@@ -749,14 +744,10 @@ export function HrTrainingPanel({
                 )}
                 <Text
                   numberOfLines={2}
-                  style={[
-                    styles.syllabusSheetRowText,
-                    active && styles.syllabusSheetRowTextActive,
-                  ]}
+                  style={styles.syllabusSheetRowText}
                 >
                   Bài {idx + 1}: {les.title}
                 </Text>
-                {active ? <Check size={16} color={colors.primary} /> : null}
               </Pressable>
             );
           })}
@@ -783,14 +774,10 @@ export function HrTrainingPanel({
               )}
               <Text
                 numberOfLines={1}
-                style={[
-                  styles.syllabusSheetRowText,
-                  activeIndex === lessons.length && styles.syllabusSheetRowTextActive,
-                ]}
+                style={styles.syllabusSheetRowText}
               >
                 Thi trắc nghiệm ({quizzes.length})
               </Text>
-              {activeIndex === lessons.length ? <Check size={16} color={colors.primary} /> : null}
             </Pressable>
           ) : null}
         </View>
@@ -1639,10 +1626,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 14.5,
     fontWeight: '400',
-  },
-  syllabusSheetRowTextActive: {
-    color: colors.ink,
-    fontWeight: '500',
   },
   actionSheetRow: {
     flexDirection: 'row',
