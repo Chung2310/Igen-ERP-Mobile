@@ -24,14 +24,14 @@ GitHub repository mobile → Settings → Secrets and variables → Actions.
 | Repository variable | Giá trị |
 | --- | --- |
 | `APP_VERSION` | Mặc định `1.0.0`; phải trùng phiên bản dự kiến trên App Store Connect |
-| `APPLE_TEAM_ID` | Bắt buộc, team sở hữu Bundle ID `vn.igen.erp.mobile` |
+| `APPLE_TEAM_ID` | Bắt buộc, team sở hữu Bundle ID `com.igen.erp` |
 | `STAGING_API_URL` | Mặc định `https://staging-erp.igentechnology.net`, dùng khi chọn backend `staging` |
 | `STAGING_WEB_URL` | Tùy chọn cho staging; bỏ trống để dùng API origin |
 | `EXPO_PUBLIC_API_URL` | Bắt buộc khi chọn backend `production`, HTTPS origin có backend đã deploy và DB hoạt động; không có `/api/v1`, query, IP hoặc credentials |
 | `EXPO_PUBLIC_ERP_WEB_URL` | Web production có `/privacy-policy` và `/terms-of-service`; bỏ trống để dùng API origin |
 | `IOS_BUILD_NUMBER_BASE` | Mặc định `1000`; base + số workflow run phải lớn hơn build cao nhất đã upload |
 
-Đã tạo `.env` local từ cấu hình staging, web cùng origin, version `1.0.0`, Bundle ID `vn.igen.erp.mobile`, build local `1`; `.env` được Git bỏ qua. Không có URL production hoặc team mặc định lấy từ LuxCare. Workflow tắt dotenv và chọn backend từ input `api_environment`, mặc định staging; khi chọn production phải có URL production riêng và helper từ chối URL staging ERP đã biết. Các giá trị `EXPO_PUBLIC_*` được nhúng trong app và không phải nơi lưu secret. Bản native yêu cầu HTTPS; dùng staging/tunnel HTTPS khi thử API local.
+Đã tạo `.env` local từ cấu hình staging, web cùng origin, version `1.0.0`, Bundle ID `com.igen.erp`, build local `1`; `.env` được Git bỏ qua. Không có URL production hoặc team mặc định lấy từ LuxCare. Workflow tắt dotenv và chọn backend từ input `api_environment`, mặc định staging; khi chọn production phải có URL production riêng và helper từ chối URL staging ERP đã biết. Các giá trị `EXPO_PUBLIC_*` được nhúng trong app và không phải nơi lưu secret. Bản native yêu cầu HTTPS; dùng staging/tunnel HTTPS khi thử API local.
 
 | GitHub Secret | Nội dung |
 | --- | --- |

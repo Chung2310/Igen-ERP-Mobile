@@ -37,6 +37,6 @@ Các ô trên chưa được coi là hoàn thành chỉ vì script chạy qua. W
 - Phân công người xử lý báo cáo và theo dõi hạn. Bộ lọc text hiện là denylist tối thiểu; cần kiểm duyệt phù hợp mức rủi ro thực tế. Muốn bật lại tệp chat phải có scanner và quy trình xử lý nội dung trước.
 - Công bố thời hạn retention/backup có căn cứ, quy trình xóa ở nhà cung cấp và áp dụng lại yêu cầu khi restore. Không tick review checkbox khi chưa thực hiện.
 - Xác định hình thức phân phối phù hợp đối tượng B2B thực tế (public/unlisted/custom); không suy ra chỉ từ việc app có đăng nhập. Xác minh ngoại lệ enterprise services theo 3.1.3(c) trước khi mô tả mô hình thương mại.
-- Cấu hình team/variables/secrets ERP trên GitHub theo [IOS_BUILD.md](../IOS_BUILD.md); tạo app record `vn.igen.erp.mobile`; không dùng credentials của ứng dụng khác.
+- Cấu hình team/variables/secrets ERP trên GitHub theo [IOS_BUILD.md](../IOS_BUILD.md); tạo app record `com.igen.erp`; không dùng credentials của ứng dụng khác.
 
 Nguồn chính: [App Review Guidelines 1.2, 1.5, 2.1, 3.1 và 5.1](https://developer.apple.com/app-store/review/guidelines/), [yêu cầu SDK và age rating](https://developer.apple.com/news/upcoming-requirements/), [hỗ trợ IPv6](https://developer.apple.com/support/ipv6/).

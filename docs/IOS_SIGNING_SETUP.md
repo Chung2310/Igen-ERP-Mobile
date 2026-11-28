@@ -1,6 +1,6 @@
 # Thông tin còn thiếu để ký iOS ERP
 
-Repository: `Chung2310/Igen-ERP-Mobile`. Bundle ID đang cấu hình: **`vn.igen.erp.mobile`**. Cách build giống LuxCare: GitHub macOS + Expo prebuild + CocoaPods + Xcode archive/export; không cần EAS token hay quota EAS Build.
+Repository: `Chung2310/Igen-ERP-Mobile`. Bundle ID đang cấu hình: **`com.igen.erp`**. Cách build giống LuxCare: GitHub macOS + Expo prebuild + CocoaPods + Xcode archive/export; không cần EAS token hay quota EAS Build.
 
 ## Phần đã cấu hình trong source/local
 
@@ -16,7 +16,7 @@ Repository: `Chung2310/Igen-ERP-Mobile`. Bundle ID đang cấu hình: **`vn.igen
 | **Apple Team ID** gồm 10 ký tự | GitHub Variable `APPLE_TEAM_ID` | Mọi build có ký, kể cả signing check |
 | **Apple Distribution P12** chứa certificate và private key | GitHub Secret `IOS_DISTRIBUTION_P12_BASE64` | Mọi build có ký |
 | **Mật khẩu P12** | GitHub Secret `IOS_DISTRIBUTION_P12_PASSWORD` | Đi cùng đúng file P12; có thể rỗng nếu P12 không đặt mật khẩu |
-| **Provisioning profile App Store Connect** cho đúng team và `vn.igen.erp.mobile`, chọn certificate tương ứng P12 | GitHub Secret `IOS_APP_STORE_PROFILE_BASE64` | Ký App Store/TestFlight (`profile=production`) |
+| **Provisioning profile App Store Connect** cho đúng team và `com.igen.erp`, chọn certificate tương ứng P12 | GitHub Secret `IOS_APP_STORE_PROFILE_BASE64` | Ký App Store/TestFlight (`profile=production`) |
 | **Provisioning profile Ad Hoc**, kèm UDID iPhone/iPad thử và certificate tương ứng P12 | GitHub Secret `IOS_ADHOC_PROFILE_BASE64` | Chỉ khi muốn IPA cài trực tiếp lên thiết bị đã đăng ký (`profile=preview`) |
 | **App Store Connect API private key `.p8`** | GitHub Secret `APP_STORE_CONNECT_API_KEY_BASE64` | Chỉ khi bật upload TestFlight |
 | **Key ID** của API key | GitHub Secret `APP_STORE_CONNECT_API_KEY_ID` | Đi cùng đúng `.p8` |
@@ -36,7 +36,7 @@ Mỗi lệnh thay nội dung clipboard; dán vào Secret tương ứng trước 
 
 ## Cần xác nhận thêm, không phải signing secret
 
-1. Bundle ID `vn.igen.erp.mobile` đã đăng ký trên team nào? Nếu đã có app record dùng Bundle ID khác, báo ID thật trước khi tạo profile.
+1. Bundle ID `com.igen.erp` đã đăng ký trên team nào? Nếu đã có app record dùng Bundle ID khác, báo ID thật trước khi tạo profile.
 2. Nếu ERP đã từng upload lên App Store Connect: version và số build cao nhất hiện tại để đặt `APP_VERSION`/`IOS_BUILD_NUMBER_BASE` phù hợp. Nếu app mới, source đang chuẩn bị `1.0.0` và base `1000`.
 3. Nếu muốn build backend production: URL API production và origin web chứa chính sách/điều khoản. Hiện chỉ staging được cấu hình; không tự coi staging là production.
 4. Nếu muốn cài Ad Hoc: UDID từng iPhone/iPad phải nằm trong profile. Nếu chỉ thử qua TestFlight, không cần danh sách UDID hoặc Ad Hoc profile.

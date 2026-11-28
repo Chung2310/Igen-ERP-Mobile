@@ -58,7 +58,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "vn.igen.erp.mobile",
+      "bundleIdentifier": "com.igen.erp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
