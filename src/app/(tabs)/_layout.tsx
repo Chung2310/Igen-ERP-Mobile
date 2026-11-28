@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { Tabs, useRouter, type Href } from 'expo-router';
 import {
-  Animated,
+  type Animated,
   Easing,
   Keyboard,
   PanResponder,
@@ -84,7 +84,26 @@ export default function TabLayout() {
   const tabNavRef = useRef<{ navigate: (name: string) => void } | null>(null);
   const screenWidthRef = useRef(screenWidth);
   screenWidthRef.current = screenWidth;
-  const dragX = useRef(new Animated.Value(0)).current;
+  const swipedInGestureRef = useRef(false);
+
+  const navigateByDelta = (delta: -1 | 1) => {
+    const active = currentTabRef.current;
+    const routes = visibleTabRoutesRef.current;
+    const idx = routes.indexOf(active);
+    const nextIdx = idx + delta;
+    if (idx < 0 || nextIdx < 0 || nextIdx >= routes.length) return false;
+    const nextTab = routes[nextIdx];
+    currentTabRef.current = nextTab;
+    Keyboard.dismiss();
+    if (tabNavRef.current) {
+      tabNavRef.current.navigate(nextTab);
+    } else {
+      routerRef.current.navigate(TAB_HREFS[nextTab]);
+    }
+    return true;
+  };
+  const navigateByDeltaRef = useRef(navigateByDelta);
+  navigateByDeltaRef.current = navigateByDelta;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -105,48 +124,31 @@ export default function TabLayout() {
         if (gesture.dx < 0 && idx >= routes.length - 1) return false;
         return true;
       },
+      onPanResponderGrant: () => {
+        swipedInGestureRef.current = false;
+      },
       onPanResponderMove: (_, gesture) => {
-        dragX.setValue(Math.max(-28, Math.min(28, gesture.dx * 0.2)));
+        if (swipedInGestureRef.current) return;
+        if (Math.abs(gesture.dx) >= 48 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2) {
+          swipedInGestureRef.current = true;
+          navigateByDeltaRef.current(gesture.dx < 0 ? 1 : -1);
+        }
       },
       onPanResponderRelease: (_, gesture) => {
-        const active = currentTabRef.current;
-        const routes = visibleTabRoutesRef.current;
-        const idx = routes.indexOf(active);
-        const isHorizontalSwipe =
-          idx >= 0 &&
-          (Math.abs(gesture.dx) >= 44 || Math.abs(gesture.vx) >= 0.35) &&
+        if (swipedInGestureRef.current) {
+          swipedInGestureRef.current = false;
+          return;
+        }
+        const isHorizontalFlick =
+          (Math.abs(gesture.dx) >= 34 || (Math.abs(gesture.vx) >= 0.3 && Math.abs(gesture.dx) >= 20)) &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
 
-        if (isHorizontalSwipe) {
-          const nextIdx = gesture.dx < 0 ? idx + 1 : idx - 1;
-          if (nextIdx >= 0 && nextIdx < routes.length) {
-            const nextTab = routes[nextIdx];
-            currentTabRef.current = nextTab;
-            dragX.setValue(0);
-            Keyboard.dismiss();
-            if (tabNavRef.current) {
-              tabNavRef.current.navigate(nextTab);
-            } else {
-              routerRef.current.navigate(TAB_HREFS[nextTab]);
-            }
-            return;
-          }
+        if (isHorizontalFlick) {
+          navigateByDeltaRef.current(gesture.dx < 0 ? 1 : -1);
         }
-
-        Animated.spring(dragX, {
-          toValue: 0,
-          useNativeDriver: true,
-          speed: 28,
-          bounciness: 3,
-        }).start();
       },
       onPanResponderTerminate: () => {
-        Animated.spring(dragX, {
-          toValue: 0,
-          useNativeDriver: true,
-          speed: 28,
-          bounciness: 3,
-        }).start();
+        swipedInGestureRef.current = false;
       },
     }),
   ).current;
@@ -155,11 +157,12 @@ export default function TabLayout() {
     () => ({
       headerShown: false,
       lazy: false,
+      freezeOnBlur: true,
       transitionSpec: {
         animation: 'timing' as const,
         config: {
-          duration: 185,
-          easing: Easing.out(Easing.cubic),
+          duration: 280,
+          easing: Easing.bezier(0.22, 1, 0.36, 1),
         },
       },
       sceneStyleInterpolator: ({
@@ -168,16 +171,11 @@ export default function TabLayout() {
         current: { progress: Animated.AnimatedInterpolation<number> };
       }) => ({
         sceneStyle: {
-          opacity: current.progress.interpolate({
-            inputRange: [-1, 0, 1],
-            outputRange: [0, 1, 0],
-            extrapolate: 'clamp',
-          }),
           transform: [
             {
               translateX: current.progress.interpolate({
                 inputRange: [-1, 0, 1],
-                outputRange: [-screenWidth * 0.18, 0, screenWidth * 0.18],
+                outputRange: [-screenWidth, 0, screenWidth],
                 extrapolate: 'clamp',
               }),
             },
@@ -220,9 +218,9 @@ export default function TabLayout() {
   );
 
   return (
-    <Animated.View
+    <View
       {...panResponder.panHandlers}
-      style={{ flex: 1, transform: [{ translateX: dragX }] }}
+      style={{ flex: 1 }}
     >
       <Tabs
         backBehavior="initialRoute"
@@ -284,6 +282,6 @@ export default function TabLayout() {
         }}
       />
       </Tabs>
-    </Animated.View>
+    </View>
   );
 }
