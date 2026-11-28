@@ -6,6 +6,7 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Linking,
   Modal,
   Platform,
@@ -18,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Folder, Paperclip, Pencil, Plus, Trash2, X } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, Ellipsis, Folder, Paperclip, Pencil, Plus, Trash2, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { Card } from '@/components/Card';
@@ -91,6 +92,13 @@ export function HrWorkflowsPanel({
   const [selectedStep, setSelectedStep] = useState<{ step: HrWorkflowStep; index: number } | null>(
     null,
   );
+  const [actionSheetOpen, setActionSheetOpen] = useState(false);
+  const [expandedStepIds, setExpandedStepIds] = useState<Record<string, boolean>>({});
+
+  const toggleStepSubTasks = useCallback((stepKey: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedStepIds((prev) => ({ ...prev, [stepKey]: !prev[stepKey] }));
+  }, []);
 
   // Add / Edit step modal
   const [stepModalOpen, setStepModalOpen] = useState(false);
@@ -568,29 +576,11 @@ export function HrWorkflowsPanel({
     const steps = selectedWorkflow.steps ?? [];
     return (
       <SlideInPage key={selectedWorkflow.id}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.detailTopBar}>
-          <Pressable onPress={() => setSelectedWorkflow(null)} style={styles.backBtn}>
-            <View style={styles.iconButtonContent}><ChevronLeft size={15} color={colors.primary} /><Text style={styles.backText}>Danh sách</Text></View>
-          </Pressable>
-          {canManage ? (
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <Pressable onPress={() => openEditWorkflow(selectedWorkflow)} style={styles.editSmallBtn}>
-                <Text style={styles.editSmallText}>Sửa</Text>
-              </Pressable>
-              <Pressable onPress={openAddStep} style={styles.primaryBtn}>
-                <View style={styles.iconButtonContent}><Plus size={13} color={colors.white} /><Text style={styles.primaryBtnText}>Bước</Text></View>
-              </Pressable>
-              <Pressable
-                onPress={() => onDeleteWorkflow(selectedWorkflow)}
-                style={styles.dangerSmallBtn}
-              >
-                <Text style={styles.dangerSmallText}>Xóa</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-
+      <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: 108 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Card style={styles.detailHero}>
           <View style={styles.heroMetaRow}>
             {selectedWorkflow.category ? (
@@ -621,6 +611,10 @@ export function HrWorkflowsPanel({
           <View style={styles.flowWrap}>
             {steps.map((step, idx) => {
               const isLast = idx === steps.length - 1;
+              const stepKey = step.id || String(idx);
+              const subTasks = step.subTasks ?? [];
+              const hasSubTasks = subTasks.length > 0;
+              const isExpanded = Boolean(expandedStepIds[stepKey]);
               return (
                 <View key={step.id || idx} style={styles.flowItem}>
                   <View style={styles.flowRail}>
@@ -637,24 +631,48 @@ export function HrWorkflowsPanel({
                       <Text numberOfLines={2} style={styles.stepTitle}>
                         {step.title || `Bước ${idx + 1}`}
                       </Text>
+                      {hasSubTasks ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={isExpanded ? 'Thu gọn quy trình con' : 'Xem quy trình con'}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            toggleStepSubTasks(stepKey);
+                          }}
+                          hitSlop={10}
+                          style={({ pressed }) => [styles.stepExpandBtn, pressed && { opacity: 0.6 }]}
+                        >
+                          {isExpanded ? (
+                            <ChevronUp size={17} strokeWidth={1.8} color={colors.primary} />
+                          ) : (
+                            <ChevronDown size={17} strokeWidth={1.8} color="#64748B" />
+                          )}
+                        </Pressable>
+                      ) : null}
                     </View>
                     {step.description ? (
                       <Text numberOfLines={2} style={styles.muted}>
                         {step.description}
                       </Text>
                     ) : null}
-                    <View style={styles.stepMetaRow}>
-                      {step.deliverable ? (
-                        <View style={styles.stepTagRow}><Check size={12} color="#15803D" /><Text style={styles.stepTagGreen}>Có kết quả đầu ra</Text></View>
-                      ) : null}
-                      {step.note ? <Text style={styles.stepTagAmber}>! Có lưu ý</Text> : null}
-                      {step.subTasks?.length ? (
-                        <Text style={styles.stepTagBlue}>{step.subTasks.length} công việc con</Text>
-                      ) : null}
-                      {step.attachments?.length ? (
-                        <View style={styles.stepTagRow}><Paperclip size={12} color={colors.primary} /><Text style={styles.stepTagBlue}>{step.attachments.length} tệp</Text></View>
-                      ) : null}
-                    </View>
+                    {step.deliverable || step.note ? (
+                      <View style={styles.stepMetaRow}>
+                        {step.deliverable ? (
+                          <View style={styles.stepTagRow}><Check size={12} color="#15803D" /><Text style={styles.stepTagGreen}>Có kết quả đầu ra</Text></View>
+                        ) : null}
+                        {step.note ? <Text style={styles.stepTagAmber}>! Có lưu ý</Text> : null}
+                      </View>
+                    ) : null}
+                    {isExpanded && hasSubTasks ? (
+                      <View style={styles.stepSubTasksWrap}>
+                        {subTasks.map((sub, subIdx) => (
+                          <View key={sub.id || subIdx} style={styles.stepSubTaskItem}>
+                            <View style={styles.subDot} />
+                            <Text style={styles.stepSubTaskText}>{sub.title}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
                   </Card>
                 </View>
               );
@@ -863,6 +881,107 @@ export function HrWorkflowsPanel({
         </FullScreenFormModal>
         {renderWorkflowFormModal()}
       </ScrollView>
+
+      {/* Floating action widget for workflow actions */}
+      <HrFab
+        label="Tùy chọn quy trình"
+        icon={<Ellipsis size={24} strokeWidth={2.2} color={colors.white} />}
+        onPress={() => setActionSheetOpen(true)}
+      />
+
+      {/* Bottom Sheet: Thao tác quy trình (Quay lại danh sách / Thêm bước / Sửa / Xóa) */}
+      <Modal
+        visible={actionSheetOpen}
+        transparent
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => setActionSheetOpen(false)}
+      >
+        <Pressable
+          style={styles.bottomSheetBackdrop}
+          onPress={() => setActionSheetOpen(false)}
+        >
+          <Pressable
+            style={[
+              styles.bottomSheetCard,
+              { paddingBottom: Math.max(insets.bottom + 14, 24) },
+            ]}
+            onPress={() => {}}
+          >
+            <View style={styles.bottomSheetHandle} />
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Quay lại danh sách"
+              onPress={() => {
+                setActionSheetOpen(false);
+                setExpandedStepIds({});
+                setSelectedWorkflow(null);
+              }}
+              style={({ pressed }) => [
+                styles.actionSheetRow,
+                pressed && styles.actionSheetRowPressed,
+              ]}
+            >
+              <ArrowLeft size={18} strokeWidth={1.6} color={colors.ink} />
+              <Text style={styles.actionSheetRowText}>Quay lại danh sách</Text>
+            </Pressable>
+
+            {canManage ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Thêm bước"
+                  onPress={() => {
+                    setActionSheetOpen(false);
+                    openAddStep();
+                  }}
+                  style={({ pressed }) => [
+                    styles.actionSheetRow,
+                    pressed && styles.actionSheetRowPressed,
+                  ]}
+                >
+                  <Plus size={18} strokeWidth={1.6} color={colors.ink} />
+                  <Text style={styles.actionSheetRowText}>Thêm bước</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Sửa quy trình"
+                  onPress={() => {
+                    setActionSheetOpen(false);
+                    openEditWorkflow(selectedWorkflow);
+                  }}
+                  style={({ pressed }) => [
+                    styles.actionSheetRow,
+                    pressed && styles.actionSheetRowPressed,
+                  ]}
+                >
+                  <Pencil size={18} strokeWidth={1.6} color={colors.ink} />
+                  <Text style={styles.actionSheetRowText}>Sửa quy trình</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Xóa quy trình"
+                  onPress={() => {
+                    setActionSheetOpen(false);
+                    onDeleteWorkflow(selectedWorkflow);
+                  }}
+                  style={({ pressed }) => [
+                    styles.actionSheetRow,
+                    pressed && styles.actionSheetRowPressed,
+                  ]}
+                >
+                  <Trash2 size={18} strokeWidth={1.6} color={colors.ink} />
+                  <Text style={styles.actionSheetRowText}>Xóa quy trình</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+      </View>
       </SlideInPage>
     );
   }
@@ -1252,6 +1371,52 @@ const styles = StyleSheet.create({
   stepCard: { ...HAIRLINE_CARD, flex: 1, padding: 13, gap: 6, marginBottom: 10 },
   stepCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   stepTitle: { color: '#111827', fontSize: 14, fontWeight: '600', flex: 1 },
+  stepExpandBtn: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  stepSubTasksWrap: {
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#EEF2F7',
+    gap: 6,
+  },
+  stepSubTaskItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stepSubTaskText: { flex: 1, color: '#374151', fontSize: 12.5, lineHeight: 18 },
+  bottomSheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+  },
+  bottomSheetCard: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  bottomSheetHandle: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 12,
+  },
+  actionSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  actionSheetRowPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  actionSheetRowText: {
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: '400',
+  },
   chevron: { color: colors.muted, fontSize: 18 },
   stepMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 },
   stepTagGreen: { backgroundColor: '#E9F8F1', color: '#16885A', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
