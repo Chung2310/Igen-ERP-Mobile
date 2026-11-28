@@ -8,6 +8,7 @@ import {
   Alert,
   Image,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -39,7 +40,6 @@ import {
   RefreshCw,
   ShieldCheck,
   Smartphone,
-  Trash2,
 } from 'lucide-react-native';
 import { Screen } from '@/components/Screen';
 import {
@@ -366,6 +366,54 @@ function getInitials(name?: string) {
   );
 }
 
+function AvatarCameraDuotoneIcon({ size = 25 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4.5 7.5H7.2L8.7 5.2C9 4.75 9.5 4.5 10.05 4.5H13.95C14.5 4.5 15 4.75 15.3 5.2L16.8 7.5H19.5C20.6 7.5 21.5 8.4 21.5 9.5V17.5C21.5 18.6 20.6 19.5 19.5 19.5H4.5C3.4 19.5 2.5 18.6 2.5 17.5V9.5C2.5 8.4 3.4 7.5 4.5 7.5Z"
+        fill="#DBEAFE"
+        stroke="#1E7CE8"
+        strokeWidth="1.65"
+        strokeLinejoin="round"
+      />
+      <Circle
+        cx="12"
+        cy="13.2"
+        r="3.4"
+        fill="#FFFFFF"
+        stroke="#1E7CE8"
+        strokeWidth="1.65"
+      />
+      <Circle cx="17.7" cy="10.4" r="0.9" fill="#1E7CE8" />
+    </Svg>
+  );
+}
+
+function AvatarGalleryDuotoneIcon({ size = 25 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect
+        x="2.75"
+        y="4"
+        width="18.5"
+        height="16"
+        rx="3"
+        fill="#EFF6FF"
+        stroke="#1E7CE8"
+        strokeWidth="1.65"
+      />
+      <Circle cx="16.2" cy="8.7" r="1.6" fill="#BFDBFE" stroke="#1E7CE8" strokeWidth="1.35" />
+      <Path
+        d="M3.5 17.6L8.4 11.7C8.95 11.05 9.95 11.05 10.5 11.7L14.2 16.1L16.1 14C16.65 13.4 17.6 13.42 18.12 14.05L20.6 17.2C20.9 17.6 20.95 18.15 20.7 18.6C20.42 19.15 19.85 19.5 19.2 19.5H4.8C3.9 19.5 3.2 18.6 3.5 17.6Z"
+        fill="#BFDBFE"
+        stroke="#1E7CE8"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 // =========================================================================
 // 1. THÔNG TIN CÁ NHÂN
 // =========================================================================
@@ -376,6 +424,7 @@ function AccountDetailSection() {
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [photoURL, setPhotoURL] = useState(user?.photoURL || '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarSheetOpen, setAvatarSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const topInset = Math.max(
@@ -388,55 +437,83 @@ function AccountDetailSection() {
     setPhotoURL(user?.photoURL || '');
   }, [user?.displayName, user?.photoURL]);
 
-  const onPickAvatar = useCallback(async () => {
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Chưa cấp quyền ảnh', 'Vui lòng cho phép ứng dụng truy cập thư viện ảnh để đổi ảnh đại diện.');
-        return;
-      }
-      const picked = await withAppLockSuspended(() => ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.75,
-        base64: true,
-      }));
-      if (picked.canceled || !picked.assets?.[0]) return;
-      const asset = picked.assets[0];
-      const mimeType = asset.mimeType || 'image/jpeg';
-      let dataUrl = '';
-      if (asset.base64) {
-        dataUrl = `data:${mimeType};base64,${asset.base64}`;
-      } else {
-        const res = await fetch(asset.uri);
-        const blob = await res.blob();
-        dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onerror = () => reject(new Error('Không đọc được tệp ảnh.'));
-          reader.onload = () => resolve(String(reader.result ?? ''));
-          reader.readAsDataURL(blob);
+  const onSelectAvatar = useCallback(
+    async (source: 'camera' | 'library') => {
+      setAvatarSheetOpen(false);
+      try {
+        if (source === 'camera') {
+          const permission = await ImagePicker.requestCameraPermissionsAsync();
+          if (!permission.granted) {
+            Alert.alert(
+              'Chưa cấp quyền camera',
+              'Vui lòng cho phép ứng dụng truy cập camera để chụp ảnh đại diện.',
+            );
+            return;
+          }
+        } else {
+          const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!permission.granted) {
+            Alert.alert(
+              'Chưa cấp quyền ảnh',
+              'Vui lòng cho phép ứng dụng truy cập thư viện ảnh để đổi ảnh đại diện.',
+            );
+            return;
+          }
+        }
+
+        const pickerOptions: ImagePicker.ImagePickerOptions = {
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.75,
+          base64: true,
+        };
+
+        const picked = await withAppLockSuspended(() =>
+          source === 'camera'
+            ? ImagePicker.launchCameraAsync(pickerOptions)
+            : ImagePicker.launchImageLibraryAsync(pickerOptions),
+        );
+        if (picked.canceled || !picked.assets?.[0]) return;
+        const asset = picked.assets[0];
+        const mimeType = asset.mimeType || 'image/jpeg';
+        let dataUrl = '';
+        if (asset.base64) {
+          dataUrl = `data:${mimeType};base64,${asset.base64}`;
+        } else {
+          const res = await fetch(asset.uri);
+          const blob = await res.blob();
+          dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('Không đọc được tệp ảnh.'));
+            reader.onload = () => resolve(String(reader.result ?? ''));
+            reader.readAsDataURL(blob);
+          });
+        }
+        setUploadingAvatar(true);
+        const uploadedUrl = await uploadMyAvatar(
+          dataUrl,
+          asset.fileName || 'avatar.jpg',
+          mimeType,
+        );
+        setPhotoURL(uploadedUrl);
+        await updateMyProfile({
+          displayName: displayName.trim() || user?.displayName,
+          photoURL: uploadedUrl,
         });
+        await refreshUser();
+        Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện mới.');
+      } catch (err) {
+        Alert.alert(
+          'Lỗi đổi ảnh',
+          err instanceof Error ? err.message : 'Không thể tải ảnh đại diện lên.',
+        );
+      } finally {
+        setUploadingAvatar(false);
       }
-      setUploadingAvatar(true);
-      const uploadedUrl = await uploadMyAvatar(
-        dataUrl,
-        asset.fileName || 'avatar.jpg',
-        mimeType,
-      );
-      setPhotoURL(uploadedUrl);
-      await updateMyProfile({
-        displayName: displayName.trim() || user?.displayName,
-        photoURL: uploadedUrl,
-      });
-      await refreshUser();
-      Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện mới.');
-    } catch (err) {
-      Alert.alert('Lỗi đổi ảnh', err instanceof Error ? err.message : 'Không thể tải ảnh đại diện lên.');
-    } finally {
-      setUploadingAvatar(false);
-    }
-  }, [displayName, refreshUser, user?.displayName]);
+    },
+    [displayName, refreshUser, user?.displayName],
+  );
 
   const onSave = useCallback(async () => {
     if (!displayName.trim()) {
@@ -553,7 +630,7 @@ function AccountDetailSection() {
             accessibilityRole="button"
             accessibilityLabel="Thay đổi ảnh đại diện"
             disabled={uploadingAvatar}
-            onPress={() => void onPickAvatar()}
+            onPress={() => setAvatarSheetOpen(true)}
             style={styles.heroAvatarRing}
           >
             <View style={styles.heroAvatarInner}>
@@ -577,17 +654,6 @@ function AccountDetailSection() {
           <Text style={styles.heroName} numberOfLines={2}>
             {displayName.trim() || user?.displayName || 'Người dùng ERP'}
           </Text>
-
-          {photoURL ? (
-            <Pressable
-              disabled={uploadingAvatar || saving}
-              onPress={() => setPhotoURL('')}
-              style={styles.heroRemovePhotoPill}
-            >
-              <Trash2 size={13} color="#C74848" />
-              <Text style={styles.heroRemovePhotoText}>Dùng ảnh mặc định</Text>
-            </Pressable>
-          ) : null}
         </View>
 
         {/* Clean stacked icon + label/value rows */}
@@ -644,6 +710,58 @@ function AccountDetailSection() {
           <Text style={styles.primaryBtnText}>{saving ? 'Đang lưu...' : 'Lưu thay đổi'}</Text>
         </Pressable>
       </View>
+
+      {/* Bottom sheet chọn nguồn ảnh đại diện */}
+      <Modal
+        visible={avatarSheetOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setAvatarSheetOpen(false)}
+      >
+        <View style={styles.avatarSheetOverlay}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Đóng chọn ảnh đại diện"
+            onPress={() => setAvatarSheetOpen(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            style={[
+              styles.avatarSheetContainer,
+              { paddingBottom: Math.max(insets.bottom + 14, 24) },
+            ]}
+          >
+            <View style={styles.avatarSheetHandle} />
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Chụp ảnh"
+              onPress={() => void onSelectAvatar('camera')}
+              style={({ pressed }) => [
+                styles.avatarSheetOption,
+                pressed && styles.avatarSheetOptionPressed,
+              ]}
+            >
+              <AvatarCameraDuotoneIcon size={25} />
+              <Text style={styles.avatarSheetOptionText}>Chụp ảnh</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Chọn ảnh từ thư viện"
+              onPress={() => void onSelectAvatar('library')}
+              style={({ pressed }) => [
+                styles.avatarSheetOption,
+                pressed && styles.avatarSheetOptionPressed,
+              ]}
+            >
+              <AvatarGalleryDuotoneIcon size={25} />
+              <Text style={styles.avatarSheetOptionText}>Chọn ảnh từ thư viện</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1051,17 +1169,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  heroRemovePhotoPill: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#FCEBEC',
-  },
-  heroRemovePhotoText: { color: '#C74848', fontSize: 12, fontWeight: '500' },
   profileInfoList: {
     paddingHorizontal: 18,
     paddingTop: 4,
@@ -1274,5 +1381,39 @@ const styles = StyleSheet.create({
   dangerBtnText: { color: '#C74848', fontSize: 12, fontWeight: '600' },
   errorText: { color: '#B91C1C', fontSize: 12 },
   disabled: { opacity: 0.45 },
+  avatarSheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+  },
+  avatarSheetContainer: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 10,
+  },
+  avatarSheetHandle: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 12,
+  },
+  avatarSheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 22,
+    paddingVertical: 15,
+  },
+  avatarSheetOptionPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  avatarSheetOptionText: {
+    color: '#111827',
+    fontSize: 15.5,
+    fontWeight: '500',
+  },
 });
 

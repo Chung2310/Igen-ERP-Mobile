@@ -16,6 +16,7 @@ import {
 import { Building2, Check, ChevronDown, ChevronRight, Crown, FileText, Pencil, Phone, Plus, Search } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { HrFab } from '@/features/hr/components/HrFab';
@@ -235,6 +236,9 @@ export function OrgChartPanel({
   const [editSalary, setEditSalary] = useState('');
   const [editJdLink, setEditJdLink] = useState('');
   const [editParentId, setEditParentId] = useState('');
+  const [formPicker, setFormPicker] = useState<
+    'editDepartment' | 'editDivision' | 'editManager' | 'addDepartment' | 'addManager' | null
+  >(null);
 
   // Add employee modal
   const [addOpen, setAddOpen] = useState(false);
@@ -245,7 +249,6 @@ export function OrgChartPanel({
   const [addPhone, setAddPhone] = useState('');
   const [addRole, setAddRole] = useState<AddRole>('user');
   const [addDepartment, setAddDepartment] = useState('');
-  const [addDepartmentOpen, setAddDepartmentOpen] = useState(false);
   const [addParentId, setAddParentId] = useState('');
   const [addQualification, setAddQualification] = useState('');
   const [addSalary, setAddSalary] = useState('');
@@ -589,7 +592,7 @@ export function OrgChartPanel({
     setAddQualification('');
     setAddSalary('');
     setAddJdLink('');
-    setAddDepartmentOpen(false);
+    setFormPicker(null);
     const defaultMgr =
       orgNodes.find((n) => n.role === 'manager') ||
       orgNodes.find((n) => n.role === 'branch_owner') ||
@@ -755,7 +758,7 @@ export function OrgChartPanel({
         </View>
       ) : !filteredNodes.length ? (
         <View style={styles.directoryStateWrap}>
-          <Text style={styles.muted}>Không có nhân sự nào khớp điều kiện lọc.</Text>
+          <IgenHrEmptyState message="Không có nhân sự nào khớp điều kiện lọc." />
         </View>
       ) : (
         <View style={styles.directoryListFlat}>
@@ -848,12 +851,6 @@ export function OrgChartPanel({
             onPress={() => {}}
           >
             <View style={styles.deptSheetHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.sheetTitle}>Lọc theo phòng ban</Text>
-              <Pressable onPress={() => setDeptFilterOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
               {departmentOptions.map((dept) => {
                 const selected = filterDepartment === dept;
@@ -886,6 +883,7 @@ export function OrgChartPanel({
         onSave={isEditing ? () => void onSaveEdit() : undefined}
         saving={savingEdit}
         onClose={() => {
+          setFormPicker(null);
           if (isEditing) setIsEditing(false);
           else setSelectedNode(null);
         }}
@@ -905,79 +903,271 @@ export function OrgChartPanel({
       >
         {selectedNode ? (
           isEditing ? (
-            <View style={styles.form}>
-              <Text style={styles.label}>Họ và tên *</Text>
-              <TextInput value={editName} onChangeText={setEditName} style={styles.field} />
+            <View style={styles.editBody}>
+              <Text style={styles.detailSectionTitle}>Thông tin chung</Text>
 
-              <Text style={styles.label}>Chức danh</Text>
-              <TextInput value={editJobTitle} onChangeText={setEditJobTitle} placeholder="VD: Trưởng phòng Kinh doanh" placeholderTextColor={colors.muted} style={styles.field} />
-
-              <Text style={styles.label}>Phòng ban</Text>
-              <TextInput value={editDepartment} onChangeText={setEditDepartment} placeholder="Tên phòng ban" placeholderTextColor={colors.muted} style={styles.field} />
-
-              <Text style={styles.label}>Khối chức năng</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
-                {DIVISIONS.map((div) => (
-                  <Pressable
-                    key={div}
-                    onPress={() => setEditDivision(div)}
-                    style={[styles.deptChip, editDivision === div && styles.deptChipActive]}
-                  >
-                    <Text style={[styles.deptText, editDivision === div && styles.deptTextActive]}>{div}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              <Text style={styles.label}>Quản lý trực tiếp</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
-                <Pressable
-                  onPress={() => setEditParentId('')}
-                  style={[styles.deptChip, !editParentId && styles.deptChipActive]}
-                >
-                  <Text style={[styles.deptText, !editParentId && styles.deptTextActive]}>Không có</Text>
-                </Pressable>
-                {orgNodes
-                  .filter((n) => n.nodeId !== selectedNode.nodeId)
-                  .slice(0, 20)
-                  .map((cand) => (
-                    <Pressable
-                      key={cand.nodeId}
-                      onPress={() => setEditParentId(cand.nodeId)}
-                      style={[styles.deptChip, editParentId === cand.nodeId && styles.deptChipActive]}
-                    >
-                      <Text style={[styles.deptText, editParentId === cand.nodeId && styles.deptTextActive]}>
-                        {cand.displayName}
-                      </Text>
-                    </Pressable>
-                  ))}
-              </ScrollView>
-
-              <Text style={styles.label}>Số điện thoại</Text>
-              <TextInput value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" style={styles.field} />
-
-              <Text style={styles.label}>Trình độ chuyên môn</Text>
-              <TextInput value={editQualification} onChangeText={setEditQualification} style={styles.field} />
-
-              <Text style={styles.label}>Lương tháng (VNĐ)</Text>
-              <TextInput value={editSalary} onChangeText={setEditSalary} keyboardType="numeric" style={styles.field} />
-
-              <Text style={styles.label}>Link mô tả công việc (JD)</Text>
-              <TextInput value={editJdLink} onChangeText={setEditJdLink} autoCapitalize="none" style={styles.field} />
-
-              <View style={styles.actionRow}>
-                <Pressable onPress={() => setIsEditing(false)} style={styles.secondaryBtn}>
-                  <Text style={styles.secondaryBtnText}>Hủy</Text>
-                </Pressable>
-                <Pressable
-                  disabled={savingEdit}
-                  onPress={() => void onSaveEdit()}
-                  style={[styles.submitBtn, { flex: 1 }, savingEdit && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
-                  </Text>
-                </Pressable>
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Họ và tên *</Text>
+                <TextInput
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Nhập họ và tên"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
               </View>
+
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Chức danh</Text>
+                <TextInput
+                  value={editJobTitle}
+                  onChangeText={setEditJobTitle}
+                  placeholder="VD: Trưởng phòng Kinh doanh"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setFormPicker('editDepartment')}
+                style={styles.editRow}
+              >
+                <Text style={styles.infoLabel}>Phòng ban</Text>
+                <View style={styles.editSelectRow}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.editInput, { flex: 1 }, !editDepartment && styles.editPlaceholder]}
+                  >
+                    {editDepartment || 'Chọn phòng ban'}
+                  </Text>
+                  <ChevronDown size={16} color="#9CA3AF" />
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setFormPicker('editDivision')}
+                style={styles.editRow}
+              >
+                <Text style={styles.infoLabel}>Khối chức năng</Text>
+                <View style={styles.editSelectRow}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.editInput, { flex: 1 }, !editDivision && styles.editPlaceholder]}
+                  >
+                    {editDivision || 'Chọn khối chức năng'}
+                  </Text>
+                  <ChevronDown size={16} color="#9CA3AF" />
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setFormPicker('editManager')}
+                style={styles.editRow}
+              >
+                <Text style={styles.infoLabel}>Quản lý trực tiếp</Text>
+                <View style={styles.editSelectRow}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.editInput, { flex: 1 }, !editParentId && styles.editPlaceholder]}
+                  >
+                    {orgNodes.find((n) => n.nodeId === editParentId)?.displayName || 'Không có'}
+                  </Text>
+                  <ChevronDown size={16} color="#9CA3AF" />
+                </View>
+              </Pressable>
+
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Số điện thoại</Text>
+                <TextInput
+                  value={editPhone}
+                  onChangeText={setEditPhone}
+                  keyboardType="phone-pad"
+                  placeholder="Nhập số điện thoại"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
+
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Trình độ chuyên môn</Text>
+                <TextInput
+                  value={editQualification}
+                  onChangeText={setEditQualification}
+                  placeholder="VD: Đại học / Thạc sĩ"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
+
+              <View style={styles.editRow}>
+                <Text style={styles.infoLabel}>Lương tháng (VNĐ)</Text>
+                <TextInput
+                  value={editSalary}
+                  onChangeText={setEditSalary}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
+
+              <View style={[styles.editRow, styles.editRowLast]}>
+                <Text style={styles.infoLabel}>Link mô tả công việc (JD)</Text>
+                <TextInput
+                  value={editJdLink}
+                  onChangeText={setEditJdLink}
+                  autoCapitalize="none"
+                  placeholder="https://..."
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.editInput}
+                />
+              </View>
+
+              <Modal
+                visible={
+                  formPicker === 'editDepartment' ||
+                  formPicker === 'editDivision' ||
+                  formPicker === 'editManager'
+                }
+                transparent
+                statusBarTranslucent
+                animationType="slide"
+                onRequestClose={() => setFormPicker(null)}
+              >
+                <Pressable style={styles.deptSheetBackdrop} onPress={() => setFormPicker(null)}>
+                  <Pressable
+                    style={[styles.deptSheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
+                    onPress={() => {}}
+                  >
+                    <View style={styles.deptSheetHandle} />
+                    <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                      {formPicker === 'editDepartment' ? (
+                        <>
+                          <Pressable
+                            onPress={() => {
+                              setEditDepartment('');
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, !editDepartment && styles.deptSheetRowActive]}
+                          >
+                            <Text style={[styles.deptSheetRowText, !editDepartment && styles.deptSheetRowTextActive]}>
+                              Chưa phân phòng ban
+                            </Text>
+                            {!editDepartment ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                          {Array.from(
+                            new Set(
+                              [
+                                ...(editDepartment ? [editDepartment] : []),
+                                ...departmentOptions.slice(1),
+                              ].filter(Boolean),
+                            ),
+                          ).map((dept) => {
+                            const selected = editDepartment === dept;
+                            return (
+                              <Pressable
+                                key={dept}
+                                onPress={() => {
+                                  setEditDepartment(dept);
+                                  setFormPicker(null);
+                                }}
+                                style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                              >
+                                <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                                  {dept}
+                                </Text>
+                                {selected ? <Check size={17} color={colors.primary} /> : null}
+                              </Pressable>
+                            );
+                          })}
+                        </>
+                      ) : formPicker === 'editDivision' ? (
+                        <>
+                          <Pressable
+                            onPress={() => {
+                              setEditDivision('');
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, !editDivision && styles.deptSheetRowActive]}
+                          >
+                            <Text style={[styles.deptSheetRowText, !editDivision && styles.deptSheetRowTextActive]}>
+                              Chưa chọn khối chức năng
+                            </Text>
+                            {!editDivision ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                          {Array.from(
+                            new Set([
+                              ...(editDivision ? [editDivision] : []),
+                              ...DIVISIONS,
+                            ]),
+                          ).map((div) => {
+                            const selected = editDivision === div;
+                            return (
+                              <Pressable
+                                key={div}
+                                onPress={() => {
+                                  setEditDivision(div);
+                                  setFormPicker(null);
+                                }}
+                                style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                              >
+                                <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                                  {div}
+                                </Text>
+                                {selected ? <Check size={17} color={colors.primary} /> : null}
+                              </Pressable>
+                            );
+                          })}
+                        </>
+                      ) : (
+                        <>
+                          <Pressable
+                            onPress={() => {
+                              setEditParentId('');
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, !editParentId && styles.deptSheetRowActive]}
+                          >
+                            <Text style={[styles.deptSheetRowText, !editParentId && styles.deptSheetRowTextActive]}>
+                              Không có
+                            </Text>
+                            {!editParentId ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                          {orgNodes
+                            .filter((n) => n.nodeId !== selectedNode.nodeId)
+                            .map((cand) => {
+                              const selected = editParentId === cand.nodeId;
+                              const sub = [cand.jobTitle || cand.position, cand.department]
+                                .filter(Boolean)
+                                .join(' · ');
+                              return (
+                                <Pressable
+                                  key={cand.nodeId}
+                                  onPress={() => {
+                                    setEditParentId(cand.nodeId);
+                                    setFormPicker(null);
+                                  }}
+                                  style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                                >
+                                  <View style={{ flex: 1, paddingRight: 10 }}>
+                                    <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                                      {cand.displayName}
+                                    </Text>
+                                    {sub ? <Text numberOfLines={1} style={styles.sheetSubText}>{sub}</Text> : null}
+                                  </View>
+                                  {selected ? <Check size={17} color={colors.primary} /> : null}
+                                </Pressable>
+                              );
+                            })}
+                        </>
+                      )}
+                    </ScrollView>
+                  </Pressable>
+                </Pressable>
+              </Modal>
             </View>
           ) : (
             <View style={styles.detailBody}>
@@ -1084,102 +1274,186 @@ export function OrgChartPanel({
         saving={adding}
         onClose={() => setAddOpen(false)}
       >
-        <View style={styles.form}>
-          <Text style={styles.label}>Họ và tên *</Text>
-          <TextInput value={addName} onChangeText={setAddName} placeholder="Nguyễn Văn A" placeholderTextColor={colors.muted} style={styles.field} />
+        <View style={styles.editBody}>
+          <Text style={styles.detailSectionTitle}>Thông tin chung</Text>
 
-          <Text style={styles.label}>Email đăng nhập *</Text>
-          <TextInput value={addEmail} onChangeText={setAddEmail} keyboardType="email-address" autoCapitalize="none" placeholder="email@congty.vn" placeholderTextColor={colors.muted} style={styles.field} />
-
-          <Text style={styles.label}>Mật khẩu (tối thiểu 6 ký tự) *</Text>
-          <TextInput value={addPassword} onChangeText={setAddPassword} secureTextEntry placeholder="••••••" placeholderTextColor={colors.muted} style={styles.field} />
-
-          <Text style={styles.label}>Vai trò</Text>
-          <View style={styles.relList}>
-            {(['user', 'manager', 'branch_owner', 'admin'] as const).map((r) => (
-              <Pressable
-                key={r}
-                onPress={() => setAddRole(r)}
-                style={[styles.deptChip, addRole === r && styles.deptChipActive]}
-              >
-                <Text style={[styles.deptText, addRole === r && styles.deptTextActive]}>
-                  {ROLE_LABELS[r]}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Họ và tên *</Text>
+            <TextInput value={addName} onChangeText={setAddName} placeholder="Nguyễn Văn A" placeholderTextColor="#9CA3AF" style={styles.editInput} />
           </View>
 
-          <Text style={styles.label}>Phòng ban</Text>
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Email đăng nhập *</Text>
+            <TextInput value={addEmail} onChangeText={setAddEmail} keyboardType="email-address" autoCapitalize="none" placeholder="email@congty.vn" placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
+
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Mật khẩu (tối thiểu 6 ký tự) *</Text>
+            <TextInput value={addPassword} onChangeText={setAddPassword} secureTextEntry placeholder="••••••" placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
+
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Vai trò</Text>
+            <View style={styles.editChipWrap}>
+              {(['user', 'manager', 'branch_owner', 'admin'] as const).map((r) => (
+                <Pressable
+                  key={r}
+                  onPress={() => setAddRole(r)}
+                  style={[styles.editChip, addRole === r && styles.editChipActive]}
+                >
+                  <Text style={[styles.editChipText, addRole === r && styles.editChipTextActive]}>
+                    {ROLE_LABELS[r]}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ expanded: addDepartmentOpen }}
-            onPress={() => setAddDepartmentOpen((open) => !open)}
-            style={styles.departmentSelector}
+            onPress={() => setFormPicker('addDepartment')}
+            style={styles.editRow}
           >
-            <Text style={[styles.departmentSelectorText, !addDepartment && styles.departmentPlaceholder]}>
-              {addDepartment || 'Chọn phòng ban'}
-            </Text>
-            <ChevronDown size={16} color={colors.muted} />
-          </Pressable>
-          {addDepartmentOpen ? (
-            <View style={styles.departmentDropdown}>
-              {departmentOptions.length > 1 ? (
-                <ScrollView nestedScrollEnabled style={styles.departmentOptions}>
-                  {departmentOptions.slice(1).map((department) => (
-                    <Pressable
-                      key={department}
-                      onPress={() => {
-                        setAddDepartment(department);
-                        setAddDepartmentOpen(false);
-                      }}
-                      style={styles.departmentOption}
-                    >
-                      <Text style={styles.departmentOptionText}>{department}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              ) : (
-                <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>
-              )}
-            </View>
-          ) : null}
-
-          <Text style={styles.label}>Quản lý trực tiếp</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 6 }}>
-            {orgNodes.slice(0, 20).map((cand) => (
-              <Pressable
-                key={cand.nodeId}
-                onPress={() => setAddParentId(cand.nodeId)}
-                style={[styles.deptChip, addParentId === cand.nodeId && styles.deptChipActive]}
+            <Text style={styles.infoLabel}>Phòng ban</Text>
+            <View style={styles.editSelectRow}>
+              <Text
+                numberOfLines={1}
+                style={[styles.editInput, { flex: 1 }, !addDepartment && styles.editPlaceholder]}
               >
-                <Text style={[styles.deptText, addParentId === cand.nodeId && styles.deptTextActive]}>
-                  {cand.displayName}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
-          <Text style={styles.label}>Số điện thoại</Text>
-          <TextInput value={addPhone} onChangeText={setAddPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor={colors.muted} style={styles.field} />
-
-          <Text style={styles.label}>Trình độ chuyên môn</Text>
-          <TextInput value={addQualification} onChangeText={setAddQualification} placeholder="Đại học / Thạc sĩ..." placeholderTextColor={colors.muted} style={styles.field} />
-
-          <Text style={styles.label}>Lương tháng (VNĐ)</Text>
-          <TextInput value={addSalary} onChangeText={setAddSalary} keyboardType="numeric" placeholder="15.000.000" placeholderTextColor={colors.muted} style={styles.field} />
-
-          <Text style={styles.label}>Link mô tả công việc (JD)</Text>
-          <TextInput value={addJdLink} onChangeText={setAddJdLink} autoCapitalize="none" placeholder="https://..." placeholderTextColor={colors.muted} style={styles.field} />
+                {addDepartment || 'Chọn phòng ban'}
+              </Text>
+              <ChevronDown size={16} color="#9CA3AF" />
+            </View>
+          </Pressable>
 
           <Pressable
-            disabled={adding}
-            onPress={() => void onAddEmployee()}
-            style={[styles.submitBtn, adding && styles.disabled]}
+            accessibilityRole="button"
+            onPress={() => setFormPicker('addManager')}
+            style={styles.editRow}
           >
-            <Text style={styles.submitBtnText}>
-              {adding ? 'Đang thêm...' : 'Thêm vào danh sách nhân sự'}
-            </Text>
+            <Text style={styles.infoLabel}>Quản lý trực tiếp</Text>
+            <View style={styles.editSelectRow}>
+              <Text
+                numberOfLines={1}
+                style={[styles.editInput, { flex: 1 }, !addParentId && styles.editPlaceholder]}
+              >
+                {orgNodes.find((n) => n.nodeId === addParentId)?.displayName || 'Không có'}
+              </Text>
+              <ChevronDown size={16} color="#9CA3AF" />
+            </View>
           </Pressable>
+
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Số điện thoại</Text>
+            <TextInput value={addPhone} onChangeText={setAddPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
+
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Trình độ chuyên môn</Text>
+            <TextInput value={addQualification} onChangeText={setAddQualification} placeholder="Đại học / Thạc sĩ..." placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
+
+          <View style={styles.editRow}>
+            <Text style={styles.infoLabel}>Lương tháng (VNĐ)</Text>
+            <TextInput value={addSalary} onChangeText={setAddSalary} keyboardType="numeric" placeholder="15.000.000" placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
+
+          <View style={[styles.editRow, styles.editRowLast]}>
+            <Text style={styles.infoLabel}>Link mô tả công việc (JD)</Text>
+            <TextInput value={addJdLink} onChangeText={setAddJdLink} autoCapitalize="none" placeholder="https://..." placeholderTextColor="#9CA3AF" style={styles.editInput} />
+          </View>
+
+          <Modal
+            visible={formPicker === 'addDepartment' || formPicker === 'addManager'}
+            transparent
+            statusBarTranslucent
+            animationType="slide"
+            onRequestClose={() => setFormPicker(null)}
+          >
+            <Pressable style={styles.deptSheetBackdrop} onPress={() => setFormPicker(null)}>
+              <Pressable
+                style={[styles.deptSheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
+                onPress={() => {}}
+              >
+                <View style={styles.deptSheetHandle} />
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {formPicker === 'addDepartment' ? (
+                    <>
+                      <Pressable
+                        onPress={() => {
+                          setAddDepartment('');
+                          setFormPicker(null);
+                        }}
+                        style={[styles.deptSheetRow, !addDepartment && styles.deptSheetRowActive]}
+                      >
+                        <Text style={[styles.deptSheetRowText, !addDepartment && styles.deptSheetRowTextActive]}>
+                          Chưa phân phòng ban
+                        </Text>
+                        {!addDepartment ? <Check size={17} color={colors.primary} /> : null}
+                      </Pressable>
+                      {departmentOptions.slice(1).map((dept) => {
+                        const selected = addDepartment === dept;
+                        return (
+                          <Pressable
+                            key={dept}
+                            onPress={() => {
+                              setAddDepartment(dept);
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                          >
+                            <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                              {dept}
+                            </Text>
+                            {selected ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      <Pressable
+                        onPress={() => {
+                          setAddParentId('');
+                          setFormPicker(null);
+                        }}
+                        style={[styles.deptSheetRow, !addParentId && styles.deptSheetRowActive]}
+                      >
+                        <Text style={[styles.deptSheetRowText, !addParentId && styles.deptSheetRowTextActive]}>
+                          Không có
+                        </Text>
+                        {!addParentId ? <Check size={17} color={colors.primary} /> : null}
+                      </Pressable>
+                      {orgNodes.map((cand) => {
+                        const selected = addParentId === cand.nodeId;
+                        const sub = [cand.jobTitle || cand.position, cand.department]
+                          .filter(Boolean)
+                          .join(' · ');
+                        return (
+                          <Pressable
+                            key={cand.nodeId}
+                            onPress={() => {
+                              setAddParentId(cand.nodeId);
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                          >
+                            <View style={{ flex: 1, paddingRight: 10 }}>
+                              <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                                {cand.displayName}
+                              </Text>
+                              {sub ? <Text numberOfLines={1} style={styles.sheetSubText}>{sub}</Text> : null}
+                            </View>
+                            {selected ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                        );
+                      })}
+                    </>
+                  )}
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </Modal>
         </View>
       </FullScreenFormModal>
     </ScrollView>
@@ -1367,6 +1641,63 @@ const styles = StyleSheet.create({
   leaderBtnText: { color: '#B45309', fontSize: 12, fontWeight: '800' },
   deleteBtn: { backgroundColor: '#FCEBEC', minHeight: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   deleteBtnText: { color: '#C74848', fontSize: 12, fontWeight: '700' },
+  editBody: { gap: 0 },
+  editRow: {
+    paddingVertical: 12,
+    gap: 5,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  editRowLast: {
+    borderBottomWidth: 0,
+  },
+  editInput: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '500',
+    paddingHorizontal: 0,
+    paddingVertical: 2,
+    backgroundColor: 'transparent',
+  },
+  editPlaceholder: {
+    color: '#9CA3AF',
+    fontWeight: '400',
+  },
+  editSelectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  editChipRow: {
+    gap: 8,
+    paddingTop: 4,
+    paddingBottom: 2,
+  },
+  editChipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingTop: 4,
+  },
+  editChip: {
+    backgroundColor: '#F4F6FA',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 99,
+  },
+  editChipActive: {
+    backgroundColor: '#EAF2FF',
+  },
+  editChipText: {
+    color: '#4B5563',
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  editChipTextActive: {
+    color: colors.primary,
+    fontWeight: '500',
+  },
   form: { gap: 8, paddingBottom: 12 },
   label: { color: colors.ink, fontSize: 11, fontWeight: '700', marginTop: 4 },
   field: { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12, color: colors.ink },
@@ -1552,6 +1883,11 @@ const styles = StyleSheet.create({
   deptSheetRowTextActive: {
     color: colors.primary,
     fontWeight: '500',
+  },
+  sheetSubText: {
+    color: '#6B7280',
+    fontSize: 12,
+    marginTop: 2,
   },
 });
 

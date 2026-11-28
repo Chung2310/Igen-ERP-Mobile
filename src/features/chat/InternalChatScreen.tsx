@@ -882,12 +882,6 @@ export function InternalChatScreen({ embedded = false }: { embedded?: boolean } 
         <Pressable style={styles.modalBackdrop} onPress={() => setNewChatOpen(false)}>
           <Pressable style={styles.newChatSheet} onPress={() => { }}>
             <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Cuộc trò chuyện mới</Text>
-              <Pressable onPress={() => setNewChatOpen(false)} hitSlop={8}>
-                <Text style={styles.modalClose}>Đóng</Text>
-              </Pressable>
-            </View>
 
             {selectedIds.length > 1 ? (
               <TextInput

@@ -17,6 +17,7 @@ import * as Sharing from 'expo-sharing';
 import { Check, ChevronDown, Coins, Gift, Plus, Search, ShoppingBag, SlidersHorizontal, Sparkles, Ticket, User, X } from 'lucide-react-native';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
 import { colors } from '@/theme/colors';
+import { DEFAULT_LOAD_MORE_LIMIT, isCloseToBottom } from '@/utils/scrollLoadMore';
 import { getAccessToken } from '@/core/auth/authSession';
 import { DateTimeField } from '@/features/quotation/DateTimeField';
 import {
@@ -257,13 +258,31 @@ export function RetailShiftOpenModal({
   );
 }
 
-function Page({ children, refreshing, onRefresh }: { children: ReactNode; refreshing?: boolean; onRefresh?: () => void }) {
+function Page({
+  children,
+  refreshing,
+  onRefresh,
+  onEndReached,
+}: {
+  children: ReactNode;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  onEndReached?: () => void;
+}) {
   return (
     <ScrollView
       style={s.page}
       contentContainerStyle={s.content}
       keyboardShouldPersistTaps="handled"
       refreshControl={onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} /> : undefined}
+      scrollEventThrottle={16}
+      onScroll={
+        onEndReached
+          ? (event) => {
+              if (isCloseToBottom(event)) onEndReached();
+            }
+          : undefined
+      }
     >
       {children}
     </ScrollView>
@@ -401,6 +420,7 @@ function WarrantyPanel({ scope }: { scope: RetailScope }) {
   const [rows, setRows] = useState<RetailWarrantyRow[]>([]);
   const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [lookup, setLookup] = useState('');
   const [lookupType, setLookupType] = useState<'serial' | 'phone'>('serial');
@@ -440,21 +460,33 @@ function WarrantyPanel({ scope }: { scope: RetailScope }) {
     }
   };
 
-  const load = useCallback(async () => {
-    setBusy(true);
+  const load = useCallback(async (targetPage = page) => {
+    const append = targetPage > 1;
+    if (append) setLoadingMore(true);
+    else setBusy(true);
     setError('');
     try {
-      const result = await retailApi.warrantyOrders(scope, { q: q.trim() || undefined, status, days, page, limit: 30 });
-      setRows(result.items || []);
+      const result = await retailApi.warrantyOrders(scope, {
+        q: q.trim() || undefined,
+        status,
+        days,
+        page: targetPage,
+        limit: DEFAULT_LOAD_MORE_LIMIT,
+      });
+      const incoming = result.items || [];
+      setRows((current) =>
+        append ? [...current, ...incoming.filter((row) => !current.some((item) => item.id === row.id))] : incoming,
+      );
       setTotal(result.total || 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không tải được danh sách bảo hành.');
     } finally {
       setBusy(false);
+      setLoadingMore(false);
     }
   }, [days, page, q, scope, status]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(page); }, [load, page]);
 
   const searchLookup = async () => {
     if (!lookup.trim()) {
@@ -500,10 +532,18 @@ function WarrantyPanel({ scope }: { scope: RetailScope }) {
   };
 
   const activeFilterCount = (status !== 'all' ? 1 : 0) + (days !== 30 ? 1 : 0);
-  const totalPages = Math.max(1, Math.ceil(total / 30));
 
   return (
-    <Page refreshing={busy} onRefresh={() => void load()}>
+    <Page
+      refreshing={busy}
+      onRefresh={() => {
+        if (page !== 1) setPage(1);
+        else void load(1);
+      }}
+      onEndReached={() => {
+        if (!busy && !loadingMore && rows.length < total) setPage((v) => v + 1);
+      }}
+    >
       <Section title="Bảo hành đơn bán" right={<Pill label={`${total.toLocaleString('vi-VN')} dòng`} bg="#EFF6FF" fg={colors.primary} />}>
         <TextInput
           value={q}
@@ -562,11 +602,7 @@ function WarrantyPanel({ scope }: { scope: RetailScope }) {
           );
         })}
         {!busy && !rows.length && <Text style={s.empty}>Không có sản phẩm phù hợp.</Text>}
-        <View style={s.pagination}>
-          <Action secondary compact disabled={page <= 1} label="‹ Trước" onPress={() => setPage((v) => Math.max(1, v - 1))} />
-          <Text style={s.pageLabel}>Trang {page} / {totalPages}</Text>
-          <Action secondary compact disabled={page >= totalPages} label="Sau ›" onPress={() => setPage((v) => Math.min(totalPages, v + 1))} />
-        </View>
+        {loadingMore && <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />}
       </Section>
 
       <FullScreenFormModal visible={Boolean(selectedRow)} title="Chi tiết bảo hành" onClose={() => setSelectedRow(null)}>
@@ -766,7 +802,9 @@ function ReturnsPanel({ scope, canManage, createRequest, onCreateRequestHandled 
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -787,20 +825,32 @@ function ReturnsPanel({ scope, canManage, createRequest, onCreateRequestHandled 
   const [saving, setSaving] = useState(false);
   const afterSaleAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
 
-  const load = useCallback(async () => {
-    setBusy(true);
+  const load = useCallback(async (targetPage = page) => {
+    const append = targetPage > 1;
+    if (append) setLoadingMore(true);
+    else setBusy(true);
     setError('');
     try {
-      const result = await retailApi.afterSales(scope, { q: q.trim() || undefined, type: type || undefined, page, limit: 20 });
-      setRows(result.items || []);
+      const result = await retailApi.afterSales(scope, {
+        q: q.trim() || undefined,
+        type: type || undefined,
+        page: targetPage,
+        limit: DEFAULT_LOAD_MORE_LIMIT,
+      });
+      const incoming = result.items || [];
+      setRows((current) =>
+        append ? [...current, ...incoming.filter((row) => !current.some((item) => item._id === row._id))] : incoming,
+      );
+      setHasMore(incoming.length >= DEFAULT_LOAD_MORE_LIMIT);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không tải được phiếu đổi trả.');
     } finally {
       setBusy(false);
+      setLoadingMore(false);
     }
   }, [page, q, scope, type]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(page); }, [load, page]);
   useEffect(() => { if (canManage) void retailApi.currentShift(scope).then(setShift).catch(() => setShift(null)); }, [canManage, scope]);
 
   useEffect(() => {
@@ -922,7 +972,16 @@ function ReturnsPanel({ scope, canManage, createRequest, onCreateRequestHandled 
   };
 
   return (
-    <Page refreshing={busy} onRefresh={() => void load()}>
+    <Page
+      refreshing={busy}
+      onRefresh={() => {
+        if (page !== 1) setPage(1);
+        else void load(1);
+      }}
+      onEndReached={() => {
+        if (!busy && !loadingMore && hasMore) setPage((v) => v + 1);
+      }}
+    >
       <Section
         title="Đổi trả & thu mua"
         right={(
@@ -1042,11 +1101,7 @@ function ReturnsPanel({ scope, canManage, createRequest, onCreateRequestHandled 
           </Card>
         ))}
         {!busy && !rows.length && <Text style={s.empty}>Chưa có chứng từ đổi trả.</Text>}
-        <View style={s.pagination}>
-          <Action secondary compact disabled={page <= 1} label="‹ Trước" onPress={() => setPage((v) => Math.max(1, v - 1))} />
-          <Text style={s.pageLabel}>Trang {page}</Text>
-          <Action secondary compact disabled={rows.length < 20} label="Sau ›" onPress={() => setPage((v) => v + 1)} />
-        </View>
+        {loadingMore && <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />}
       </Section>
       <FullScreenFormModal visible={filterOpen} title="Lọc chứng từ đổi trả" onClose={() => setFilterOpen(false)}>
         <View style={{ gap: 14, paddingTop: 2 }}>
@@ -1077,24 +1132,35 @@ function InvoicesPanel({ scope, canManage }: { scope: RetailScope; canManage: bo
   const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<RetailInvoice | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const load = useCallback(async () => {
-    setBusy(true);
+  const load = useCallback(async (targetPage = page) => {
+    const append = targetPage > 1;
+    if (append) setLoadingMore(true);
+    else setBusy(true);
     setError('');
     try {
-      const result = await retailApi.invoices(scope, { q: q.trim() || undefined, page, limit: 20 });
-      setRows(result.items || []);
+      const result = await retailApi.invoices(scope, {
+        q: q.trim() || undefined,
+        page: targetPage,
+        limit: DEFAULT_LOAD_MORE_LIMIT,
+      });
+      const incoming = result.items || [];
+      setRows((current) =>
+        append ? [...current, ...incoming.filter((row) => !current.some((item) => item._id === row._id))] : incoming,
+      );
       setTotal(result.total || 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không tải được hóa đơn.');
     } finally {
       setBusy(false);
+      setLoadingMore(false);
     }
   }, [page, q, scope]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(page); }, [load, page]);
 
   const open = async (invoice: RetailInvoice) => {
     setError('');
@@ -1146,10 +1212,19 @@ function InvoicesPanel({ scope, canManage }: { scope: RetailScope; canManage: bo
   };
 
   return (
-    <Page refreshing={busy} onRefresh={() => void load()}>
+    <Page
+      refreshing={busy}
+      onRefresh={() => {
+        if (page !== 1) setPage(1);
+        else void load(1);
+      }}
+      onEndReached={() => {
+        if (!busy && !loadingMore && rows.length < total) setPage((v) => v + 1);
+      }}
+    >
       <Section title="Hóa đơn bán lẻ" right={<Pill label={`${total.toLocaleString('vi-VN')} hóa đơn`} bg="#EFF6FF" fg={colors.primary} />}>
         <Field label="Tìm hóa đơn / đơn bán / khách hàng" value={q} onChangeText={(v) => { setQ(v); setPage(1); }} placeholder="Mã hóa đơn, đơn hàng hoặc khách" />
-        <Loading busy={busy} error={error} onRetry={() => void load()} />
+        <Loading busy={busy} error={error} onRetry={() => void load(1)} />
         {rows.map((invoice) => (
           <Card key={invoice._id} onPress={() => void open(invoice)}>
             <View style={s.cardTopRow}>
@@ -1168,11 +1243,7 @@ function InvoicesPanel({ scope, canManage }: { scope: RetailScope; canManage: bo
           </Card>
         ))}
         {!busy && !rows.length && <Text style={s.empty}>Không tìm thấy hóa đơn.</Text>}
-        <View style={s.pagination}>
-          <Action secondary compact disabled={page <= 1} label="‹ Trước" onPress={() => setPage((v) => Math.max(1, v - 1))} />
-          <Text style={s.pageLabel}>Trang {page}</Text>
-          <Action secondary compact disabled={rows.length < 20} label="Sau ›" onPress={() => setPage((v) => v + 1)} />
-        </View>
+        {loadingMore && <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} />}
       </Section>
 
       <FullScreenFormModal visible={Boolean(selected)} title={`Hóa đơn ${selected?.invoiceNo || ''}`} onClose={() => setSelected(null)}>

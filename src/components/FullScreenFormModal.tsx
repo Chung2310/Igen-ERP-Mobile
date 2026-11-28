@@ -1,5 +1,7 @@
-import { type PropsWithChildren, type ReactNode, useEffect, useState } from 'react';
+import { type PropsWithChildren, type ReactNode, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -8,7 +10,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft } from 'lucide-react-native';
@@ -51,7 +56,38 @@ export function FullScreenFormModal({
   children,
 }: FullScreenFormModalProps) {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [mounted, setMounted] = useState(visible);
+  const slideProgress = useRef(new Animated.Value(visible ? 0 : 1)).current;
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      slideProgress.stopAnimation();
+      slideProgress.setValue(1);
+      Animated.timing(slideProgress, {
+        toValue: 0,
+        duration: 240,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    } else if (mounted) {
+      slideProgress.stopAnimation();
+      Animated.timing(slideProgress, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && !visibleRef.current) {
+          setMounted(false);
+        }
+      });
+    }
+  }, [mounted, slideProgress, visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -74,21 +110,38 @@ export function FullScreenFormModal({
 
   const topPad = Math.max(insets.top, Platform.OS === 'android' ? 28 : 16);
   const bottomPad = Math.max(insets.bottom, 16);
+  const translateX = slideProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Math.max(screenWidth, 320)],
+  });
+  const backdropOpacity = slideProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.22, 0],
+  });
+
+  if (!mounted) return null;
 
   return (
     <Modal
-      visible={visible}
+      visible={mounted}
+      transparent
       statusBarTranslucent
-      animationType="slide"
+      animationType="none"
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        style={[
-          styles.root,
-          Platform.OS === 'android' && keyboardHeight > 0 ? { paddingBottom: keyboardHeight } : null,
-        ]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={styles.modalHost}>
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.backdropScrim, { opacity: backdropOpacity }]}
+        />
+        <Animated.View style={[styles.animatedPage, { transform: [{ translateX }] }]}>
+          <KeyboardAvoidingView
+            style={[
+              styles.root,
+              Platform.OS === 'android' && keyboardHeight > 0 ? { paddingBottom: keyboardHeight } : null,
+            ]}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
         {/* Top navigation header: < or Hủy | Centered Title | Lưu or Right Action */}
         <View style={[styles.header, { paddingTop: topPad }]}>
           <Pressable
@@ -156,12 +209,71 @@ export function FullScreenFormModal({
         {footer ? (
           <View style={[styles.footer, { paddingBottom: bottomPad }]}>{footer}</View>
         ) : null}
-      </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 
+/**
+ * Wrapper hiệu ứng trượt nhẹ từ phải sang trái cho các màn hình chi tiết render inline.
+ */
+export function SlideInPage({
+  children,
+  style,
+}: PropsWithChildren<{ style?: StyleProp<ViewStyle> }>) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    anim.setValue(0);
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [anim]);
+
+  return (
+    <Animated.View
+      style={[
+        { flex: 1 },
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateX: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [36, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
+  modalHost: {
+    flex: 1,
+  },
+  backdropScrim: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: '#0F172A',
+  },
+  animatedPage: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
   root: {
     flex: 1,
     backgroundColor: colors.white,

@@ -1,8 +1,16 @@
 import { PopupError } from '@/components/PopupError';
-import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import { FullScreenFormModal, SlideInPage } from '@/components/FullScreenFormModal';
+import {
+  HrFormCustomRow,
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+  HrFormSwitchRow,
+} from '@/features/hr/components/HrFormFields';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Linking,
   Modal,
   Pressable,
@@ -22,17 +30,25 @@ import {
   Circle,
   CircleCheck,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Clock3,
+  Ellipsis,
   Eye,
   FileText,
   Paperclip,
+  Pencil,
   Play,
   Plus,
+  Trash2,
   UserRound,
   Video,
 } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { showHrConfirm } from '@/features/hr/components/HrConfirmModal';
 import { HrFab } from '@/features/hr/components/HrFab';
 import { HrNoticeHost, showHrNotice } from '@/features/hr/components/HrNoticeModal';
@@ -64,6 +80,71 @@ function formatDate(value?: string): string {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('vi-VN');
+}
+
+function getYoutubeThumbnailUrl(rawUrl?: string): string | null {
+  if (!rawUrl) return null;
+  const match = rawUrl
+    .trim()
+    .match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/))([A-Za-z0-9_-]{11})/i);
+  return match?.[1] ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null;
+}
+
+function IntroCourseIcon({ size = 17, color = colors.ink }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Clean course overview card with info dot & structured intro lines */}
+      <Rect
+        x="3.5"
+        y="4"
+        width="17"
+        height="16"
+        rx="3"
+        stroke={color}
+        strokeWidth="1.65"
+      />
+      {/* Top header divider */}
+      <Path d="M3.5 9H20.5" stroke={color} strokeWidth="1.5" />
+      {/* Mini header dots */}
+      <Path d="M6.8 6.5H7.2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <Path d="M9.8 6.5H10.2" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      {/* Small info "i" mark on left + intro text lines on right */}
+      <Path d="M7.5 12.2H7.55" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <Path d="M7.5 14.6V17" stroke={color} strokeWidth="1.65" strokeLinecap="round" />
+      <Path d="M11 13H17.2" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <Path d="M11 16.3H15.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function LessonCountIcon({ size = 14, color = colors.muted }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Stacked book / lesson cover with bookmark & page detail lines */}
+      <Rect
+        x="4"
+        y="3.5"
+        width="16"
+        height="17"
+        rx="2.4"
+        stroke={color}
+        strokeWidth="1.85"
+      />
+      {/* Left binding spine */}
+      <Path d="M8 3.5V20.5" stroke={color} strokeWidth="1.75" />
+      {/* Bookmark tab at top-right */}
+      <Path
+        d="M14.5 3.5V9.2L16.25 7.9L18 9.2V3.5"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Crisp lesson text lines */}
+      <Path d="M11 12.2H17" stroke={color} strokeWidth="1.65" strokeLinecap="round" />
+      <Path d="M11 15.6H15.5" stroke={color} strokeWidth="1.65" strokeLinecap="round" />
+    </Svg>
+  );
 }
 
 export function HrTrainingPanel({
@@ -99,8 +180,10 @@ export function HrTrainingPanel({
   const [monitorModalOpen, setMonitorModalOpen] = useState(false);
 
   // Study / Detail screen state
+  const insets = useSafeAreaInsets();
   const [selectedCourse, setSelectedCourse] = useState<HrTrainingCourse | null>(null);
   const [activeIndex, setActiveIndex] = useState<number>(-1); // -1 = intro, 0..n-1 = lesson, n = quiz
+  const [actionSheetOpen, setActionSheetOpen] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizErrors, setQuizErrors] = useState<Record<number, boolean>>({});
@@ -259,6 +342,7 @@ export function HrTrainingPanel({
         if (!enroll) return;
         const completed = enroll.completedLessons || [];
         const key = `lesson_${lessonIdx}`;
+        const alreadyCourseDone = (enroll.progress ?? 0) >= 100 || enroll.status === 'completed';
 
         if (!completed.includes(key)) {
           const nextCompleted = [...completed, key];
@@ -287,7 +371,9 @@ export function HrTrainingPanel({
         } else if (hasQuiz) {
           setActiveIndex(lessons.length);
         } else {
-          showHrNotice('Chúc mừng', `Bạn đã hoàn thành khóa học "${selectedCourse.title || selectedCourse.name}"!`);
+          if (!alreadyCourseDone) {
+            showHrNotice('Chúc mừng', `Bạn đã hoàn thành khóa học "${selectedCourse.title || selectedCourse.name}"!`);
+          }
           setSelectedCourse(null);
           void load(true);
         }
@@ -586,250 +672,357 @@ export function HrTrainingPanel({
     const completedLessons = enroll?.completedLessons || [];
     const isLessonsDone = lessons.every((_, idx) => completedLessons.includes(`lesson_${idx}`));
     const isQuizPassed = Boolean(enroll?.quizPassed);
+    const isCourseDone = progress >= 100 || enroll?.status === 'completed';
+    const isQuizReviewed = isQuizPassed || isCourseDone;
     const canEditThis = isSupervisor;
 
     return (
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Top bar */}
-        <View style={styles.detailTopBar}>
-          <Pressable onPress={() => setSelectedCourse(null)} style={styles.backBtn}>
-            <View style={styles.iconButtonContent}><ArrowLeft size={14} color={colors.ink} /><Text style={styles.backBtnText}>Danh sách</Text></View>
-          </Pressable>
-          {canEditThis ? (
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <Pressable onPress={() => openEditCourse(selectedCourse)} style={styles.smallEditBtn}>
-                <Text style={styles.smallEditBtnText}>Sửa</Text>
-              </Pressable>
-              <Pressable onPress={() => handleDeleteCourse(selectedCourse)} style={styles.smallDelBtn}>
-                <Text style={styles.smallDelBtnText}>Xóa</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-
-        {/* Course Header & Progress Card */}
-        <Card style={styles.heroCard}>
-          <View style={styles.badgeRow}>
-            <Text style={styles.categoryBadge}>{selectedCourse.category || 'Đào tạo'}</Text>
-            {selectedCourse.isRequired ? <Text style={styles.requiredBadge}>Bắt buộc</Text> : null}
-          </View>
-          <Text style={styles.heroTitle}>{selectedCourse.title || selectedCourse.name}</Text>
-          <View style={styles.courseMetaRow}>
-            <UserRound size={13} color={colors.muted} />
-            <Text style={styles.subMeta}>Giảng viên: {selectedCourse.instructor || 'Chưa cập nhật'}</Text>
-            {selectedCourse.duration ? <><Clock3 size={13} color={colors.muted} /><Text style={styles.subMeta}>{selectedCourse.duration}</Text></> : null}
-          </View>
-
-          <View style={styles.progressSection}>
-            <View style={styles.headRow}>
-              <Text style={styles.progressLabel}>Tiến độ hoàn thành</Text>
-              <Text style={styles.progressPct}>{progress}%</Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
-            </View>
-          </View>
-
-          {isSupervisor && progress < 100 ? (
-            <Pressable
-              disabled={submittingProgress}
-              onPress={() => void handleCompleteDirectly()}
-              style={styles.bypassBtn}
-            >
-              <Text style={styles.bypassBtnText}>Bỏ qua & Hoàn thành học (Quản lý)</Text>
-            </Pressable>
-          ) : null}
-        </Card>
-
-        {/* Syllabus navigation pills */}
-        <Text style={styles.sectionTitle}>Mục lục khóa học</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 7, paddingBottom: 10 }}
-        >
-          <Pressable
-            onPress={() => {
-              setActiveIndex(-1);
-              setQuizSubmitted(false);
-            }}
-            style={[styles.syllabusPill, activeIndex === -1 && styles.syllabusPillActive]}
-          >
-            <View style={styles.iconButtonContent}><BookOpen size={13} color={activeIndex === -1 ? colors.white : colors.primary} /><Text style={[styles.syllabusText, activeIndex === -1 && styles.syllabusTextActive]}>Giới thiệu</Text></View>
-          </Pressable>
-
-          {lessons.map((les, idx) => {
-            const done = completedLessons.includes(`lesson_${idx}`);
-            const active = activeIndex === idx;
-            return (
-              <Pressable
-                key={idx}
-                onPress={() => {
-                  setActiveIndex(idx);
-                  setQuizSubmitted(false);
-                }}
-                style={[styles.syllabusPill, active && styles.syllabusPillActive]}
-              >
-                <View style={styles.iconButtonContent}>
-                  {done ? <CircleCheck size={13} color={active ? colors.white : '#16885A'} /> : les.type === 'video' || les.type === 'youtube' ? <Video size={13} color={active ? colors.white : colors.primary} /> : <FileText size={13} color={active ? colors.white : colors.primary} />}
-                  <Text style={[styles.syllabusText, active && styles.syllabusTextActive]} numberOfLines={1}>Bài {idx + 1}: {les.title}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-
-          {quizzes.length > 0 ? (
-            <Pressable
-              onPress={() => {
-                if (!isLessonsDone) {
-                  showHrNotice('Chưa mở khóa', 'Bạn cần hoàn thành tất cả bài giảng trước khi thi sát hạch.');
-                  return;
-                }
-                setActiveIndex(lessons.length);
-              }}
-              style={[
-                styles.syllabusPill,
-                activeIndex === lessons.length && styles.syllabusPillActive,
-                !isLessonsDone && styles.disabled,
-              ]}
-            >
-              <View style={styles.iconButtonContent}>
-                {isQuizPassed ? <CircleCheck size={13} color={activeIndex === lessons.length ? colors.white : '#16885A'} /> : <ClipboardList size={13} color={activeIndex === lessons.length ? colors.white : colors.primary} />}
-              <Text
-                style={[
-                  styles.syllabusText,
-                  activeIndex === lessons.length && styles.syllabusTextActive,
-                ]}
-              >
-                Thi trắc nghiệm ({quizzes.length})
-              </Text>
-              </View>
-            </Pressable>
-          ) : null}
-        </ScrollView>
-
-        {/* Section 1: Overview / Intro */}
+      <SlideInPage key={selectedCourse.id}>
+      <View style={{ flex: 1 }}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: 108 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Course Header, Syllabus & Overview (hidden once learning starts) */}
         {activeIndex === -1 ? (
-          <Card style={styles.studyCard}>
-            <Text style={styles.studyHeading}>Giới thiệu khóa học</Text>
-            <Text style={styles.studyBody}>
-              {selectedCourse.description || 'Khóa học chưa có mô tả chi tiết.'}
-            </Text>
-
-            <View style={styles.overviewBox}>
-              <Text style={styles.overviewTitle}>Nội dung học</Text>
-              <View style={styles.overviewBulletRow}>
-                <Circle size={5} color={colors.primary} fill={colors.primary} />
-                <Text style={styles.overviewBullet}>{lessons.length} bài giảng</Text>
+          <>
+            <Card style={styles.heroCard}>
+              <View style={styles.badgeRow}>
+                <Text style={styles.categoryBadge}>{selectedCourse.category || 'Đào tạo'}</Text>
+                {selectedCourse.isRequired ? <Text style={styles.requiredBadge}>Bắt buộc</Text> : null}
               </View>
-              <View style={styles.overviewBulletRow}>
-                <Circle size={5} color={colors.primary} fill={colors.primary} />
-                <Text style={styles.overviewBullet}>
-                  {quizzes.length > 0
-                    ? `Đạt 100% bài kiểm tra trắc nghiệm (${quizzes.length} câu)`
-                    : 'Hoàn thành tất cả bài giảng'}
+              <Text style={styles.heroTitle}>{selectedCourse.title || selectedCourse.name}</Text>
+              <View style={styles.headRow}>
+                <View style={[styles.courseMetaRow, { flex: 1 }]}>
+                  <UserRound size={13} color={colors.muted} />
+                  <Text numberOfLines={1} style={[styles.subMeta, { flexShrink: 1 }]}>
+                    Giảng viên: {selectedCourse.instructor || 'Chưa cập nhật'}
+                  </Text>
+                </View>
+                {selectedCourse.duration ? (
+                  <View style={styles.courseMetaRow}>
+                    <Clock3 size={13} color={colors.muted} />
+                    <Text style={styles.subMeta}>{selectedCourse.duration}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={styles.progressSection}>
+                <View style={styles.headRow}>
+                  <Text style={styles.progressLabel}>Tiến độ hoàn thành</Text>
+                  <Text style={styles.progressPct}>{progress}%</Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
+                </View>
+              </View>
+
+              {isSupervisor && progress < 100 ? (
+                <Pressable
+                  disabled={submittingProgress}
+                  onPress={() => void handleCompleteDirectly()}
+                  style={({ pressed }) => [styles.startCourseBtn, pressed && { opacity: 0.72 }]}
+                >
+                  <Text style={styles.startCourseBtnText}>Bỏ qua</Text>
+                </Pressable>
+              ) : null}
+            </Card>
+
+            {/* Full inline syllabus list (read-only overview; use "Bắt đầu học" to start) */}
+            <Text style={styles.sectionTitle}>Mục lục khóa học</Text>
+            <View style={styles.syllabusCard}>
+              <View style={styles.syllabusListRow}>
+                <IntroCourseIcon size={17} color={colors.ink} />
+                <Text
+                  numberOfLines={1}
+                  style={styles.syllabusSheetRowText}
+                >
+                  Giới thiệu
                 </Text>
               </View>
+
+              {lessons.map((les, idx) => {
+                const done = completedLessons.includes(`lesson_${idx}`);
+                const isLast = idx === lessons.length - 1 && quizzes.length === 0;
+                return (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.syllabusListRow,
+                      isLast && styles.syllabusListRowLast,
+                    ]}
+                  >
+                    {done ? (
+                      <CircleCheck size={17} strokeWidth={1.6} color="#16885A" />
+                    ) : les.type === 'video' || les.type === 'youtube' ? (
+                      <Video size={17} strokeWidth={1.6} color={colors.ink} />
+                    ) : (
+                      <FileText size={17} strokeWidth={1.6} color={colors.ink} />
+                    )}
+                    <Text
+                      numberOfLines={2}
+                      style={styles.syllabusSheetRowText}
+                    >
+                      Bài {idx + 1}: {les.title}
+                    </Text>
+                  </View>
+                );
+              })}
+
+              {quizzes.length > 0 ? (
+                <View
+                  style={[
+                    styles.syllabusListRow,
+                    styles.syllabusListRowLast,
+                    !isLessonsDone && styles.disabled,
+                  ]}
+                >
+                  {isQuizPassed ? (
+                    <CircleCheck size={17} strokeWidth={1.6} color="#16885A" />
+                  ) : (
+                    <ClipboardList size={17} strokeWidth={1.6} color={colors.ink} />
+                  )}
+                  <Text
+                    numberOfLines={1}
+                    style={styles.syllabusSheetRowText}
+                  >
+                    Thi trắc nghiệm ({quizzes.length})
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
-            <Pressable
-              onPress={() => {
-                if (lessons.length > 0) {
-                  setActiveIndex(0);
-                } else if (quizzes.length > 0) {
-                  setActiveIndex(0);
-                } else {
-                  showHrNotice('Thông báo', 'Khóa học chưa có nội dung bài giảng.');
-                }
-              }}
-              style={styles.submitBtn}
-            >
-              <View style={styles.iconButtonContent}><Play size={14} color={colors.white} /><Text style={styles.submitBtnText}>Bắt đầu học</Text></View>
-            </Pressable>
-          </Card>
+            {/* Section 1: Overview / Intro */}
+            <Card style={styles.studyCard}>
+              <Text style={styles.studyHeading}>Giới thiệu khóa học</Text>
+              <Text style={styles.studyBody}>
+                {selectedCourse.description || 'Khóa học chưa có mô tả chi tiết.'}
+              </Text>
+
+              <View style={styles.overviewBox}>
+                <Text style={styles.overviewTitle}>Nội dung học</Text>
+                <View style={styles.overviewBulletRow}>
+                  <Circle size={5} color={colors.primary} fill={colors.primary} />
+                  <Text style={styles.overviewBullet}>{lessons.length} bài giảng</Text>
+                </View>
+                <View style={styles.overviewBulletRow}>
+                  <Circle size={5} color={colors.primary} fill={colors.primary} />
+                  <Text style={styles.overviewBullet}>
+                    {quizzes.length > 0
+                      ? `Đạt 100% bài kiểm tra trắc nghiệm (${quizzes.length} câu)`
+                      : 'Hoàn thành tất cả bài giảng'}
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable
+                onPress={() => {
+                  if (lessons.length > 0) {
+                    setActiveIndex(0);
+                  } else if (quizzes.length > 0) {
+                    setActiveIndex(0);
+                  } else {
+                    showHrNotice('Thông báo', 'Khóa học chưa có nội dung bài giảng.');
+                  }
+                }}
+                style={({ pressed }) => [styles.startCourseBtn, pressed && { opacity: 0.72 }]}
+              >
+                <View style={styles.iconButtonContent}>
+                  {isCourseDone ? (
+                    <>
+                      <Eye size={14} color={colors.ink} />
+                      <Text style={styles.startCourseBtnText}>Xem kết quả</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={14} color={colors.ink} />
+                      <Text style={styles.startCourseBtnText}>Bắt đầu học</Text>
+                    </>
+                  )}
+                </View>
+              </Pressable>
+            </Card>
+          </>
         ) : null}
 
         {/* Section 2: Active Lesson */}
         {activeIndex >= 0 && activeIndex < lessons.length ? (() => {
           const les = lessons[activeIndex];
-          const isCompleted = completedLessons.includes(`lesson_${activeIndex}`);
           const isVideo = les.type === 'video' || les.type === 'youtube';
+          const youtubeThumb = les.url ? getYoutubeThumbnailUrl(les.url) : null;
+          const showVideoCard = isVideo || Boolean(youtubeThumb);
+          const openLessonLink = () => {
+            if (!les.url) return;
+            void Linking.openURL(les.url).catch(() =>
+              showHrNotice('Không mở được liên kết', 'Vui lòng kiểm tra lại đường dẫn bài giảng.', 'error'),
+            );
+          };
           return (
-            <Card style={styles.studyCard}>
-              <View style={styles.courseMetaRow}>
-                <Text style={styles.lessonCounter}>Bài giảng {activeIndex + 1} / {lessons.length}</Text>
-                {isCompleted ? <View style={styles.iconButtonContent}><Check size={13} color="#16885A" /><Text style={styles.lessonCounter}>Đã hoàn thành</Text></View> : null}
+            <View style={styles.lessonFlatWrap}>
+              <View style={styles.lessonHeaderBar}>
+                <View style={styles.lessonHeaderLeft}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Quay lại bài trước"
+                    onPress={() => setActiveIndex((prev) => prev - 1)}
+                    hitSlop={10}
+                    style={({ pressed }) => [styles.lessonBackBtn, pressed && { opacity: 0.6 }]}
+                  >
+                    <ChevronLeft size={18} strokeWidth={1.8} color={colors.ink} />
+                  </Pressable>
+                  <Text numberOfLines={2} style={styles.lessonHeaderTitle}>
+                    {les.title}
+                  </Text>
+                </View>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={submittingProgress}
+                  onPress={() => void handleMarkLessonComplete(activeIndex)}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.lessonNextBtn,
+                    submittingProgress && styles.disabled,
+                    pressed && { opacity: 0.65 },
+                  ]}
+                >
+                  <Text style={styles.lessonNextText}>
+                    {submittingProgress
+                      ? 'Đang lưu...'
+                      : isCourseDone && activeIndex === lessons.length - 1 && quizzes.length === 0
+                        ? 'Hoàn thành'
+                        : 'Tiếp theo'}
+                  </Text>
+                  {!submittingProgress ? (
+                    <ChevronRight size={18} strokeWidth={1.8} color={colors.primary} />
+                  ) : null}
+                </Pressable>
               </View>
-              <Text style={styles.studyHeading}>{les.title}</Text>
 
               {les.url ? (
-                <Pressable
-                  onPress={() => void Linking.openURL(les.url!)}
-                  style={styles.resourceBox}
-                >
-                  <View style={styles.iconButtonContent}>{isVideo ? <Video size={15} color={colors.primary} /> : <Paperclip size={15} color={colors.primary} />}<Text style={styles.resourceTitle}>{isVideo ? 'Mở video bài giảng' : 'Mở tài liệu đính kèm'}</Text></View>
-                  <Text numberOfLines={2} style={styles.resourceUrl}>
-                    {les.fileName || les.url}
-                  </Text>
-                </Pressable>
+                showVideoCard ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Mở video bài giảng"
+                    onPress={openLessonLink}
+                    style={({ pressed }) => [styles.videoThumbWrap, pressed && { opacity: 0.9 }]}
+                  >
+                    {youtubeThumb ? (
+                      <Image
+                        source={{ uri: youtubeThumb }}
+                        style={styles.videoThumbImage}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+                    <View style={styles.videoThumbOverlay}>
+                      <View style={styles.videoPlayCircle}>
+                        <Play size={22} color={colors.white} fill={colors.white} />
+                      </View>
+                    </View>
+                  </Pressable>
+                ) : (
+                  <Pressable onPress={openLessonLink} style={styles.resourceBox}>
+                    <View style={styles.iconButtonContent}>
+                      <Paperclip size={15} color={colors.primary} />
+                      <Text style={styles.resourceTitle}>Mở tài liệu đính kèm</Text>
+                    </View>
+                    <Text numberOfLines={2} style={styles.resourceUrl}>
+                      {les.fileName || les.url}
+                    </Text>
+                  </Pressable>
+                )
               ) : null}
 
               {les.content ? (
-                <View style={styles.lessonContentBox}>
-                  <Text style={styles.studyBody}>{les.content}</Text>
-                </View>
+                <Text style={styles.lessonBodyText}>{les.content}</Text>
               ) : !les.url ? (
                 <Text style={styles.muted}>Bài giảng này chưa có nội dung hoặc tài liệu đính kèm.</Text>
               ) : null}
-
-              <View style={styles.studyFooter}>
-                <Pressable
-                  onPress={() => setActiveIndex((prev) => prev - 1)}
-                  style={styles.cancelBtn}
-                >
-                  <View style={styles.iconButtonContent}><ArrowLeft size={14} color={colors.ink} /><Text style={styles.cancelBtnText}>Bài trước</Text></View>
-                </Pressable>
-                <Pressable
-                  disabled={submittingProgress}
-                  onPress={() => void handleMarkLessonComplete(activeIndex)}
-                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, submittingProgress && styles.disabled]}
-                >
-                  <View style={styles.iconButtonContent}>
-                    {!submittingProgress ? <>{activeIndex === lessons.length - 1 && quizzes.length === 0 ? <Check size={14} color={colors.white} /> : <ArrowRight size={14} color={colors.white} />}</> : null}
-                    <Text style={styles.submitBtnText}>
-                      {submittingProgress ? 'Đang lưu...' : activeIndex === lessons.length - 1 ? quizzes.length > 0 ? 'Hoàn thành & Làm bài thi' : 'Hoàn thành khóa học' : 'Hoàn thành bài & Tiếp tục'}
-                    </Text>
-                  </View>
-                </Pressable>
-              </View>
-            </Card>
+            </View>
           );
         })() : null}
 
         {/* Section 3: Quiz */}
         {activeIndex === lessons.length && quizzes.length > 0 ? (
-          <Card style={styles.studyCard}>
-            <Text style={styles.quizTag}>ĐÁNH GIÁ SÁT HẠCH TRẮC NGHIỆM</Text>
-            <Text style={styles.studyHeading}>Bài thi cuối khóa</Text>
+          <View style={styles.lessonFlatWrap}>
+            <View style={styles.lessonHeaderBar}>
+              <View style={styles.lessonHeaderLeft}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Quay lại"
+                  onPress={() => setActiveIndex(lessons.length > 0 ? lessons.length - 1 : -1)}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.lessonBackBtn, pressed && { opacity: 0.6 }]}
+                >
+                  <ChevronLeft size={18} strokeWidth={1.8} color={colors.ink} />
+                </Pressable>
+                <Text numberOfLines={2} style={styles.lessonHeaderTitle}>
+                  Bài thi cuối khóa
+                </Text>
+              </View>
+
+              {isQuizReviewed ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setSelectedCourse(null);
+                    void load(true);
+                  }}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.lessonNextBtn, pressed && { opacity: 0.65 }]}
+                >
+                  <Text style={styles.lessonNextText}>Hoàn thành</Text>
+                  <ChevronRight size={18} strokeWidth={1.8} color={colors.primary} />
+                </Pressable>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={submittingProgress}
+                  onPress={() => void handleSubmitQuiz()}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.lessonNextBtn,
+                    submittingProgress && styles.disabled,
+                    pressed && { opacity: 0.65 },
+                  ]}
+                >
+                  <Text style={styles.lessonNextText}>
+                    {submittingProgress ? 'Đang chấm...' : 'Nộp bài'}
+                  </Text>
+                  {!submittingProgress ? (
+                    <ChevronRight size={18} strokeWidth={1.8} color={colors.primary} />
+                  ) : null}
+                </Pressable>
+              )}
+            </View>
+
             <Text style={styles.muted}>
-              Trả lời đúng 100% số câu hỏi ({quizzes.length} câu) để hoàn thành khóa học.
+              {isQuizReviewed
+                ? `Đã hoàn thành bài kiểm tra (${quizzes.length}/${quizzes.length} câu đúng).`
+                : `Trả lời đúng 100% số câu hỏi (${quizzes.length} câu) để hoàn thành khóa học.`}
             </Text>
 
-            <View style={{ gap: 12, marginTop: 6 }}>
+            <View style={{ gap: 4 }}>
               {quizzes.map((q, qIdx) => {
-                const isErr = quizSubmitted && quizErrors[qIdx];
+                const isErr = !isQuizReviewed && quizSubmitted && quizErrors[qIdx];
+                const isLast = qIdx === quizzes.length - 1;
                 return (
-                  <View key={qIdx} style={[styles.quizBox, isErr && styles.quizBoxError]}>
-                    <Text style={styles.quizQuestion}>
-                      Q{qIdx + 1}: {q.question}
+                  <View
+                    key={qIdx}
+                    style={[styles.quizFlatItem, isLast && styles.quizFlatItemLast]}
+                  >
+                    <Text style={[styles.quizQuestion, isErr && { color: '#B91C1C' }]}>
+                      Câu {qIdx + 1}: {q.question}
                     </Text>
                     <View style={{ gap: 6, marginTop: 8 }}>
                       {q.options.map((opt, oIdx) => {
-                        const chosen = quizAnswers[qIdx] === oIdx;
+                        const chosen = isQuizReviewed
+                          ? oIdx === q.correctOptionIndex
+                          : quizAnswers[qIdx] === oIdx;
                         return (
                           <Pressable
                             key={oIdx}
-                            disabled={isQuizPassed}
+                            disabled={isQuizReviewed}
                             onPress={() => {
                               setQuizAnswers((prev) => ({ ...prev, [qIdx]: oIdx }));
                               if (quizSubmitted) {
@@ -848,43 +1041,104 @@ export function HrTrainingPanel({
                         );
                       })}
                     </View>
+                    {isErr ? (
+                      <Text style={styles.quizErrorText}>Câu trả lời chưa đúng</Text>
+                    ) : null}
                   </View>
                 );
               })}
             </View>
-
-            <View style={styles.studyFooter}>
-              {lessons.length > 0 ? (
-                <Pressable onPress={() => setActiveIndex(lessons.length - 1)} style={styles.cancelBtn}>
-                  <View style={styles.iconButtonContent}><ArrowLeft size={14} color={colors.ink} /><Text style={styles.cancelBtnText}>Bài giảng</Text></View>
-                </Pressable>
-              ) : null}
-              {isQuizPassed ? (
-                <Pressable
-                  onPress={() => {
-                    setSelectedCourse(null);
-                    void load(true);
-                  }}
-                  style={[styles.submitBtn, { flex: 1, marginTop: 0, backgroundColor: '#16885A' }]}
-                >
-                  <View style={styles.iconButtonContent}><Check size={14} color={colors.white} /><Text style={styles.submitBtnText}>Hoàn thành khóa học</Text></View>
-                </Pressable>
-              ) : (
-                <Pressable
-                  disabled={submittingProgress}
-                  onPress={() => void handleSubmitQuiz()}
-                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, submittingProgress && styles.disabled]}
-                >
-                  <View style={styles.iconButtonContent}>{!submittingProgress ? <ArrowRight size={14} color={colors.white} /> : null}<Text style={styles.submitBtnText}>{submittingProgress ? 'Đang chấm điểm...' : 'Nộp bài thi & Đánh giá'}</Text></View>
-                </Pressable>
-              )}
-            </View>
-          </Card>
+          </View>
         ) : null}
 
         {renderCourseFormModal()}
         <HrNoticeHost />
       </ScrollView>
+
+      {/* Floating action widget for course actions */}
+      <HrFab
+        label="Tùy chọn khóa học"
+        icon={<Ellipsis size={24} strokeWidth={2.2} color={colors.white} />}
+        onPress={() => setActionSheetOpen(true)}
+      />
+
+      {/* Bottom Sheet: Thao tác khóa học (Quay lại danh sách / Sửa / Xóa) */}
+      <Modal
+        visible={actionSheetOpen}
+        transparent
+        statusBarTranslucent
+        animationType="slide"
+        onRequestClose={() => setActionSheetOpen(false)}
+      >
+        <Pressable
+          style={styles.bottomSheetBackdrop}
+          onPress={() => setActionSheetOpen(false)}
+        >
+          <Pressable
+            style={[
+              styles.bottomSheetCard,
+              { paddingBottom: Math.max(insets.bottom + 14, 24) },
+            ]}
+            onPress={() => {}}
+          >
+            <View style={styles.bottomSheetHandle} />
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Quay lại danh sách"
+              onPress={() => {
+                setActionSheetOpen(false);
+                setSelectedCourse(null);
+              }}
+              style={({ pressed }) => [
+                styles.actionSheetRow,
+                pressed && styles.actionSheetRowPressed,
+              ]}
+            >
+              <ArrowLeft size={18} strokeWidth={1.6} color={colors.ink} />
+              <Text style={styles.actionSheetRowText}>Quay lại danh sách</Text>
+            </Pressable>
+
+            {canEditThis ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Sửa khóa học"
+                  onPress={() => {
+                    setActionSheetOpen(false);
+                    openEditCourse(selectedCourse);
+                  }}
+                  style={({ pressed }) => [
+                    styles.actionSheetRow,
+                    pressed && styles.actionSheetRowPressed,
+                  ]}
+                >
+                  <Pencil size={18} strokeWidth={1.6} color={colors.ink} />
+                  <Text style={styles.actionSheetRowText}>Sửa khóa học</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Xóa khóa học"
+                  onPress={() => {
+                    setActionSheetOpen(false);
+                    handleDeleteCourse(selectedCourse);
+                  }}
+                  style={({ pressed }) => [
+                    styles.actionSheetRow,
+                    pressed && styles.actionSheetRowPressed,
+                  ]}
+                >
+                  <Trash2 size={18} strokeWidth={1.6} color={colors.ink} />
+                  <Text style={styles.actionSheetRowText}>Xóa khóa học</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+      </View>
+      </SlideInPage>
     );
   }
 
@@ -900,145 +1154,171 @@ export function HrTrainingPanel({
         saving={savingCourse}
         onClose={() => setFormOpen(false)}
       >
-        <View style={{ gap: 8, paddingBottom: 14 }}>
-          <Text style={styles.label}>Tên khóa học *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin khóa học" />
+          <HrFormInputRow
+            label="Tên khóa học *"
             value={formTitle}
             onChangeText={setFormTitle}
             placeholder="VD: Quy chế bảo mật & văn hóa công ty"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
           />
-
-          <Text style={styles.label}>Mô tả tóm tắt</Text>
-          <TextInput
+          <HrFormInputRow
+            label="Mô tả tóm tắt"
             value={formDesc}
             onChangeText={setFormDesc}
             multiline
             placeholder="Nội dung chính khóa học..."
-            placeholderTextColor={colors.muted}
-            style={[styles.field, { minHeight: 62, textAlignVertical: 'top' }]}
           />
-
-          <Text style={styles.label}>Danh mục đào tạo</Text>
-          <View style={styles.wrapRow}>
-            {CATEGORIES.map((cat) => {
-              const active = formCategory === cat;
-              return (
-                <Pressable
-                  key={cat}
-                  onPress={() => setFormCategory(cat)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Text style={styles.label}>Thời lượng học</Text>
-          <TextInput
+          <HrFormSelectRow
+            label="Danh mục đào tạo"
+            sheetTitle="Chọn danh mục đào tạo"
+            value={formCategory}
+            options={CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+            onSelect={setFormCategory}
+          />
+          <HrFormInputRow
+            label="Thời lượng học"
             value={formDuration}
             onChangeText={setFormDuration}
             placeholder="VD: 2 giờ 30 phút"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
+          />
+          <HrFormSwitchRow
+            label="Khóa học bắt buộc"
+            value={formRequired}
+            onValueChange={setFormRequired}
+          />
+          <HrFormSwitchRow
+            label="Tự động giao khi có nhân sự mới"
+            value={formAutoOnboarding}
+            onValueChange={setFormAutoOnboarding}
+            last
           />
 
-          <View style={styles.switchRow}>
-            <Text style={styles.label}>Khóa học bắt buộc</Text>
-            <Switch
-              value={formRequired}
-              onValueChange={setFormRequired}
-              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-            />
-          </View>
-          <View style={styles.switchRow}>
-            <Text style={styles.label}>Tự động giao khi có nhân sự mới</Text>
-            <Switch
-              value={formAutoOnboarding}
-              onValueChange={setFormAutoOnboarding}
-              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-            />
-          </View>
-
           {/* Lessons builder */}
-          <View style={styles.builderHeader}>
-            <Text style={styles.label}>Bài giảng ({formLessons.length})</Text>
+          <View style={styles.builderFlatHeader}>
+            <Text style={styles.builderFlatSectionTitle}>Bài giảng ({formLessons.length})</Text>
             <Pressable
               onPress={() => openLessonEditor()}
-              style={styles.addSmallBtn}
+              hitSlop={8}
+              style={({ pressed }) => [styles.builderAddLink, pressed && { opacity: 0.65 }]}
             >
-              <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm bài</Text></View>
+              <Plus size={15} strokeWidth={1.9} color={colors.primary} />
+              <Text style={styles.builderAddLinkText}>Thêm bài</Text>
             </Pressable>
           </View>
-          {formLessons.map((les, idx) => (
-            <View key={`lesson-${idx}`} style={styles.builderEntry}>
-              <Pressable onPress={() => openLessonEditor(idx)} style={[styles.builderCard, styles.builderEntryMain]}>
-                <View style={styles.headRow}>
-                  <Text style={styles.codeBadge}>Bài {idx + 1}</Text>
-                  <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
+          {formLessons.length === 0 ? (
+            <Text style={[styles.muted, { paddingVertical: 10 }]}>Chưa có bài giảng nào.</Text>
+          ) : (
+            formLessons.map((les, idx) => {
+              const isLast = idx === formLessons.length - 1;
+              return (
+                <View
+                  key={`lesson-${idx}`}
+                  style={[styles.builderFlatRow, isLast && styles.builderFlatRowLast]}
+                >
+                  <Pressable
+                    onPress={() => openLessonEditor(idx)}
+                    style={({ pressed }) => [styles.builderFlatCopy, pressed && { opacity: 0.65 }]}
+                  >
+                    <Text numberOfLines={1} style={styles.builderFlatTitle}>
+                      Bài {idx + 1}: {les.title || 'Chưa có tên bài giảng'}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.builderFlatSub}>
+                      {les.type === 'video' || les.type === 'youtube' ? 'Video' : 'Văn bản / Tài liệu'}
+                      {les.url ? ` · ${les.url}` : ''}
+                    </Text>
+                  </Pressable>
+                  <View style={styles.builderFlatActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xóa bài ${idx + 1}`}
+                      onPress={() => showHrConfirm({
+                        title: 'Xóa bài giảng?',
+                        message: `Bạn có chắc muốn xóa bài giảng "${les.title || `Bài ${idx + 1}`}"?`,
+                        confirmLabel: 'Xóa bài giảng',
+                        onConfirm: () => setFormLessons((prev) => prev.filter((_, i) => i !== idx)),
+                      })}
+                      hitSlop={8}
+                      style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.55 }]}
+                    >
+                      <Trash2 size={16} strokeWidth={1.7} color="#DC2626" />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Sửa bài ${idx + 1}`}
+                      onPress={() => openLessonEditor(idx)}
+                      hitSlop={8}
+                    >
+                      <ChevronRight size={16} strokeWidth={1.7} color="#9CA3AF" />
+                    </Pressable>
+                  </View>
                 </View>
-                <Text numberOfLines={1} style={styles.rowTitle}>{les.title || 'Chưa có tên bài giảng'}</Text>
-                <Text numberOfLines={1} style={styles.muted}>
-                  {les.type === 'video' || les.type === 'youtube' ? 'Video' : 'Văn bản / Tài liệu'}
-                  {les.url ? ` · ${les.url}` : ''}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setFormLessons((prev) => prev.filter((_, i) => i !== idx))}
-                style={styles.deleteEntryBtn}
-              >
-                <Text style={styles.smallDelBtnText}>Xóa</Text>
-              </Pressable>
-            </View>
-          ))}
+              );
+            })
+          )}
 
           {/* Quiz builder */}
-          <View style={styles.builderHeader}>
-            <Text style={styles.label}>Trắc nghiệm MCQ ({formQuizzes.length})</Text>
+          <View style={styles.builderFlatHeader}>
+            <Text style={styles.builderFlatSectionTitle}>Câu hỏi trắc nghiệm ({formQuizzes.length})</Text>
             <Pressable
               onPress={() => openQuizEditor()}
-              style={styles.addSmallBtn}
+              hitSlop={8}
+              style={({ pressed }) => [styles.builderAddLink, pressed && { opacity: 0.65 }]}
             >
-              <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.addSmallBtnText}>Thêm câu hỏi</Text></View>
+              <Plus size={15} strokeWidth={1.9} color={colors.primary} />
+              <Text style={styles.builderAddLinkText}>Thêm câu hỏi</Text>
             </Pressable>
           </View>
-          {formQuizzes.map((q, qIdx) => (
-            <View key={`quiz-${qIdx}`} style={styles.builderEntry}>
-              <Pressable onPress={() => openQuizEditor(qIdx)} style={[styles.builderCard, styles.builderEntryMain]}>
-                <View style={styles.headRow}>
-                  <Text style={styles.codeBadge}>Câu {qIdx + 1}</Text>
-                  <Text style={styles.addSmallBtnText}>Chỉnh sửa</Text>
+          {formQuizzes.length === 0 ? (
+            <Text style={[styles.muted, { paddingVertical: 10 }]}>Chưa có câu hỏi trắc nghiệm nào.</Text>
+          ) : (
+            formQuizzes.map((q, qIdx) => {
+              const isLast = qIdx === formQuizzes.length - 1;
+              return (
+                <View
+                  key={`quiz-${qIdx}`}
+                  style={[styles.builderFlatRow, isLast && styles.builderFlatRowLast]}
+                >
+                  <Pressable
+                    onPress={() => openQuizEditor(qIdx)}
+                    style={({ pressed }) => [styles.builderFlatCopy, pressed && { opacity: 0.65 }]}
+                  >
+                    <Text numberOfLines={2} style={styles.builderFlatTitle}>
+                      Câu {qIdx + 1}: {q.question || 'Chưa có nội dung câu hỏi'}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.builderFlatSub}>
+                      {q.options.filter((option) => option.trim()).length} đáp án
+                      {q.options[q.correctOptionIndex]?.trim() ? ` · Đúng: ${q.options[q.correctOptionIndex].trim()}` : ''}
+                    </Text>
+                  </Pressable>
+                  <View style={styles.builderFlatActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xóa câu ${qIdx + 1}`}
+                      onPress={() => showHrConfirm({
+                        title: 'Xóa câu hỏi?',
+                        message: `Bạn có chắc muốn xóa câu hỏi "${q.question || `Câu ${qIdx + 1}`}"?`,
+                        confirmLabel: 'Xóa câu hỏi',
+                        onConfirm: () => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx)),
+                      })}
+                      hitSlop={8}
+                      style={({ pressed }) => [{ padding: 4 }, pressed && { opacity: 0.55 }]}
+                    >
+                      <Trash2 size={16} strokeWidth={1.7} color="#DC2626" />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Sửa câu ${qIdx + 1}`}
+                      onPress={() => openQuizEditor(qIdx)}
+                      hitSlop={8}
+                    >
+                      <ChevronRight size={16} strokeWidth={1.7} color="#9CA3AF" />
+                    </Pressable>
+                  </View>
                 </View>
-                <Text numberOfLines={2} style={styles.rowTitle}>{q.question || 'Chưa có nội dung câu hỏi'}</Text>
-                <Text numberOfLines={1} style={styles.muted}>
-                  {q.options.filter((option) => option.trim()).length} đáp án
-                  {q.options[q.correctOptionIndex]?.trim() ? ` · Đúng: ${q.options[q.correctOptionIndex].trim()}` : ''}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setFormQuizzes((prev) => prev.filter((_, i) => i !== qIdx))}
-                style={styles.deleteEntryBtn}
-              >
-                <Text style={styles.smallDelBtnText}>Xóa</Text>
-              </Pressable>
-            </View>
-          ))}
-
-          <Pressable
-            disabled={savingCourse}
-            onPress={() => void handleSaveCourse()}
-            style={[styles.submitBtn, savingCourse && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>
-              {savingCourse
-                ? 'Đang lưu...'
-                : editingCourse
-                  ? 'Cập nhật khóa học'
-                  : 'Đăng tải khóa học'}
-            </Text>
-          </Pressable>
+              );
+            })
+          )}
         </View>
       </FullScreenFormModal>
       <FullScreenFormModal
@@ -1053,141 +1333,116 @@ export function HrTrainingPanel({
         onClose={() => setContentEditorOpen(false)}
       >
         {contentEditorKind === 'lesson' ? (
-          <View style={styles.editorForm}>
-            <Text style={styles.label}>Tên bài giảng *</Text>
-            <TextInput
+          <View>
+            <HrFormSectionTitle title="Nội dung bài giảng" />
+            <HrFormInputRow
+              label="Tên bài giảng *"
               value={lessonDraft.title}
               onChangeText={(title) => setLessonDraft((prev) => ({ ...prev, title }))}
               placeholder="Ví dụ: Quy trình an toàn lao động"
-              placeholderTextColor={colors.muted}
-              style={styles.field}
             />
-
-            <Text style={styles.label}>Loại bài giảng</Text>
-            <View style={styles.wrapRow}>
-              {(['text', 'video'] as const).map((type) => {
-                const active = type === 'video'
-                  ? lessonDraft.type === 'video' || lessonDraft.type === 'youtube'
-                  : lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube';
-                return (
-                  <Pressable
-                    key={type}
-                    onPress={() => setLessonDraft((prev) => ({ ...prev, type }))}
-                    style={[styles.chip, active && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                      {type === 'video' ? 'Video' : 'Văn bản / Tài liệu'}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Text style={styles.label}>
-              {lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link video' : 'Link tài liệu (tùy chọn)'}
-            </Text>
-            <TextInput
+            <HrFormSelectRow
+              label="Loại bài giảng"
+              sheetTitle="Chọn loại bài giảng"
+              value={lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'video' : 'text'}
+              options={[
+                { value: 'text', label: 'Văn bản / Tài liệu' },
+                { value: 'video', label: 'Video' },
+              ]}
+              onSelect={(type) => setLessonDraft((prev) => ({ ...prev, type: type as 'text' | 'video' }))}
+            />
+            <HrFormInputRow
+              label={lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link video' : 'Link tài liệu (tùy chọn)'}
               value={lessonDraft.url || ''}
               onChangeText={(url) => setLessonDraft((prev) => ({ ...prev, url }))}
               placeholder={lessonDraft.type === 'video' || lessonDraft.type === 'youtube' ? 'Link YouTube / video...' : 'https://...'}
-              placeholderTextColor={colors.muted}
               autoCapitalize="none"
-              style={styles.field}
+              last={lessonDraft.type === 'video' || lessonDraft.type === 'youtube'}
             />
-
             {lessonDraft.type !== 'video' && lessonDraft.type !== 'youtube' ? (
-              <>
-                <Text style={styles.label}>Nội dung bài giảng</Text>
-                <TextInput
-                  value={lessonDraft.content || ''}
-                  onChangeText={(content) => setLessonDraft((prev) => ({ ...prev, content }))}
-                  multiline
-                  placeholder="Nhập nội dung lý thuyết..."
-                  placeholderTextColor={colors.muted}
-                  style={[styles.field, styles.editorTextArea]}
-                />
-              </>
+              <HrFormInputRow
+                label="Nội dung bài giảng"
+                value={lessonDraft.content || ''}
+                onChangeText={(content) => setLessonDraft((prev) => ({ ...prev, content }))}
+                multiline
+                placeholder="Nhập nội dung lý thuyết..."
+                last
+              />
             ) : null}
-
-            <View style={styles.editorActionRow}>
-              <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
-                <Text style={styles.cancelBtnText}>Hủy</Text>
-              </Pressable>
-              <Pressable onPress={saveLessonDraft} style={[styles.submitBtn, styles.editorAction]}>
-                <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm bài giảng' : 'Lưu bài giảng'}</Text>
-              </Pressable>
-            </View>
           </View>
         ) : (
-          <View style={styles.editorForm}>
-            <Text style={styles.label}>Nội dung câu hỏi *</Text>
-            <TextInput
+          <View>
+            <HrFormInputRow
+              label="Nội dung câu hỏi *"
               value={quizDraft.question}
               onChangeText={(question) => setQuizDraft((prev) => ({ ...prev, question }))}
               multiline
               placeholder="Nhập câu hỏi trắc nghiệm..."
-              placeholderTextColor={colors.muted}
-              style={[styles.field, styles.editorTextArea]}
             />
-
-            <Text style={styles.label}>Các đáp án · Chọn nút tròn cạnh đáp án đúng</Text>
-            {quizDraft.options.map((option, optionIndex) => {
-              const isCorrect = quizDraft.correctOptionIndex === optionIndex;
-              return (
-                <View key={`option-${optionIndex}`} style={styles.quizEditorOptionRow}>
-                  <Pressable
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: isCorrect }}
-                    onPress={() => setQuizDraft((prev) => ({ ...prev, correctOptionIndex: optionIndex }))}
-                    style={[styles.radioOuter, isCorrect && styles.radioOuterActive]}
-                  >
-                    {isCorrect ? <View style={styles.radioInner} /> : null}
-                  </Pressable>
-                  <TextInput
-                    value={option}
-                    onChangeText={(value) => setQuizDraft((prev) => {
-                      const options = [...prev.options];
-                      options[optionIndex] = value;
-                      return { ...prev, options };
-                    })}
-                    placeholder={`Đáp án ${optionIndex + 1}`}
-                    placeholderTextColor={colors.muted}
-                    style={[styles.field, styles.quizEditorOptionField]}
-                  />
-                  {quizDraft.options.length > 2 ? (
-                    <Pressable
-                      onPress={() => setQuizDraft((prev) => {
-                        const options = prev.options.filter((_, index) => index !== optionIndex);
-                        const correctOptionIndex = prev.correctOptionIndex === optionIndex
-                          ? Math.min(optionIndex, options.length - 1)
-                          : prev.correctOptionIndex > optionIndex
-                            ? prev.correctOptionIndex - 1
-                            : prev.correctOptionIndex;
-                        return { ...prev, options, correctOptionIndex };
-                      })}
-                      hitSlop={8}
+            <HrFormCustomRow label="Các đáp án · Chọn nút tròn cạnh đáp án đúng" last>
+              <View style={{ gap: 8, marginTop: 6 }}>
+                {quizDraft.options.map((option, optionIndex) => {
+                  const isCorrect = quizDraft.correctOptionIndex === optionIndex;
+                  return (
+                    <View
+                      key={`option-${optionIndex}`}
+                      style={[styles.quizOption, isCorrect && styles.quizOptionActive]}
                     >
-                      <Text style={styles.smallDelBtnText}>Xóa</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              );
-            })}
-            <Pressable onPress={() => setQuizDraft((prev) => ({ ...prev, options: [...prev.options, ''] }))}>
-              <View style={styles.iconButtonContent}>
-                <Plus size={13} color={colors.primary} />
-                <Text style={styles.addSmallBtnText}>Thêm đáp án</Text>
+                      <Pressable
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: isCorrect }}
+                        onPress={() => setQuizDraft((prev) => ({ ...prev, correctOptionIndex: optionIndex }))}
+                        hitSlop={6}
+                        style={[styles.radioOuter, isCorrect && styles.radioOuterActive]}
+                      >
+                        {isCorrect ? <View style={styles.radioInner} /> : null}
+                      </Pressable>
+                      <TextInput
+                        value={option}
+                        onChangeText={(value) => setQuizDraft((prev) => {
+                          const options = [...prev.options];
+                          options[optionIndex] = value;
+                          return { ...prev, options };
+                        })}
+                        placeholder={`Đáp án ${optionIndex + 1}`}
+                        placeholderTextColor="#9CA3AF"
+                        style={[styles.quizEditorInput, isCorrect && styles.quizOptionTextActive]}
+                      />
+                      {quizDraft.options.length > 2 ? (
+                        <Pressable
+                          onPress={() => showHrConfirm({
+                            title: 'Xóa đáp án?',
+                            message: `Bạn có chắc muốn xóa đáp án "${option.trim() || `Đáp án ${optionIndex + 1}`}"?`,
+                            confirmLabel: 'Xóa đáp án',
+                            onConfirm: () => setQuizDraft((prev) => {
+                              const options = prev.options.filter((_, index) => index !== optionIndex);
+                              const correctOptionIndex = prev.correctOptionIndex === optionIndex
+                                ? Math.min(optionIndex, options.length - 1)
+                                : prev.correctOptionIndex > optionIndex
+                                  ? prev.correctOptionIndex - 1
+                                  : prev.correctOptionIndex;
+                              return { ...prev, options, correctOptionIndex };
+                            }),
+                          })}
+                          hitSlop={8}
+                          style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+                        >
+                          <Trash2 size={15} strokeWidth={1.7} color="#DC2626" />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  );
+                })}
+                <Pressable
+                  onPress={() => setQuizDraft((prev) => ({ ...prev, options: [...prev.options, ''] }))}
+                  hitSlop={6}
+                  style={({ pressed }) => [styles.builderAddLink, { marginTop: 2 }, pressed && { opacity: 0.65 }]}
+                >
+                  <Plus size={15} strokeWidth={1.9} color={colors.primary} />
+                  <Text style={styles.builderAddLinkText}>Thêm đáp án</Text>
+                </Pressable>
               </View>
-            </Pressable>
-
-            <View style={styles.editorActionRow}>
-              <Pressable onPress={() => setContentEditorOpen(false)} style={[styles.cancelBtn, styles.editorAction]}>
-                <Text style={styles.cancelBtnText}>Hủy</Text>
-              </Pressable>
-              <Pressable onPress={saveQuizDraft} style={[styles.submitBtn, styles.editorAction]}>
-                <Text style={styles.submitBtnText}>{editingContentIndex == null ? 'Thêm câu hỏi' : 'Lưu câu hỏi'}</Text>
-              </Pressable>
-            </View>
+            </HrFormCustomRow>
           </View>
         )}
       </FullScreenFormModal>
@@ -1230,11 +1485,6 @@ export function HrTrainingPanel({
             </Text>
             <ChevronDown size={15} strokeWidth={1.7} color="#64748B" />
           </Pressable>
-          {monitorUid ? (
-            <Pressable onPress={() => setMonitorUid('')} hitSlop={8} style={styles.clearMonitorBtn}>
-              <Text style={styles.clearMonitorText}>Xem của tôi</Text>
-            </Pressable>
-          ) : null}
         </View>
       ) : null}
 
@@ -1260,16 +1510,15 @@ export function HrTrainingPanel({
           </Pressable>
         </Card>
       ) : !filteredCourses.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Chưa có khóa học đào tạo nào.</Text>
-        </Card>
+        <View style={styles.stateCard}>
+          <IgenHrEmptyState message="Chưa có khóa học đào tạo nào." />
+        </View>
       ) : (
         <View style={styles.list}>
           {filteredCourses.map((course) => {
             const enroll = findEnrollment(course.id);
             const progress = enroll?.progress ?? 0;
             const isDone = enroll?.status === 'completed';
-            const actionLabel = !enroll ? 'Bắt đầu' : isDone ? 'Xem lại' : 'Tiếp tục';
             const createdLabel = formatDate(course.createdAt);
             return (
               <Card
@@ -1280,26 +1529,27 @@ export function HrTrainingPanel({
                 style={styles.card}
               >
                 <View style={styles.headRow}>
+                  <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.rowTitle, { flex: 1 }]}>
+                    {course.title || course.name}
+                  </Text>
                   <View style={styles.badgeRow}>
-                    <Text style={styles.categoryBadge}>{course.category || 'Đào tạo'}</Text>
-                    {course.isRequired ? <Text style={styles.requiredBadge}>Bắt buộc</Text> : null}
-                    {isDone ? <View style={styles.iconButtonContent}><Check size={12} color="#16885A" /><Text style={styles.doneBadge}>Hoàn thành</Text></View> : null}
+                    {isDone ? (
+                      <Text style={styles.doneBadge}>Hoàn thành</Text>
+                    ) : (
+                      <>
+                        <Text style={styles.categoryBadge}>{course.category || 'Đào tạo'}</Text>
+                        {course.isRequired ? <Text style={styles.requiredBadge}>Bắt buộc</Text> : null}
+                      </>
+                    )}
                   </View>
-                  {createdLabel ? <Text style={styles.subMeta}>{createdLabel}</Text> : null}
                 </View>
 
-                <Text style={styles.rowTitle}>{course.title || course.name}</Text>
-
-                {course.description ? (
-                  <Text numberOfLines={2} style={styles.muted}>
-                    {course.description}
-                  </Text>
-                ) : null}
-
-                <View style={styles.courseMetaRow}>
-                  <UserRound size={13} color={colors.muted} /><Text style={styles.subMeta}>{course.instructor || 'Chưa cập nhật'}</Text>
-                  <BookOpen size={13} color={colors.muted} /><Text style={styles.subMeta}>{course.lessons?.length ?? 0} bài học</Text>
-                  {(course.quizzes?.length ?? 0) > 0 ? <><ClipboardList size={13} color={colors.muted} /><Text style={styles.subMeta}>{course.quizzes?.length} câu thi</Text></> : null}
+                <View style={styles.headRow}>
+                  <View style={[styles.courseMetaRow, { flex: 1 }]}>
+                    <LessonCountIcon size={14} color={colors.muted} /><Text style={styles.subMeta}>{course.lessons?.length ?? 0} bài học</Text>
+                    {(course.quizzes?.length ?? 0) > 0 ? <><ClipboardList size={13} color={colors.muted} /><Text style={styles.subMeta}>{course.quizzes?.length} câu thi</Text></> : null}
+                  </View>
+                  {createdLabel ? <Text style={styles.subMeta}>{createdLabel}</Text> : null}
                 </View>
 
                 <View style={styles.cardFooter}>
@@ -1307,43 +1557,8 @@ export function HrTrainingPanel({
                     <View style={styles.progressTrack}>
                       <View style={[styles.progressFill, { width: `${Math.min(100, progress)}%` }]} />
                     </View>
-                    <Text style={styles.subMeta}>Tiến độ: {progress}%</Text>
                   </View>
-                  {!monitorUid ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      {isSupervisor ? (
-                        <>
-                          <Pressable
-                            onPress={(e) => {
-                              e.stopPropagation?.();
-                              openEditCourse(course);
-                            }}
-                            style={styles.smallEditBtn}
-                          >
-                            <Text style={styles.smallEditBtnText}>Sửa</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={(e) => {
-                              e.stopPropagation?.();
-                              handleDeleteCourse(course);
-                            }}
-                            style={styles.smallDelBtn}
-                          >
-                            <Text style={styles.smallDelBtnText}>Xóa</Text>
-                          </Pressable>
-                        </>
-                      ) : null}
-                      <Pressable
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          void openCourseDetail(course);
-                        }}
-                        style={[styles.actionBtn, isDone && styles.actionBtnDone]}
-                      >
-                        <Text style={styles.actionBtnText}>{actionLabel}</Text>
-                      </Pressable>
-                    </View>
-                  ) : null}
+                  <Text style={styles.subMeta}>{progress}%</Text>
                 </View>
               </Card>
             );
@@ -1362,12 +1577,6 @@ export function HrTrainingPanel({
         <Pressable style={styles.monitorSheetBackdrop} onPress={() => setMonitorModalOpen(false)}>
           <Pressable style={styles.monitorSheet} onPress={() => {}}>
             <View style={styles.monitorSheetHandle} />
-            <View style={[styles.headRow, { marginBottom: 12 }]}>
-              <Text style={styles.sheetTitle}>Giám sát tiến độ nhân viên</Text>
-              <Pressable onPress={() => setMonitorModalOpen(false)} hitSlop={8}>
-                <Text style={styles.closeText}>Đóng</Text>
-              </Pressable>
-            </View>
             <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
               <Pressable
                 onPress={() => {
@@ -1436,8 +1645,6 @@ const styles = StyleSheet.create({
   monitorTriggerText: { color: colors.ink, fontSize: 15, fontWeight: '400', flexShrink: 1 },
   monitorChip: { backgroundColor: colors.white, borderColor: '#DCE5F2', borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99 },
   monitorChipText: { color: colors.primary, fontSize: 12, fontWeight: '500' },
-  clearMonitorBtn: { paddingVertical: 4, paddingLeft: 8 },
-  clearMonitorText: { color: colors.primary, fontSize: 13.5, fontWeight: '500' },
   monitorSheetBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.35)', justifyContent: 'flex-end' },
   monitorSheet: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 26 },
   monitorSheetHandle: { width: 38, height: 4, borderRadius: 99, backgroundColor: '#D6DFEC', alignSelf: 'center', marginBottom: 12 },
@@ -1509,6 +1716,100 @@ const styles = StyleSheet.create({
   syllabusPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   syllabusText: { color: '#111827', fontSize: 12, fontWeight: '500' },
   syllabusTextActive: { color: colors.white, fontWeight: '600' },
+  syllabusTrigger: {
+    ...HAIRLINE_CARD,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 12,
+    gap: 10,
+  },
+  syllabusTriggerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+  },
+  syllabusTriggerCaption: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '400',
+  },
+  syllabusTriggerValue: {
+    color: '#111827',
+    fontSize: 13.5,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  bottomSheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+  },
+  bottomSheetCard: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  bottomSheetHandle: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    marginBottom: 12,
+  },
+  bottomSheetTitle: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '600',
+    paddingHorizontal: 6,
+    marginBottom: 8,
+  },
+  syllabusCard: {
+    ...HAIRLINE_CARD,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  syllabusListRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  syllabusListRowLast: {
+    borderBottomWidth: 0,
+  },
+  syllabusSheetRowText: {
+    flex: 1,
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: '400',
+  },
+  actionSheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  actionSheetRowPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  actionSheetRowText: {
+    color: colors.ink,
+    fontSize: 14.5,
+    fontWeight: '400',
+  },
   studyCard: { ...HAIRLINE_CARD, padding: 15, gap: 10 },
   lessonCounter: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
   studyHeading: { color: '#111827', fontSize: 15, fontWeight: '600', lineHeight: 21 },
@@ -1520,13 +1821,61 @@ const styles = StyleSheet.create({
   resourceBox: { backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, gap: 4 },
   resourceTitle: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   resourceUrl: { color: '#6B7280', fontSize: 11.5 },
+  videoThumbWrap: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    position: 'relative',
+  },
+  videoThumbImage: { width: '100%', height: '100%' },
+  videoThumbOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 3,
+  },
   lessonContentBox: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12 },
+  lessonFlatWrap: { gap: 12, paddingTop: 2 },
+  lessonHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5EAF2',
+  },
+  lessonHeaderLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  lessonBackBtn: { paddingVertical: 2, paddingRight: 2 },
+  lessonHeaderTitle: { flex: 1, color: '#111827', fontSize: 16, fontWeight: '600', lineHeight: 22 },
+  lessonNextBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingLeft: 6 },
+  lessonNextText: { color: colors.primary, fontSize: 14, fontWeight: '400' },
+  lessonBodyText: { color: '#1F2937', fontSize: 14.5, lineHeight: 23 },
   studyFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EEF2F7' },
 
   // Quiz
   quizTag: { color: '#16885A', fontSize: 10.5, fontWeight: '600', letterSpacing: 0.3 },
   quizBox: { backgroundColor: '#F6F8FC', borderColor: '#E5EAF2', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12 },
   quizBoxError: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  quizFlatItem: { paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#EEF2F7' },
+  quizFlatItemLast: { borderBottomWidth: 0 },
   quizQuestion: { color: '#111827', fontSize: 13, fontWeight: '600', lineHeight: 19 },
   quizOption: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.white, borderColor: '#E5EAF2', borderWidth: 1, borderRadius: 10, padding: 10 },
   quizOptionActive: { backgroundColor: '#EAF2FF', borderColor: colors.primary },
@@ -1555,18 +1904,64 @@ const styles = StyleSheet.create({
   builderEntry: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   builderEntryMain: { flex: 1 },
   deleteEntryBtn: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 8 },
+  builderFlatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#EEF2F7',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  builderFlatSectionTitle: { color: '#111827', fontSize: 15, fontWeight: '600' },
+  builderAddLink: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 2 },
+  builderAddLinkText: { color: colors.primary, fontSize: 13.5, fontWeight: '500' },
+  builderFlatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF2F7',
+  },
+  builderFlatRowLast: { borderBottomWidth: 0 },
+  builderFlatCopy: { flex: 1, gap: 3 },
+  builderFlatTitle: { color: '#111827', fontSize: 14.5, fontWeight: '500', lineHeight: 20 },
+  builderFlatSub: { color: '#6B7280', fontSize: 12.5, fontWeight: '400' },
+  builderFlatActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   editorForm: { gap: 8, paddingBottom: 14 },
   editorTextArea: { minHeight: 90, textAlignVertical: 'top' },
   editorActionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   editorAction: { flex: 1 },
-  quizEditorOptionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  quizEditorOptionField: { flex: 1 },
+  quizEditorInput: {
+    flex: 1,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    backgroundColor: 'transparent',
+    fontSize: 14,
+    color: '#111827',
+  },
   addSmallBtn: { backgroundColor: '#EAF2FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   addSmallBtnText: { color: colors.primary, fontSize: 11.5, fontWeight: '600' },
   pickerRow: { padding: 12, borderRadius: 10, backgroundColor: '#F6F8FC', marginBottom: 6 },
   pickerRowActive: { backgroundColor: '#EAF2FF' },
   submitBtn: { backgroundColor: colors.primary, minHeight: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 6, paddingHorizontal: 14 },
   submitBtnText: { color: colors.white, fontSize: 13.5, fontWeight: '600' },
+  startCourseBtn: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minHeight: 36,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    paddingHorizontal: 12,
+  },
+  startCourseBtnText: { color: colors.ink, fontSize: 12.5, fontWeight: '500' },
   cancelBtn: { backgroundColor: '#F1F5F9', minHeight: 44, paddingHorizontal: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   cancelBtnText: { color: '#374151', fontSize: 13, fontWeight: '600' },
   disabled: { opacity: 0.45 },

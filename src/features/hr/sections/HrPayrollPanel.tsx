@@ -22,7 +22,14 @@ import {
   XCircle,
 } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { AnimatedFilterContent, CenteringChipBar } from '@/components/CenteringChipBar';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import {
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+} from '@/features/hr/components/HrFormFields';
 import { HrFab } from '@/features/hr/components/HrFab';
 import {
   approvePayrollAdjustment,
@@ -341,28 +348,15 @@ export function HrPayrollPanel({
     >
       {/* Sub-tabs */}
       {canViewAll ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 6, marginBottom: 10 }}
-        >
-          {subSections.map((item) => {
-            const active = section === item.key;
-            return (
-              <Pressable
-                key={item.key}
-                onPress={() => setSection(item.key)}
-                style={[styles.subTabPill, active && styles.subTabPillActive]}
-              >
-                <Text style={[styles.subTabText, active && styles.subTabTextActive]}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        <CenteringChipBar
+          items={subSections}
+          activeKey={section}
+          onSelect={setSection}
+          style={{ marginHorizontal: -14, marginBottom: 10 }}
+        />
       ) : null}
 
+      <AnimatedFilterContent transitionKey={section}>
       {/* Period switcher (for overview & adjustments) */}
       {canViewAll && (section === 'overview' || section === 'adjustments') ? (
         <Card style={styles.dateBar}>
@@ -390,9 +384,9 @@ export function HrPayrollPanel({
       ) : section === 'mine' || !canViewAll ? (
         // ================= MY PAYSLIPS =================
         !myPayslips.length ? (
-          <Card style={styles.stateCard}>
-            <Text style={styles.muted}>Chưa có phiếu lương nào được phát hành cho bạn.</Text>
-          </Card>
+          <View style={styles.stateCard}>
+            <IgenHrEmptyState message="Chưa có phiếu lương nào được phát hành cho bạn." />
+          </View>
         ) : (
           <View style={styles.list}>
             {myPayslips.map((slip, idx) => (
@@ -417,9 +411,9 @@ export function HrPayrollPanel({
       ) : section === 'policies' ? (
         // ================= POLICIES =================
         !policies.length ? (
-          <Card style={styles.stateCard}>
-            <Text style={styles.muted}>Chưa có chính sách lương nào.</Text>
-          </Card>
+          <View style={styles.stateCard}>
+            <IgenHrEmptyState message="Chưa có chính sách lương nào." />
+          </View>
         ) : (
           <View style={styles.list}>
             {policies.map((pol) => (
@@ -457,9 +451,9 @@ export function HrPayrollPanel({
         // ================= ADJUSTMENTS =================
         <>
           {!adjustments.length ? (
-            <Card style={styles.stateCard}>
-              <Text style={styles.muted}>Chưa có khoản thưởng / phụ cấp / khấu trừ nào kỳ {period}.</Text>
-            </Card>
+            <View style={styles.stateCard}>
+              <IgenHrEmptyState message={`Chưa có khoản thưởng / phụ cấp / khấu trừ nào kỳ ${period}.`} />
+            </View>
           ) : (
             <View style={styles.list}>
               {adjustments.map((adj) => {
@@ -699,12 +693,11 @@ export function HrPayrollPanel({
           />
 
           {run?.effectiveError ? null : !filteredResults.length ? (
-            <Card style={styles.stateCard}>
-              <Text style={styles.muted}>
-                Chưa có kết quả bảng lương kỳ {period}.
-                {!run && canManage ? ' Bấm "Tính / Xử lý lương" để khởi tạo.' : run?.status === 'draft' && canManage ? ' Bấm "Tính / Xử lý lương" để cập nhật kỳ nháp.' : ''}
-              </Text>
-            </Card>
+            <View style={styles.stateCard}>
+              <IgenHrEmptyState
+                message={`Chưa có kết quả bảng lương kỳ ${period}.${!run && canManage ? ' Bấm "Tính / Xử lý lương" để khởi tạo.' : run?.status === 'draft' && canManage ? ' Bấm "Tính / Xử lý lương" để cập nhật kỳ nháp.' : ''}`}
+              />
+            </View>
           ) : (
             <View style={styles.list}>
               {filteredResults.map((row, idx) => {
@@ -744,6 +737,7 @@ export function HrPayrollPanel({
           )}
         </>
       )}
+      </AnimatedFilterContent>
 
       {/* Payslip Detail Full-Screen Page */}
       <FullScreenFormModal
@@ -840,61 +834,41 @@ export function HrPayrollPanel({
         saving={actionLoading}
         onClose={() => setAdjOpen(false)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Nhân viên *</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {employees.slice(0, 30).map((emp) => {
-              const uid = emp.uid || emp._id || emp.id || '';
-              const active = adjEmpId === uid;
-              return (
-                <Pressable
-                  key={uid}
-                  onPress={() => setAdjEmpId(uid)}
-                  style={[styles.chip, active && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {emp.displayName}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          <Text style={styles.label}>Loại điều chỉnh</Text>
-          <View style={styles.wrapRow}>
-            {ADJ_KINDS.map((k) => (
-              <Pressable
-                key={k.value}
-                onPress={() => setAdjKind(k.value)}
-                style={[styles.chip, adjKind === k.value && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, adjKind === k.value && styles.chipTextActive]}>
-                  {k.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.label}>Số tiền (VNĐ) *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin điều chỉnh" />
+          <HrFormSelectRow
+            label="Nhân viên *"
+            sheetTitle="Chọn nhân viên"
+            value={adjEmpId}
+            placeholder="Chọn nhân viên"
+            options={employees.map((emp) => ({
+              value: emp.uid || emp._id || emp.id || '',
+              label: emp.displayName,
+              subtitle: [emp.jobTitle || emp.position, emp.department].filter(Boolean).join(' · ') || undefined,
+            }))}
+            onSelect={setAdjEmpId}
+          />
+          <HrFormSelectRow
+            label="Loại điều chỉnh"
+            sheetTitle="Chọn loại điều chỉnh"
+            value={adjKind}
+            options={ADJ_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+            onSelect={(val) => setAdjKind(val as typeof adjKind)}
+          />
+          <HrFormInputRow
+            label="Số tiền (VNĐ) *"
             value={adjAmount}
             onChangeText={setAdjAmount}
             keyboardType="numeric"
             placeholder="VD: 500000"
-            style={styles.field}
           />
-          <Text style={styles.label}>Lý do *</Text>
-          <TextInput
+          <HrFormInputRow
+            label="Lý do *"
             value={adjReason}
             onChangeText={setAdjReason}
             placeholder="VD: Thưởng hoàn thành dự án..."
-            style={styles.field}
+            last
           />
-          <Pressable
-            disabled={actionLoading}
-            onPress={() => void onCreateAdjustment()}
-            style={[styles.submitBtn, actionLoading && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{actionLoading ? 'Đang lưu...' : 'Lưu điều chỉnh'}</Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
 
@@ -914,28 +888,16 @@ export function HrPayrollPanel({
         saving={actionLoading}
         onClose={() => setReopenOpen(false)}
       >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Lý do mở lại *</Text>
-          <TextInput
+        <View>
+          <HrFormSectionTitle title="Thông tin mở lại kỳ lương" />
+          <HrFormInputRow
+            label="Lý do mở lại *"
             value={reopenReason}
             onChangeText={setReopenReason}
             multiline
             placeholder="Nhập lý do mở lại bảng lương..."
-            style={[styles.field, { minHeight: 70, textAlignVertical: 'top' }]}
+            last
           />
-          <Pressable
-            disabled={actionLoading || !reopenReason.trim()}
-            onPress={() => {
-              if (!run) return;
-              void runAction(async () => {
-                await reopenPayrollRun(run._id, run.version, reopenReason.trim(), branchId);
-                setReopenOpen(false);
-              }, 'Đã mở lại kỳ lương.');
-            }}
-            style={[styles.submitBtn, (actionLoading || !reopenReason.trim()) && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>Xác nhận mở lại</Text>
-          </Pressable>
         </View>
       </FullScreenFormModal>
 

@@ -131,8 +131,8 @@ export const customerManagementApi = {
   transactionDetail(id: string, scope: CustomerScope, row: CustomerTransactionRow) {
     return data<CustomerTransactionDetail>(`/customers/${encodeURIComponent(id)}/transactions/${row.kind}/${encodeURIComponent(row.sourceId)}${query({ ...scope, eventId: row.eventId })}`, { headers: { 'x-branch-id': scope.branchId } });
   },
-  repairs(id: string, scope: CustomerScope, page = 1, signal?: AbortSignal) {
-    return data<{ items: RepairHistoryItem[]; total: number; page: number; limit: number }>(`/customers/${encodeURIComponent(id)}/repairs${query({ ...scope, page })}`, { signal });
+  repairs(id: string, scope: CustomerScope, page = 1, signal?: AbortSignal, limit = 50) {
+    return data<{ items: RepairHistoryItem[]; total: number; page: number; limit: number }>(`/customers/${encodeURIComponent(id)}/repairs${query({ ...scope, page, limit })}`, { signal });
   },
   pointPolicy(scope: CustomerScope) {
     return data<CustomerPointPolicy>(`/retail/points/policy${query(scope)}`);

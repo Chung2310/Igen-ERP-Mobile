@@ -1,7 +1,9 @@
 import { PopupError } from '@/components/PopupError';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Modal,
   Pressable,
   RefreshControl,
@@ -15,7 +17,14 @@ import {
 import * as Location from 'expo-location';
 import { AlertTriangle, CheckCircle2, ChevronRight, Info, LocateFixed, MapPin, Phone, Plus, Radio } from 'lucide-react-native';
 import { Card } from '@/components/Card';
+import { IgenHrEmptyState } from '@/components/EmptyStateIllustration';
 import { FullScreenFormModal } from '@/components/FullScreenFormModal';
+import {
+  HrFormInputRow,
+  HrFormSectionTitle,
+  HrFormSelectRow,
+  HrFormSwitchRow,
+} from '@/features/hr/components/HrFormFields';
 import { HrFab } from '@/features/hr/components/HrFab';
 import {
   createHrBranch,
@@ -131,6 +140,9 @@ export function HrBranchesPanel({
   onBranchesChanged?: () => void;
 }) {
   const [branches, setBranches] = useState<HrBranch[]>([]);
+  const detailSlideX = useRef(new Animated.Value(0)).current;
+  const detailOpacity = useRef(new Animated.Value(1)).current;
+  const prevEditingRef = useRef(false);
   const [employees, setEmployees] = useState<HrEmployee[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -440,12 +452,39 @@ export function HrBranchesPanel({
     }
   }, [load, ownerEmail, ownerName, ownerPassword, ownerPhone, savingOwner, selectedBranch, showNotice]);
 
+  useEffect(() => {
+    if (!selectedBranch) {
+      prevEditingRef.current = false;
+      detailSlideX.setValue(0);
+      detailOpacity.setValue(1);
+      return;
+    }
+    if (prevEditingRef.current === isEditing) return;
+    const direction = isEditing ? 1 : -1;
+    prevEditingRef.current = isEditing;
+    detailSlideX.setValue(direction * 36);
+    detailOpacity.setValue(0.2);
+    Animated.parallel([
+      Animated.timing(detailSlideX, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(detailOpacity, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [detailOpacity, detailSlideX, isEditing, selectedBranch]);
+
   const renderLocationConfigEditor = () => (
     <View style={styles.locationBox}>
       <View style={styles.locationHeader}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.locationTitle}>Cấu hình chấm công</Text>
-          <Text style={styles.locationHint}>Bắt buộc để nhân viên chấm công theo vị trí & IP.</Text>
+          <Text style={styles.locationTitle}>Tọa độ chấm công</Text>
         </View>
         <Pressable
           disabled={locating}
@@ -453,8 +492,8 @@ export function HrBranchesPanel({
           style={[styles.locateBtn, locating && styles.disabled]}
         >
           <View style={styles.iconButtonContent}>
-            {!locating ? <LocateFixed size={14} color={colors.primary} /> : null}
-            <Text style={styles.locateBtnText}>{locating ? 'Đang lấy...' : 'Vị trí & IP'}</Text>
+            {!locating ? <LocateFixed size={14} color={colors.white} /> : null}
+            <Text style={styles.locateBtnText}>{locating ? 'Đang lấy...' : 'Lấy vị trí & IP'}</Text>
           </View>
         </Pressable>
       </View>
@@ -507,9 +546,6 @@ export function HrBranchesPanel({
         autoCorrect={false}
         style={[styles.locationField, styles.ipInput]}
       />
-      <Text style={styles.ipHint}>
-        IPv4 được kiểm tra chính xác; IPv6 dùng chung mạng /64 cho các thiết bị cùng Wi-Fi.
-      </Text>
     </View>
   );
 
@@ -519,388 +555,327 @@ export function HrBranchesPanel({
 
   return (
     <View style={{ flex: 1 }}>
-    <ScrollView
-      contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            void load(true);
-          }}
-          tintColor={colors.primary}
-          colors={[colors.primary]}
-        />
-      }
-    >
-      <View style={styles.searchRow}>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Tìm theo tên, mã chi nhánh, địa chỉ..."
-          placeholderTextColor="#94A3B8"
-          style={styles.searchField}
-        />
-      </View>
-
-      {loading ? (
-        <Card style={styles.stateCard}>
-          <ActivityIndicator size="small" color={colors.primary} />
-        </Card>
-      ) : error ? (
-        <Card style={styles.stateCard}>
-          <PopupError error={error} />
-          <Pressable onPress={() => void load()} style={styles.primaryBtn}>
-            <Text style={styles.primaryBtnText}>Thử lại</Text>
-          </Pressable>
-        </Card>
-      ) : !filtered.length ? (
-        <Card style={styles.stateCard}>
-          <Text style={styles.muted}>Chưa có chi nhánh nào.</Text>
-        </Card>
-      ) : (
-        <View style={styles.list}>
-          {filtered.map((branch) => {
-            const isMain = branch.code?.toUpperCase() === 'MAIN';
-            const active = branch.isActive !== false;
-            const managerName = branch.managerId ? employeeNameById.get(branch.managerId) : undefined;
-            const cfg = branch.locationConfig;
-            return (
-              <Card key={branch._id} onPress={() => openDetail(branch)} style={styles.card}>
-                <View style={styles.headRow}>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.badgeRow}>
-                      <Text style={styles.codeBadge}>{branch.code}</Text>
-                      {isMain ? <Text style={styles.mainBadge}>Trụ sở chính</Text> : null}
-                      <Text style={[styles.statusBadge, !active && styles.statusInactive]}>
-                        {active ? 'Hoạt động' : 'Tạm ngưng'}
-                      </Text>
-                    </View>
-                    <Text numberOfLines={1} style={styles.rowTitle}>
-                      {branch.name}
-                    </Text>
-                  </View>
-                  <ChevronRight size={16} color={colors.muted} />
-                </View>
-                {branch.address ? (
-                  <View style={styles.metaRow}><MapPin size={13} color={colors.muted} /><Text numberOfLines={2} style={styles.muted}>{branch.address}</Text></View>
-                ) : null}
-                <View style={styles.metaRow}>
-                  <Phone size={13} color={colors.muted} />
-                  <Text style={styles.subMeta}>{branch.phone || 'Chưa có SĐT'}{managerName ? ` · QL: ${managerName}` : ''}</Text>
-                </View>
-                <View style={styles.metaRow}>
-                  {cfg ? <Radio size={13} color="#16885A" /> : <AlertTriangle size={13} color="#B45309" />}
-                  <Text style={[styles.subMeta, cfg ? styles.configOk : styles.configMissing]}>
-                    {cfg ? `Chấm công: bán kính ${cfg.allowedRadius}m · ${cfg.allowedPublicIps?.length || 0} IP` : 'Chưa cấu hình vị trí & IP chấm công'}
-                  </Text>
-                </View>
-              </Card>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Detail & Edit Branch Full-Screen Page */}
-      <FullScreenFormModal
-        visible={Boolean(selectedBranch)}
-        title={isEditing ? 'Chỉnh sửa chi nhánh' : selectedBranch?.name || 'Chi tiết chi nhánh'}
-        cancelLabel={isEditing ? 'Hủy' : undefined}
-        onSave={isEditing ? () => void onSaveEdit() : undefined}
-        saving={saving}
-        onClose={() => {
-          if (isEditing) setIsEditing(false);
-          else setSelectedBranch(null);
-        }}
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: 92 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              void load(true);
+            }}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
-        {selectedBranch ? (
-          isEditing ? (
-            <View style={{ gap: 8, paddingBottom: 12 }}>
-              <Text style={styles.label}>Mã chi nhánh *</Text>
-              <TextInput
-                value={code}
-                editable={false}
-                autoCapitalize="characters"
-                style={[styles.field, styles.readonlyField]}
-              />
+        <View style={styles.searchRow}>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Tìm theo tên, mã chi nhánh, địa chỉ..."
+            placeholderTextColor="#94A3B8"
+            style={styles.searchField}
+          />
+        </View>
 
-              <Text style={styles.label}>Tên chi nhánh *</Text>
-              <TextInput value={name} onChangeText={setName} style={styles.field} />
-
-              <Text style={styles.label}>Địa chỉ</Text>
-              <TextInput value={address} onChangeText={setAddress} style={styles.field} />
-
-              <Text style={styles.label}>Số điện thoại</Text>
-              <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.field} />
-
-              <Text style={styles.label}>Quản lý chi nhánh</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 4 }}>
-                <Pressable
-                  onPress={() => setManagerId('')}
-                  style={[styles.chip, !managerId && styles.chipActive]}
-                >
-                  <Text style={[styles.chipText, !managerId && styles.chipTextActive]}>Chưa chỉ định</Text>
-                </Pressable>
-                {employees.slice(0, 25).map((emp) => {
-                  const uid = emp.uid || emp._id || emp.id || '';
-                  const active = managerId === uid;
-                  return (
-                    <Pressable
-                      key={uid}
-                      onPress={() => setManagerId(uid)}
-                      style={[styles.chip, active && styles.chipActive]}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                        {emp.displayName}
+        {loading ? (
+          <Card style={styles.stateCard}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </Card>
+        ) : error ? (
+          <Card style={styles.stateCard}>
+            <PopupError error={error} />
+            <Pressable onPress={() => void load()} style={styles.primaryBtn}>
+              <Text style={styles.primaryBtnText}>Thử lại</Text>
+            </Pressable>
+          </Card>
+        ) : !filtered.length ? (
+          <View style={styles.stateCard}>
+            <IgenHrEmptyState message="Chưa có chi nhánh nào." />
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {filtered.map((branch) => {
+              const isMain = branch.code?.toUpperCase() === 'MAIN';
+              const active = branch.isActive !== false;
+              const managerName = branch.managerId ? employeeNameById.get(branch.managerId) : undefined;
+              return (
+                <Card key={branch._id} onPress={() => openDetail(branch)} style={styles.card}>
+                  <View style={styles.headRow}>
+                    <View style={styles.titleBadgeRow}>
+                      <Text numberOfLines={1} ellipsizeMode="tail" style={styles.rowTitle}>
+                        {branch.name}
                       </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-
-              {renderLocationConfigEditor()}
-
-              <View style={styles.switchRow}>
-                <Text style={styles.label}>Đang hoạt động</Text>
-                <Switch
-                  value={isActive}
-                  onValueChange={setIsActive}
-                  trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-                />
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                <Pressable onPress={() => setIsEditing(false)} style={styles.cancelBtn}>
-                  <Text style={styles.cancelBtnText}>Hủy</Text>
-                </Pressable>
-                <Pressable
-                  disabled={saving}
-                  onPress={() => void onSaveEdit()}
-                  style={[styles.submitBtn, { flex: 1, marginTop: 0 }, saving && styles.disabled]}
-                >
-                  <Text style={styles.submitBtnText}>
-                    {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : (
-            <View style={{ gap: 10, paddingBottom: 10 }}>
-              <View style={styles.infoRow}>
-                <Text style={styles.muted}>Mã chi nhánh</Text>
-                <Text style={styles.infoVal}>{selectedBranch.code}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.muted}>Trạng thái</Text>
-                <Text style={styles.infoVal}>
-                  {selectedBranch.isActive === false ? 'Tạm ngưng' : 'Đang hoạt động'}
-                </Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.muted}>Điện thoại</Text>
-                <Text style={styles.infoVal}>{selectedBranch.phone || 'Chưa cập nhật'}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.muted}>Quản lý</Text>
-                <Text style={styles.infoVal}>
-                  {(selectedBranch.managerId && employeeNameById.get(selectedBranch.managerId)) ||
-                    'Chưa chỉ định'}
-                </Text>
-              </View>
-              <View style={{ gap: 4 }}>
-                <Text style={styles.label}>Địa chỉ</Text>
-                <Text style={styles.muted}>
-                  {selectedBranch.address || 'Chưa cập nhật địa chỉ.'}
-                </Text>
-              </View>
-
-              <View style={styles.locationBox}>
-                <Text style={styles.locationTitle}>Cấu hình chấm công</Text>
-                {selectedBranch.locationConfig ? (
-                  <View style={{ gap: 6, marginTop: 4 }}>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.muted}>Tọa độ (Vĩ độ, Kinh độ)</Text>
-                      <Text style={styles.infoVal}>
-                        {selectedBranch.locationConfig.latitude}, {selectedBranch.locationConfig.longitude}
-                      </Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                      <Text style={styles.muted}>Bán kính cho phép</Text>
-                      <Text style={styles.infoVal}>{selectedBranch.locationConfig.allowedRadius} m</Text>
-                    </View>
-                    <View style={{ gap: 4 }}>
-                      <Text style={styles.muted}>IP công cộng được phép</Text>
-                      <View style={styles.ipChipWrap}>
-                        {(selectedBranch.locationConfig.allowedPublicIps || []).map((ip) => (
-                          <Text key={ip} style={styles.ipChip}>
-                            {ip}
-                          </Text>
-                        ))}
+                      <View style={styles.inlineBadges}>
+                        <Text style={[styles.statusBadge, !active && styles.statusInactive]}>
+                          {active ? 'Hoạt động' : 'Tạm ngưng'}
+                        </Text>
                       </View>
                     </View>
                   </View>
-                ) : (
-                  <Text style={[styles.muted, { marginTop: 4 }]}>
-                    Chưa cấu hình vị trí GPS và IP mạng cho chi nhánh này.
-                  </Text>
-                )}
-              </View>
+                  {branch.address ? (
+                    <View style={styles.metaRow}><MapPin size={13} color={colors.muted} /><Text numberOfLines={2} style={styles.muted}>{branch.address}</Text></View>
+                  ) : null}
+                  <View style={styles.metaRow}>
+                    <Phone size={13} color={colors.muted} />
+                    <Text style={styles.subMeta}>{branch.phone || 'Chưa có SĐT'}{managerName ? ` · QL: ${managerName}` : ''}</Text>
+                  </View>
+                </Card>
+              );
+            })}
+          </View>
+        )}
 
-              {canManage ? (
-                <View style={{ gap: 8, marginTop: 8 }}>
-                  <Pressable onPress={startEdit} style={styles.submitBtn}>
-                    <Text style={styles.submitBtnText}>Chỉnh sửa chi nhánh</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setOwnerModalOpen(true)}
-                    style={styles.secondaryBtn}
-                  >
-                    <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.secondaryBtnText}>Tạo tài khoản Quản lý chi nhánh</Text></View>
-                  </Pressable>
+        {/* Detail & Edit Branch Full-Screen Page */}
+        <FullScreenFormModal
+          visible={Boolean(selectedBranch)}
+          title={isEditing ? 'Chỉnh sửa chi nhánh' : selectedBranch?.name || 'Chi tiết chi nhánh'}
+          cancelLabel={isEditing ? 'Hủy' : undefined}
+          onSave={isEditing ? () => void onSaveEdit() : undefined}
+          saving={saving}
+          onClose={() => {
+            if (isEditing) setIsEditing(false);
+            else setSelectedBranch(null);
+          }}
+        >
+          {selectedBranch ? (
+            <Animated.View
+              style={{
+                opacity: detailOpacity,
+                transform: [{ translateX: detailSlideX }],
+              }}
+            >
+            {isEditing ? (
+              <View>
+                <HrFormSectionTitle title="Thông tin chi nhánh" />
+                <HrFormInputRow
+                  label="Mã chi nhánh *"
+                  value={code}
+                  onChangeText={setCode}
+                  editable={false}
+                  autoCapitalize="characters"
+                />
+                <HrFormInputRow label="Tên chi nhánh *" value={name} onChangeText={setName} placeholder="VD: Chi nhánh Hà Nội" />
+                <HrFormInputRow label="Địa chỉ" value={address} onChangeText={setAddress} placeholder="Số nhà, đường, quận/huyện..." />
+                <HrFormInputRow label="Số điện thoại" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="0987654321" />
+                <HrFormSelectRow
+                  label="Quản lý chi nhánh"
+                  sheetTitle="Chọn quản lý chi nhánh"
+                  value={managerId}
+                  placeholder="Chưa chỉ định"
+                  options={[
+                    { value: '', label: 'Chưa chỉ định' },
+                    ...employees.map((emp) => ({
+                      value: emp.uid || emp._id || emp.id || '',
+                      label: emp.displayName,
+                      subtitle: [emp.jobTitle || emp.position, emp.department].filter(Boolean).join(' · ') || undefined,
+                    })),
+                  ]}
+                  onSelect={setManagerId}
+                />
+                <HrFormSwitchRow label="Đang hoạt động" value={isActive} onValueChange={setIsActive} last />
+
+                <View style={{ marginTop: 12 }}>
+                  {renderLocationConfigEditor()}
                 </View>
-              ) : null}
+              </View>
+            ) : (
+              <View style={{ gap: 10, paddingBottom: 10 }}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.muted}>Mã chi nhánh</Text>
+                  <Text style={styles.infoVal}>{selectedBranch.code}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.muted}>Trạng thái</Text>
+                  <Text style={styles.infoVal}>
+                    {selectedBranch.isActive === false ? 'Tạm ngưng' : 'Đang hoạt động'}
+                  </Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.muted}>Điện thoại</Text>
+                  <Text style={styles.infoVal}>{selectedBranch.phone || 'Chưa cập nhật'}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={styles.muted}>Quản lý</Text>
+                  <Text style={styles.infoVal}>
+                    {(selectedBranch.managerId && employeeNameById.get(selectedBranch.managerId)) ||
+                      'Chưa chỉ định'}
+                  </Text>
+                </View>
+                <View style={{ gap: 4 }}>
+                  <Text style={styles.label}>Địa chỉ</Text>
+                  <Text style={styles.muted}>
+                    {selectedBranch.address || 'Chưa cập nhật địa chỉ.'}
+                  </Text>
+                </View>
+
+                <View style={styles.locationBox}>
+                  <Text style={styles.locationTitle}>Tọa độ chấm công</Text>
+                  {selectedBranch.locationConfig ? (
+                    <View style={{ gap: 2, marginTop: 6 }}>
+                      <View style={styles.locationInfoRow}>
+                        <Text style={styles.muted}>Vĩ độ</Text>
+                        <Text style={styles.infoVal}>{selectedBranch.locationConfig.latitude}</Text>
+                      </View>
+                      <View style={styles.locationInfoRow}>
+                        <Text style={styles.muted}>Kinh độ</Text>
+                        <Text style={styles.infoVal}>{selectedBranch.locationConfig.longitude}</Text>
+                      </View>
+                      <View style={styles.locationInfoRow}>
+                        <Text style={styles.muted}>Bán kính cho phép</Text>
+                        <Text style={styles.infoVal}>{selectedBranch.locationConfig.allowedRadius} m</Text>
+                      </View>
+                      <View style={{ gap: 6, marginTop: 4 }}>
+                        <Text style={styles.muted}>IP công cộng được phép</Text>
+                        <View style={styles.ipChipWrap}>
+                          {(selectedBranch.locationConfig.allowedPublicIps || []).map((ip) => (
+                            <Text key={ip} style={styles.ipChip}>
+                              {ip}
+                            </Text>
+                          ))}
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={[styles.muted, { marginTop: 4 }]}>
+                      Chưa cấu hình vị trí GPS và IP mạng cho chi nhánh này.
+                    </Text>
+                  )}
+                </View>
+
+                {canManage ? (
+                  <View style={{ gap: 8, marginTop: 8 }}>
+                    <Pressable onPress={startEdit} style={styles.submitBtn}>
+                      <Text style={styles.submitBtnText}>Chỉnh sửa chi nhánh</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setOwnerModalOpen(true)}
+                      style={styles.secondaryBtn}
+                    >
+                      <View style={styles.iconButtonContent}><Plus size={13} color={colors.primary} /><Text style={styles.secondaryBtnText}>Tạo tài khoản Quản lý chi nhánh</Text></View>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            )}
+            </Animated.View>
+          ) : null}
+        </FullScreenFormModal>
+
+        {/* Create Branch Full-Screen Page */}
+        <FullScreenFormModal
+          visible={createOpen}
+          title="Thêm chi nhánh mới"
+          cancelLabel="Hủy"
+          onSave={() => void onCreate()}
+          saving={saving}
+          onClose={() => setCreateOpen(false)}
+        >
+          <View>
+            <HrFormSectionTitle title="Thông tin chi nhánh" />
+            <HrFormInputRow
+              label="Mã chi nhánh *"
+              value={code}
+              onChangeText={setCode}
+              autoCapitalize="characters"
+              placeholder="VD: CN_HN"
+            />
+            <HrFormInputRow
+              label="Tên chi nhánh *"
+              value={name}
+              onChangeText={setName}
+              placeholder="VD: Chi nhánh Hà Nội"
+            />
+            <HrFormInputRow
+              label="Địa chỉ"
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Số nhà, đường, quận/huyện..."
+            />
+            <HrFormInputRow
+              label="Số điện thoại"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              placeholder="0987654321"
+              last
+            />
+
+            <View style={{ marginTop: 12 }}>
+              {renderLocationConfigEditor()}
             </View>
-          )
-        ) : null}
-      </FullScreenFormModal>
+          </View>
+        </FullScreenFormModal>
 
-      {/* Create Branch Full-Screen Page */}
-      <FullScreenFormModal
-        visible={createOpen}
-        title="Thêm chi nhánh mới"
-        cancelLabel="Hủy"
-        onSave={() => void onCreate()}
-        saving={saving}
-        onClose={() => setCreateOpen(false)}
-      >
-        <View style={{ gap: 8, paddingBottom: 12 }}>
-          <Text style={styles.label}>Mã chi nhánh *</Text>
-          <TextInput
-            value={code}
-            onChangeText={setCode}
-            autoCapitalize="characters"
-            placeholder="VD: CN_HN"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
-          />
-          <Text style={styles.label}>Tên chi nhánh *</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="VD: Chi nhánh Hà Nội"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
-          />
-          <Text style={styles.label}>Địa chỉ</Text>
-          <TextInput
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Số nhà, đường, quận/huyện..."
-            placeholderTextColor={colors.muted}
-            style={styles.field}
-          />
-          <Text style={styles.label}>Số điện thoại</Text>
-          <TextInput
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            placeholder="0987654321"
-            placeholderTextColor={colors.muted}
-            style={styles.field}
-          />
+        {/* Create Branch Owner Full-Screen Page */}
+        <FullScreenFormModal
+          visible={ownerModalOpen}
+          title="Tạo Quản lý chi nhánh"
+          cancelLabel="Hủy"
+          onSave={() => void onCreateOwner()}
+          saving={savingOwner}
+          onClose={() => setOwnerModalOpen(false)}
+        >
+          <View>
+            <HrFormSectionTitle title="Thông tin tài khoản" />
+            <HrFormInputRow label="Họ và tên *" value={ownerName} onChangeText={setOwnerName} placeholder="Nguyễn Văn A" />
+            <HrFormInputRow label="Email đăng nhập *" value={ownerEmail} onChangeText={setOwnerEmail} keyboardType="email-address" autoCapitalize="none" placeholder="quanly@congty.vn" />
+            <HrFormInputRow label="Mật khẩu (≥ 6 ký tự) *" value={ownerPassword} onChangeText={setOwnerPassword} secureTextEntry placeholder="••••••" />
+            <HrFormInputRow label="Số điện thoại" value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad" placeholder="0987654321" last />
+          </View>
+        </FullScreenFormModal>
 
-          {renderLocationConfigEditor()}
-
-          <Pressable
-            disabled={saving}
-            onPress={() => void onCreate()}
-            style={[styles.submitBtn, saving && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>{saving ? 'Đang tạo...' : 'Tạo chi nhánh'}</Text>
-          </Pressable>
-        </View>
-      </FullScreenFormModal>
-
-      {/* Create Branch Owner Full-Screen Page */}
-      <FullScreenFormModal
-        visible={ownerModalOpen}
-        title="Tạo Quản lý chi nhánh"
-        cancelLabel="Hủy"
-        onSave={() => void onCreateOwner()}
-        saving={savingOwner}
-        onClose={() => setOwnerModalOpen(false)}
-      >
-        <View style={{ gap: 8 }}>
-          <Text style={styles.label}>Họ và tên *</Text>
-          <TextInput value={ownerName} onChangeText={setOwnerName} placeholder="Nguyễn Văn A" placeholderTextColor={colors.muted} style={styles.field} />
-          <Text style={styles.label}>Email đăng nhập *</Text>
-          <TextInput value={ownerEmail} onChangeText={setOwnerEmail} keyboardType="email-address" autoCapitalize="none" placeholder="quanly@congty.vn" placeholderTextColor={colors.muted} style={styles.field} />
-          <Text style={styles.label}>Mật khẩu (≥ 6 ký tự) *</Text>
-          <TextInput value={ownerPassword} onChangeText={setOwnerPassword} secureTextEntry placeholder="••••••" placeholderTextColor={colors.muted} style={styles.field} />
-          <Text style={styles.label}>Số điện thoại</Text>
-          <TextInput value={ownerPhone} onChangeText={setOwnerPhone} keyboardType="phone-pad" placeholder="0987654321" placeholderTextColor={colors.muted} style={styles.field} />
-          <Pressable
-            disabled={savingOwner}
-            onPress={() => void onCreateOwner()}
-            style={[styles.submitBtn, savingOwner && styles.disabled]}
-          >
-            <Text style={styles.submitBtnText}>
-              {savingOwner ? 'Đang tạo...' : 'Tạo tài khoản'}
-            </Text>
-          </Pressable>
-        </View>
-      </FullScreenFormModal>
-
-      <Modal
-        visible={locationPermissionPrompt}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setLocationPermissionPrompt(false)}
-      >
-        <Pressable style={styles.dialogBackdrop} onPress={() => setLocationPermissionPrompt(false)}>
-          <Pressable style={styles.dialogCard} onPress={() => {}}>
-            <View style={[styles.dialogIconWrap, { backgroundColor: '#EAF2FF' }]}>
-              <MapPin size={22} color={colors.primary} />
-            </View>
-            <Text style={styles.dialogTitle}>Cho phép truy cập vị trí</Text>
-            <Text style={styles.dialogMessage}>
-              ERP Mobile cần vị trí hiện tại để tự điền vĩ độ và kinh độ cho chi nhánh. Sau khi tiếp tục, hệ thống sẽ hỏi quyền truy cập vị trí. Tọa độ chỉ được dùng để cấu hình chấm công.
-            </Text>
-            <View style={styles.dialogActions}>
-              <Pressable onPress={() => setLocationPermissionPrompt(false)} style={styles.dialogSecondaryBtn}>
-                <Text style={styles.dialogSecondaryText}>Để sau</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  setLocationPermissionPrompt(false);
-                  void captureLocationAndIp();
-                }}
-                style={styles.dialogPrimaryBtn}
-              >
-                <Text style={styles.dialogPrimaryText}>Tiếp tục</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={Boolean(notice)} transparent animationType="fade" onRequestClose={() => setNotice(null)}>
-        <Pressable style={styles.dialogBackdrop} onPress={() => setNotice(null)}>
-          <Pressable style={styles.dialogCard} onPress={() => {}}>
-            <View style={[styles.dialogIconWrap, { backgroundColor: noticeIconBackground }]}>
-              <NoticeIcon size={22} color={noticeColor} />
-            </View>
-            <Text style={styles.dialogTitle}>{notice?.title}</Text>
-            <Text style={styles.dialogMessage}>{notice?.message}</Text>
-            <Pressable onPress={() => setNotice(null)} style={styles.dialogPrimaryBtn}>
-              <Text style={styles.dialogPrimaryText}>Đóng</Text>
+        <Modal
+          visible={locationPermissionPrompt}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setLocationPermissionPrompt(false)}
+        >
+          <Pressable style={styles.dialogBackdrop} onPress={() => setLocationPermissionPrompt(false)}>
+            <Pressable style={styles.dialogCard} onPress={() => { }}>
+              <View style={[styles.dialogIconWrap, { backgroundColor: '#EAF2FF' }]}>
+                <MapPin size={22} color={colors.primary} />
+              </View>
+              <Text style={styles.dialogTitle}>Cho phép truy cập vị trí</Text>
+              <Text style={styles.dialogMessage}>
+                ERP Mobile cần vị trí hiện tại để tự điền vĩ độ và kinh độ cho chi nhánh. Sau khi tiếp tục, hệ thống sẽ hỏi quyền truy cập vị trí. Tọa độ chỉ được dùng để cấu hình chấm công.
+              </Text>
+              <View style={styles.dialogActions}>
+                <Pressable onPress={() => setLocationPermissionPrompt(false)} style={styles.dialogSecondaryBtn}>
+                  <Text style={styles.dialogSecondaryText}>Để sau</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setLocationPermissionPrompt(false);
+                    void captureLocationAndIp();
+                  }}
+                  style={styles.dialogPrimaryBtn}
+                >
+                  <Text style={styles.dialogPrimaryText}>Tiếp tục</Text>
+                </Pressable>
+              </View>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
-    </ScrollView>
-    {canManage ? <HrFab label="Thêm chi nhánh" onPress={openCreate} /> : null}
+        </Modal>
+
+        <Modal visible={Boolean(notice)} transparent animationType="fade" onRequestClose={() => setNotice(null)}>
+          <Pressable style={styles.dialogBackdrop} onPress={() => setNotice(null)}>
+            <Pressable style={styles.dialogCard} onPress={() => { }}>
+              <View style={[styles.dialogIconWrap, { backgroundColor: noticeIconBackground }]}>
+                <NoticeIcon size={22} color={noticeColor} />
+              </View>
+              <Text style={styles.dialogTitle}>{notice?.title}</Text>
+              <Text style={styles.dialogMessage}>{notice?.message}</Text>
+              <Pressable onPress={() => setNotice(null)} style={styles.dialogPrimaryBtn}>
+                <Text style={styles.dialogPrimaryText}>Đóng</Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      </ScrollView>
+      {canManage ? <HrFab label="Thêm chi nhánh" onPress={openCreate} /> : null}
     </View>
   );
 }
@@ -949,12 +924,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  titleBadgeRow: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  inlineBadges: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   codeBadge: { color: colors.primary, backgroundColor: '#EAF2FF', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
   mainBadge: { color: '#B45309', backgroundColor: '#FFF3E5', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
   statusBadge: { color: '#16885A', backgroundColor: '#E9F8F1', fontSize: 10.5, fontWeight: '500', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
   statusInactive: { color: '#64748B', backgroundColor: '#F1F5F9' },
-  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600' },
+  rowTitle: { color: '#111827', fontSize: 14, fontWeight: '600', flex: 1, minWidth: 0 },
   muted: { color: '#6B7280', fontSize: 12.5, fontWeight: '400', lineHeight: 18 },
   subMeta: { color: '#6B7280', fontSize: 11.5, fontWeight: '400', marginTop: 2 },
   configOk: { color: '#16885A', fontWeight: '500' },
@@ -979,6 +956,7 @@ const styles = StyleSheet.create({
   field: { backgroundColor: '#F6F8FC', borderColor: '#DCE5F2', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13.5, color: '#111827' },
   readonlyField: { backgroundColor: '#F1F5F9', color: '#6B7280' },
   locationBox: { backgroundColor: '#F5F9FF', borderColor: '#DCE7F7', borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, padding: 12, marginTop: 6 },
+  locationInfoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   locationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 },
   locationTitle: { color: '#111827', fontSize: 13, fontWeight: '600' },
   locationHint: { color: '#6B7280', fontSize: 11, marginTop: 2 },
