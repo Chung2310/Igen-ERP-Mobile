@@ -826,7 +826,7 @@ export function HrTrainingPanel({
                     hitSlop={10}
                     style={({ pressed }) => [styles.lessonBackBtn, pressed && { opacity: 0.6 }]}
                   >
-                    <ChevronLeft size={21} strokeWidth={2} color={colors.ink} />
+                    <ChevronLeft size={18} strokeWidth={1.8} color={colors.ink} />
                   </Pressable>
                   <Text numberOfLines={2} style={styles.lessonHeaderTitle}>
                     {les.title}
@@ -848,7 +848,7 @@ export function HrTrainingPanel({
                     {submittingProgress ? 'Đang lưu...' : 'Tiếp theo'}
                   </Text>
                   {!submittingProgress ? (
-                    <ChevronRight size={17} strokeWidth={2} color={colors.primary} />
+                    <ChevronRight size={18} strokeWidth={1.8} color={colors.primary} />
                   ) : null}
                 </Pressable>
               </View>
@@ -1681,7 +1681,7 @@ const styles = StyleSheet.create({
   lessonBackBtn: { paddingVertical: 2, paddingRight: 2 },
   lessonHeaderTitle: { flex: 1, color: '#111827', fontSize: 16, fontWeight: '600', lineHeight: 22 },
   lessonNextBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4, paddingLeft: 6 },
-  lessonNextText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  lessonNextText: { color: colors.primary, fontSize: 14, fontWeight: '400' },
   lessonBodyText: { color: '#1F2937', fontSize: 14.5, lineHeight: 23 },
   studyFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#EEF2F7' },
 
