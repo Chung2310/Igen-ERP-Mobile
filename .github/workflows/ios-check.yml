@@ -1,8 +1,7 @@
 name: iOS native checks
 on:
-  pull_request:
   push:
-    branches: [develop]
+    branches: [production]
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,6 +10,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   simulator:
+    if: github.ref == 'refs/heads/production'
     runs-on: macos-26
     timeout-minutes: 90
     env:

@@ -4,7 +4,7 @@ Repo này là repository Git riêng **Igen-ERP-Mobile**. Hai workflow nằm tron
 
 ## Kiểm tra không cần credentials
 
-`iOS native checks` chạy khi mở pull request, push `develop` hoặc chạy thủ công. Runner `macos-26` cài Node 22, kiểm tra TypeScript, test helper, cấu hình Expo đã áp dụng plugin, sau đó build Release cho simulator và kiểm tra privacy manifest **trong app đã build**. Không cài simulator build lên iPhone; không dùng kết quả này thay cho kiểm thử thiết bị thật.
+`iOS native checks` chỉ chạy khi push nhánh `production` hoặc chạy thủ công trên nhánh `production`; không build từ pull request hay `develop`. Cả hai workflow đều có điều kiện ở cấp job `github.ref == 'refs/heads/production'`, nên chọn nhánh khác trong Run workflow sẽ bị bỏ qua trước khi cấp runner hoặc đọc signing secrets. Runner `macos-26` cài Node 22, kiểm tra TypeScript, test helper, cấu hình Expo đã áp dụng plugin, sau đó build Release cho simulator và kiểm tra privacy manifest **trong app đã build**. Không cài simulator build lên iPhone; không dùng kết quả này thay cho kiểm thử thiết bị thật.
 
 Trên Windows/macOS, chạy:
 
@@ -47,7 +47,7 @@ Giữ credentials ngoài repository; không gửi qua chat hoặc ghi vào log. 
 
 ## Chạy build có ký
 
-1. Run **Build iOS IPA (GitHub macOS)**, chọn `signing_check_only=true`. Helper kiểm tra hạn profile, team, explicit Bundle ID, certificate trong P12 có nằm trong profile và private key có sử dụng được không. Credentials chỉ vào keychain tạm trên runner và được dọn trong bước `always()`.
+1. Run **Build iOS IPA (GitHub macOS)**, chọn **Use workflow from: production**, chọn `signing_check_only=true`. Nhánh Git `production` là điều kiện bắt buộc, độc lập với lựa chọn backend và signing profile. Helper kiểm tra hạn profile, team, explicit Bundle ID, certificate trong P12 có nằm trong profile và private key có sử dụng được không. Credentials chỉ vào keychain tạm trên runner và được dọn trong bước `always()`.
 2. Run mới với `api_environment=staging` cho backend thử hoặc `production` cho backend thật. Đây là lựa chọn riêng với `profile=preview` (Ad Hoc) hoặc `profile=production` (ký App Store/TestFlight). Có thể ký App Store/TestFlight nhưng dùng backend staging để thử. `upload_testflight` mặc định **false**. Không chọn signing-only nếu muốn có IPA.
 3. Workflow kiểm tra backend health + DB, URL chính sách, quyền native, icon và manifest; sinh native project mới; chỉ cấu hình ký app target, không ép signing lên Pods; archive/export; xác minh arm64, JS bundle, signature, entitlements, version, SDK và manifest trong IPA.
 4. Tải artifact `ERP-ios-...`: `ERP.ipa`, dSYMs và `privacy-audit.json`. Artifact log nằm riêng; thư mục keychain/profile/API key không được upload. Artifact hết hạn sau 7 ngày.

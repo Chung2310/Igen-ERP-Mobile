@@ -34,6 +34,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/production'
     runs-on: macos-26
     timeout-minutes: 120
     defaults:
