@@ -236,6 +236,9 @@ export function OrgChartPanel({
   const [editSalary, setEditSalary] = useState('');
   const [editJdLink, setEditJdLink] = useState('');
   const [editParentId, setEditParentId] = useState('');
+  const [formPicker, setFormPicker] = useState<
+    'editDepartment' | 'editDivision' | 'editManager' | 'addDepartment' | 'addManager' | null
+  >(null);
 
   // Add employee modal
   const [addOpen, setAddOpen] = useState(false);
@@ -246,7 +249,6 @@ export function OrgChartPanel({
   const [addPhone, setAddPhone] = useState('');
   const [addRole, setAddRole] = useState<AddRole>('user');
   const [addDepartment, setAddDepartment] = useState('');
-  const [addDepartmentOpen, setAddDepartmentOpen] = useState(false);
   const [addParentId, setAddParentId] = useState('');
   const [addQualification, setAddQualification] = useState('');
   const [addSalary, setAddSalary] = useState('');
@@ -887,6 +889,7 @@ export function OrgChartPanel({
         onSave={isEditing ? () => void onSaveEdit() : undefined}
         saving={savingEdit}
         onClose={() => {
+          setFormPicker(null);
           if (isEditing) setIsEditing(false);
           else setSelectedNode(null);
         }}
@@ -931,57 +934,56 @@ export function OrgChartPanel({
                 />
               </View>
 
-              <View style={styles.editRow}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setFormPicker('editDepartment')}
+                style={styles.editRow}
+              >
                 <Text style={styles.infoLabel}>Phòng ban</Text>
-                <TextInput
-                  value={editDepartment}
-                  onChangeText={setEditDepartment}
-                  placeholder="Tên phòng ban"
-                  placeholderTextColor="#9CA3AF"
-                  style={styles.editInput}
-                />
-              </View>
-
-              <View style={styles.editRow}>
-                <Text style={styles.infoLabel}>Khối chức năng</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.editChipRow}>
-                  {DIVISIONS.map((div) => (
-                    <Pressable
-                      key={div}
-                      onPress={() => setEditDivision(div)}
-                      style={[styles.editChip, editDivision === div && styles.editChipActive]}
-                    >
-                      <Text style={[styles.editChipText, editDivision === div && styles.editChipTextActive]}>{div}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-
-              <View style={styles.editRow}>
-                <Text style={styles.infoLabel}>Quản lý trực tiếp</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.editChipRow}>
-                  <Pressable
-                    onPress={() => setEditParentId('')}
-                    style={[styles.editChip, !editParentId && styles.editChipActive]}
+                <View style={styles.editSelectRow}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.editInput, { flex: 1 }, !editDepartment && styles.editPlaceholder]}
                   >
-                    <Text style={[styles.editChipText, !editParentId && styles.editChipTextActive]}>Không có</Text>
-                  </Pressable>
-                  {orgNodes
-                    .filter((n) => n.nodeId !== selectedNode.nodeId)
-                    .slice(0, 20)
-                    .map((cand) => (
-                      <Pressable
-                        key={cand.nodeId}
-                        onPress={() => setEditParentId(cand.nodeId)}
-                        style={[styles.editChip, editParentId === cand.nodeId && styles.editChipActive]}
-                      >
-                        <Text style={[styles.editChipText, editParentId === cand.nodeId && styles.editChipTextActive]}>
-                          {cand.displayName}
-                        </Text>
-                      </Pressable>
-                    ))}
-                </ScrollView>
-              </View>
+                    {editDepartment || 'Chọn phòng ban'}
+                  </Text>
+                  <ChevronDown size={16} color="#9CA3AF" />
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setFormPicker('editDivision')}
+                style={styles.editRow}
+              >
+                <Text style={styles.infoLabel}>Khối chức năng</Text>
+                <View style={styles.editSelectRow}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.editInput, { flex: 1 }, !editDivision && styles.editPlaceholder]}
+                  >
+                    {editDivision || 'Chọn khối chức năng'}
+                  </Text>
+                  <ChevronDown size={16} color="#9CA3AF" />
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setFormPicker('editManager')}
+                style={styles.editRow}
+              >
+                <Text style={styles.infoLabel}>Quản lý trực tiếp</Text>
+                <View style={styles.editSelectRow}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.editInput, { flex: 1 }, !editParentId && styles.editPlaceholder]}
+                  >
+                    {orgNodes.find((n) => n.nodeId === editParentId)?.displayName || 'Không có'}
+                  </Text>
+                  <ChevronDown size={16} color="#9CA3AF" />
+                </View>
+              </Pressable>
 
               <View style={styles.editRow}>
                 <Text style={styles.infoLabel}>Số điện thoại</Text>
@@ -1029,6 +1031,161 @@ export function OrgChartPanel({
                   style={styles.editInput}
                 />
               </View>
+
+              <Modal
+                visible={
+                  formPicker === 'editDepartment' ||
+                  formPicker === 'editDivision' ||
+                  formPicker === 'editManager'
+                }
+                transparent
+                statusBarTranslucent
+                animationType="slide"
+                onRequestClose={() => setFormPicker(null)}
+              >
+                <Pressable style={styles.deptSheetBackdrop} onPress={() => setFormPicker(null)}>
+                  <Pressable
+                    style={[styles.deptSheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
+                    onPress={() => {}}
+                  >
+                    <View style={styles.deptSheetHandle} />
+                    <View style={styles.modalHeader}>
+                      <Text style={styles.sheetTitle}>
+                        {formPicker === 'editDepartment'
+                          ? 'Chọn phòng ban'
+                          : formPicker === 'editDivision'
+                            ? 'Chọn khối chức năng'
+                            : 'Chọn quản lý trực tiếp'}
+                      </Text>
+                      <Pressable onPress={() => setFormPicker(null)} hitSlop={8}>
+                        <Text style={styles.closeText}>Đóng</Text>
+                      </Pressable>
+                    </View>
+                    <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                      {formPicker === 'editDepartment' ? (
+                        <>
+                          <Pressable
+                            onPress={() => {
+                              setEditDepartment('');
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, !editDepartment && styles.deptSheetRowActive]}
+                          >
+                            <Text style={[styles.deptSheetRowText, !editDepartment && styles.deptSheetRowTextActive]}>
+                              Chưa phân phòng ban
+                            </Text>
+                            {!editDepartment ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                          {Array.from(
+                            new Set(
+                              [
+                                ...(editDepartment ? [editDepartment] : []),
+                                ...departmentOptions.slice(1),
+                              ].filter(Boolean),
+                            ),
+                          ).map((dept) => {
+                            const selected = editDepartment === dept;
+                            return (
+                              <Pressable
+                                key={dept}
+                                onPress={() => {
+                                  setEditDepartment(dept);
+                                  setFormPicker(null);
+                                }}
+                                style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                              >
+                                <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                                  {dept}
+                                </Text>
+                                {selected ? <Check size={17} color={colors.primary} /> : null}
+                              </Pressable>
+                            );
+                          })}
+                        </>
+                      ) : formPicker === 'editDivision' ? (
+                        <>
+                          <Pressable
+                            onPress={() => {
+                              setEditDivision('');
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, !editDivision && styles.deptSheetRowActive]}
+                          >
+                            <Text style={[styles.deptSheetRowText, !editDivision && styles.deptSheetRowTextActive]}>
+                              Chưa chọn khối chức năng
+                            </Text>
+                            {!editDivision ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                          {Array.from(
+                            new Set([
+                              ...(editDivision ? [editDivision] : []),
+                              ...DIVISIONS,
+                            ]),
+                          ).map((div) => {
+                            const selected = editDivision === div;
+                            return (
+                              <Pressable
+                                key={div}
+                                onPress={() => {
+                                  setEditDivision(div);
+                                  setFormPicker(null);
+                                }}
+                                style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                              >
+                                <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                                  {div}
+                                </Text>
+                                {selected ? <Check size={17} color={colors.primary} /> : null}
+                              </Pressable>
+                            );
+                          })}
+                        </>
+                      ) : (
+                        <>
+                          <Pressable
+                            onPress={() => {
+                              setEditParentId('');
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, !editParentId && styles.deptSheetRowActive]}
+                          >
+                            <Text style={[styles.deptSheetRowText, !editParentId && styles.deptSheetRowTextActive]}>
+                              Không có
+                            </Text>
+                            {!editParentId ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                          {orgNodes
+                            .filter((n) => n.nodeId !== selectedNode.nodeId)
+                            .map((cand) => {
+                              const selected = editParentId === cand.nodeId;
+                              const sub = [cand.jobTitle || cand.position, cand.department]
+                                .filter(Boolean)
+                                .join(' · ');
+                              return (
+                                <Pressable
+                                  key={cand.nodeId}
+                                  onPress={() => {
+                                    setEditParentId(cand.nodeId);
+                                    setFormPicker(null);
+                                  }}
+                                  style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                                >
+                                  <View style={{ flex: 1, paddingRight: 10 }}>
+                                    <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                                      {cand.displayName}
+                                    </Text>
+                                    {sub ? <Text numberOfLines={1} style={styles.sheetSubText}>{sub}</Text> : null}
+                                  </View>
+                                  {selected ? <Check size={17} color={colors.primary} /> : null}
+                                </Pressable>
+                              );
+                            })}
+                        </>
+                      )}
+                    </ScrollView>
+                  </Pressable>
+                </Pressable>
+              </Modal>
             </View>
           ) : (
             <View style={styles.detailBody}>
@@ -1170,59 +1327,39 @@ export function OrgChartPanel({
             </View>
           </View>
 
-          <View style={styles.editRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setFormPicker('addDepartment')}
+            style={styles.editRow}
+          >
             <Text style={styles.infoLabel}>Phòng ban</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: addDepartmentOpen }}
-              onPress={() => setAddDepartmentOpen((open) => !open)}
-              style={styles.editSelectRow}
-            >
-              <Text style={[styles.editInput, !addDepartment && styles.editPlaceholder]}>
+            <View style={styles.editSelectRow}>
+              <Text
+                numberOfLines={1}
+                style={[styles.editInput, { flex: 1 }, !addDepartment && styles.editPlaceholder]}
+              >
                 {addDepartment || 'Chọn phòng ban'}
               </Text>
-              <ChevronDown size={16} color="#6B7280" />
-            </Pressable>
-            {addDepartmentOpen ? (
-              <View style={styles.departmentDropdown}>
-                {departmentOptions.length > 1 ? (
-                  <ScrollView nestedScrollEnabled style={styles.departmentOptions}>
-                    {departmentOptions.slice(1).map((department) => (
-                      <Pressable
-                        key={department}
-                        onPress={() => {
-                          setAddDepartment(department);
-                          setAddDepartmentOpen(false);
-                        }}
-                        style={styles.departmentOption}
-                      >
-                        <Text style={styles.departmentOptionText}>{department}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                ) : (
-                  <Text style={styles.departmentEmpty}>Chưa có phòng ban để chọn.</Text>
-                )}
-              </View>
-            ) : null}
-          </View>
+              <ChevronDown size={16} color="#9CA3AF" />
+            </View>
+          </Pressable>
 
-          <View style={styles.editRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setFormPicker('addManager')}
+            style={styles.editRow}
+          >
             <Text style={styles.infoLabel}>Quản lý trực tiếp</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.editChipRow}>
-              {orgNodes.slice(0, 20).map((cand) => (
-                <Pressable
-                  key={cand.nodeId}
-                  onPress={() => setAddParentId(cand.nodeId)}
-                  style={[styles.editChip, addParentId === cand.nodeId && styles.editChipActive]}
-                >
-                  <Text style={[styles.editChipText, addParentId === cand.nodeId && styles.editChipTextActive]}>
-                    {cand.displayName}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
+            <View style={styles.editSelectRow}>
+              <Text
+                numberOfLines={1}
+                style={[styles.editInput, { flex: 1 }, !addParentId && styles.editPlaceholder]}
+              >
+                {orgNodes.find((n) => n.nodeId === addParentId)?.displayName || 'Không có'}
+              </Text>
+              <ChevronDown size={16} color="#9CA3AF" />
+            </View>
+          </Pressable>
 
           <View style={styles.editRow}>
             <Text style={styles.infoLabel}>Số điện thoại</Text>
@@ -1243,6 +1380,106 @@ export function OrgChartPanel({
             <Text style={styles.infoLabel}>Link mô tả công việc (JD)</Text>
             <TextInput value={addJdLink} onChangeText={setAddJdLink} autoCapitalize="none" placeholder="https://..." placeholderTextColor="#9CA3AF" style={styles.editInput} />
           </View>
+
+          <Modal
+            visible={formPicker === 'addDepartment' || formPicker === 'addManager'}
+            transparent
+            statusBarTranslucent
+            animationType="slide"
+            onRequestClose={() => setFormPicker(null)}
+          >
+            <Pressable style={styles.deptSheetBackdrop} onPress={() => setFormPicker(null)}>
+              <Pressable
+                style={[styles.deptSheet, { paddingBottom: Math.max(insets.bottom, 16) + 10 }]}
+                onPress={() => {}}
+              >
+                <View style={styles.deptSheetHandle} />
+                <View style={styles.modalHeader}>
+                  <Text style={styles.sheetTitle}>
+                    {formPicker === 'addDepartment' ? 'Chọn phòng ban' : 'Chọn quản lý trực tiếp'}
+                  </Text>
+                  <Pressable onPress={() => setFormPicker(null)} hitSlop={8}>
+                    <Text style={styles.closeText}>Đóng</Text>
+                  </Pressable>
+                </View>
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {formPicker === 'addDepartment' ? (
+                    <>
+                      <Pressable
+                        onPress={() => {
+                          setAddDepartment('');
+                          setFormPicker(null);
+                        }}
+                        style={[styles.deptSheetRow, !addDepartment && styles.deptSheetRowActive]}
+                      >
+                        <Text style={[styles.deptSheetRowText, !addDepartment && styles.deptSheetRowTextActive]}>
+                          Chưa phân phòng ban
+                        </Text>
+                        {!addDepartment ? <Check size={17} color={colors.primary} /> : null}
+                      </Pressable>
+                      {departmentOptions.slice(1).map((dept) => {
+                        const selected = addDepartment === dept;
+                        return (
+                          <Pressable
+                            key={dept}
+                            onPress={() => {
+                              setAddDepartment(dept);
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                          >
+                            <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                              {dept}
+                            </Text>
+                            {selected ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <>
+                      <Pressable
+                        onPress={() => {
+                          setAddParentId('');
+                          setFormPicker(null);
+                        }}
+                        style={[styles.deptSheetRow, !addParentId && styles.deptSheetRowActive]}
+                      >
+                        <Text style={[styles.deptSheetRowText, !addParentId && styles.deptSheetRowTextActive]}>
+                          Không có
+                        </Text>
+                        {!addParentId ? <Check size={17} color={colors.primary} /> : null}
+                      </Pressable>
+                      {orgNodes.map((cand) => {
+                        const selected = addParentId === cand.nodeId;
+                        const sub = [cand.jobTitle || cand.position, cand.department]
+                          .filter(Boolean)
+                          .join(' · ');
+                        return (
+                          <Pressable
+                            key={cand.nodeId}
+                            onPress={() => {
+                              setAddParentId(cand.nodeId);
+                              setFormPicker(null);
+                            }}
+                            style={[styles.deptSheetRow, selected && styles.deptSheetRowActive]}
+                          >
+                            <View style={{ flex: 1, paddingRight: 10 }}>
+                              <Text style={[styles.deptSheetRowText, selected && styles.deptSheetRowTextActive]}>
+                                {cand.displayName}
+                              </Text>
+                              {sub ? <Text numberOfLines={1} style={styles.sheetSubText}>{sub}</Text> : null}
+                            </View>
+                            {selected ? <Check size={17} color={colors.primary} /> : null}
+                          </Pressable>
+                        );
+                      })}
+                    </>
+                  )}
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </Modal>
         </View>
       </FullScreenFormModal>
     </ScrollView>
@@ -1672,6 +1909,11 @@ const styles = StyleSheet.create({
   deptSheetRowTextActive: {
     color: colors.primary,
     fontWeight: '500',
+  },
+  sheetSubText: {
+    color: '#6B7280',
+    fontSize: 12,
+    marginTop: 2,
   },
 });
 
