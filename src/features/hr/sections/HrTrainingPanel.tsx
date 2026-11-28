@@ -333,6 +333,7 @@ export function HrTrainingPanel({
         if (!enroll) return;
         const completed = enroll.completedLessons || [];
         const key = `lesson_${lessonIdx}`;
+        const alreadyCourseDone = (enroll.progress ?? 0) >= 100 || enroll.status === 'completed';
 
         if (!completed.includes(key)) {
           const nextCompleted = [...completed, key];
@@ -361,7 +362,9 @@ export function HrTrainingPanel({
         } else if (hasQuiz) {
           setActiveIndex(lessons.length);
         } else {
-          showHrNotice('Chúc mừng', `Bạn đã hoàn thành khóa học "${selectedCourse.title || selectedCourse.name}"!`);
+          if (!alreadyCourseDone) {
+            showHrNotice('Chúc mừng', `Bạn đã hoàn thành khóa học "${selectedCourse.title || selectedCourse.name}"!`);
+          }
           setSelectedCourse(null);
           void load(true);
         }
@@ -660,6 +663,8 @@ export function HrTrainingPanel({
     const completedLessons = enroll?.completedLessons || [];
     const isLessonsDone = lessons.every((_, idx) => completedLessons.includes(`lesson_${idx}`));
     const isQuizPassed = Boolean(enroll?.quizPassed);
+    const isCourseDone = progress >= 100 || enroll?.status === 'completed';
+    const isQuizReviewed = isQuizPassed || isCourseDone;
     const canEditThis = isSupervisor;
 
     return (
@@ -804,7 +809,19 @@ export function HrTrainingPanel({
                 }}
                 style={({ pressed }) => [styles.startCourseBtn, pressed && { opacity: 0.72 }]}
               >
-                <View style={styles.iconButtonContent}><Play size={14} color={colors.ink} /><Text style={styles.startCourseBtnText}>Bắt đầu học</Text></View>
+                <View style={styles.iconButtonContent}>
+                  {isCourseDone ? (
+                    <>
+                      <Eye size={14} color={colors.ink} />
+                      <Text style={styles.startCourseBtnText}>Xem kết quả</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Play size={14} color={colors.ink} />
+                      <Text style={styles.startCourseBtnText}>Bắt đầu học</Text>
+                    </>
+                  )}
+                </View>
               </Pressable>
             </Card>
           </>
@@ -844,7 +861,11 @@ export function HrTrainingPanel({
                   ]}
                 >
                   <Text style={styles.lessonNextText}>
-                    {submittingProgress ? 'Đang lưu...' : 'Tiếp theo'}
+                    {submittingProgress
+                      ? 'Đang lưu...'
+                      : isCourseDone && activeIndex === lessons.length - 1 && quizzes.length === 0
+                        ? 'Hoàn thành'
+                        : 'Tiếp theo'}
                   </Text>
                   {!submittingProgress ? (
                     <ChevronRight size={18} strokeWidth={1.8} color={colors.primary} />
@@ -901,7 +922,7 @@ export function HrTrainingPanel({
                 </Text>
               </View>
 
-              {isQuizPassed ? (
+              {isQuizReviewed ? (
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
@@ -911,8 +932,8 @@ export function HrTrainingPanel({
                   hitSlop={8}
                   style={({ pressed }) => [styles.lessonNextBtn, pressed && { opacity: 0.65 }]}
                 >
-                  <Text style={[styles.lessonNextText, { color: '#16885A' }]}>Hoàn thành</Text>
-                  <ChevronRight size={18} strokeWidth={1.8} color="#16885A" />
+                  <Text style={styles.lessonNextText}>Hoàn thành</Text>
+                  <ChevronRight size={18} strokeWidth={1.8} color={colors.primary} />
                 </Pressable>
               ) : (
                 <Pressable
@@ -937,12 +958,14 @@ export function HrTrainingPanel({
             </View>
 
             <Text style={styles.muted}>
-              Trả lời đúng 100% số câu hỏi ({quizzes.length} câu) để hoàn thành khóa học.
+              {isQuizReviewed
+                ? `Đã hoàn thành bài kiểm tra (${quizzes.length}/${quizzes.length} câu đúng).`
+                : `Trả lời đúng 100% số câu hỏi (${quizzes.length} câu) để hoàn thành khóa học.`}
             </Text>
 
             <View style={{ gap: 4 }}>
               {quizzes.map((q, qIdx) => {
-                const isErr = quizSubmitted && quizErrors[qIdx];
+                const isErr = !isQuizReviewed && quizSubmitted && quizErrors[qIdx];
                 const isLast = qIdx === quizzes.length - 1;
                 return (
                   <View
@@ -954,11 +977,13 @@ export function HrTrainingPanel({
                     </Text>
                     <View style={{ gap: 6, marginTop: 8 }}>
                       {q.options.map((opt, oIdx) => {
-                        const chosen = quizAnswers[qIdx] === oIdx;
+                        const chosen = isQuizReviewed
+                          ? oIdx === q.correctOptionIndex
+                          : quizAnswers[qIdx] === oIdx;
                         return (
                           <Pressable
                             key={oIdx}
-                            disabled={isQuizPassed}
+                            disabled={isQuizReviewed}
                             onPress={() => {
                               setQuizAnswers((prev) => ({ ...prev, [qIdx]: oIdx }));
                               if (quizSubmitted) {
