@@ -615,6 +615,9 @@ export function HrWorkflowsPanel({
               const stepKey = step.id || String(idx);
               const subTasks = step.subTasks ?? [];
               const hasSubTasks = subTasks.length > 0;
+              const hasDetails = Boolean(
+                step.description?.trim() || step.deliverable?.trim() || step.note?.trim() || hasSubTasks,
+              );
               const isExpanded = Boolean(expandedStepIds[stepKey]);
               return (
                 <View key={step.id || idx} style={styles.flowItem}>
@@ -632,10 +635,10 @@ export function HrWorkflowsPanel({
                       <Text numberOfLines={2} style={styles.stepTitle}>
                         {step.title || `Bước ${idx + 1}`}
                       </Text>
-                      {hasSubTasks ? (
+                      {hasDetails ? (
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel={isExpanded ? 'Thu gọn quy trình con' : 'Xem quy trình con'}
+                          accessibilityLabel={isExpanded ? 'Thu gọn chi tiết bước' : 'Xem chi tiết bước'}
                           onPress={(e) => {
                             e.stopPropagation();
                             toggleStepSubTasks(stepKey);
@@ -651,27 +654,31 @@ export function HrWorkflowsPanel({
                         </Pressable>
                       ) : null}
                     </View>
-                    {step.description ? (
-                      <Text numberOfLines={2} style={styles.muted}>
-                        {step.description}
-                      </Text>
-                    ) : null}
-                    {step.deliverable || step.note ? (
-                      <View style={styles.stepMetaRow}>
-                        {step.deliverable ? (
-                          <View style={styles.stepTagRow}><Check size={12} color="#15803D" /><Text style={styles.stepTagGreen}>Có kết quả đầu ra</Text></View>
-                        ) : null}
-                        {step.note ? <Text style={styles.stepTagAmber}>! Có lưu ý</Text> : null}
-                      </View>
-                    ) : null}
-                    {isExpanded && hasSubTasks ? (
+                    {isExpanded && hasDetails ? (
                       <View style={styles.stepSubTasksWrap}>
-                        {subTasks.map((sub, subIdx) => (
-                          <View key={sub.id || subIdx} style={styles.stepSubTaskItem}>
-                            <View style={styles.subDot} />
-                            <Text style={styles.stepSubTaskText}>{sub.title}</Text>
+                        {step.description ? (
+                          <Text style={styles.muted}>
+                            {step.description}
+                          </Text>
+                        ) : null}
+                        {step.deliverable || step.note ? (
+                          <View style={styles.stepMetaRow}>
+                            {step.deliverable ? (
+                              <View style={styles.stepTagRow}><Check size={12} color="#15803D" /><Text style={styles.stepTagGreen}>Có kết quả đầu ra</Text></View>
+                            ) : null}
+                            {step.note ? <Text style={styles.stepTagAmber}>! Có lưu ý</Text> : null}
                           </View>
-                        ))}
+                        ) : null}
+                        {hasSubTasks ? (
+                          <View style={{ gap: 6 }}>
+                            {subTasks.map((sub, subIdx) => (
+                              <View key={sub.id || subIdx} style={styles.stepSubTaskItem}>
+                                <View style={styles.subDot} />
+                                <Text style={styles.stepSubTaskText}>{sub.title}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : null}
                       </View>
                     ) : null}
                   </Card>
