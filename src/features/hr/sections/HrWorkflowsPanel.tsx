@@ -582,12 +582,6 @@ export function HrWorkflowsPanel({
         showsVerticalScrollIndicator={false}
       >
         <Card style={styles.detailHero}>
-          <View style={styles.heroMetaRow}>
-            {selectedWorkflow.category ? (
-              <Text style={styles.badge}>{selectedWorkflow.category}</Text>
-            ) : null}
-            <Text style={styles.stepCountBadge}>{steps.length} bước thực hiện</Text>
-          </View>
           <Text style={styles.detailTitle}>
             {selectedWorkflow.name || selectedWorkflow.title || 'Quy trình nội bộ'}
           </Text>
@@ -596,7 +590,14 @@ export function HrWorkflowsPanel({
           ) : null}
         </Card>
 
-        <Text style={styles.sectionHeading}>Sơ đồ các bước thực hiện</Text>
+        <View style={styles.sectionHeadingRow}>
+          <Text style={styles.sectionHeading}>Sơ đồ các bước thực hiện</Text>
+          {selectedWorkflow.category ? (
+            <Text numberOfLines={1} ellipsizeMode="tail" style={styles.sectionCategoryBadge}>
+              {selectedWorkflow.category}
+            </Text>
+          ) : null}
+        </View>
 
         {steps.length === 0 ? (
           <Card style={styles.stateCard}>
@@ -1361,7 +1362,25 @@ const styles = StyleSheet.create({
   heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailTitle: { color: '#111827', fontSize: 16, fontWeight: '700' },
   detailDesc: { color: '#6B7280', fontSize: 12.5, lineHeight: 19 },
-  sectionHeading: { color: '#111827', fontSize: 14.5, fontWeight: '700', marginBottom: 10 },
+  sectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 10,
+  },
+  sectionHeading: { color: '#111827', fontSize: 14.5, fontWeight: '700', flexShrink: 0 },
+  sectionCategoryBadge: {
+    color: colors.primary,
+    backgroundColor: '#EAF2FF',
+    fontSize: 10.5,
+    fontWeight: '500',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    overflow: 'hidden',
+    flexShrink: 1,
+  },
   flowWrap: { gap: 2 },
   flowItem: { flexDirection: 'row', alignItems: 'stretch', gap: 10 },
   flowRail: { alignItems: 'center', width: 28 },
